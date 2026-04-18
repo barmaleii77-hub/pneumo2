@@ -323,6 +323,13 @@ ID: `PLAN-0043`.
 Источник: chat: branch/tree recovery 2026-04-18.
 ID: `PLAN-0044`.
 
+45. Resolve quarantine branch 7823dc2
+Назначение: Разобрать локальную ветку codex/quarantine-mixed-gui-dirty-20260418: проверить targeted tests на самом quarantine commit, перенести патч в актуальный codex/work cherry-pick-ом без merge, зафиксировать интегрированные lane scopes, validation и non-closure boundaries, затем удалить локальную quarantine branch после успешного коммита.
+Артефакт: [context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md](./context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md)
+Статус: active.
+Источник: chat: quarantine 7823dc2 resolution 2026-04-18.
+ID: `PLAN-0045`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

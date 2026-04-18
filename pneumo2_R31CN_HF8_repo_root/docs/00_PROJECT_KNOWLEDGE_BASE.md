@@ -87,9 +87,10 @@ Operational note:
 28. [docs/context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md](./context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md)
 29. [docs/gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md)
 30. [docs/context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md](./context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md)
-31. [docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
-32. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
-33. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
+31. [docs/context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md](./context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md)
+32. [docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
+33. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
+34. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
 
 ### 3. Активные требования и рабочий backlog
 
@@ -252,6 +253,7 @@ Operational note:
 - [docs/context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md](./context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md)
 - [docs/gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md)
 - [docs/context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md](./context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md)
+- [docs/context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md](./context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md)
 - [docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
 
 Что задаёт общий canon:
@@ -372,6 +374,9 @@ Operational note:
 - Branch/tree recovery audit фиксирует, что primary `codex/work` снова чистый,
   локальные duplicate worktrees/branches удалены, а смешанный GUI-код сохранён
   только в quarantine branch для read-only разбора по lane.
+- Quarantine 7823dc2 resolution фиксирует, что локальный quarantine patch
+  разобран, перенесён в `codex/work` cherry-pick-ом и проверен focused
+  desktop/docs/no-mojibake тестами без runtime-closure claims.
 - Recovery Plan-mode prompts становятся текущим starter pack для тех же 10
   параллельных чатов: старт только от clean `origin/codex/work`, никаких веток
   и правок до принятого плана, quarantine только read-only.

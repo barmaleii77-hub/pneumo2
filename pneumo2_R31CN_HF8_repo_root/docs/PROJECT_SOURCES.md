@@ -60,6 +60,7 @@
 - `docs/context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md` — historical code-tree audit: dirty files by lane, prepared worktrees, ignored-artifact cleanup boundary and code hotspots before recovery quarantine.
 - `docs/gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md` — historical self-contained starter prompts for the same 10 Plan-mode chats before branch/tree recovery.
 - `docs/context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md` — recovery audit after quarantining the mixed GUI dirty tree and removing duplicate local worktrees/branches; current clean-start policy for new chats.
+- `docs/context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md` — integration note for resolving local quarantine commit `7823dc2` by cherry-pick into `codex/work`, with targeted validation results and non-closure boundaries.
 - `docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md` — current self-contained Plan-mode starter prompts for the same 10 chats after branch/tree recovery.
 - `docs/context/gui_spec_imports/v3/README.md` — active detailed reference layer из `pneumo_gui_codex_package_v3.zip`.
 - `docs/context/gui_spec_imports/v3/pneumo_gui_codex_spec_v3_refined.json` — главный machine-readable GUI-spec.

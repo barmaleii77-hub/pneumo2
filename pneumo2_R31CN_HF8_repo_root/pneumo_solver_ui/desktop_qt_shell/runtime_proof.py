@@ -304,6 +304,7 @@ def validate_qt_main_shell_runtime_proof(
         "visible_diagnostics_action",
         "status_progress_messages_strip",
         "command_search_project_tree_route",
+        "all_launchable_tools_visible_from_shell",
         "layout_save_restore_reset",
         "no_domain_windows_launched",
     }
@@ -329,6 +330,22 @@ def validate_qt_main_shell_runtime_proof(
         errors.append("runtime proof must not launch domain windows")
     if handoff.get("managed_external_launcher_only") is not True:
         errors.append("runtime proof must preserve managed-external launcher policy")
+
+    launch_coverage = proof.get("launch_coverage")
+    if not isinstance(launch_coverage, dict):
+        errors.append("runtime proof launch_coverage must be an object")
+        launch_coverage = {}
+    expected_launch_keys = {str(item) for item in launch_coverage.get("expected") or []}
+    if not expected_launch_keys:
+        errors.append("runtime proof launch_coverage.expected must be non-empty")
+    for surface in ("browser", "menu", "toolbar", "command_search"):
+        surface_keys = {str(item) for item in launch_coverage.get(surface) or []}
+        missing = sorted(expected_launch_keys - surface_keys)
+        if missing:
+            errors.append(
+                f"runtime proof launch coverage missing from {surface}: "
+                + ", ".join(missing)
+            )
 
     manual_required = {str(item) for item in proof.get("manual_verification_required") or []}
     required_manual = set(_manual_check_ids())
@@ -507,6 +524,15 @@ def collect_qt_main_shell_runtime_proof(*, offscreen: bool = False, state_path: 
                 dock.objectName() for dock in window.findChildren(QtWidgets.QDockWidget)
             )
             menu_labels = [action.text() for action in window.menuBar().actions()]
+            launch_coverage = {
+                key: list(value)
+                for key, value in window.launch_surface_coverage().items()
+            }
+            expected_launch_keys = set(launch_coverage["expected"])
+            launch_coverage_missing = {
+                surface: sorted(expected_launch_keys - set(launch_coverage[surface]))
+                for surface in ("browser", "menu", "toolbar", "command_search")
+            }
             proof: dict[str, object] = {
                 "schema": "qt_main_shell_runtime_proof.v1",
                 "generated_utc": _utc_iso(),
@@ -564,6 +590,8 @@ def collect_qt_main_shell_runtime_proof(*, offscreen: bool = False, state_path: 
                     "current_surface": command_search_surface,
                     "status_text": command_search_status_text,
                 },
+                "launch_coverage": launch_coverage,
+                "launch_coverage_missing": launch_coverage_missing,
                 "layout": {
                     "settings_path": str(settings_path.resolve(strict=False)),
                     "saved": bool(layout_saved),
@@ -607,6 +635,9 @@ def collect_qt_main_shell_runtime_proof(*, offscreen: bool = False, state_path: 
                 == "ShellMessagesStrip",
                 "command_search_project_tree_route": search_result_count > 0
                 and "дерево проекта" in str(dict(proof["command_search"]).get("status_text") or ""),
+                "all_launchable_tools_visible_from_shell": all(
+                    not missing for missing in launch_coverage_missing.values()
+                ),
                 "layout_save_restore_reset": bool(layout_saved and layout_reset),
                 "no_domain_windows_launched": True,
             }

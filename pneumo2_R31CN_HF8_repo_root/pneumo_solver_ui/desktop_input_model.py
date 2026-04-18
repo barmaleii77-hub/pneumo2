@@ -44,6 +44,10 @@ DESKTOP_INPUT_HANDOFF_IDS: dict[str, str] = {
     "WS-SUITE": "HO-003",
 }
 
+DESKTOP_SECTION_DISPLAY_TITLES: dict[str, str] = {
+    "Численные настройки": "Расчётные настройки",
+}
+
 
 DESKTOP_HELP_OVERRIDES: dict[str, dict[str, str]] = {
     "база": {
@@ -374,6 +378,13 @@ class DesktopInputSection:
     title: str
     description: str
     fields: tuple[DesktopInputFieldSpec, ...] = field(default_factory=tuple)
+
+
+def desktop_section_display_title(section_title: str) -> str:
+    clean_title = str(section_title or "").strip()
+    if not clean_title:
+        return "Раздел"
+    return DESKTOP_SECTION_DISPLAY_TITLES.get(clean_title, clean_title)
 
 
 DESKTOP_INPUT_SECTIONS: tuple[DesktopInputSection, ...] = (
@@ -2143,6 +2154,45 @@ def desktop_field_values_match(
         return current_value == reference_value
 
 
+def describe_desktop_field_source_state(
+    current_payload: dict[str, Any],
+    reference_payload: dict[str, Any],
+    key: str,
+    source_label: str = "",
+) -> dict[str, Any]:
+    clean_key = str(key or "").strip()
+    specs = field_spec_map()
+    spec = specs.get(clean_key)
+    current_obj = load_base_defaults()
+    current_obj.update(dict(current_payload or {}))
+    reference_obj = load_base_defaults()
+    reference_obj.update(dict(reference_payload or {}))
+    current_value = current_obj.get(clean_key)
+    reference_value = reference_obj.get(clean_key)
+    if spec is None:
+        is_dirty = current_value != reference_value
+        label = clean_key
+        unit_label = ""
+    else:
+        is_dirty = not desktop_field_values_match(spec, current_value, reference_value)
+        label = spec.label
+        unit_label = spec.unit_label
+    state = "dirty" if is_dirty else "current"
+    source = str(source_label or "").strip() or "default_base.json"
+    return {
+        "key": clean_key,
+        "label": label,
+        "unit_label": unit_label,
+        "source_label": source,
+        "state": state,
+        "state_label": "изменено" if is_dirty else "актуально",
+        "is_dirty": is_dirty,
+        "current": current_value,
+        "reference": reference_value,
+        "marker": f"source: {source} · state: {state}",
+    }
+
+
 def build_desktop_profile_diff(
     current_payload: dict[str, Any],
     reference_payload: dict[str, Any],
@@ -2438,6 +2488,7 @@ __all__ = [
     "DESKTOP_INPUT_SNAPSHOT_FILENAME",
     "DESKTOP_INPUT_SECTIONS",
     "DESKTOP_INPUT_SNAPSHOT_SCHEMA_VERSION",
+    "DESKTOP_SECTION_DISPLAY_TITLES",
     "DesktopInputFieldSpec",
     "DesktopInputSection",
     "DESKTOP_PREVIEW_SURFACE_OPTIONS",
@@ -2457,7 +2508,9 @@ __all__ = [
     "delete_desktop_profile",
     "describe_desktop_inputs_handoff_for_workspace",
     "describe_desktop_inputs_snapshot_state",
+    "describe_desktop_field_source_state",
     "desktop_section_status_label",
+    "desktop_section_display_title",
     "build_desktop_section_summary_cards",
     "desktop_field_values_match",
     "desktop_profile_dir_path",

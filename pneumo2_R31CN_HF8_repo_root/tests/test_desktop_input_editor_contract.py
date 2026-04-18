@@ -24,7 +24,9 @@ from pneumo_solver_ui.desktop_input_model import (
     build_desktop_section_issue_cards,
     build_desktop_section_summary_cards,
     DESKTOP_INPUT_SECTIONS,
+    describe_desktop_field_source_state,
     desktop_field_values_match,
+    desktop_section_display_title,
     find_desktop_field_matches,
     desktop_section_status_label,
     desktop_profile_dir_path,
@@ -74,6 +76,8 @@ def test_desktop_input_model_exposes_main_operator_sections() -> None:
     assert "Компоненты" in titles
     assert "Справочные данные" in titles
     assert "Численные настройки" in titles
+    assert desktop_section_display_title("Численные настройки") == "Расчётные настройки"
+    assert desktop_section_display_title("Пневматика") == "Пневматика"
 
     specs = field_spec_map()
     section_map = desktop_field_section_map()
@@ -126,6 +130,15 @@ def test_desktop_input_graphic_contexts_are_registered_and_canonical() -> None:
     assert "mass_sprung" in contexts
     assert "integration" in contexts
     assert "invented_context" not in contexts
+
+    graphics_src = (ROOT / "pneumo_solver_ui" / "desktop_input_graphics.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    assert "source_marker_var" in graphics_src
+    assert "Источник: WS-INPUTS live" in graphics_src
+    assert "режим: По исходным данным" in graphics_src
+    assert '"Расчётные настройки"' in graphics_src
 
 
 def test_desktop_input_numeric_controls_have_units_and_physical_ranges() -> None:
@@ -207,6 +220,7 @@ def test_desktop_inputs_snapshot_freezes_handoff_for_ring_and_suite(tmp_path: Pa
     assert snapshot["payload_hash"] == desktop_input_payload_hash(payload)
     assert "Массы" in snapshot["section_keys"]
     assert "Численные настройки" in snapshot["section_keys"]
+    assert "Расчётные настройки" not in snapshot["section_keys"]
 
     target = tmp_path / "inputs_snapshot.json"
     saved = save_desktop_inputs_snapshot(payload, source_path=default_base_json_path(), target_path=target)
@@ -400,6 +414,34 @@ def test_desktop_profile_diff_helpers_detect_only_meaningful_changes() -> None:
     assert "термодинамика" in diff_keys
     assert "стабилизатор_вкл" not in diff_keys
     assert "макс_число_внутренних_шагов_на_dt" not in diff_keys
+
+
+def test_desktop_field_source_state_helper_reports_current_and_dirty_markers() -> None:
+    reference = load_base_defaults()
+    current = dict(reference)
+
+    current_state = describe_desktop_field_source_state(
+        current,
+        reference,
+        "база",
+        "demo_source.json",
+    )
+    assert current_state["state"] == "current"
+    assert current_state["is_dirty"] is False
+    assert current_state["marker"] == "source: demo_source.json · state: current"
+
+    current["база"] = float(reference["база"]) + 0.25
+    dirty_state = describe_desktop_field_source_state(
+        current,
+        reference,
+        "база",
+        "demo_source.json",
+    )
+    assert dirty_state["state"] == "dirty"
+    assert dirty_state["is_dirty"] is True
+    assert dirty_state["label"] == "Колёсная база"
+    assert dirty_state["unit_label"] == "м"
+    assert dirty_state["marker"] == "source: demo_source.json · state: dirty"
 
 
 def test_desktop_quick_presets_modify_expected_parameter_groups() -> None:
@@ -887,7 +929,9 @@ def test_desktop_input_editor_is_wired_into_desktop_control_center() -> None:
     assert "История пока пуста." in editor_src
     assert "Пошаговый маршрут настройки" in editor_src
     assert "self.section_titles" in editor_src
-    assert 'text=f"{idx + 1}. {title}"' in editor_src
+    assert "display_title = self._display_section_title(title)" in editor_src
+    assert 'text=f"{idx + 1}. {display_title}"' in editor_src
+    assert "и расчётные настройки" in editor_src
     assert "Назад" in editor_src
     assert "Далее" in editor_src
     assert "К следующему замечанию" in editor_src
@@ -931,6 +975,13 @@ def test_desktop_input_editor_is_wired_into_desktop_control_center() -> None:
     assert "source_reference_payload" in editor_src
     assert "source_reference_diffs_by_key" in editor_src
     assert "_refresh_source_reference_diff_state" in editor_src
+    assert "describe_desktop_field_source_state" in editor_src
+    assert "inspector_source_state_var" in editor_src
+    assert "Source/state:" in editor_src
+    assert "source: {source} · state: {state}" in (
+        ROOT / "pneumo_solver_ui" / "desktop_input_model.py"
+    ).read_text(encoding="utf-8", errors="replace")
+    assert "source: {self._display_source_name()} · state: {state}" in editor_src
     assert "_build_field_restore_button" in editor_src
     assert "_refresh_section_header_summaries" in editor_src
     assert "_jump_to_section_issue" in editor_src
@@ -948,6 +999,12 @@ def test_desktop_input_editor_is_wired_into_desktop_control_center() -> None:
     assert "· изменено и от рабочей точки" in editor_src
     assert 'text="К рабочей точке"' in editor_src
     assert 'text="Совпадает"' in editor_src
+    assert "Открыть inputs_snapshot.json" in editor_src
+    assert "Открыть папку WS-INPUTS" in editor_src
+    assert "_open_inputs_handoff_snapshot" in editor_src
+    assert "_open_inputs_handoff_dir" in editor_src
+    assert "desktop_inputs_snapshot_handoff_path" in editor_src
+    assert "desktop_inputs_handoff_dir_path" in editor_src
     assert "build_desktop_section_change_cards" in editor_src
     assert "build_desktop_section_issue_cards" in editor_src
     assert "Быстрый поиск по параметрам" in editor_src
@@ -1083,7 +1140,7 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "_current_selfcheck_subject_signature" in editor_src
     assert "_selfcheck_freshness_state" in editor_src
     assert "массы, механика, статическая настройка, компоненты, справочные данные" in editor_src
-    assert "и численные настройки" in editor_src
+    assert "и расчётные настройки" in editor_src
     assert "автоснимок включён" in run_setup_model_src
     assert 'artifacts_notebook = ttk.Notebook(actions)' in editor_src
     assert 'artifacts_notebook.add(latest_preview_frame, text="Preview")' in editor_src

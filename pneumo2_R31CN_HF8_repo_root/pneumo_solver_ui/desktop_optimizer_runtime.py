@@ -232,6 +232,11 @@ def _optimization_active_mode(summary: OptimizationRunSummary) -> str:
     return "stage_runner" if str(summary.pipeline_mode or "") == "staged" else "distributed_coordinator"
 
 
+def _short_hash_text(value: Any, *, width: int = 12) -> str:
+    text = str(value or "").strip()
+    return text[:width] if text else ""
+
+
 class DesktopOptimizerRuntime:
     def __init__(
         self,
@@ -310,6 +315,204 @@ class DesktopOptimizerRuntime:
             "coord_resume_enabled": bool(self.session_state.get("opt_resume", False)),
             "coord_run_id": str(self.session_state.get("opt_dist_run_id", "") or "").strip(),
             "launch_pipeline": "staged" if use_staged else "coordinator",
+        }
+
+    def selected_run_identity_summary(
+        self,
+        run_dir: Path | str | None = None,
+    ) -> dict[str, Any]:
+        resume_target = self.resume_target_summary()
+        resolved_run_dir = _resolved_path_text(
+            run_dir
+            if run_dir is not None
+            else self.session_state.get(_HISTORY_SELECTED_RUN_DIR_KEY, "")
+        )
+        launch_pipeline = str(resume_target.get("launch_pipeline") or "")
+        stage_resume = bool(self.session_state.get("opt_stage_resume", False))
+        coord_resume = bool(self.session_state.get("opt_resume", False))
+        resume_requested = bool(
+            (launch_pipeline == "staged" and stage_resume)
+            or (launch_pipeline == "coordinator" and coord_resume)
+        )
+        selected_contract_path = self.selected_run_contract_path()
+        base_payload: dict[str, Any] = {
+            "state": "MISSING",
+            "status": "info",
+            "banner": "Run identity: historical run is not selected.",
+            "selected_run_dir": resolved_run_dir,
+            "selected_run_name": Path(resolved_run_dir).name if resolved_run_dir else "",
+            "selected_pipeline": "",
+            "launch_pipeline": launch_pipeline,
+            "resume_requested": resume_requested,
+            "stage_resume_enabled": stage_resume,
+            "coord_resume_enabled": coord_resume,
+            "blocking_reasons": tuple(),
+            "warnings": tuple(),
+            "diff_bits": tuple(),
+            "selected_run_contract_path": str(selected_contract_path),
+            "selected_run_contract_exists": selected_contract_path.exists(),
+        }
+        if not resolved_run_dir:
+            if resume_requested:
+                return {
+                    **base_payload,
+                    "state": "BLOCKED",
+                    "status": "warn",
+                    "banner": "Resume safety: resume is enabled, but no history run is selected.",
+                    "blocking_reasons": ("resume target missing",),
+                }
+            return base_payload
+
+        details = self.selected_run_details(resolved_run_dir)
+        if details is None:
+            return {
+                **base_payload,
+                "state": "BLOCKED" if resume_requested else "MISSING",
+                "status": "warn",
+                "banner": "Run identity: selected run is no longer available in workspace history.",
+                "blocking_reasons": ("selected run missing from history",),
+            }
+
+        summary = details.summary
+        drift = self.contract_drift_summary(summary)
+        scope_payload = dict(drift.get("scope_payload") or {})
+        diff_bits = tuple(
+            str(bit) for bit in (drift.get("diff_bits") or ()) if str(bit).strip()
+        )
+        baseline_compatibility = str(drift.get("baseline_compatibility") or "")
+        selected_contract = self.build_selected_run_contract(
+            summary,
+            selected_from="desktop_optimizer_center_preview",
+        )
+        selected_pipeline = str(summary.pipeline_mode or "")
+        blocking_reasons: list[str] = []
+        warnings: list[str] = []
+        scope_mismatch = str(scope_payload.get("compatibility") or "") == "different"
+        mode_mismatch = str(scope_payload.get("mode_compatibility") or "") == "different"
+        baseline_mismatch = baseline_compatibility == "different"
+
+        if resume_requested and selected_pipeline and selected_pipeline != launch_pipeline:
+            blocking_reasons.append(
+                f"resume pipeline mismatch: selected={selected_pipeline}, launch={launch_pipeline}"
+            )
+        if resume_requested and not str(summary.problem_hash or "").strip():
+            blocking_reasons.append("selected run problem_hash missing")
+        if scope_mismatch or mode_mismatch:
+            reason = "problem scope mismatch"
+            if mode_mismatch:
+                reason += " / hash mode mismatch"
+            if resume_requested:
+                blocking_reasons.append(reason)
+            else:
+                warnings.append(reason)
+        if baseline_mismatch:
+            if resume_requested:
+                blocking_reasons.append("active baseline source mismatch")
+            else:
+                warnings.append("active baseline source differs")
+        if diff_bits:
+            warnings.append("objective contract drift: " + ", ".join(diff_bits))
+
+        if blocking_reasons:
+            state = "BLOCKED"
+            status = "warn"
+            banner = "Resume safety: selected run cannot be resumed under the current launch contract."
+        elif scope_mismatch or mode_mismatch or baseline_mismatch or diff_bits:
+            state = "STALE"
+            status = "info" if not resume_requested else "warn"
+            banner = "Run identity: selected run is historical/stale against the current launch contract."
+        elif selected_pipeline:
+            state = "CURRENT"
+            status = "ok"
+            banner = "Run identity: selected run matches the current launch contract."
+        else:
+            state = "HISTORICAL"
+            status = "info"
+            banner = "Run identity: selected run is historical and has limited pipeline evidence."
+
+        return {
+            **base_payload,
+            "state": state,
+            "status": status,
+            "banner": banner,
+            "selected_run_dir": str(Path(summary.run_dir).resolve()),
+            "selected_run_name": str(summary.run_dir.name),
+            "selected_pipeline": selected_pipeline,
+            "backend": str(summary.backend or ""),
+            "status_label": str(summary.status_label or summary.status or ""),
+            "run_id": str(summary.run_id or summary.run_dir.name),
+            "objective_contract_hash": str(
+                summary.objective_contract_hash
+                or selected_contract.get("objective_contract_hash")
+                or ""
+            ),
+            "objective_contract_hash_short": _short_hash_text(
+                summary.objective_contract_hash
+                or selected_contract.get("objective_contract_hash")
+            ),
+            "problem_hash": str(summary.problem_hash or ""),
+            "problem_hash_short": _short_hash_text(summary.problem_hash),
+            "problem_hash_mode": str(summary.problem_hash_mode or ""),
+            "active_baseline_hash": str(summary.active_baseline_hash or ""),
+            "active_baseline_hash_short": _short_hash_text(summary.active_baseline_hash),
+            "active_baseline_ref": str(summary.baseline_source_path or ""),
+            "active_baseline_label": str(
+                summary.baseline_source_label or summary.baseline_source_kind or ""
+            ),
+            "suite_snapshot_hash": str(summary.suite_snapshot_hash or ""),
+            "suite_snapshot_hash_short": _short_hash_text(summary.suite_snapshot_hash),
+            "result_path": str(summary.result_path or ""),
+            "selected_run_contract_hash": str(
+                selected_contract.get("selected_run_contract_hash") or ""
+            ),
+            "selected_run_contract_hash_short": _short_hash_text(
+                selected_contract.get("selected_run_contract_hash")
+            ),
+            "analysis_handoff_ready_state": str(
+                selected_contract.get("analysis_handoff_ready_state") or ""
+            ),
+            "blocking_reasons": tuple(blocking_reasons),
+            "warnings": tuple(warnings),
+            "diff_bits": diff_bits,
+            "scope_payload": dict(scope_payload),
+            "baseline_compatibility": baseline_compatibility,
+        }
+
+    def launch_preflight_summary(self) -> dict[str, Any]:
+        snapshot = self.contract_snapshot()
+        identity = self.selected_run_identity_summary()
+        blocking_reasons: list[str] = []
+        warnings: list[str] = []
+
+        baseline_state = str(snapshot.active_baseline_state or "").strip().lower()
+        baseline_banner = str(snapshot.active_baseline_banner or "").strip()
+        if baseline_state in {"stale", "invalid"} and not bool(
+            snapshot.optimizer_baseline_can_consume
+        ):
+            blocking_reasons.append(
+                "Active baseline HO-006 is "
+                + baseline_state
+                + (": " + baseline_banner if baseline_banner else "")
+            )
+        elif not bool(snapshot.optimizer_baseline_can_consume):
+            warnings.append(
+                "Active baseline HO-006 is not current; launch will use the explicit baseline source only."
+            )
+
+        if bool(identity.get("resume_requested")) and str(identity.get("state") or "") == "BLOCKED":
+            blocking_reasons.extend(
+                str(item)
+                for item in tuple(identity.get("blocking_reasons") or ())
+                if str(item).strip()
+            )
+
+        can_launch = not blocking_reasons
+        return {
+            "can_launch": can_launch,
+            "state": "READY" if can_launch else "BLOCKED",
+            "blocking_reasons": tuple(blocking_reasons),
+            "warnings": tuple(warnings),
+            "selected_run_identity": dict(identity),
         }
 
     def apply_run_contract(self, summary: OptimizationRunSummary) -> dict[str, Any]:
@@ -1113,6 +1316,7 @@ class DesktopOptimizerRuntime:
             "latest_pointer": self.latest_pointer_summary(),
             "selected_run_next_step": self.selected_run_next_step_summary(),
             "resume_target": self.resume_target_summary(),
+            "selected_run_identity": self.selected_run_identity_summary(),
             "active_surface": self.active_job_surface(),
             "finished_overview": self.finished_job_overview(),
             "best_finished_row": dict(finished_rows[0]) if finished_rows else None,
@@ -1339,6 +1543,45 @@ class DesktopOptimizerRuntime:
             }
         )
 
+        identity = self.selected_run_identity_summary(selected_run_dir)
+        identity_state = str(identity.get("state") or "MISSING")
+        identity_reasons = tuple(
+            str(item)
+            for item in tuple(identity.get("blocking_reasons") or ())
+            if str(item).strip()
+        )
+        identity_warnings = tuple(
+            str(item)
+            for item in tuple(identity.get("warnings") or ())
+            if str(item).strip()
+        )
+        if identity_state == "BLOCKED":
+            identity_status = "warn"
+        elif identity_state in {"STALE", "HISTORICAL", "MISSING"}:
+            identity_status = "info"
+        else:
+            identity_status = "ok"
+        identity_summary = str(identity.get("banner") or "")
+        if identity_reasons:
+            identity_summary += " Blockers: " + ", ".join(identity_reasons) + "."
+        elif identity_warnings:
+            identity_summary += " Notes: " + ", ".join(identity_warnings[:2]) + "."
+        rows.append(
+            {
+                "title": "Run identity & resume safety",
+                "status": identity_status,
+                "summary": identity_summary,
+                "action": "History",
+                "state": identity_state,
+                "resume_requested": bool(identity.get("resume_requested")),
+                "selected_run_contract_hash": str(
+                    identity.get("selected_run_contract_hash") or ""
+                ),
+                "problem_hash": str(identity.get("problem_hash") or ""),
+                "active_baseline_hash": str(identity.get("active_baseline_hash") or ""),
+            }
+        )
+
         if int(packaging_overview.get("total_runs", 0) or 0) <= 0:
             packaging_status = "info"
             packaging_summary = "No finished packaging evidence yet; launch can proceed, but comparison history is still empty."
@@ -1472,6 +1715,14 @@ class DesktopOptimizerRuntime:
         self.session_state["use_staged_opt"] = bool(is_staged)
 
     def start_job(self) -> DistOptJob:
+        preflight = self.launch_preflight_summary()
+        if not bool(preflight.get("can_launch")):
+            reasons = ", ".join(
+                str(item)
+                for item in tuple(preflight.get("blocking_reasons") or ())
+                if str(item).strip()
+            )
+            raise RuntimeError("Launch preflight blocked: " + (reasons or "unknown reason"))
         job = start_optimization_job(
             self.session_state,
             ui_root=self.ui_root,

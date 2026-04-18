@@ -477,6 +477,71 @@ def test_desktop_optimizer_runtime_launch_readiness_blocks_stale_ho006(
     assert contract_path.read_text(encoding="utf-8") == before
 
 
+def test_desktop_optimizer_runtime_blocks_resume_preflight_for_mismatched_selected_run(
+    tmp_path: Path,
+) -> None:
+    runtime = DesktopOptimizerRuntime(
+        ui_root=UI_ROOT,
+        cpu_count=8,
+        platform_name="win32",
+    )
+    runtime.workspace_dir = tmp_path
+    current = runtime.contract_snapshot()
+
+    staged_run = tmp_path / "opt_runs" / "staged" / "p_stage_identity_mismatch"
+    staged_run.mkdir(parents=True)
+    (staged_run / "sp.json").write_text(
+        json.dumps({"status": "done", "ts": "2026-04-17T12:00:00Z", "run_id": "stage-old"}),
+        encoding="utf-8",
+    )
+    (staged_run / "results_all.csv").write_text("status\nDONE\n", encoding="utf-8")
+    (staged_run / "problem_hash.txt").write_text("different-problem-hash", encoding="utf-8")
+    (staged_run / "problem_hash_mode.txt").write_text(current.problem_hash_mode, encoding="utf-8")
+    (staged_run / "baseline_source.json").write_text(
+        json.dumps(
+            {
+                "source_kind": current.baseline_source_kind,
+                "source_label": current.baseline_source_label,
+                "baseline_path": current.baseline_path,
+                "active_baseline_hash": "active-baseline-old",
+                "suite_snapshot_hash": "suite-old",
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    (staged_run / "objective_contract.json").write_text(
+        json.dumps(
+            objective_contract_payload(
+                objective_keys=current.objective_keys,
+                penalty_key=current.penalty_key,
+                penalty_tol=current.penalty_tol,
+                source="test_resume_identity",
+            ),
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    runtime.bind_selected_run_dir(staged_run)
+    runtime.update_state({"opt_use_staged": True, "use_staged_opt": True, "opt_stage_resume": True})
+
+    identity = runtime.selected_run_identity_summary()
+    preflight = runtime.launch_preflight_summary()
+    readiness = runtime.launch_readiness_summary()
+    by_title = {
+        str(row.get("title") or ""): dict(row)
+        for row in tuple(readiness.get("rows") or ())
+    }
+
+    assert identity["state"] == "BLOCKED"
+    assert identity["resume_requested"] is True
+    assert "problem scope mismatch" in ", ".join(identity["blocking_reasons"])
+    assert preflight["can_launch"] is False
+    assert "problem scope mismatch" in ", ".join(preflight["blocking_reasons"])
+    assert by_title["Run identity & resume safety"]["status"] == "warn"
+    assert by_title["Run identity & resume safety"]["state"] == "BLOCKED"
+
+
 def test_desktop_optimizer_center_formats_stale_ho006_as_blocked_summary() -> None:
     center = object.__new__(DesktopOptimizerCenter)
     center._contract_snapshot = SimpleNamespace(
@@ -1061,11 +1126,14 @@ def test_desktop_optimizer_center_keeps_tabbed_modular_architecture() -> None:
     assert "def active_job_surface(self) -> dict[str, Any]:" in runtime_src
     assert "def bind_selected_run_dir(self, run_dir: Path | str | None) -> None:" in runtime_src
     assert "def resume_target_summary(self) -> dict[str, Any]:" in runtime_src
+    assert "def selected_run_identity_summary(" in runtime_src
+    assert "def launch_preflight_summary(self) -> dict[str, Any]:" in runtime_src
     assert "def apply_run_contract(self, summary: OptimizationRunSummary) -> dict[str, Any]:" in runtime_src
     assert "def selected_run_details(" in runtime_src
 
     assert "class HandoffTreePanel" in panels_src
     assert "class PackagingTreePanel" in panels_src
+    assert 'columns=("status", "pipeline", "run_id", "objective", "scope", "baseline")' in panels_src
     assert "class DesktopOptimizerDashboardTab" in dashboard_tab_src
     assert "class DesktopOptimizerContractTab" in contract_tab_src
     assert "class DesktopOptimizerRuntimeTab" in runtime_tab_src

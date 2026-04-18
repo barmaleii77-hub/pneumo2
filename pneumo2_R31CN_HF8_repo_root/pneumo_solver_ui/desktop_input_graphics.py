@@ -62,14 +62,25 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
     def __init__(self, master: tk.Misc) -> None:
         super().__init__(master, text="Инженерная схема", padding=8)
         self.columnconfigure(0, weight=1)
-        self.rowconfigure(1, weight=1)
+        self.rowconfigure(2, weight=1)
         self.summary_var = tk.StringVar(master=self, value="Выберите параметр или раздел.")
+        self.source_marker_var = tk.StringVar(
+            master=self,
+            value="Источник: WS-INPUTS live · source: default_base.json · state: current · режим: По исходным данным",
+        )
         ttk.Label(
             self,
             textvariable=self.summary_var,
             wraplength=520,
             justify="left",
         ).grid(row=0, column=0, sticky="ew")
+        ttk.Label(
+            self,
+            textvariable=self.source_marker_var,
+            wraplength=520,
+            justify="left",
+            foreground="#5b6770",
+        ).grid(row=1, column=0, sticky="ew", pady=(4, 0))
         self.canvas = tk.Canvas(
             self,
             width=self.CANVAS_WIDTH,
@@ -78,7 +89,7 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
             highlightthickness=1,
             highlightbackground="#d6dbe1",
         )
-        self.canvas.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
+        self.canvas.grid(row=2, column=0, sticky="nsew", pady=(8, 0))
         self._scheme_images: dict[str, tk.PhotoImage | None] = {
             "mech": self._load_scheme_image(self._MECH_SCHEME_PATH, max_width=220, max_height=130),
             "pneumo": self._load_scheme_image(self._PNEUMO_SCHEME_PATH, max_width=220, max_height=130),
@@ -93,6 +104,7 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
         unit_label: str = "",
         field_key: str = "",
         graphic_context: str = "",
+        source_marker: str = "",
     ) -> None:
         self.canvas.delete("all")
         active_context = self._resolve_active_context(
@@ -103,6 +115,10 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
         )
         geom = self._geometry_from_payload(payload)
         self.summary_var.set(self._build_summary(section_title, field_label, unit_label, active_context))
+        marker = str(source_marker or "source: default_base.json · state: current").strip()
+        self.source_marker_var.set(
+            f"Источник: WS-INPUTS live · {marker} · режим: По исходным данным"
+        )
         self._draw_reference_scheme(section_title, field_label, active_context, geom)
         self._draw_metrics(section_title, payload, geom, active_context, unit_label)
 
@@ -252,7 +268,7 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
             return "trim_target"
         if str(section_title or "").strip() == "Справочные данные":
             return "gas_model"
-        if str(section_title or "").strip() == "Численные настройки":
+        if str(section_title or "").strip() in {"Численные настройки", "Расчётные настройки"}:
             return "integration"
         return ""
 
@@ -475,7 +491,7 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
                 f"Сомкнутая длина пружины: {1000.0 * self._safe_float(payload, 'пружина_длина_солид_м', 0.0):.0f} мм",
                 f"Запас до coil bind: {1000.0 * self._safe_float(payload, 'пружина_запас_до_coil_bind_минимум_м', 0.0):.0f} мм",
             ]
-        if section == "Численные настройки":
+        if section in {"Численные настройки", "Расчётные настройки"}:
             return [
                 f"Шаг интегрирования: {self._safe_float(payload, 'макс_шаг_интегрирования_с', 0.0):.4f} с",
                 f"Внутренних шагов: {self._safe_float(payload, 'макс_число_внутренних_шагов_на_dt', 0.0):.0f}",

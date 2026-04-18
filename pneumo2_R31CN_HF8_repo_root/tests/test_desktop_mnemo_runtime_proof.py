@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 
@@ -34,12 +35,44 @@ def test_desktop_mnemo_runtime_proof_collects_and_validates_offscreen(tmp_path: 
     assert output["status"] == "PASS"
     assert output["release_readiness"] == "PENDING_REAL_WINDOWS_VISUAL_CHECK"
     assert proof_path.exists()
+    proof = json.loads(proof_path.read_text(encoding="utf-8"))
+    required_checks = {
+        "visible_window_geometry",
+        "native_canvas_size_present",
+        "status_truth_text_visible",
+        "blank_startup_unavailable_truth_visible",
+        "blank_startup_does_not_claim_confirmed_truth",
+        "no_blocking_modal_visible",
+        "close_returns_control_under_budget",
+        "window_hidden_after_close",
+        "playback_timer_stopped_after_close",
+        "pointer_watcher_stopped_after_close",
+    }
+    assert required_checks.issubset(set(proof["checks"]))
+    assert all(proof["checks"][check_id] is True for check_id in required_checks)
+    assert proof["dataset_loaded"] is False
+    assert proof["truth_text"] == "Mnemo: unavailable pressure/state"
+    assert proof["status_strip_visibility"]["truth_text_visible"] is True
+    assert proof["blocking_modal_dialogs"] == []
+    assert proof["close_state"] == {
+        "window_visible_after_close": False,
+        "playback_timer_active_after_close": False,
+        "pointer_watcher_timer_active_after_close": False,
+    }
+    assert proof["timings_s"]["close_s"] <= proof["close_budget_s"]
+    assert {
+        "windows_snap_restore",
+        "mnemo_dock_overlap_inspection",
+        "unavailable_truth_state_visible",
+        "long_running_follow_playback_stability",
+    }.issubset(set(proof["manual_verification_required"]))
 
     validation = validate_desktop_mnemo_runtime_proof(proof_path)
     assert validation["ok"] is True
     assert validation["automated_status"] == "PASS"
     assert validation["release_readiness"] == "PENDING_REAL_WINDOWS_VISUAL_CHECK"
     assert validation["warnings"] == ["real Windows visual/no-hang verification is still pending"]
+    assert validation["missing_manual_verification"] == []
 
 
 def test_send_bundle_evidence_manifest_tracks_desktop_mnemo_runtime_proof(tmp_path: Path) -> None:

@@ -481,6 +481,142 @@ def test_desktop_results_runtime_surfaces_stale_selected_result_context(tmp_path
     assert format_result_context_summary(snapshot) == "Контекст результата: устарел"
 
 
+def test_desktop_results_runtime_surfaces_latest_optimizer_selected_run_contract(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    send_bundles = repo_root / "send_bundles"
+    workspace = repo_root / "pneumo_solver_ui" / "workspace"
+    pointer_dir = workspace / "_pointers"
+    contract_dir = workspace / "handoffs" / "WS-OPTIMIZATION"
+    run_dir = workspace / "opt_runs" / "coord" / "p_selected_contract"
+    send_bundles.mkdir(parents=True, exist_ok=True)
+    pointer_dir.mkdir(parents=True, exist_ok=True)
+    contract_dir.mkdir(parents=True, exist_ok=True)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    selected_contract_path = contract_dir / "selected_run_contract.json"
+    selected_contract_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "selected_run_contract_v1",
+                "handoff_id": "HO-007",
+                "run_id": "run-selected-001",
+                "run_dir": str(run_dir),
+                "objective_contract_hash": "objective-selected",
+                "hard_gate_key": "penalty_total",
+                "hard_gate_tolerance": 0.15,
+                "problem_hash": "problem-selected",
+                "problem_hash_mode": "stable",
+                "active_baseline_hash": "baseline-selected",
+                "suite_snapshot_hash": "suite-selected",
+                "results_csv_path": str(run_dir / "export" / "trials.csv"),
+                "analysis_handoff_ready_state": "ready",
+                "selected_run_contract_hash": "selected-contract-001",
+                "blocking_states": [],
+                "warnings": [],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    latest_optimizer_pointer = pointer_dir / "latest_optimization.json"
+    latest_optimizer_pointer.write_text(
+        json.dumps(
+            {
+                "run_dir": str(run_dir),
+                "updated_at": "2026-04-17T12:00:00Z",
+                "kind": "optimization",
+                "meta": {
+                    "selected_from": "desktop_optimizer_center",
+                    "selected_run_contract_path": str(selected_contract_path),
+                    "selected_run_contract_hash": "selected-contract-001",
+                    "analysis_handoff_ready_state": "ready",
+                    "status": "done",
+                    "backend": "Ray",
+                },
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    (send_bundles / "latest_send_bundle_validation.json").write_text(
+        json.dumps(
+            {
+                "ok": True,
+                "errors": [],
+                "warnings": [],
+                "result_context": {
+                    "current": {
+                        "run_id": "run-current-001",
+                        "objective_contract_hash": "objective-current",
+                        "problem_hash": "problem-current",
+                    }
+                },
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    (send_bundles / "latest_send_bundle_validation.md").write_text("# validation\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.collect_anim_latest_diagnostics_summary",
+        lambda include_meta=True: {},
+    )
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.load_latest_send_bundle_anim_dashboard",
+        lambda out_dir: {},
+    )
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.format_anim_dashboard_brief_lines",
+        lambda anim: [],
+    )
+    monkeypatch.setattr(
+        "pneumo_solver_ui.desktop_results_runtime.build_anim_operator_recommendations",
+        lambda anim: [],
+    )
+
+    runtime = DesktopResultsRuntime(repo_root=repo_root, python_executable="python")
+    snapshot = runtime.snapshot()
+    overview = {row.key: row for row in snapshot.validation_overview_rows}
+    artifacts = {item.key: item for item in snapshot.recent_artifacts}
+    fields = {field.key: field for field in snapshot.result_context_fields}
+
+    assert snapshot.latest_optimizer_pointer_json_path == latest_optimizer_pointer.resolve()
+    assert snapshot.latest_optimizer_run_dir == run_dir.resolve()
+    assert snapshot.selected_run_contract_path == selected_contract_path.resolve()
+    assert snapshot.selected_run_contract_hash == "selected-contract-001"
+    assert snapshot.selected_run_contract_status == "READY"
+    assert overview["selected_optimizer_run_contract"].status == "READY"
+    assert overview["selected_optimizer_run_contract"].artifact_key == "selected_optimizer_run_contract"
+    assert artifacts["selected_optimizer_run_contract"].path == selected_contract_path.resolve()
+    assert artifacts["latest_optimizer_pointer"].path == latest_optimizer_pointer.resolve()
+    assert snapshot.result_context_state == "STALE"
+    assert fields["selected_run_contract_hash"].selected_value == "selected-contract-001"
+    assert fields["selected_run_contract_path"].selected_value == str(selected_contract_path.resolve())
+    assert fields["objective_contract_hash"].status == "STALE"
+    assert fields["objective_contract_hash"].selected_value == "objective-selected"
+    assert fields["problem_hash"].selected_value == "problem-selected"
+    assert fields["active_baseline_hash"].selected_value == "baseline-selected"
+    assert fields["suite_snapshot_hash"].selected_value == "suite-selected"
+
+    manifest = runtime.build_diagnostics_evidence_manifest(snapshot)
+    assert manifest["selected_run_contract_hash"] == "selected-contract-001"
+    assert manifest["selected_run_contract_path"] == str(selected_contract_path.resolve())
+    assert manifest["optimizer_selected_run_contract"]["status"] == "READY"
+    assert manifest["result_context"]["selected"]["selected_run_contract_hash"] == "selected-contract-001"
+    assert manifest["result_context"]["selected"]["active_baseline_hash"] == "baseline-selected"
+
+    sidecar = runtime.build_compare_current_context_sidecar(snapshot)
+    assert sidecar["optimizer_selected_run_contract"]["hash"] == "selected-contract-001"
+    assert sidecar["artifacts"]["selected_run_contract_path"] == str(selected_contract_path.resolve())
+    assert sidecar["selected_context_ref"]["selected_run_contract_path"] == str(selected_contract_path.resolve())
+
+
 def test_desktop_results_runtime_keeps_validation_report_visible_without_json(tmp_path: Path, monkeypatch) -> None:
     repo_root = tmp_path / "repo"
     send_bundles = repo_root / "send_bundles"
@@ -1009,6 +1145,8 @@ def test_test_center_gui_embeds_validation_results_center_modules() -> None:
     assert "optimizer_scope_gate_reason: str" in model_src
     assert "suggested_next_step: str" in model_src
     assert "suggested_next_action_key: str = \"\"" in model_src
+    assert "latest_optimizer_pointer_json_path: Path | None = None" in model_src
+    assert "selected_run_contract_hash: str = \"\"" in model_src
 
     assert "class DesktopResultsRuntime" in runtime_src
     assert "def snapshot(self) -> DesktopResultsSnapshot:" in runtime_src
@@ -1028,5 +1166,8 @@ def test_test_center_gui_embeds_validation_results_center_modules() -> None:
     assert "write_compare_current_context_sidecar(" in runtime_src
     assert "latest_compare_current_context.json" in runtime_src
     assert "compare_current_context_sidecar" in runtime_src
+    assert "selected_optimizer_run_contract" in runtime_src
+    assert "latest_optimizer_pointer" in runtime_src
+    assert "optimizer_selected_run_contract" in runtime_src
     assert "--current-context" in runtime_src
     assert "def animator_args(" in runtime_src

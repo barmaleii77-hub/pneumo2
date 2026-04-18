@@ -192,6 +192,9 @@ _CONTEXT_FIELD_TITLES: dict[str, str] = {
     "analysis_context_status": "Analysis context status",
     "animator_link_contract_hash": "Animator link contract hash",
     "selected_run_contract_hash": "Selected run contract hash",
+    "selected_run_contract_path": "Selected run contract path",
+    "run_dir": "Optimizer run directory",
+    "results_csv_path": "Optimizer results CSV",
     "selected_test_id": "Selected test ID",
     "selected_npz_path": "Selected animation NPZ",
     "compare_contract_hash": "Compare contract hash",
@@ -228,6 +231,12 @@ _CONTEXT_KEY_ALIASES: dict[str, tuple[str, ...]] = {
         "selected_run_contract_hash",
         "anim_latest_selected_run_contract_hash",
     ),
+    "selected_run_contract_path": (
+        "selected_run_contract_path",
+        "anim_latest_selected_run_contract_path",
+    ),
+    "run_dir": ("run_dir", "optimizer_run_dir", "selected_run_dir"),
+    "results_csv_path": ("results_csv_path", "optimizer_results_csv_path"),
     "selected_test_id": ("selected_test_id", "anim_latest_selected_test_id"),
     "selected_npz_path": ("selected_npz_path", "anim_latest_selected_npz_path", "anim_latest_npz_path"),
     "compare_contract_hash": ("compare_contract_hash", "compare_contract_id"),
@@ -280,6 +289,151 @@ def _effective_workspace_dir(repo_root: Path) -> Path:
     return (Path(repo_root) / "pneumo_solver_ui" / "workspace").resolve()
 
 
+def _latest_optimizer_pointer_paths(repo_root: Path) -> tuple[Path, Path]:
+    workspace_dir = _effective_workspace_dir(repo_root)
+    return (
+        workspace_dir / "_pointers" / "latest_optimization.json",
+        workspace_dir / "opt" / "_last_opt.json",
+    )
+
+
+def _latest_optimizer_pointer_payload(repo_root: Path) -> tuple[Path | None, dict[str, Any]]:
+    for path in _latest_optimizer_pointer_paths(repo_root):
+        payload = _safe_read_json_dict(path)
+        if payload:
+            return path.resolve(), payload
+    return None, {}
+
+
+def _optimizer_selected_contract_info(
+    *,
+    repo_root: Path,
+    pointer_path: Path | None,
+    pointer_payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    meta = _as_mapping(pointer_payload.get("meta"))
+    run_dir = _existing_path(pointer_payload.get("run_dir"))
+    contract_path = _existing_path(meta.get("selected_run_contract_path"))
+    if contract_path is None:
+        fallback = (
+            _effective_workspace_dir(repo_root)
+            / "handoffs"
+            / "WS-OPTIMIZATION"
+            / "selected_run_contract.json"
+        )
+        contract_path = _existing_path(fallback)
+    contract_payload = _safe_read_json_dict(contract_path)
+    selected_run_contract_hash = str(
+        meta.get("selected_run_contract_hash")
+        or contract_payload.get("selected_run_contract_hash")
+        or ""
+    ).strip()
+    if not selected_run_contract_hash and contract_path is not None:
+        selected_run_contract_hash = _sha256_file(contract_path)
+    ready_state = str(
+        meta.get("analysis_handoff_ready_state")
+        or contract_payload.get("analysis_handoff_ready_state")
+        or ""
+    ).strip()
+    blocking_states = tuple(
+        str(item)
+        for item in (contract_payload.get("blocking_states") or ())
+        if str(item).strip()
+    )
+    warnings = tuple(
+        str(item)
+        for item in (contract_payload.get("warnings") or ())
+        if str(item).strip()
+    )
+    if pointer_path is None:
+        status = "MISSING"
+        banner = "Latest optimizer pointer is not available."
+    elif contract_path is None:
+        status = "MISSING"
+        banner = "Latest optimizer pointer exists, but selected_run_contract.json is missing."
+    elif blocking_states or ready_state == "blocked":
+        status = "BLOCKED"
+        banner = "Selected optimizer run contract has blocking handoff states."
+    elif warnings or ready_state == "warning":
+        status = "WARN"
+        banner = "Selected optimizer run contract is available with warnings."
+    else:
+        status = "READY"
+        banner = "Selected optimizer run contract is available for results evidence."
+
+    selected_context: dict[str, Any] = {
+        "selected_run_contract_hash": selected_run_contract_hash,
+        "selected_run_contract_path": str(contract_path or ""),
+        "run_dir": str(run_dir or pointer_payload.get("run_dir") or ""),
+        "run_id": str(contract_payload.get("run_id") or meta.get("run_id") or ""),
+        "run_contract_hash": selected_run_contract_hash,
+        "selected_run_hash": selected_run_contract_hash,
+        "objective_contract_hash": str(
+            contract_payload.get("objective_contract_hash")
+            or meta.get("objective_contract_hash")
+            or ""
+        ),
+        "hard_gate_key": str(contract_payload.get("hard_gate_key") or meta.get("penalty_key") or ""),
+        "hard_gate_tolerance": str(
+            contract_payload.get("hard_gate_tolerance")
+            if contract_payload.get("hard_gate_tolerance") is not None
+            else meta.get("penalty_tol", "")
+        ),
+        "active_baseline_hash": str(
+            contract_payload.get("active_baseline_hash")
+            or meta.get("active_baseline_hash")
+            or ""
+        ),
+        "suite_snapshot_hash": str(
+            contract_payload.get("suite_snapshot_hash")
+            or meta.get("suite_snapshot_hash")
+            or ""
+        ),
+        "problem_hash": str(contract_payload.get("problem_hash") or meta.get("problem_hash") or ""),
+        "problem_hash_mode": str(
+            contract_payload.get("problem_hash_mode") or meta.get("problem_hash_mode") or ""
+        ),
+        "objective_keys": contract_payload.get("objective_stack")
+        or meta.get("objective_keys")
+        or (),
+        "penalty_key": str(
+            contract_payload.get("hard_gate_key")
+            or meta.get("penalty_key")
+            or ""
+        ),
+        "penalty_tol": str(
+            contract_payload.get("hard_gate_tolerance")
+            if contract_payload.get("hard_gate_tolerance") is not None
+            else meta.get("penalty_tol", "")
+        ),
+        "results_csv_path": str(
+            contract_payload.get("results_csv_path")
+            or meta.get("result_path")
+            or ""
+        ),
+    }
+    selected_context = {
+        key: value
+        for key, value in selected_context.items()
+        if _stringify_context_value(value)
+    }
+    return {
+        "pointer_path": pointer_path,
+        "pointer_payload": dict(pointer_payload),
+        "run_dir": run_dir,
+        "meta": meta,
+        "contract_path": contract_path,
+        "contract_payload": contract_payload,
+        "selected_context": selected_context,
+        "selected_run_contract_hash": selected_run_contract_hash,
+        "status": status,
+        "banner": banner,
+        "ready_state": ready_state,
+        "blocking_states": blocking_states,
+        "warnings": warnings,
+    }
+
+
 def _as_mapping(value: Any) -> dict[str, Any]:
     return dict(value) if isinstance(value, Mapping) else {}
 
@@ -328,6 +482,7 @@ def _extract_result_context(
     validation_payload: Mapping[str, Any],
     triage_payload: Mapping[str, Any],
     anim_diag: Mapping[str, Any],
+    optimizer_selected_context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     result_context = _nested_mapping(validation_payload, "result_context")
     current: dict[str, Any] = {}
@@ -355,6 +510,7 @@ def _extract_result_context(
     _merge_context(selected, _as_mapping(validation_payload.get("optimizer_scope")))
     _merge_context(selected, _as_mapping(triage_payload.get("dist_progress")))
     _merge_context(selected, anim_diag)
+    _merge_context(selected, _as_mapping(optimizer_selected_context or {}))
 
     fields: list[DesktopResultsContextField] = []
     mismatches: list[str] = []
@@ -646,6 +802,14 @@ class DesktopResultsRuntime:
         latest_mnemo_event_log_path = _existing_path(
             anim_diag.get("anim_latest_mnemo_event_log_path")
         )
+        latest_optimizer_pointer_path, latest_optimizer_pointer_payload = (
+            _latest_optimizer_pointer_payload(self.repo_root)
+        )
+        optimizer_contract_info = _optimizer_selected_contract_info(
+            repo_root=self.repo_root,
+            pointer_path=latest_optimizer_pointer_path,
+            pointer_payload=latest_optimizer_pointer_payload,
+        )
 
         latest_autotest_run_dir = _latest_child_dir(self.autotest_runs_dir)
         latest_diagnostics_run_dir = _latest_child_dir(self.diagnostics_runs_dir)
@@ -653,6 +817,7 @@ class DesktopResultsRuntime:
             validation_payload=validation_payload,
             triage_payload=triage_payload,
             anim_diag=anim_diag,
+            optimizer_selected_context=optimizer_contract_info.get("selected_context"),
         )
         workspace_manifest_path = (
             _effective_workspace_dir(self.repo_root) / "exports" / "analysis_evidence_manifest.json"
@@ -704,6 +869,22 @@ class DesktopResultsRuntime:
             category="evidence",
             path=compare_current_context_sidecar_path,
             detail="HO-009 WS-ANALYSIS -> CompareViewer current_context_ref",
+        )
+        _append_artifact(
+            items,
+            key="selected_optimizer_run_contract",
+            title="Selected optimizer run contract",
+            category="evidence",
+            path=optimizer_contract_info.get("contract_path"),
+            detail="HO-007 WS-OPTIMIZATION -> WS-ANALYSIS selected-run provenance",
+        )
+        _append_artifact(
+            items,
+            key="latest_optimizer_pointer",
+            title="Latest optimizer pointer",
+            category="evidence",
+            path=latest_optimizer_pointer_path,
+            detail="Durable latest_optimization pointer",
         )
 
         validation_status = _validation_status(
@@ -817,6 +998,31 @@ class DesktopResultsRuntime:
                 evidence_path=diagnostics_evidence_manifest_path,
                 action_key="export_diagnostics_evidence",
                 artifact_key="diagnostics_evidence_manifest",
+            ),
+            DesktopResultsOverviewRow(
+                key="selected_optimizer_run_contract",
+                title="Контракт выбранного optimizer run",
+                status=str(optimizer_contract_info.get("status") or "MISSING"),
+                detail=(
+                    str(optimizer_contract_info.get("banner") or "")
+                    + " hash="
+                    + _short_text(
+                        optimizer_contract_info.get("selected_run_contract_hash"),
+                        limit=18,
+                    )
+                ),
+                next_action=(
+                    "Открыть selected_run_contract"
+                    if optimizer_contract_info.get("contract_path") is not None
+                    else "Создать latest pointer в Optimizer Center"
+                ),
+                evidence_path=optimizer_contract_info.get("contract_path"),
+                action_key=(
+                    "open_artifact"
+                    if optimizer_contract_info.get("contract_path") is not None
+                    else "open_diagnostics_gui"
+                ),
+                artifact_key="selected_optimizer_run_contract",
             ),
             DesktopResultsOverviewRow(
                 key="anim_latest_results",
@@ -964,6 +1170,16 @@ class DesktopResultsRuntime:
             latest_capture_export_manifest_status=capture_manifest_status,
             latest_capture_export_manifest_handoff_id=capture_export_manifest_handoff_id,
             latest_capture_hash=capture_hash,
+            latest_optimizer_pointer_json_path=latest_optimizer_pointer_path,
+            latest_optimizer_run_dir=optimizer_contract_info.get("run_dir"),
+            selected_run_contract_path=optimizer_contract_info.get("contract_path"),
+            selected_run_contract_hash=str(
+                optimizer_contract_info.get("selected_run_contract_hash") or ""
+            ),
+            selected_run_contract_status=str(
+                optimizer_contract_info.get("status") or "MISSING"
+            ),
+            selected_run_contract_banner=str(optimizer_contract_info.get("banner") or ""),
         )
 
     def artifact_by_key(
@@ -1141,6 +1357,8 @@ class DesktopResultsRuntime:
             ("capture_export_manifest", "HO-010 manifest текущего прогона"),
             ("mnemo_event_log", "Журнал мнемосхемы текущего прогона"),
             ("compare_current_context_sidecar", "Compare handoff текущего прогона"),
+            ("selected_optimizer_run_contract", "Optimizer selected-run contract текущего прогона"),
+            ("latest_optimizer_pointer", "Latest optimizer pointer текущего прогона"),
         )
         for artifact_key, title in pinned_map:
             artifact = self.artifact_by_key(snapshot, artifact_key)
@@ -1228,10 +1446,22 @@ class DesktopResultsRuntime:
             "project_path": str(self.repo_root),
             "run_id": selected_context.get("run_id") or os.environ.get("PNEUMO_RUN_ID", ""),
             "run_contract_hash": selected_context.get("run_contract_hash", ""),
+            "selected_run_contract_hash": snapshot.selected_run_contract_hash,
+            "selected_run_contract_path": str(snapshot.selected_run_contract_path or ""),
             "compare_contract_id": selected_context.get("compare_contract_hash", ""),
             "context_hash": selected_context.get("analysis_context_hash")
             or selected_context.get("run_contract_hash")
             or "",
+            "optimizer_selected_run_contract": {
+                "status": snapshot.selected_run_contract_status,
+                "banner": snapshot.selected_run_contract_banner,
+                "path": str(snapshot.selected_run_contract_path or ""),
+                "hash": snapshot.selected_run_contract_hash,
+                "latest_optimizer_pointer_path": str(
+                    snapshot.latest_optimizer_pointer_json_path or ""
+                ),
+                "latest_optimizer_run_dir": str(snapshot.latest_optimizer_run_dir or ""),
+            },
             "selected_artifact_list": selected_artifacts,
             "selected_tables": [],
             "selected_charts": [],
@@ -1346,6 +1576,16 @@ class DesktopResultsRuntime:
                 "detail": snapshot.result_context_detail,
                 "required_action": snapshot.result_context_action,
             },
+            "optimizer_selected_run_contract": {
+                "status": snapshot.selected_run_contract_status,
+                "banner": snapshot.selected_run_contract_banner,
+                "path": str(snapshot.selected_run_contract_path or ""),
+                "hash": snapshot.selected_run_contract_hash,
+                "latest_optimizer_pointer_path": str(
+                    snapshot.latest_optimizer_pointer_json_path or ""
+                ),
+                "latest_optimizer_run_dir": str(snapshot.latest_optimizer_run_dir or ""),
+            },
             "mismatch_banner": {
                 "banner_id": "BANNER-HIST-002" if mismatches else "BANNER-HIST-001",
                 "severity": "warning" if mismatches else "info",
@@ -1362,6 +1602,10 @@ class DesktopResultsRuntime:
                 ),
                 "latest_capture_export_manifest_path": str(
                     snapshot.latest_capture_export_manifest_path or ""
+                ),
+                "selected_run_contract_path": str(snapshot.selected_run_contract_path or ""),
+                "latest_optimizer_pointer_path": str(
+                    snapshot.latest_optimizer_pointer_json_path or ""
                 ),
             },
         }
@@ -1558,6 +1802,26 @@ class DesktopResultsRuntime:
                             "current_context_ref_hash="
                             + _short_text(obj.get("current_context_ref_hash"), limit=36)
                         )
+                    return tuple(lines)
+
+                if artifact.key == "selected_optimizer_run_contract":
+                    lines = [
+                        f"schema_version={obj.get('schema_version')}",
+                        f"handoff_id={obj.get('handoff_id')}",
+                        f"run_id={obj.get('run_id') or '—'}",
+                        "selected_run_contract_hash="
+                        + _short_text(obj.get("selected_run_contract_hash"), limit=36),
+                        "objective_contract_hash="
+                        + _short_text(obj.get("objective_contract_hash"), limit=36),
+                        "problem_hash=" + _short_text(obj.get("problem_hash"), limit=36),
+                        "active_baseline_hash="
+                        + _short_text(obj.get("active_baseline_hash"), limit=36),
+                        f"analysis_handoff={obj.get('analysis_handoff_ready_state') or '—'}",
+                    ]
+                    blocking = [str(item) for item in (obj.get("blocking_states") or ()) if str(item).strip()]
+                    warnings = [str(item) for item in (obj.get("warnings") or ()) if str(item).strip()]
+                    lines.append(f"blocking_states={len(blocking)}")
+                    lines.append(f"warnings={len(warnings)}")
                     return tuple(lines)
 
                 if artifact.key == "capture_export_manifest":

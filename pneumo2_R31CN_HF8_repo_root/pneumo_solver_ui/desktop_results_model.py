@@ -93,6 +93,12 @@ class DesktopResultsSnapshot:
     latest_capture_export_manifest_status: str = "MISSING"
     latest_capture_export_manifest_handoff_id: str = ""
     latest_capture_hash: str = ""
+    latest_optimizer_pointer_json_path: Path | None = None
+    latest_optimizer_run_dir: Path | None = None
+    selected_run_contract_path: Path | None = None
+    selected_run_contract_hash: str = ""
+    selected_run_contract_status: str = "MISSING"
+    selected_run_contract_banner: str = "Selected optimizer run contract is not available."
 
 
 def format_validation_summary(snapshot: DesktopResultsSnapshot) -> str:

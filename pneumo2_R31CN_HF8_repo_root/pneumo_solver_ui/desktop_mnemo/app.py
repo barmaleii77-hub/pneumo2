@@ -14401,7 +14401,25 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
         self.resizeDocks([self._overview_dock, self._selection_dock], [320, 360], QtCore.Qt.Horizontal)
         self.resizeDocks([self._overview_dock, self._trends_dock], [760, 260], QtCore.Qt.Vertical)
 
+    def _stop_runtime_activity_for_close(self) -> None:
+        self.playing = False
+        try:
+            self.play_timer.stop()
+        except Exception:
+            pass
+        try:
+            self.pointer_watcher.stop()
+        except Exception:
+            pass
+        try:
+            with QtCore.QSignalBlocker(self.play_action):
+                self.play_action.setChecked(False)
+            self.play_action.setText("Пуск")
+        except Exception:
+            pass
+
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:  # type: ignore[override]
+        self._stop_runtime_activity_for_close()
         self.ui_state.save_window_geometry(self, "window/geometry")
         try:
             self.ui_state.set_value("window/state", self.saveState())

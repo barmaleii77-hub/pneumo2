@@ -58,6 +58,17 @@ def _runtime_label(spec: DesktopShellToolSpec) -> str:
     return "Процесс"
 
 
+def _unique_specs(specs: tuple[DesktopShellToolSpec, ...]) -> tuple[DesktopShellToolSpec, ...]:
+    seen: set[str] = set()
+    result: list[DesktopShellToolSpec] = []
+    for spec in specs:
+        if spec.key in seen:
+            continue
+        seen.add(spec.key)
+        result.append(spec)
+    return tuple(result)
+
+
 class DesktopQtMainShell(QtWidgets.QMainWindow):
     def __init__(self, *, startup_tool_keys: tuple[str, ...] = ()) -> None:
         super().__init__()
@@ -83,12 +94,100 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self._build_menu()
         self._restore_layout()
         self._populate_workspace_switcher()
+        self._populate_launch_tool_switcher()
         self._populate_browser_tree()
         self._refresh_search_results()
         self._apply_selected_tool(self._selected_tool_key, announce=False)
         self._install_shortcuts()
         self._start_polling()
         QtCore.QTimer.singleShot(0, self._open_startup_tools)
+
+    def _launchable_specs(self) -> tuple[DesktopShellToolSpec, ...]:
+        return tuple(spec for spec in self.specs if spec.standalone_module)
+
+    def _main_route_specs(self) -> tuple[DesktopShellToolSpec, ...]:
+        return tuple(self.spec_by_key[key] for key in MAIN_ROUTE_KEYS if key in self.spec_by_key)
+
+    def _launch_surface_groups(self) -> tuple[tuple[str, tuple[DesktopShellToolSpec, ...]], ...]:
+        main_route_specs = self._main_route_specs()
+        tool_specs = tuple(spec for spec in self.specs if spec.entry_kind == "tool")
+        analysis_specs = tuple(
+            spec
+            for spec in self.specs
+            if spec.entry_kind in {"contextual", "external"}
+        )
+        return (
+            ("Маршрут проекта", main_route_specs),
+            ("Справочники и служебные центры", _unique_specs(tool_specs)),
+            ("Анализ и специализированные окна", _unique_specs(analysis_specs)),
+        )
+
+    def expected_launchable_tool_keys(self) -> tuple[str, ...]:
+        return tuple(spec.key for spec in self._launchable_specs())
+
+    def visible_browser_tool_keys(self) -> tuple[str, ...]:
+        keys: set[str] = set()
+
+        def visit(item: QtWidgets.QTreeWidgetItem) -> None:
+            key = item.data(0, QtCore.Qt.ItemDataRole.UserRole)
+            if isinstance(key, str) and key in self.spec_by_key:
+                keys.add(key)
+            for child_index in range(item.childCount()):
+                visit(item.child(child_index))
+
+        for index in range(self.browser_tree.topLevelItemCount()):
+            visit(self.browser_tree.topLevelItem(index))
+        return tuple(sorted(keys))
+
+    def visible_menu_tool_keys(self) -> tuple[str, ...]:
+        keys = {
+            str(action.data())
+            for action in self.findChildren(QtGui.QAction)
+            if isinstance(action.data(), str) and action.data() in self.spec_by_key
+        }
+        return tuple(sorted(keys))
+
+    def visible_toolbar_tool_keys(self) -> tuple[str, ...]:
+        keys: set[str] = set()
+        for combo in (self.workspace_combo, self.launch_tool_combo):
+            for index in range(combo.count()):
+                key = combo.itemData(index)
+                if isinstance(key, str) and key in self.spec_by_key:
+                    keys.add(key)
+        return tuple(sorted(keys))
+
+    def visible_command_search_tool_keys(self) -> tuple[str, ...]:
+        keys = {
+            entry.action_value
+            for entry in self.command_entries
+            if entry.action_kind == "tool" and entry.action_value in self.spec_by_key
+        }
+        return tuple(sorted(keys))
+
+    def launch_surface_coverage(self) -> dict[str, tuple[str, ...]]:
+        return {
+            "expected": self.expected_launchable_tool_keys(),
+            "browser": self.visible_browser_tool_keys(),
+            "menu": self.visible_menu_tool_keys(),
+            "toolbar": self.visible_toolbar_tool_keys(),
+            "command_search": self.visible_command_search_tool_keys(),
+        }
+
+    def _add_tool_action(
+        self,
+        menu: QtWidgets.QMenu,
+        spec: DesktopShellToolSpec,
+        *,
+        shortcut: QtGui.QKeySequence | None = None,
+    ) -> QtGui.QAction:
+        action = menu.addAction(spec.title)
+        action.setData(spec.key)
+        action.setObjectName(f"LaunchAction_{spec.key}")
+        action.setToolTip(spec.effective_tooltip)
+        if shortcut is not None:
+            action.setShortcut(shortcut)
+        action.triggered.connect(lambda _checked=False, item_key=spec.key: self.open_tool(item_key))
+        return action
 
     def _configure_window(self) -> None:
         release = get_release()
@@ -179,30 +278,34 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             spec = self.spec_by_key.get(key)
             if spec is None:
                 continue
-            action = run_menu.addAction(spec.title)
-            action.triggered.connect(lambda _checked=False, item_key=key: self.open_tool(item_key))
+            self._add_tool_action(run_menu, spec)
+        all_tools_menu = run_menu.addMenu("Все GUI-модули")
+        for group_title, group_specs in self._launch_surface_groups():
+            group_menu = all_tools_menu.addMenu(group_title)
+            for spec in group_specs:
+                self._add_tool_action(group_menu, spec)
         run_menu.addSeparator()
         stop_action = run_menu.addAction("Остановить выбранное окно")
         stop_action.setShortcut(QtGui.QKeySequence("Shift+F5"))
         stop_action.triggered.connect(self.stop_selected_tool)
 
         analysis_menu = menubar.addMenu("Анализ")
-        for key in ("desktop_results_center", "compare_viewer"):
+        for key in ("desktop_results_center", "desktop_engineering_analysis_center", "compare_viewer"):
             spec = self.spec_by_key.get(key)
             if spec is None:
                 continue
-            action = analysis_menu.addAction(spec.title)
-            action.triggered.connect(lambda _checked=False, item_key=key: self.open_tool(item_key))
+            self._add_tool_action(analysis_menu, spec)
 
         animation_menu = menubar.addMenu("Анимация")
         for key in ("desktop_animator", "desktop_mnemo"):
             spec = self.spec_by_key.get(key)
             if spec is None:
                 continue
-            action = animation_menu.addAction(spec.title)
-            if key == "desktop_animator":
-                action.setShortcut(QtGui.QKeySequence("F8"))
-            action.triggered.connect(lambda _checked=False, item_key=key: self.open_tool(item_key))
+            self._add_tool_action(
+                animation_menu,
+                spec,
+                shortcut=QtGui.QKeySequence("F8") if key == "desktop_animator" else None,
+            )
 
         diagnostics_menu = menubar.addMenu("Диагностика")
         collect_diag_action = diagnostics_menu.addAction("Собрать диагностику")
@@ -216,8 +319,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             spec = self.spec_by_key.get(key)
             if spec is None:
                 continue
-            action = tools_menu.addAction(spec.title)
-            action.triggered.connect(lambda _checked=False, item_key=key: self.open_tool(item_key))
+            self._add_tool_action(tools_menu, spec)
         legacy_action = tools_menu.addAction("Открыть legacy Tk-shell")
         legacy_action.triggered.connect(self._show_legacy_shell_note)
 
@@ -241,6 +343,22 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.open_workspace_button.setToolTip("Открывает выбранное рабочее пространство через launcher/handoff.")
         self.open_workspace_button.clicked.connect(self.open_selected_workspace)
         toolbar.addWidget(self.open_workspace_button)
+
+        toolbar.addSeparator()
+
+        toolbar.addWidget(QtWidgets.QLabel("GUI-модуль:"))
+        self.launch_tool_combo = QtWidgets.QComboBox(toolbar)
+        self.launch_tool_combo.setObjectName("DesktopQtShellLaunchToolCombo")
+        self.launch_tool_combo.setAccessibleName("Единый выбор GUI-модуля")
+        self.launch_tool_combo.setToolTip("Все launchable GUI-модули из shell registry.")
+        self.launch_tool_combo.currentIndexChanged.connect(self._on_launch_tool_changed)
+        toolbar.addWidget(self.launch_tool_combo)
+
+        self.open_launch_tool_button = QtWidgets.QPushButton("Открыть модуль", toolbar)
+        self.open_launch_tool_button.setObjectName("DesktopQtShellOpenLaunchTool")
+        self.open_launch_tool_button.setToolTip("Открывает выбранный GUI-модуль из единого shell registry.")
+        self.open_launch_tool_button.clicked.connect(self.open_selected_launch_tool)
+        toolbar.addWidget(self.open_launch_tool_button)
 
         toolbar.addSeparator()
 
@@ -480,6 +598,16 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.workspace_combo.setCurrentIndex(index)
         self.workspace_combo.blockSignals(False)
 
+    def _populate_launch_tool_switcher(self) -> None:
+        self.launch_tool_combo.blockSignals(True)
+        self.launch_tool_combo.clear()
+        for spec in self._launchable_specs():
+            label = f"{spec.title} ({_migration_label(spec)})"
+            self.launch_tool_combo.addItem(label, userData=spec.key)
+        index = max(0, self.launch_tool_combo.findData(self._selected_tool_key))
+        self.launch_tool_combo.setCurrentIndex(index)
+        self.launch_tool_combo.blockSignals(False)
+
     def _populate_browser_tree(self) -> None:
         self.browser_tree.clear()
         project_root = QtWidgets.QTreeWidgetItem(
@@ -506,18 +634,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         project_root.setExpanded(True)
         artifacts_root.setExpanded(True)
 
-        grouped_specs = {
-            "Маршрут проекта": [self.spec_by_key[key] for key in MAIN_ROUTE_KEYS if key in self.spec_by_key],
-            "Справочники и служебные центры": [
-                spec for spec in self.specs if spec.entry_kind == "tool"
-            ],
-            "Анализ и специализированные окна": [
-                spec
-                for spec in self.specs
-                if spec.key in ("compare_viewer", "desktop_animator", "desktop_mnemo")
-            ],
-        }
-        for group_title, group_specs in grouped_specs.items():
+        for group_title, group_specs in self._launch_surface_groups():
             root_item = QtWidgets.QTreeWidgetItem((group_title, ""))
             for spec in group_specs:
                 item = QtWidgets.QTreeWidgetItem(
@@ -587,6 +704,12 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self._refresh_inspector(spec)
         self._refresh_runtime_table()
         self._select_browser_item(key)
+        if hasattr(self, "launch_tool_combo"):
+            index = self.launch_tool_combo.findData(key)
+            if index >= 0 and self.launch_tool_combo.currentIndex() != index:
+                self.launch_tool_combo.blockSignals(True)
+                self.launch_tool_combo.setCurrentIndex(index)
+                self.launch_tool_combo.blockSignals(False)
         if announce:
             self._set_status_message(f"Выбрано рабочее окно: {spec.title}")
 
@@ -851,6 +974,11 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         if isinstance(key, str) and key:
             self.open_tool(key)
 
+    def open_selected_launch_tool(self) -> None:
+        key = self.launch_tool_combo.currentData()
+        if isinstance(key, str) and key:
+            self.open_tool(key)
+
     def stop_selected_tool(self) -> None:
         key = self._selected_tool_key
         if not key:
@@ -886,6 +1014,11 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
 
     def _on_workspace_changed(self, index: int) -> None:
         key = self.workspace_combo.itemData(index)
+        if isinstance(key, str) and key:
+            self._select_workspace(key)
+
+    def _on_launch_tool_changed(self, index: int) -> None:
+        key = self.launch_tool_combo.itemData(index)
         if isinstance(key, str) and key:
             self._select_workspace(key)
 

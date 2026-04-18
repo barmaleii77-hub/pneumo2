@@ -59,27 +59,30 @@
 16. [BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md](../context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md)
    — recovery audit after quarantining the mixed GUI dirty tree and removing
    duplicate local worktrees/branches.
-17. [16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
+17. [QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md](../context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md)
+   — resolution note for integrating quarantine commit `7823dc2` into
+   `codex/work` by cherry-pick, with validation and non-closure boundaries.
+18. [16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
    — current self-contained Plan-mode starter prompts for the same 10 chats.
    Prefer this file for all new chat starts.
-18. [gui_spec_imports/v37_github_kb_supplement/README.md](../context/gui_spec_imports/v37_github_kb_supplement/README.md),
+19. [gui_spec_imports/v37_github_kb_supplement/README.md](../context/gui_spec_imports/v37_github_kb_supplement/README.md),
    [TECHNICAL_SPECIFICATION.md](../context/gui_spec_imports/v37_github_kb_supplement/TECHNICAL_SPECIFICATION.md)
    и [GUI_SPEC.yaml](../context/gui_spec_imports/v37_github_kb_supplement/GUI_SPEC.yaml)
    — successor GitHub KB/TZ/spec supplement. Он уточняет requirements,
    workspace contracts, parameter catalogs, acceptance и open gaps, но не
    является runtime-closure proof.
-19. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
+20. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
    и related `v3/*`
    — checked-in detailed machine-readable reference layer.
-20. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
+21. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
    и related `v13_ring_editor_migration/*`
    — специализированный addendum для `WS-RING` и handoff `WS-RING -> WS-SUITE`.
-21. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
+22. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
    — historical design-recovery layer, который возвращает проект из implementation-веток в design-first.
-22. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
+23. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
    и [gui_spec_archive_lineage.json](../context/gui_spec_archive_lineage.json)
    — lineage `v1…v13 + v37`, чтобы понимать роль каждого архива и successor supplement.
-23. `docs/gui_chat_prompts/*`
+24. `docs/gui_chat_prompts/*`
    — implementation prompts, которые должны наследовать канон, а не заменять его.
 
 ## Что считается reference layer
@@ -136,6 +139,9 @@
 - `BRANCH_TREE_RECOVERY_AUDIT_2026-04-18` фиксирует текущий clean primary
   worktree, quarantine branch, удаление локальных duplicate worktrees/branches
   и новую политику старта параллельных чатов.
+- `QUARANTINE_7823DC2_RESOLUTION_2026-04-18` фиксирует перенос карантинного
+  патча в `codex/work` через cherry-pick, результаты focused validation и
+  явные non-closure boundaries.
 - `16_RECOVERY_PLAN_MODE_START_PROMPTS` задаёт текущие самодостаточные
   стартовые промты для тех же 10 чатов: старт только с clean
   `origin/codex/work`, quarantine только read-only и без веток до принятого

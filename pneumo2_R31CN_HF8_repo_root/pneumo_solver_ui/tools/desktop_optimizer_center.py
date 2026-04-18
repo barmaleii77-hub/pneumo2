@@ -56,6 +56,11 @@ DRIFT_LABELS = {
 }
 
 
+def _short_hash(value: Any, *, width: int = 12) -> str:
+    text = str(value or "").strip()
+    return text[:width] if text else "—"
+
+
 class DesktopOptimizerCenter:
     def __init__(self, host: tk.Misc | None = None, *, hosted: bool = False) -> None:
         self._owns_root = host is None
@@ -355,13 +360,61 @@ class DesktopOptimizerCenter:
             lines.extend(str(line) for line in surface.get("captions") or [])
         return "\n".join(lines)
 
+    def _format_run_identity_text(self, identity: dict[str, Any] | None = None) -> str:
+        payload = dict(identity or self.runtime.selected_run_identity_summary())
+        state = str(payload.get("state") or "MISSING").upper()
+        lines = [
+            f"state: {state}",
+            str(payload.get("banner") or "Run identity summary is not available."),
+            (
+                "resume: "
+                f"requested={'yes' if bool(payload.get('resume_requested')) else 'no'} | "
+                f"launch={payload.get('launch_pipeline') or '—'} | "
+                f"selected={payload.get('selected_pipeline') or '—'}"
+            ),
+        ]
+        if payload.get("selected_run_dir"):
+            lines.extend(
+                [
+                    f"run: {payload.get('selected_run_name') or '—'}",
+                    f"run_id: {payload.get('run_id') or '—'}",
+                    f"run_dir: {payload.get('selected_run_dir')}",
+                    (
+                        "hashes: "
+                        f"objective={_short_hash(payload.get('objective_contract_hash'))} | "
+                        f"problem={_short_hash(payload.get('problem_hash'))} | "
+                        f"baseline={_short_hash(payload.get('active_baseline_hash'))} | "
+                        f"suite={_short_hash(payload.get('suite_snapshot_hash'))}"
+                    ),
+                    (
+                        "selected_run_contract: "
+                        f"{_short_hash(payload.get('selected_run_contract_hash'))} | "
+                        f"exists={'yes' if bool(payload.get('selected_run_contract_exists')) else 'no'} | "
+                        f"analysis={payload.get('analysis_handoff_ready_state') or '—'}"
+                    ),
+                ]
+            )
+        blockers = tuple(
+            str(item) for item in tuple(payload.get("blocking_reasons") or ()) if str(item).strip()
+        )
+        warnings = tuple(
+            str(item) for item in tuple(payload.get("warnings") or ()) if str(item).strip()
+        )
+        if blockers:
+            lines.append("blockers: " + "; ".join(blockers))
+        if warnings:
+            lines.append("notes: " + "; ".join(warnings))
+        return "\n".join(lines)
+
     def _format_resume_target_text(self) -> str:
         payload = self.runtime.resume_target_summary()
+        identity_text = self._format_run_identity_text()
         selected_run_dir = str(payload.get("selected_run_dir") or "")
         if not selected_run_dir:
             return (
                 "History target не выбран.\n"
-                "Выберите staged/coordinator run во вкладке History, чтобы использовать его как resume target."
+                "Выберите staged/coordinator run во вкладке History, чтобы использовать его как resume target.\n\n"
+                + identity_text
             )
         lines = [
             f"выбранный прогон: {payload.get('selected_run_name') or '—'}",
@@ -381,6 +434,7 @@ class DesktopOptimizerCenter:
             )
         else:
             lines.append("продолжение координатора: выключено")
+        lines.extend(["", "Run identity / resume safety:", identity_text])
         return "\n".join(lines)
 
     def _format_dashboard_workspace_text(self) -> str:
@@ -417,6 +471,7 @@ class DesktopOptimizerCenter:
     def _format_dashboard_runtime_text(self, dashboard: dict[str, Any]) -> str:
         launch_profile = dict(dashboard.get("launch_profile") or {})
         resume_target = dict(dashboard.get("resume_target") or {})
+        identity = dict(dashboard.get("selected_run_identity") or {})
         active_surface = dict(dashboard.get("active_surface") or {})
         lines = [
             f"профиль запуска: {launch_profile.get('profile_label') or '—'}",
@@ -429,6 +484,13 @@ class DesktopOptimizerCenter:
                 "resume target: "
                 f"{resume_target.get('selected_run_name') or 'not selected'} / "
                 f"{resume_target.get('selected_pipeline') or '—'}"
+            ),
+            (
+                "identity: "
+                f"{identity.get('state') or 'MISSING'} | "
+                f"objective={_short_hash(identity.get('objective_contract_hash'))} | "
+                f"problem={_short_hash(identity.get('problem_hash'))} | "
+                f"baseline={_short_hash(identity.get('active_baseline_hash'))}"
             ),
         ]
         if not active_surface:
@@ -617,6 +679,7 @@ class DesktopOptimizerCenter:
         snapshot = self._contract_snapshot
         if snapshot is None:
             snapshot = self.runtime.contract_snapshot()
+        identity = self.runtime.selected_run_identity_summary()
         objective_stack = ", ".join(tuple(getattr(snapshot, "objective_keys", ()) or ())) or "—"
         hard_gate = format_hard_gate(
             getattr(snapshot, "penalty_key", ""),
@@ -631,6 +694,13 @@ class DesktopOptimizerCenter:
                 f"Активный режим: {mode_label}",
                 f"Objective stack: {objective_stack}",
                 f"Hard gate: {hard_gate}",
+                (
+                    "Run identity: "
+                    f"{identity.get('state') or 'MISSING'} | "
+                    f"objective={_short_hash(identity.get('objective_contract_hash'))} | "
+                    f"problem={_short_hash(identity.get('problem_hash'))} | "
+                    f"resume={'requested' if bool(identity.get('resume_requested')) else 'off'}"
+                ),
             ]
         )
 
@@ -697,6 +767,7 @@ class DesktopOptimizerCenter:
             return f"Selected run context: {self._selected_run_dir}\nRun уже недоступен в workspace history."
         summary = getattr(details, "summary")
         drift = self.runtime.contract_drift_summary(summary)
+        identity = self.runtime.selected_run_identity_summary(self._selected_run_dir)
         packaging_row = self.runtime.selected_packaging_row(self._selected_run_dir)
         handoff_row = self.runtime.selected_handoff_row(self._selected_run_dir)
         latest_pointer = self.runtime.latest_pointer_summary()
@@ -704,6 +775,14 @@ class DesktopOptimizerCenter:
             f"selected run: {summary.run_dir}",
             f"status: {summary.status_label} ({summary.status})",
             f"pipeline/backend: {summary.pipeline_mode} / {summary.backend}",
+            f"run identity: {identity.get('state') or 'MISSING'} | {identity.get('banner') or '—'}",
+            (
+                "identity hashes: "
+                f"run_id={identity.get('run_id') or '—'} | "
+                f"objective={_short_hash(identity.get('objective_contract_hash'))} | "
+                f"problem={_short_hash(identity.get('problem_hash'))} | "
+                f"baseline={_short_hash(identity.get('active_baseline_hash'))}"
+            ),
             f"objective keys: {', '.join(summary.objective_keys) or '—'}",
             f"results: {summary.result_path or 'not found'}",
         ]
@@ -759,6 +838,7 @@ class DesktopOptimizerCenter:
             return "Выбранный run больше не найден в workspace history."
         summary = getattr(details, "summary")
         drift = self.runtime.contract_drift_summary(summary)
+        identity = self.runtime.selected_run_identity_summary(self._selected_run_dir)
         diff_bits = tuple(str(bit) for bit in (drift.get("diff_bits") or ()) if str(bit).strip())
         scope_payload = dict(drift.get("scope_payload") or {})
         baseline_compatibility = str(drift.get("baseline_compatibility") or "")
@@ -770,6 +850,17 @@ class DesktopOptimizerCenter:
             return normalized
 
         lines = [
+            f"identity state: {identity.get('state') or 'MISSING'}",
+            f"identity banner: {identity.get('banner') or '—'}",
+            (
+                "identity hashes: "
+                f"run_id={identity.get('run_id') or '—'} | "
+                f"objective={_short_hash(identity.get('objective_contract_hash'))} | "
+                f"problem={_short_hash(identity.get('problem_hash'))} | "
+                f"baseline={_short_hash(identity.get('active_baseline_hash'))} | "
+                f"selected_contract={_short_hash(identity.get('selected_run_contract_hash'))}"
+            ),
+            "",
             f"selected run: {summary.run_dir}",
             f"pipeline/status: {summary.pipeline_mode} / {summary.status_label}",
             (
@@ -930,6 +1021,10 @@ class DesktopOptimizerCenter:
                     "status": str(summary.status_label),
                     "pipeline": str(summary.pipeline_mode),
                     "backend": str(summary.backend),
+                    "run_id": str(summary.run_id or summary.run_dir.name),
+                    "objective": _short_hash(summary.objective_contract_hash),
+                    "scope": _short_hash(summary.problem_hash),
+                    "baseline": _short_hash(summary.active_baseline_hash),
                 }
             )
         return rows
@@ -1025,9 +1120,11 @@ class DesktopOptimizerCenter:
         if details is None or row is None:
             return "Выберите staged run слева, чтобы увидеть handoff recommendation и continuation contract."
         summary = getattr(details, "summary")
+        identity = self.runtime.selected_run_identity_summary(summary.run_dir)
         lines = [
             f"source staged run: {summary.run_dir}",
             f"status: {summary.status_label} ({summary.status})",
+            f"identity: {identity.get('state') or 'MISSING'} | run_id={identity.get('run_id') or '—'} | objective={_short_hash(identity.get('objective_contract_hash'))}",
             (
                 "handoff preset: "
                 f"{summary.handoff_preset_tag or row.get('preset') or '—'} | "
@@ -1201,6 +1298,7 @@ class DesktopOptimizerCenter:
         if details is None or row is None:
             return "Selected finished-job summary пока недоступен."
         summary = getattr(details, "summary")
+        identity = self.runtime.selected_run_identity_summary(summary.run_dir)
         result_path = summary.result_path if summary.result_path is not None else None
         contract_text = ", ".join(summary.objective_keys) or "—"
         return "\n".join(
@@ -1208,6 +1306,14 @@ class DesktopOptimizerCenter:
                 f"run_dir: {summary.run_dir}",
                 f"pipeline/backend: {summary.pipeline_mode} / {summary.backend}",
                 f"status: {summary.status_label} ({summary.status})",
+                f"run identity: {identity.get('state') or 'MISSING'} | run_id={identity.get('run_id') or '—'}",
+                (
+                    "hashes: "
+                    f"objective={_short_hash(identity.get('objective_contract_hash'))} | "
+                    f"problem={_short_hash(identity.get('problem_hash'))} | "
+                    f"baseline={_short_hash(identity.get('active_baseline_hash'))} | "
+                    f"suite={_short_hash(identity.get('suite_snapshot_hash'))}"
+                ),
                 f"results: {result_path or 'not found'}",
                 f"objective keys: {contract_text}",
                 f"penalty: {summary.penalty_key or '—'} tol={summary.penalty_tol if summary.penalty_tol is not None else '—'}",
@@ -1318,10 +1424,12 @@ class DesktopOptimizerCenter:
         if details is None or row is None:
             return "Packaging contract context появится здесь для выбранного run."
         summary = getattr(details, "summary")
+        identity = self.runtime.selected_run_identity_summary(summary.run_dir)
         return "\n".join(
             [
                 f"run_dir: {summary.run_dir}",
                 f"pipeline/backend: {summary.pipeline_mode} / {summary.backend}",
+                f"run identity: {identity.get('state') or 'MISSING'} | run_id={identity.get('run_id') or '—'}",
                 f"objective keys: {', '.join(summary.objective_keys) or '—'}",
                 f"penalty: {summary.penalty_key or '—'} tol={summary.penalty_tol if summary.penalty_tol is not None else '—'}",
                 f"problem hash: {summary.problem_hash or '—'}",
@@ -1339,14 +1447,25 @@ class DesktopOptimizerCenter:
         summary = getattr(details, "summary")
         packaging = getattr(details, "packaging_snapshot")
         stage_rows = tuple(getattr(details, "stage_policy_rows") or ())
+        identity = self.runtime.selected_run_identity_summary(summary.run_dir)
         summary_lines = [
             f"run_dir: {summary.run_dir}",
             f"status: {summary.status_label} ({summary.status})",
             f"pipeline/backend: {summary.pipeline_mode} / {summary.backend}",
+            f"run_id: {identity.get('run_id') or '—'}",
+            f"identity state: {identity.get('state') or 'MISSING'}",
             f"rows: {summary.row_count} | done={summary.done_count} | running={summary.running_count} | errors={summary.error_count}",
             f"note: {summary.note or '—'}",
         ]
         contract_lines = [
+            (
+                "identity hashes: "
+                f"objective={_short_hash(identity.get('objective_contract_hash'))} | "
+                f"problem={_short_hash(identity.get('problem_hash'))} | "
+                f"baseline={_short_hash(identity.get('active_baseline_hash'))} | "
+                f"suite={_short_hash(identity.get('suite_snapshot_hash'))}"
+            ),
+            f"selected_run_contract_hash: {_short_hash(identity.get('selected_run_contract_hash'))}",
             f"objective keys: {', '.join(summary.objective_keys) or '—'}",
             f"penalty: {summary.penalty_key or '—'} tol={summary.penalty_tol if summary.penalty_tol is not None else '—'}",
             f"problem hash: {summary.problem_hash or '—'}",
@@ -1770,6 +1889,7 @@ class DesktopOptimizerCenter:
         self.status_var.set(
             "Contract выбранного run подставлен в launch context: "
             + ", ".join(sorted(str(key) for key in updates))
+            + ". Baseline/source provenance не подменялись автоматически."
         )
         self.refresh_all()
         self.notebook.select(self.contract_tab)
@@ -1795,6 +1915,21 @@ class DesktopOptimizerCenter:
 
     def launch_job(self) -> None:
         self._sync_widget_state()
+        preflight = self.runtime.launch_preflight_summary()
+        if not bool(preflight.get("can_launch")):
+            reasons = "\n".join(
+                "- " + str(item)
+                for item in tuple(preflight.get("blocking_reasons") or ())
+                if str(item).strip()
+            )
+            messagebox.showwarning(
+                "Desktop Optimizer Center",
+                "Запуск заблокирован preflight-проверкой:\n" + (reasons or "- unknown"),
+            )
+            self.status_var.set("Launch preflight blocked: review Runtime / Contract banners.")
+            self.refresh_all()
+            self.notebook.select(self.runtime_tab)
+            return
         try:
             job = self.runtime.start_job()
         except Exception as exc:

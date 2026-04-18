@@ -89,18 +89,24 @@ class HistoryTreePanel(ttk.LabelFrame):
         self.rowconfigure(0, weight=1)
         self.tree = ttk.Treeview(
             self,
-            columns=("status", "pipeline", "backend"),
+            columns=("status", "pipeline", "run_id", "objective", "scope", "baseline"),
             show="tree headings",
             height=18,
         )
         self.tree.heading("#0", text="Прогон")
         self.tree.heading("status", text="Статус")
         self.tree.heading("pipeline", text="Контур")
-        self.tree.heading("backend", text="Исполнитель")
+        self.tree.heading("run_id", text="Run ID")
+        self.tree.heading("objective", text="Objective")
+        self.tree.heading("scope", text="Scope")
+        self.tree.heading("baseline", text="Baseline")
         self.tree.column("#0", width=260, stretch=True)
         self.tree.column("status", width=90, stretch=False, anchor="center")
         self.tree.column("pipeline", width=90, stretch=False, anchor="center")
-        self.tree.column("backend", width=180, stretch=True)
+        self.tree.column("run_id", width=130, stretch=False, anchor="center")
+        self.tree.column("objective", width=110, stretch=False, anchor="center")
+        self.tree.column("scope", width=110, stretch=False, anchor="center")
+        self.tree.column("baseline", width=110, stretch=False, anchor="center")
         self.tree.grid(row=0, column=0, sticky="nsew")
         scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.tree.yview)
         scrollbar.grid(row=0, column=1, sticky="ns")
@@ -119,7 +125,10 @@ class HistoryTreePanel(ttk.LabelFrame):
                 values=(
                     str(row.get("status") or ""),
                     str(row.get("pipeline") or ""),
-                    str(row.get("backend") or ""),
+                    str(row.get("run_id") or ""),
+                    str(row.get("objective") or ""),
+                    str(row.get("scope") or ""),
+                    str(row.get("baseline") or ""),
                 ),
             )
         if selected_key and self.tree.exists(selected_key):

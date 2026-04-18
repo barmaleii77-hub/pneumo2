@@ -293,6 +293,7 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert 'menubar.addMenu("Инструменты")' in src
     assert 'menubar.addMenu("Справка")' in src
     assert 'self.workspace_combo = QtWidgets.QComboBox(toolbar)' in src
+    assert 'self.launch_tool_combo = QtWidgets.QComboBox(toolbar)' in src
     assert 'self.command_search_edit = QtWidgets.QLineEdit(toolbar)' in src
     assert 'self.optimization_mode_combo = QtWidgets.QComboBox(toolbar)' in src
     assert 'self.browser_dock = QtWidgets.QDockWidget("Обзор проекта", self)' in src
@@ -320,6 +321,8 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert "DesktopShellCoexistenceManager()" in src
     assert "QSettings" in src
     assert "build_shell_project_context()" in src
+    assert "def launch_surface_coverage(self) -> dict[str, tuple[str, ...]]:" in src
+    assert '"desktop_engineering_analysis_center"' in src
     assert "def _reset_layout(self) -> None:" in src
     assert 'self.settings.setValue("layout/geometry", geometry)' in src
     assert 'self.settings.setValue("layout/window_state", state)' in src
@@ -485,6 +488,8 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
         diagnostics_button = window.findChild(QtWidgets.QPushButton, "AlwaysVisibleDiagnosticsAction")
         assert diagnostics_button is window.diagnostics_button
         assert diagnostics_button.shortcut().matches(QtGui.QKeySequence("F7"))
+        launch_combo = window.findChild(QtWidgets.QComboBox, "DesktopQtShellLaunchToolCombo")
+        assert launch_combo is window.launch_tool_combo
         assert window.message_strip_label.objectName() == "ShellMessagesStrip"
         assert window.status_progress_bar.objectName() == "ShellStatusProgress"
         assert window.status_progress_bar.value() == 0
@@ -509,6 +514,22 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
         }
         assert "Проект: Runtime Shell" in top_level_labels
         assert "Маршрут проекта" in top_level_labels
+
+        expected_launch_keys = {
+            spec.key for spec in build_desktop_shell_specs() if spec.standalone_module
+        }
+        coverage = {
+            surface: set(keys)
+            for surface, keys in window.launch_surface_coverage().items()
+        }
+        assert coverage["expected"] == expected_launch_keys
+        assert expected_launch_keys <= coverage["browser"]
+        assert expected_launch_keys <= coverage["menu"]
+        assert expected_launch_keys <= coverage["toolbar"]
+        assert expected_launch_keys <= coverage["command_search"]
+        assert "desktop_engineering_analysis_center" in coverage["browser"]
+        assert "desktop_engineering_analysis_center" in coverage["menu"]
+        assert "desktop_engineering_analysis_center" in coverage["toolbar"]
 
         window.command_search_edit.setText("дерево проекта")
         app.processEvents()
@@ -650,6 +671,21 @@ def test_desktop_qt_shell_runtime_proof_writes_shell_only_evidence(
     assert proof["checks"]["visible_diagnostics_action"] is True
     assert proof["checks"]["layout_save_restore_reset"] is True
     assert proof["checks"]["command_search_project_tree_route"] is True
+    assert proof["checks"]["all_launchable_tools_visible_from_shell"] is True
+    expected_launch_keys = {
+        spec.key for spec in build_desktop_shell_specs() if spec.standalone_module
+    }
+    assert set(proof["launch_coverage"]["expected"]) == expected_launch_keys
+    assert set(proof["launch_coverage"]["browser"]) >= expected_launch_keys
+    assert set(proof["launch_coverage"]["menu"]) >= expected_launch_keys
+    assert set(proof["launch_coverage"]["toolbar"]) >= expected_launch_keys
+    assert set(proof["launch_coverage"]["command_search"]) >= expected_launch_keys
+    assert proof["launch_coverage_missing"] == {
+        "browser": [],
+        "menu": [],
+        "toolbar": [],
+        "command_search": [],
+    }
     assert proof["diagnostics_action"]["object_name"] == "AlwaysVisibleDiagnosticsAction"
     assert "snap_half_third_quarter" in proof["manual_verification_required"]
     validation = validate_qt_main_shell_runtime_proof(proof_path)
@@ -882,6 +918,13 @@ def test_desktop_qt_shell_runtime_proof_validator_rejects_failed_automated_check
                     "external_domain_windows_launched": 0,
                     "managed_external_launcher_only": True,
                 },
+                "launch_coverage": {
+                    "expected": ["desktop_input_editor"],
+                    "browser": ["desktop_input_editor"],
+                    "menu": ["desktop_input_editor"],
+                    "toolbar": ["desktop_input_editor"],
+                    "command_search": ["desktop_input_editor"],
+                },
                 "checks": {
                     "qmainwindow_runtime": True,
                     "native_titlebar_precondition": True,
@@ -891,6 +934,7 @@ def test_desktop_qt_shell_runtime_proof_validator_rejects_failed_automated_check
                     "visible_diagnostics_action": True,
                     "status_progress_messages_strip": True,
                     "command_search_project_tree_route": True,
+                    "all_launchable_tools_visible_from_shell": True,
                     "layout_save_restore_reset": True,
                     "no_domain_windows_launched": True,
                 },

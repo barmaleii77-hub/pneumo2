@@ -26,11 +26,15 @@ from pneumo_solver_ui.desktop_input_model import (
     build_desktop_section_issue_cards,
     build_desktop_section_summary_cards,
     build_desktop_preview_surface,
+    describe_desktop_field_source_state,
     describe_desktop_inputs_snapshot_state,
     build_desktop_profile_diff,
     delete_desktop_profile,
     describe_desktop_run_mode,
+    desktop_section_display_title,
     desktop_section_status_label,
+    desktop_inputs_handoff_dir_path,
+    desktop_inputs_snapshot_handoff_path,
     desktop_profile_dir_path,
     desktop_profile_display_name,
     desktop_run_summary_path,
@@ -154,7 +158,7 @@ class DesktopInputEditor:
             section.title: section for section in DESKTOP_INPUT_SECTIONS
         }
         self.current_section_title_var = tk.StringVar(
-            value=self.section_titles[0] if self.section_titles else "Раздел"
+            value=desktop_section_display_title(self.section_titles[0]) if self.section_titles else "Раздел"
         )
         self.current_section_summary_var = tk.StringVar(
             value="Выберите раздел слева и редактируйте параметры в рабочей области."
@@ -241,6 +245,7 @@ class DesktopInputEditor:
         self.inspector_unit_var = tk.StringVar(value="Единица: —")
         self.inspector_range_var = tk.StringVar(value="Диапазон: —")
         self.inspector_context_var = tk.StringVar(value="Контекст: —")
+        self.inspector_source_state_var = tk.StringVar(value="Source/state: —")
         self.inspector_help_var = tk.StringVar(value="Выберите параметр слева или в форме, чтобы увидеть пояснение.")
         self.inspector_related_summary_var = tk.StringVar(value="Связанные параметры появятся после выбора поля.")
         self._inspector_related_field_keys: dict[str, str] = {}
@@ -479,6 +484,9 @@ class DesktopInputEditor:
             return self.section_titles[index]
         return self.section_titles[0]
 
+    def _display_section_title(self, section_title: str) -> str:
+        return desktop_section_display_title(section_title)
+
     def _field_search_tracks_current_section(self) -> bool:
         return str(self.field_search_mode or "idle").strip().lower() in {
             "current_section",
@@ -491,9 +499,10 @@ class DesktopInputEditor:
             return
         safe_index = max(0, min(int(index), len(self.section_titles) - 1))
         section_title = self.section_titles[safe_index]
+        display_title = self._display_section_title(section_title)
         self.section_notebook.select(safe_index)
-        if str(self.current_section_title_var.get() or "") != section_title:
-            self.current_section_title_var.set(section_title)
+        if str(self.current_section_title_var.get() or "") != display_title:
+            self.current_section_title_var.set(display_title)
         if hasattr(self, "section_tree"):
             item_id = self._section_tree_ids.get(section_title)
             if item_id:
@@ -556,7 +565,7 @@ class DesktopInputEditor:
             payload=payload,
             spec=selected_spec,
         )
-        self.inspector_section_var.set(f"Раздел: {section_title}")
+        self.inspector_section_var.set(f"Раздел: {self._display_section_title(section_title)}")
 
     def _refresh_graphics_for_section(
         self,
@@ -565,13 +574,15 @@ class DesktopInputEditor:
         payload: dict[str, object],
         spec: DesktopInputFieldSpec | None = None,
     ) -> None:
+        display_title = self._display_section_title(section_title)
         refresh_kwargs = {
-            "section_title": section_title,
+            "section_title": display_title,
             "payload": payload,
             "field_label": spec.label if spec is not None else "",
             "unit_label": spec.unit_label if spec is not None else "",
             "field_key": spec.key if spec is not None else "",
             "graphic_context": spec.effective_graphic_context if spec is not None else "",
+            "source_marker": self._graphics_source_state_marker(section_title, payload, spec),
         }
         graphics_by_title = getattr(self, "section_graphics_panels", {})
         graphic_panel = graphics_by_title.get(section_title)
@@ -585,6 +596,31 @@ class DesktopInputEditor:
         if not context:
             return ""
         return DesktopInputGraphicPanel.CONTEXT_TITLES.get(context, context.replace("_", " "))
+
+    def _field_source_state_info(
+        self,
+        key: str,
+        payload: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        return describe_desktop_field_source_state(
+            dict(payload or self._gather_payload()),
+            self.source_reference_payload,
+            key,
+            self._display_source_name(),
+        )
+
+    def _graphics_source_state_marker(
+        self,
+        section_title: str,
+        payload: dict[str, object],
+        spec: DesktopInputFieldSpec | None,
+    ) -> str:
+        if spec is not None:
+            return str(self._field_source_state_info(spec.key, payload).get("marker") or "")
+        section = self.section_by_title.get(section_title)
+        field_keys = [field.key for field in tuple(getattr(section, "fields", ()) or ())]
+        state = "dirty" if any(key in self.source_reference_diffs_by_key for key in field_keys) else "current"
+        return f"source: {self._display_source_name()} · state: {state}"
 
     def _build_related_field_items(self, spec: DesktopInputFieldSpec) -> list[tuple[str, str]]:
         same_section = [
@@ -701,7 +737,7 @@ class DesktopInputEditor:
             self._set_status("Следующих шагов с замечаниями сейчас нет.")
             return
         self._select_section_by_title(title)
-        self._set_status(f"Открыт следующий шаг с замечанием: {title}")
+        self._set_status(f"Открыт следующий шаг с замечанием: {self._display_section_title(title)}")
 
     def _go_next_changed_section(self) -> None:
         _rows, _readiness_by_title, _change_cards, change_by_title = self._build_section_route_state()
@@ -714,7 +750,7 @@ class DesktopInputEditor:
             self._set_status("Следующих изменённых шагов сейчас нет.")
             return
         self._select_section_by_title(title)
-        self._set_status(f"Открыт следующий изменённый шаг: {title}")
+        self._set_status(f"Открыт следующий изменённый шаг: {self._display_section_title(title)}")
 
     def _refresh_section_route_summary(self) -> None:
         if not self.section_titles:
@@ -742,7 +778,7 @@ class DesktopInputEditor:
             issue_badge = f" · {issue_count} зам." if issue_count > 0 else ""
             change_badge = f" · {changed_count} изм." if changed_count > 0 else ""
             button.configure(
-                text=f"{idx + 1}. {title} · {status_text}{issue_badge}{change_badge}",
+                text=f"{idx + 1}. {self._display_section_title(title)} · {status_text}{issue_badge}{change_badge}",
                 style=self._route_button_style_for_state(
                     is_current=idx == current_index,
                     status_key=status_key,
@@ -753,6 +789,9 @@ class DesktopInputEditor:
         current_title = self.section_titles[index]
         previous_title = self.section_titles[index - 1] if index > 0 else "—"
         next_title = self.section_titles[index + 1] if index + 1 < len(self.section_titles) else "Готово к запуску"
+        current_display_title = self._display_section_title(current_title)
+        previous_display_title = self._display_section_title(previous_title) if previous_title != "—" else "—"
+        next_display_title = self._display_section_title(next_title) if next_title != "Готово к запуску" else next_title
         current_row = readiness_by_title.get(current_title, {})
         current_issue_card = issue_by_title.get(current_title, {})
         current_change_card = change_by_title.get(current_title, {})
@@ -772,13 +811,13 @@ class DesktopInputEditor:
             lambda title: int(change_by_title.get(title, {}).get("changed_count") or 0) > 0
         )
         self.route_summary_var.set(
-            f"Сейчас шаг {index + 1} из {len(self.section_titles)}: {current_title}. "
-            f"Предыдущий: {previous_title}. Следующий: {next_title}. "
+            f"Сейчас шаг {index + 1} из {len(self.section_titles)}: {current_display_title}. "
+            f"Предыдущий: {previous_display_title}. Следующий: {next_display_title}. "
             f"Готово шагов: {ok_count}; требуют внимания: {warn_count}. "
             f"Шагов с замечаниями: {issue_sections}. "
             f"Изменено шагов: {changed_sections}. "
-            f"Следующий шаг с замечанием: {next_attention_title or 'не найден'}. "
-            f"Следующий изменённый шаг: {next_changed_title or 'не найден'}. "
+            f"Следующий шаг с замечанием: {self._display_section_title(next_attention_title) if next_attention_title else 'не найден'}. "
+            f"Следующий изменённый шаг: {self._display_section_title(next_changed_title) if next_changed_title else 'не найден'}. "
             f"Статус шага: {desktop_section_status_label(str(current_row.get('status') or ''))}. "
             f"Замечаний шага: {current_issue_count}. "
             f"Замечания шага: {str(current_issue_card.get('summary') or 'замечаний нет').strip()}. "
@@ -786,7 +825,7 @@ class DesktopInputEditor:
             f"Изменения шага: {str(current_change_card.get('summary') or 'без изменений').strip()}."
         )
 
-        self.current_section_title_var.set(current_title)
+        self.current_section_title_var.set(current_display_title)
         self.current_section_summary_var.set(
             f"{desktop_section_status_label(str(current_row.get('status') or ''))}. "
             f"Замечаний: {current_issue_count}. "
@@ -808,7 +847,7 @@ class DesktopInputEditor:
                     badges.append(f"зам. {issue_count}")
                 if changed_count > 0:
                     badges.append(f"изм. {changed_count}")
-                self.section_tree.item(item_id, text=f"{idx + 1}. {title} · " + " · ".join(badges))
+                self.section_tree.item(item_id, text=f"{idx + 1}. {self._display_section_title(title)} · " + " · ".join(badges))
 
     def _refresh_section_header_summaries(self) -> None:
         current_payload = self._gather_payload()
@@ -926,7 +965,8 @@ class DesktopInputEditor:
                     )
             tab_index = self.section_title_to_index.get(title)
             if tab_index is not None:
-                tab_caption = title if changed_count <= 0 else f"{title} · {changed_count} изм."
+                display_title = self._display_section_title(title)
+                tab_caption = display_title if changed_count <= 0 else f"{display_title} · {changed_count} изм."
                 self.section_notebook.tab(tab_index, text=tab_caption)
 
     def _jump_to_section_issue(self, section_title: str) -> None:
@@ -938,12 +978,13 @@ class DesktopInputEditor:
         if not focus_key:
             focus_key = str(self.section_change_focus_by_title.get(title) or "").strip()
         if not focus_key:
-            self._set_status(f"Кластер «{title}» выглядит согласованным.")
+            self._set_status(f"Кластер «{self._display_section_title(title)}» выглядит согласованным.")
             return
         self._jump_to_field(focus_key)
 
     def _reset_section_to_source_reference(self, section: object) -> None:
         title = getattr(section, "title", "Раздел")
+        display_title = self._display_section_title(str(title))
         fields = tuple(getattr(section, "fields", ()) or ())
         if not fields:
             return
@@ -962,11 +1003,11 @@ class DesktopInputEditor:
             if str(key or "").strip()
         }
         if not changed_keys:
-            self._set_status(f"Раздел «{title}» уже совпадает с рабочей точкой.")
+            self._set_status(f"Раздел «{display_title}» уже совпадает с рабочей точкой.")
             return
         if not messagebox.askyesno(
             "Desktop Input Editor",
-            f"Вернуть раздел «{title}» к рабочей точке?",
+            f"Вернуть раздел «{display_title}» к рабочей точке?",
         ):
             return
         restored_count = 0
@@ -984,16 +1025,16 @@ class DesktopInputEditor:
                 continue
             self._refresh_value_label(spec.key)
         self._remember_safe_action(
-            f"Возврат раздела к рабочей точке: {title}",
+            f"Возврат раздела к рабочей точке: {display_title}",
             before_payload,
             changed_count=restored_count,
         )
         self._refresh_config_summary()
         self._refresh_profile_comparison()
         self._refresh_section_header_summaries()
-        self._set_status(f"Раздел «{title}» возвращён к рабочей точке.")
+        self._set_status(f"Раздел «{display_title}» возвращён к рабочей точке.")
         self._append_run_log(
-            f"[section-restore] Раздел «{title}» возвращён к рабочей точке; полей: {restored_count}"
+            f"[section-restore] Раздел «{display_title}» возвращён к рабочей точке; полей: {restored_count}"
         )
 
     def _restore_field_to_source_reference(self, key: str) -> None:
@@ -1089,7 +1130,8 @@ class DesktopInputEditor:
         clean_key = str(key or "").strip()
         clean_label = str(label or clean_key).strip() or clean_key
         clean_section_title = str(section_title or "").strip()
-        display = f"{clean_label} — {clean_section_title or '—'}"
+        display_section_title = self._display_section_title(clean_section_title) if clean_section_title else "—"
+        display = f"{clean_label} — {display_section_title}"
         badges = self._field_search_badges_for_key(
             clean_key,
             extra_badges=extra_badges,
@@ -1178,7 +1220,7 @@ class DesktopInputEditor:
                 f"{profile_diff_count} отличается от профиля; "
                 f"{attention_count} совпадает с первыми замечаниями. "
                 f"Первый результат: {str(first_match.get('label') or '').strip()} "
-                f"в секции «{str(first_match.get('section_title') or '').strip()}»."
+                f"в секции «{self._display_section_title(str(first_match.get('section_title') or '').strip())}»."
             ),
             empty_text=(
                 f"По запросу «{query}» ничего не найдено. Попробуйте часть названия или описание параметра."
@@ -1216,7 +1258,7 @@ class DesktopInputEditor:
             summary_text=(
                 f"Изменено от рабочей точки: {len(items)} параметров. "
                 f"Первый: {str(first_item.get('label') or '').strip()} "
-                f"в секции «{str(first_item.get('section_title') or '').strip()}»."
+                f"в секции «{self._display_section_title(str(first_item.get('section_title') or '').strip())}»."
             ),
             empty_text="Отличий от рабочей точки по полям сейчас нет.",
         )
@@ -1256,7 +1298,7 @@ class DesktopInputEditor:
             summary_text=(
                 f"Шагов с замечаниями: {len(items)}. "
                 f"Первое замечание: {str(first_item.get('label') or '').strip()} "
-                f"в секции «{str(first_item.get('section_title') or '').strip()}»."
+                f"в секции «{self._display_section_title(str(first_item.get('section_title') or '').strip())}»."
             ),
             empty_text="Секций с замечаниями сейчас нет.",
         )
@@ -1277,6 +1319,7 @@ class DesktopInputEditor:
             if announce:
                 self._set_status("Текущий кластер пока недоступен.")
             return
+        display_title = self._display_section_title(section_title)
         issue_cards = build_desktop_section_issue_cards(self._gather_payload())
         issue_by_title = {
             str(card.get("title") or "").strip(): card for card in issue_cards
@@ -1310,20 +1353,20 @@ class DesktopInputEditor:
         self._apply_field_search_items(
             items,
             summary_text=(
-                f"Замечания текущего кластера «{section_title}»: {len(items)}. "
+                f"Замечания текущего кластера «{display_title}»: {len(items)}. "
                 f"Из них: {changed_count} изменено от рабочей точки; "
                 f"{profile_diff_count} отличается от профиля. "
                 f"Первое замечание: {str(first_item.get('label') or '').strip()} "
-                f"в секции «{str(first_item.get('section_title') or section_title).strip()}»."
+                f"в секции «{self._display_section_title(str(first_item.get('section_title') or section_title).strip())}»."
             ),
-            empty_text=f"В текущем кластере «{section_title}» замечаний сейчас нет.",
+            empty_text=f"В текущем кластере «{display_title}» замечаний сейчас нет.",
         )
         if not announce:
             return
         if items:
-            self._set_status(f"Показаны замечания текущего кластера: {section_title}")
+            self._set_status(f"Показаны замечания текущего кластера: {display_title}")
         else:
-            self._set_status(f"В текущем кластере «{section_title}» замечаний сейчас нет.")
+            self._set_status(f"В текущем кластере «{display_title}» замечаний сейчас нет.")
 
     def _show_current_section_fields_in_search(self, *, announce: bool = True) -> None:
         self.field_search_mode = "current_section"
@@ -1337,6 +1380,7 @@ class DesktopInputEditor:
             if announce:
                 self._set_status("Текущий кластер пока недоступен.")
             return
+        display_title = self._display_section_title(section_title)
         items = [
             self._build_field_search_item(
                 key=str(item.get("key") or "").strip(),
@@ -1367,21 +1411,21 @@ class DesktopInputEditor:
         self._apply_field_search_items(
             items,
             summary_text=(
-                f"Текущий кластер «{section_title}»: {len(items)} параметров. "
+                f"Текущий кластер «{display_title}»: {len(items)} параметров. "
                 f"Из них: {changed_count} изменено от рабочей точки; "
                 f"{profile_diff_count} отличается от профиля; "
                 f"{attention_count} совпадает с первым замечанием кластера. "
                 f"Первый: {str(first_item.get('label') or '').strip()} "
-                f"в секции «{str(first_item.get('section_title') or section_title).strip()}»."
+                f"в секции «{self._display_section_title(str(first_item.get('section_title') or section_title).strip())}»."
             ),
-            empty_text=f"В кластере «{section_title}» доступных параметров сейчас нет.",
+            empty_text=f"В кластере «{display_title}» доступных параметров сейчас нет.",
         )
         if not announce:
             return
         if items:
-            self._set_status(f"Показаны параметры текущего кластера: {section_title}")
+            self._set_status(f"Показаны параметры текущего кластера: {display_title}")
         else:
-            self._set_status(f"В кластере «{section_title}» доступных параметров сейчас нет.")
+            self._set_status(f"В кластере «{display_title}» доступных параметров сейчас нет.")
 
     def _show_current_section_changed_fields_in_search(self, *, announce: bool = True) -> None:
         self.field_search_mode = "current_section_changed"
@@ -1395,6 +1439,7 @@ class DesktopInputEditor:
             if announce:
                 self._set_status("Текущий кластер пока недоступен.")
             return
+        display_title = self._display_section_title(section_title)
         items = [
             self._build_field_search_item(
                 key=str(item.get("key") or "").strip(),
@@ -1422,20 +1467,20 @@ class DesktopInputEditor:
         self._apply_field_search_items(
             items,
             summary_text=(
-                f"Изменения текущего кластера «{section_title}»: {len(items)} параметров. "
+                f"Изменения текущего кластера «{display_title}»: {len(items)} параметров. "
                 f"Из них: {profile_diff_count} отличается от профиля; "
                 f"{attention_count} совпадает с первым замечанием кластера. "
                 f"Первое изменение: {str(first_item.get('label') or '').strip()} "
-                f"в секции «{str(first_item.get('section_title') or section_title).strip()}»."
+                f"в секции «{self._display_section_title(str(first_item.get('section_title') or section_title).strip())}»."
             ),
-            empty_text=f"В текущем кластере «{section_title}» изменений от рабочей точки нет.",
+            empty_text=f"В текущем кластере «{display_title}» изменений от рабочей точки нет.",
         )
         if not announce:
             return
         if items:
-            self._set_status(f"Показаны изменения текущего кластера: {section_title}")
+            self._set_status(f"Показаны изменения текущего кластера: {display_title}")
         else:
-            self._set_status(f"В текущем кластере «{section_title}» изменений от рабочей точки нет.")
+            self._set_status(f"В текущем кластере «{display_title}» изменений от рабочей точки нет.")
 
     def _show_section_search_from_summary(self, section_title: str) -> None:
         title = str(section_title or "").strip()
@@ -1491,7 +1536,7 @@ class DesktopInputEditor:
             summary_text=(
                 f"Отличия с профилем «{profile_name}»: {len(items)} параметров. "
                 f"Первый: {str(first_item.get('label') or '').strip()} "
-                f"в секции «{str(first_item.get('section_title') or '').strip()}»."
+                f"в секции «{self._display_section_title(str(first_item.get('section_title') or '').strip())}»."
             ),
             empty_text=f"Отличий с профилем «{profile_name}» сейчас нет.",
         )
@@ -1529,8 +1574,9 @@ class DesktopInputEditor:
         self._scroll_to_field(clean_key)
         spec, _label = self._widget_handles.get(clean_key, (None, None))
         if spec is not None:
+            display_title = self._display_section_title(section_title or "")
             self.field_search_summary_var.set(
-                f"Переход к параметру «{spec.label}» в секции «{section_title or '—'}»."
+                f"Переход к параметру «{spec.label}» в секции «{display_title or '—'}»."
             )
             self._set_status(f"Открыт параметр: {spec.label}")
 
@@ -1830,6 +1876,16 @@ class DesktopInputEditor:
             wraplength=840,
             justify="left",
         ).grid(row=0, column=1, sticky="ew", padx=(12, 0))
+        ttk.Button(
+            handoff_box,
+            text="Открыть inputs_snapshot.json",
+            command=self._open_inputs_handoff_snapshot,
+        ).grid(row=1, column=0, sticky="w", pady=(8, 0))
+        ttk.Button(
+            handoff_box,
+            text="Открыть папку WS-INPUTS",
+            command=self._open_inputs_handoff_dir,
+        ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(8, 0))
 
         diff_frame = ttk.Frame(profile_details_notebook, padding=8)
         profile_details_notebook.add(diff_frame, text="Сравнение")
@@ -2128,7 +2184,7 @@ class DesktopInputEditor:
             text=(
                 "Быстрый маршрут помогает идти по кластерам: сначала геометрия, затем пневматика, "
                 "массы, механика, статическая настройка, компоненты, справочные данные "
-                "и численные настройки. "
+                "и расчётные настройки. "
                 "Это только навигация по текущему editor "
                 "и не дублирует отдельные окна Animator, Compare Viewer или Mnemo."
             ),
@@ -2136,9 +2192,10 @@ class DesktopInputEditor:
             justify="left",
         ).grid(row=0, column=0, columnspan=route_col_count, sticky="w")
         for idx, title in enumerate(self.section_titles):
+            display_title = self._display_section_title(title)
             button = ttk.Button(
                 route_frame,
-                text=f"{idx + 1}. {title}",
+                text=f"{idx + 1}. {display_title}",
                 command=lambda section_title=title: self._select_section_by_title(section_title),
             )
             button.grid(row=1, column=idx, sticky="ew", padx=(0 if idx == 0 else 8, 0), pady=(10, 0))
@@ -2269,7 +2326,7 @@ class DesktopInputEditor:
         for idx, title in enumerate(self.section_titles):
             item_id = f"section::{idx}"
             self._section_tree_ids[title] = item_id
-            self.section_tree.insert("", "end", iid=item_id, text=f"{idx + 1}. {title}")
+            self.section_tree.insert("", "end", iid=item_id, text=f"{idx + 1}. {self._display_section_title(title)}")
         if self.section_titles:
             first_item = self._section_tree_ids.get(self.section_titles[0])
             if first_item:
@@ -2391,11 +2448,18 @@ class DesktopInputEditor:
         ).grid(row=3, column=0, sticky="ew", pady=(4, 0))
         ttk.Label(
             facts_box,
+            textvariable=self.inspector_source_state_var,
+            wraplength=280,
+            justify="left",
+            foreground="#355c7d",
+        ).grid(row=4, column=0, sticky="ew", pady=(4, 0))
+        ttk.Label(
+            facts_box,
             textvariable=self.inspector_help_var,
             wraplength=280,
             justify="left",
             foreground="#4b5563",
-        ).grid(row=4, column=0, sticky="ew", pady=(8, 0))
+        ).grid(row=5, column=0, sticky="ew", pady=(8, 0))
         related_box = ttk.LabelFrame(inspector_panel, text="Связанные параметры", padding=8)
         related_box.grid(row=2, column=0, sticky="nsew", pady=(8, 0))
         related_box.columnconfigure(0, weight=1)
@@ -2440,7 +2504,7 @@ class DesktopInputEditor:
 
         for section in DESKTOP_INPUT_SECTIONS:
             tab = ScrollableSection(notebook)
-            notebook.add(tab, text=section.title)
+            notebook.add(tab, text=self._display_section_title(section.title))
             tab.body.columnconfigure(0, weight=1)
             section_desc_label = ttk.Label(
                 tab.body,
@@ -2719,16 +2783,18 @@ class DesktopInputEditor:
         self._selected_field_key = spec.key
         self._selected_field_spec = spec
         section_title = self._section_title_by_key.get(spec.key, "—")
+        payload = self._gather_payload()
+        source_state = self._field_source_state_info(spec.key, payload)
         self.inspector_title_var.set(spec.label)
-        self.inspector_section_var.set(f"Раздел: {section_title}")
+        self.inspector_section_var.set(f"Раздел: {self._display_section_title(section_title)}")
         self.inspector_unit_var.set(f"Единица: {spec.unit_label or 'безразмерно'}")
         self.inspector_range_var.set(f"Диапазон: {spec.range_text}")
         self.inspector_context_var.set(
             f"Контекст: {self._graphic_context_title(spec.effective_graphic_context) or 'общий'}"
         )
+        self.inspector_source_state_var.set(f"Source/state: {source_state.get('marker') or '—'}")
         self.inspector_help_var.set(spec.effective_tooltip_text or spec.description)
         self._refresh_inspector_related_fields(spec)
-        payload = self._gather_payload()
         self._refresh_graphics_for_section(
             section_title=section_title,
             payload=payload,
@@ -2756,6 +2822,9 @@ class DesktopInputEditor:
         self.source_reference_diffs_by_key = {
             str(item.get("key") or ""): item for item in diffs
         }
+        if self._selected_field_key:
+            source_state = self._field_source_state_info(self._selected_field_key)
+            self.inspector_source_state_var.set(f"Source/state: {source_state.get('marker') or '—'}")
 
     def _on_field_var_changed(self, key: str) -> None:
         self._refresh_source_reference_diff_state()
@@ -2818,6 +2887,26 @@ class DesktopInputEditor:
                 "Desktop Input Editor",
                 f"Не удалось заморозить inputs_snapshot.json:\n{exc}",
             )
+
+    def _open_inputs_handoff_snapshot(self) -> None:
+        target = desktop_inputs_snapshot_handoff_path()
+        if not target.exists():
+            messagebox.showinfo("Desktop Input Editor", "inputs_snapshot.json пока не создан.")
+            return
+        self._open_path(
+            target,
+            success_text=f"Открыт inputs_snapshot.json: {target}",
+            error_title="Не удалось открыть inputs_snapshot.json",
+        )
+
+    def _open_inputs_handoff_dir(self) -> None:
+        target = desktop_inputs_handoff_dir_path()
+        target.mkdir(parents=True, exist_ok=True)
+        self._open_path(
+            target,
+            success_text=f"Открыта папка WS-INPUTS: {target}",
+            error_title="Не удалось открыть папку WS-INPUTS",
+        )
 
     def _current_suite_rows_for_handoff(self) -> tuple[list[dict[str, object]], Path, str]:
         profile_key = self._selected_run_profile_key()
@@ -3256,20 +3345,23 @@ class DesktopInputEditor:
             text = f"{float(value):.{int(spec.digits)}f} {spec.unit_label}".strip()
         compare_diff = key in self.compare_diffs_by_key
         source_diff = key in self.source_reference_diffs_by_key
+        source_state = self._field_source_state_info(key)
+        source_marker = str(source_state.get("marker") or "").strip()
+        text_with_marker = f"{text} · {source_marker}" if source_marker else text
         if compare_diff and source_diff:
             label.configure(
-                text=f"{text} · изменено и от рабочей точки",
+                text=f"{text} · изменено и от рабочей точки · {source_marker}",
                 foreground="#8a4b00",
             )
         elif compare_diff:
-            label.configure(text=f"{text} · изменено", foreground="#a05a00")
+            label.configure(text=f"{text} · изменено · {source_marker}", foreground="#a05a00")
         elif source_diff:
             label.configure(
-                text=f"{text} · изменено от рабочей точки",
+                text=f"{text} · изменено от рабочей точки · {source_marker}",
                 foreground="#16507a",
             )
         else:
-            label.configure(text=text, foreground="#2f4f4f")
+            label.configure(text=text_with_marker, foreground="#2f4f4f")
         if restore_button is not None:
             if source_diff:
                 restore_button.configure(text="К рабочей точке", state="normal")
@@ -4194,7 +4286,7 @@ class DesktopInputEditor:
                 parent_id = self.compare_tree.insert(
                     "",
                     "end",
-                    text=section_title,
+                    text=self._display_section_title(section_title),
                     values=(f"{sum(1 for item in self.compare_diffs_by_key.values() if self._section_title_by_key.get(str(item.get('key') or ''), 'Прочее') == section_title)} отличий", ""),
                     open=True,
                 )
@@ -4424,12 +4516,13 @@ class DesktopInputEditor:
 
     def _reset_section_to_defaults(self, section: object) -> None:
         title = getattr(section, "title", "Раздел")
+        display_title = self._display_section_title(str(title))
         fields = tuple(getattr(section, "fields", ()) or ())
         if not fields:
             return
         if not messagebox.askyesno(
             "Desktop Input Editor",
-            f"Вернуть раздел «{title}» к значениям по умолчанию?",
+            f"Вернуть раздел «{display_title}» к значениям по умолчанию?",
         ):
             return
         before_payload = self._gather_payload()
@@ -4449,15 +4542,15 @@ class DesktopInputEditor:
                 continue
             self._refresh_value_label(spec.key)
         self._remember_safe_action(
-            f"Сброс раздела: {title}",
+            f"Сброс раздела: {display_title}",
             before_payload,
             changed_count=changed_count,
         )
         self._refresh_config_summary()
         self._refresh_profile_comparison()
-        self._set_status(f"Раздел «{title}» возвращён к значениям по умолчанию.")
+        self._set_status(f"Раздел «{display_title}» возвращён к значениям по умолчанию.")
         self._append_run_log(
-            f"[section-reset] Раздел «{title}» сброшен к default_base.json; полей: {changed_count}"
+            f"[section-reset] Раздел «{display_title}» сброшен к default_base.json; полей: {changed_count}"
         )
 
     def _gather_payload(self) -> dict[str, object]:

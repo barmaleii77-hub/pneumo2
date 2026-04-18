@@ -723,7 +723,7 @@ class LauncherGUI:
         ttk.Button(top, text="Запустить (с авто-установкой зависимостей)", command=self.start_app).pack(
             side="right", padx=6
         )
-        ttk.Button(top, text="Запустить Desktop GUI-spec", command=self.start_desktop_shell).pack(side="right", padx=6)
+        ttk.Button(top, text="Запустить Desktop Main Shell", command=self.start_desktop_shell).pack(side="right", padx=6)
         ttk.Button(top, text="Остановить", command=lambda: self.stop_app(reason="button_stop")).pack(side="right", padx=6)
         ttk.Button(top, text="Только установить зависимости", command=self.install_deps).pack(side="right", padx=6)
 
@@ -747,7 +747,7 @@ class LauncherGUI:
         ttk.Button(bottom, text="Открыть папку логов", command=self.open_logs_dir).pack(side="left")
         ttk.Button(bottom, text="Открыть deps_install.log", command=self.open_deps_log).pack(side="left", padx=6)
         ttk.Button(bottom, text="Открыть streamlit_stdout.log", command=self.open_streamlit_log).pack(side="left", padx=6)
-        ttk.Button(bottom, text="Открыть desktop_gui_spec_shell.log", command=self.open_desktop_log).pack(side="left", padx=6)
+        ttk.Button(bottom, text="Открыть desktop_main_shell_qt.log", command=self.open_desktop_log).pack(side="left", padx=6)
         ttk.Button(bottom, text="Выход", command=self.on_close).pack(side="right")
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -843,6 +843,7 @@ class LauncherGUI:
         transient_keys = {
             "PNEUMO_UI_PORT",
             "PNEUMO_AUTO_SEND_BUNDLE",
+            "PNEUMO_DESKTOP_MAIN_SHELL_QT",
             "PNEUMO_DESKTOP_GUI_SPEC_SHELL",
             "PNEUMO_LAUNCH_SURFACE",
         }
@@ -1839,7 +1840,7 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
         def worker() -> None:
             with self._lock:
                 try:
-                    self._ui_status("Готовлю окружение для desktop GUI-spec …")
+                    self._ui_status("Готовлю окружение для главного Desktop Main Shell …")
                     self._pbar_set(0)
                     ok = self._install_deps_sync()
                     if not ok:
@@ -1850,18 +1851,18 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
                     _, _, log_dir, _, _, env = self._prepare_child_session_env(
                         run_prefix="DESKTOP",
                         extra_env={
-                            "PNEUMO_LAUNCH_SURFACE": "desktop_gui_spec_shell",
-                            "PNEUMO_DESKTOP_GUI_SPEC_SHELL": "1",
+                            "PNEUMO_LAUNCH_SURFACE": "desktop_main_shell_qt",
+                            "PNEUMO_DESKTOP_MAIN_SHELL_QT": "1",
                         },
                     )
-                    desktop_log_path = log_dir / "desktop_gui_spec_shell.log"
+                    desktop_log_path = log_dir / "desktop_main_shell_qt.log"
                     cmd = [
                         str(py),
                         "-m",
-                        "pneumo_solver_ui.tools.desktop_gui_spec_shell",
+                        "pneumo_solver_ui.tools.desktop_main_shell_qt",
                     ]
 
-                    self._ui_status("Запускаю Desktop GUI-spec …")
+                    self._ui_status("Запускаю главное Desktop Main Shell …")
                     self._pbar_start_indeterminate()
                     self.proc_kind = "desktop"
                     self.proc = self._launch_logged_process(
@@ -1884,17 +1885,17 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
                     self._pbar_set(100)
 
                     if exited_early:
-                        self._ui_status("❌ Desktop GUI-spec завершился сразу (см. desktop log)")
-                        self._log(f"❌ Desktop GUI-spec завершился сразу — проверь лог: {desktop_log_path}")
+                        self._ui_status("❌ Desktop Main Shell завершился сразу (см. desktop log)")
+                        self._log(f"❌ Desktop Main Shell завершился сразу — проверь лог: {desktop_log_path}")
                         _safe_messagebox_error(
                             "Не удалось запустить",
-                            "Desktop GUI-spec завершился сразу после старта.\n\n"
+                            "Desktop Main Shell завершился сразу после старта.\n\n"
                             f"Проверь лог: {desktop_log_path}",
                         )
                         return
 
-                    self._ui_status("✅ Desktop GUI-spec запущен (через тот же bootstrap и venv).")
-                    self._log(f"✅ Desktop GUI-spec запущен. Лог: {desktop_log_path}")
+                    self._ui_status("✅ Desktop Main Shell запущен (через тот же bootstrap и venv).")
+                    self._log(f"✅ Desktop Main Shell запущен. Лог: {desktop_log_path}")
                 except Exception as e:
                     tb = traceback.format_exc()
                     self._pbar_stop()
@@ -1904,7 +1905,7 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
                             f.write("\nCRASH:\n" + tb + "\n")
                     except Exception:
                         pass
-                    _safe_messagebox_error("Ошибка", f"Сбой запуска desktop GUI-spec. См. логи в {LOG_DIR}")
+                    _safe_messagebox_error("Ошибка", f"Сбой запуска Desktop Main Shell. См. логи в {LOG_DIR}")
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -2109,13 +2110,13 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
         if self._launcher_stop_requested:
             self._ui_status("Остановлено.")
         elif rc in (0, None):
-            self._ui_status("Desktop GUI-spec завершён.")
+            self._ui_status("Desktop Main Shell завершён.")
         else:
-            self._ui_status("❌ Desktop GUI-spec завершился с ошибкой (см. desktop log)")
+            self._ui_status("❌ Desktop Main Shell завершился с ошибкой (см. desktop log)")
             if log_path is not None:
                 _safe_messagebox_error(
-                    "Desktop GUI-spec",
-                    "Desktop GUI-spec завершился с ошибкой.\n\n"
+                    "Desktop Main Shell",
+                    "Desktop Main Shell завершился с ошибкой.\n\n"
                     f"Проверь лог: {log_path}",
                 )
         if self._close_requested:
@@ -2204,13 +2205,13 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
     def open_desktop_log(self) -> None:
         candidates: list[Path] = []
         try:
-            if self.active_log_path is not None and self.active_log_path.name == "desktop_gui_spec_shell.log":
+            if self.active_log_path is not None and self.active_log_path.name == "desktop_main_shell_qt.log":
                 candidates.append(self.active_log_path)
         except Exception:
             pass
         try:
             if self.session_dir is not None:
-                candidates.append(self.session_dir / "logs" / "desktop_gui_spec_shell.log")
+                candidates.append(self.session_dir / "logs" / "desktop_main_shell_qt.log")
         except Exception:
             pass
 
@@ -2224,7 +2225,7 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
                 continue
 
         if target is None:
-            messagebox.showinfo("Нет файла", "desktop_gui_spec_shell.log пока не создан.")
+            messagebox.showinfo("Нет файла", "desktop_main_shell_qt.log пока не создан.")
             return
 
         try:

@@ -12,6 +12,7 @@ from pathlib import Path
 DESKTOP_MNEMO_RUNTIME_PROOF_JSON_NAME = "desktop_mnemo_runtime_proof.json"
 DESKTOP_MNEMO_RUNTIME_PROOF_MD_NAME = "desktop_mnemo_runtime_proof.md"
 DEFAULT_STARTUP_BUDGET_S = 3.0
+DEFAULT_CLOSE_BUDGET_S = 1.0
 
 
 def _utc_iso() -> str:
@@ -47,7 +48,9 @@ def _render_proof_md(proof: dict[str, object]) -> str:
         f"- dock_count: {len(proof.get('dock_object_names') or [])}",
         f"- constructor_s: {timings.get('constructor_s', '-')}",
         f"- first_event_cycle_s: {timings.get('first_event_cycle_s', '-')}",
+        f"- close_s: {timings.get('close_s', '-')}",
         f"- startup_budget_s: {proof.get('startup_budget_s', '-')}",
+        f"- close_budget_s: {proof.get('close_budget_s', '-')}",
         f"- automated_checks: {sum(1 for value in checks.values() if value is True)}/{len(checks)} true",
         "",
         "## Checks",
@@ -61,10 +64,15 @@ def _render_proof_md(proof: dict[str, object]) -> str:
             "## Boundary",
             "",
             "- This proof instantiates Desktop Mnemo and processes the first Qt event cycle.",
+            "- It also closes the window through Qt and verifies that local Desktop Mnemo timers stop.",
             "- It does not claim final Windows visual/runtime acceptance.",
             "- Real user-visible open, no-overlap inspection and hang reproduction remain operator/runtime checks.",
         ]
     )
+    manual = [str(item) for item in list(proof.get("manual_verification_required") or [])]
+    if manual:
+        lines.extend(["", "## Manual Verification Still Required", ""])
+        lines.extend(f"- {item}" for item in manual)
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -120,6 +128,7 @@ def collect_desktop_mnemo_runtime_proof(
         startup_checklist=["Instantiate QMainWindow", "Process first Qt event cycle", "Close without app.exec()"],
     )
     constructor_s = time.perf_counter() - start
+    closed_in_proof = False
     try:
         window.show()
         for _ in range(8):
@@ -136,6 +145,35 @@ def collect_desktop_mnemo_runtime_proof(
             if action.text()
         ]
         layout_contract = window._build_window_layout_contract()
+        window_rect = window.geometry()
+        native_canvas = window.mnemo_view.native_canvas
+        native_canvas_size = native_canvas.size()
+        status_text = window.status_text.text() if hasattr(window, "status_text") else ""
+        truth_text = window.truth_text.text() if hasattr(window, "truth_text") else ""
+        status_label_visible = bool(hasattr(window, "status_text") and window.status_text.isVisible())
+        truth_label_visible = bool(hasattr(window, "truth_text") and window.truth_text.isVisible())
+        path_label_visible = bool(hasattr(window, "path_text") and window.path_text.isVisible())
+        blocking_modal_dialogs = [
+            str(widget.objectName() or widget.windowTitle() or type(widget).__name__)
+            for widget in app.topLevelWidgets()
+            if isinstance(widget, QtWidgets.QDialog)
+            and widget.isVisible()
+            and widget.windowModality() != QtCore.Qt.NonModal
+        ]
+
+        close_start = time.perf_counter()
+        window.close()
+        closed_in_proof = True
+        for _ in range(8):
+            app.processEvents()
+        close_s = time.perf_counter() - close_start
+        play_timer_active_after_close = bool(
+            hasattr(window, "play_timer") and window.play_timer is not None and window.play_timer.isActive()
+        )
+        pointer_watcher = getattr(window, "pointer_watcher", None)
+        pointer_timer = getattr(pointer_watcher, "_timer", None)
+        pointer_timer_active_after_close = bool(pointer_timer is not None and pointer_timer.isActive())
+        window_visible_after_close = bool(window.isVisible())
         expected_docks = {
             "dock_overview",
             "dock_snapshot",
@@ -159,8 +197,20 @@ def collect_desktop_mnemo_runtime_proof(
             and hasattr(window, "truth_text")
             and hasattr(window, "path_text"),
             "blank_startup_does_not_require_dataset": effective_npz is not None or window.dataset is None,
+            "visible_window_geometry": bool(window_rect.width() > 0 and window_rect.height() > 0),
+            "native_canvas_size_present": bool(native_canvas_size.width() > 0 and native_canvas_size.height() > 0),
+            "status_truth_text_visible": bool(status_label_visible and truth_label_visible and truth_text),
+            "blank_startup_unavailable_truth_visible": effective_npz is not None
+            or (window.dataset is None and truth_text == "Mnemo: unavailable pressure/state" and truth_label_visible),
+            "blank_startup_does_not_claim_confirmed_truth": effective_npz is not None
+            or truth_text != "Mnemo: confirmed",
+            "no_blocking_modal_visible": not blocking_modal_dialogs,
             "pointer_path_resolved": bool(str(effective_pointer)),
             "first_event_cycle_under_budget": first_event_cycle_s <= float(startup_budget_s),
+            "close_returns_control_under_budget": close_s <= DEFAULT_CLOSE_BUDGET_S,
+            "window_hidden_after_close": not window_visible_after_close,
+            "playback_timer_stopped_after_close": not play_timer_active_after_close,
+            "pointer_watcher_stopped_after_close": not pointer_timer_active_after_close,
             "no_event_loop_exec_required": True,
         }
         automated_status = "PASS" if all(checks.values()) else "FAIL"
@@ -173,35 +223,73 @@ def collect_desktop_mnemo_runtime_proof(
             "qt_platform": QtGui.QGuiApplication.platformName(),
             "offscreen": bool(offscreen),
             "startup_budget_s": float(startup_budget_s),
+            "close_budget_s": DEFAULT_CLOSE_BUDGET_S,
             "timings_s": {
                 "constructor_s": round(float(constructor_s), 6),
                 "first_event_cycle_s": round(float(first_event_cycle_s), 6),
+                "close_s": round(float(close_s), 6),
             },
             "launch_contract": launch_contract,
             "window_object_name": window.objectName(),
             "window_title": window.windowTitle(),
+            "window_geometry": {
+                "x": int(window_rect.x()),
+                "y": int(window_rect.y()),
+                "width": int(window_rect.width()),
+                "height": int(window_rect.height()),
+            },
+            "native_canvas_size": {
+                "width": int(native_canvas_size.width()),
+                "height": int(native_canvas_size.height()),
+            },
             "dock_object_names": dock_object_names,
             "menu_labels": menu_labels,
             "toolbar_actions": toolbar_actions,
-            "status_text": window.status_text.text() if hasattr(window, "status_text") else "",
-            "truth_text": window.truth_text.text() if hasattr(window, "truth_text") else "",
+            "status_text": status_text,
+            "truth_text": truth_text,
+            "status_strip_visibility": {
+                "status_text_visible": status_label_visible,
+                "truth_text_visible": truth_label_visible,
+                "path_text_visible": path_label_visible,
+            },
             "dataset_loaded": window.dataset is not None,
             "follow_enabled": bool(window.follow_enabled),
             "pointer_path": str(effective_pointer),
             "npz_path": str(effective_npz) if effective_npz is not None else "",
             "layout_contract": layout_contract,
+            "blocking_modal_dialogs": blocking_modal_dialogs,
+            "close_state": {
+                "window_visible_after_close": window_visible_after_close,
+                "playback_timer_active_after_close": play_timer_active_after_close,
+                "pointer_watcher_timer_active_after_close": pointer_timer_active_after_close,
+            },
             "checks": checks,
             "status": automated_status,
             "release_readiness": "PENDING_REAL_WINDOWS_VISUAL_CHECK" if automated_status == "PASS" else "FAIL",
             "manual_verification_required": [
                 "real_windows_open_does_not_hang",
+                "real_windows_resize_no_overlap",
+                "windows_snap_restore",
+                "mnemo_dock_overlap_inspection",
+                "mnemo_scheme_readability",
+                "unavailable_truth_state_visible",
                 "mnemo_visual_no_overlap",
                 "mnemo_close_returns_control",
+                "second_monitor_if_available",
+                "mixed_dpi_if_available",
+                "long_running_follow_playback_stability",
+            ],
+            "non_closure": [
+                "final_windows_visual_acceptance_without_manual_evidence",
+                "snap_layouts_second_monitor_mixed_dpi_long_running_stability",
+                "producer_truth_geometry_packaging_animator_compare_shell_diagnostics_send",
+                "OG-001_through_OG-006",
             ],
         }
         return proof
     finally:
-        window.close()
+        if not closed_in_proof:
+            window.close()
         app.processEvents()
         if owns_app:
             app.quit()
@@ -228,8 +316,18 @@ def validate_desktop_mnemo_runtime_proof(proof_path: Path | str) -> dict[str, ob
         "toolbar_actions_present",
         "status_strip_present",
         "blank_startup_does_not_require_dataset",
+        "visible_window_geometry",
+        "native_canvas_size_present",
+        "status_truth_text_visible",
+        "blank_startup_unavailable_truth_visible",
+        "blank_startup_does_not_claim_confirmed_truth",
+        "no_blocking_modal_visible",
         "pointer_path_resolved",
         "first_event_cycle_under_budget",
+        "close_returns_control_under_budget",
+        "window_hidden_after_close",
+        "playback_timer_stopped_after_close",
+        "pointer_watcher_stopped_after_close",
         "no_event_loop_exec_required",
     }
     missing = sorted(required_checks - set(checks))
@@ -262,6 +360,33 @@ def validate_desktop_mnemo_runtime_proof(proof_path: Path | str) -> dict[str, ob
         errors.append(
             f"first_event_cycle_s {first_event_cycle_s:.3f} exceeds startup_budget_s {startup_budget_s:.3f}"
         )
+    try:
+        close_s = float(timings.get("close_s"))
+        close_budget_s = float(proof.get("close_budget_s"))
+    except Exception:
+        errors.append("runtime proof close timing values must be numeric")
+        close_s = 0.0
+        close_budget_s = 0.0
+    if close_budget_s > 0 and close_s > close_budget_s:
+        errors.append(f"close_s {close_s:.3f} exceeds close_budget_s {close_budget_s:.3f}")
+
+    manual_required = {str(item) for item in list(proof.get("manual_verification_required") or [])}
+    required_manual = {
+        "real_windows_open_does_not_hang",
+        "real_windows_resize_no_overlap",
+        "windows_snap_restore",
+        "mnemo_dock_overlap_inspection",
+        "mnemo_scheme_readability",
+        "unavailable_truth_state_visible",
+        "mnemo_visual_no_overlap",
+        "mnemo_close_returns_control",
+        "second_monitor_if_available",
+        "mixed_dpi_if_available",
+        "long_running_follow_playback_stability",
+    }
+    missing_manual = sorted(required_manual - manual_required)
+    if missing_manual:
+        errors.append(f"runtime proof missing manual verification item(s): {', '.join(missing_manual)}")
 
     return {
         "schema": "desktop_mnemo_runtime_proof_validation.v1",
@@ -273,6 +398,7 @@ def validate_desktop_mnemo_runtime_proof(proof_path: Path | str) -> dict[str, ob
         "release_readiness": release_readiness,
         "missing_checks": missing,
         "failed_checks": failed,
+        "missing_manual_verification": missing_manual,
     }
 
 

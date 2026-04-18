@@ -227,6 +227,10 @@ def test_desktop_mnemo_window_has_persistent_docks_and_playhead_bridge() -> None
     assert '"window_layout_contract": layout_contract' in src
     assert "window_layout_contract=self._build_window_layout_contract()" in src
     assert "QMessageBox.critical" not in src
+    assert "def _stop_runtime_activity_for_close(self) -> None:" in src
+    assert "self.play_timer.stop()" in src
+    assert "self.pointer_watcher.stop()" in src
+    assert "self._stop_runtime_activity_for_close()" in src
     assert 'self.truth_text = QtWidgets.QLabel("Mnemo: unavailable pressure/state")' in src
     assert "def _set_truth_status(self, availability: dict[str, Any] | None) -> None:" in src
     assert 'return "Mnemo: confirmed"' in src
@@ -843,6 +847,20 @@ def test_desktop_mnemo_offscreen_runtime_window_layout_evidence(
         assert canvas_png.stat().st_size > 4096
         assert _pixmap_color_sample_count(window_pixmap) >= 4
         assert _pixmap_color_sample_count(canvas_pixmap) >= 4
+
+        window.play_action.setChecked(True)
+        window.follow_action.setChecked(True)
+        qt_app.processEvents()
+        assert window.playing is True
+        assert window.play_timer.isActive()
+        assert window.pointer_watcher._timer.isActive()
+        window.close()
+        qt_app.processEvents()
+        assert window.playing is False
+        assert window.play_action.isChecked() is False
+        assert window.play_action.text() == "Пуск"
+        assert window.play_timer.isActive() is False
+        assert window.pointer_watcher._timer.isActive() is False
     finally:
         window.close()
         window.deleteLater()
@@ -921,9 +939,12 @@ def test_desktop_mnemo_offscreen_bad_npz_reports_status_without_modal(
         startup_checklist=["Проверить no-modal load failure."],
     )
     try:
+        window.show()
         qt_app.processEvents()
         assert window.dataset is None
         assert window.truth_text.text() == "Mnemo: unavailable pressure/state"
+        assert window.truth_text.isVisible()
+        assert window.truth_text.text() != "Mnemo: confirmed"
         assert window.status_text.text().startswith("Ошибка загрузки:")
         sidecar_path = window._last_load_error_sidecar_path
         assert sidecar_path is not None and sidecar_path.exists()

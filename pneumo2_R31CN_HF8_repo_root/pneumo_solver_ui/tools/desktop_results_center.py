@@ -442,6 +442,13 @@ class DesktopResultsCenter(ttk.Frame):
         self.evidence_manifest_var.set(
             f"Evidence manifest: {snapshot.diagnostics_evidence_manifest_status} | {manifest_label}"
         )
+        if snapshot.selected_run_contract_path is not None:
+            self.context_banner_var.set(
+                snapshot.result_context_banner
+                + "\nOptimizer selected-run contract: "
+                + f"{snapshot.selected_run_contract_status} | "
+                + str(snapshot.selected_run_contract_path)
+            )
         self.next_step_var.set("Следующий шаг: " + snapshot.suggested_next_step)
         self.next_detail_var.set("Почему сейчас: " + snapshot.suggested_next_detail)
         self._render_overview(snapshot)
@@ -842,6 +849,13 @@ class DesktopResultsCenter(ttk.Frame):
             format_recent_runs_summary(snapshot),
             format_result_context_summary(snapshot),
             snapshot.result_context_banner,
+            (
+                "Optimizer selected-run contract: "
+                f"{snapshot.selected_run_contract_status} | "
+                f"hash={snapshot.selected_run_contract_hash or '—'} | "
+                f"path={snapshot.selected_run_contract_path or '—'}"
+            ),
+            snapshot.selected_run_contract_banner,
             f"Evidence manifest: {snapshot.diagnostics_evidence_manifest_path or '—'}",
             "Область просмотра: " + self._browse_scope_summary(),
             "",

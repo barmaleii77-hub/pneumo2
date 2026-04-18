@@ -7,6 +7,10 @@ reported in `CODE_TREE_AUDIT_2026-04-18.md` for new work starts.
 This is a coordination and hygiene artifact. It does not approve the
 quarantined GUI code and does not claim runtime closure.
 
+Resolution update: the quarantined code in `7823dc2` was later integrated into
+`codex/work` by cherry-pick after targeted validation. See
+`QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md`.
+
 ## Repository State After Recovery
 
 Command snapshot:
@@ -35,8 +39,8 @@ Preserved safety snapshot:
 - commit: `7823dc2 chore: quarantine mixed gui dirty tree`
 - scope: unfinished mixed changes across main shell, input editor, Desktop
   Mnemo, optimizer/results and related tests
-- status: quarantine only, not approved for integration and not a source branch
-  for new chats
+- status after resolution: integrated into `codex/work` by cherry-pick, then
+  eligible for local branch deletion
 
 Additional local safety copies were stored under the ignored workspace folder:
 
@@ -169,4 +173,3 @@ git show codex/quarantine-mixed-gui-dirty-20260418:<repo-path>
 The updated self-contained prompts are stored in:
 
 - `docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md`
-

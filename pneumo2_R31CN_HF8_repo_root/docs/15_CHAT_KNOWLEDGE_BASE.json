@@ -1,6 +1,6 @@
 {
   "schema": "pneumo.chat_knowledge_base.v1",
-  "updated_at": "2026-04-18T07:16:22+00:00",
+  "updated_at": "2026-04-18T07:53:00+00:00",
   "requirements": [
     {
       "id": "REQ-0001",
@@ -558,6 +558,15 @@
       "title": "Branch tree recovery and 10 clean Plan-mode prompts",
       "details": "Зафиксировать recovery-аудит после карантина mixed GUI dirty tree, обновить PROJECT_SOURCES и GUI prompt index, а для тех же 10 параллельных чатов выдать самодостаточные стартовые промты с clean codex/work, read-only quarantine и strict owned/forbidden file boundaries.",
       "artifact_path": "gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md",
+      "status": "active"
+    },
+    {
+      "id": "PLAN-0045",
+      "created_at": "2026-04-18T07:53:00+00:00",
+      "source": "chat: quarantine 7823dc2 resolution 2026-04-18",
+      "title": "Resolve quarantine branch 7823dc2",
+      "details": "Разобрать локальную ветку codex/quarantine-mixed-gui-dirty-20260418: проверить targeted tests на самом quarantine commit, перенести патч в актуальный codex/work cherry-pick-ом без merge, зафиксировать интегрированные lane scopes, validation и non-closure boundaries, затем удалить локальную quarantine branch после успешного коммита.",
+      "artifact_path": "context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md",
       "status": "active"
     }
   ]
