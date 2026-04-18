@@ -53,6 +53,196 @@ ROOT = Path(__file__).resolve().parents[2]
 TOOLS_DIR = Path(__file__).resolve().parent
 
 
+STATUS_LABELS_RU: dict[str, str] = {
+    "READY": "готово",
+    "CURRENT": "актуально",
+    "WARN": "требует внимания",
+    "WARNING": "требует внимания",
+    "MISSING": "нет данных",
+    "STALE": "устарело",
+    "BLOCKED": "заблокировано",
+    "INVALID": "ошибка данных",
+    "DEGRADED": "неполные данные",
+    "FAILED": "ошибка",
+    "FINISHED": "завершено",
+    "RUNNING": "выполняется",
+    "STOPPING": "останавливается",
+}
+
+
+def _status_ru(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "нет данных"
+    return STATUS_LABELS_RU.get(text.upper(), text)
+
+
+def _bool_ru(value: object) -> str:
+    if value is True:
+        return "да"
+    if value is False:
+        return "нет"
+    if value is None:
+        return "нет данных"
+    return str(value)
+
+
+def _technical_message_ru(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "нет сообщения"
+    replacements = {
+        "running": "выполняется",
+        "OK": "успешно",
+        "terminate_requested": "запрошена остановка",
+        "Copied file to clipboard (CF_HDROP)": "Файл скопирован в буфер обмена",
+        "Copied file to clipboard": "Файл скопирован в буфер обмена",
+        "Copied path as text": "Путь к ZIP скопирован как текст",
+        "stale": "буфер обмена указывает на старый ZIP",
+        "Analysis evidence / HO-009 missing": "Нет данных анализа HO-009",
+        "Analysis evidence / HO-009 manifest is empty or unreadable": "Манифест анализа HO-009 пустой или не читается",
+        "manifest is empty or unreadable": "манифест пустой или не читается",
+        "context is STALE": "контекст устарел",
+        "context mismatch": "контекст не совпадает",
+        "HO-008 analysis context is BLOCKED": "контекст анализа HO-008 заблокирован",
+        "Engineering Analysis evidence / HO-007 missing": "Нет данных инженерного анализа HO-007",
+        "Engineering Analysis evidence / HO-007 manifest is empty or unreadable": (
+            "Манифест инженерного анализа HO-007 пустой или не читается"
+        ),
+        "Engineering Analysis evidence / HO-007 validation status requires attention": (
+            "Статус проверки инженерного анализа HO-007 требует внимания"
+        ),
+        "HO-007 selected-run readiness has no READY optimization candidates": (
+            "Для выбранного расчёта HO-007 нет готовых кандидатов оптимизации"
+        ),
+        "Geometry reference evidence is empty or unreadable": "Данные справочника геометрии пустые или не читаются",
+        "Geometry Reference evidence": "Данные справочника геометрии",
+        "Geometry reference evidence": "Данные справочника геометрии",
+        "producer-owned": "данные поставщика",
+        "Producer-owned": "Данные поставщика",
+        "warning-only": "только предупреждение",
+        "missing inputs": "не хватает входных данных",
+        "missing_inputs": "не хватает входных данных",
+        "Results Center": "центр результатов",
+        "Engineering Analysis Center": "центр инженерного анализа",
+        "Reference Center": "центр справочников",
+        "Open": "Откройте",
+        "export evidence manifest": "экспортируйте манифест данных",
+        "evidence manifest": "манифест данных",
+        "before SEND": "перед отправкой",
+        "SEND": "отправка",
+        "READY optimization run": "готовый расчёт оптимизации",
+        "READY optimization candidates": "готовые кандидаты оптимизации",
+        "validation/status": "статус проверки",
+        "readiness": "готовность",
+        "context state": "состояние контекста",
+        "mismatches": "расхождения",
+        "packaging": "упаковку",
+        "road_width": "ширину дороги",
+        "geometry acceptance warnings": "предупреждения по геометрии",
+        "consumer_may_fabricate_geometry": "потребитель может создавать геометрию",
+    }
+    result = text
+    for old, new in replacements.items():
+        result = result.replace(old, new)
+    return result
+
+
+def _operator_preview_text(value: object) -> str:
+    text = str(value or "")
+    if not text.strip():
+        return "(нет данных для просмотра)"
+    replacements = {
+        "# Send bundle inspection": "# Проверка ZIP для отправки",
+        "# Health report": "# Отчёт о состоянии проекта",
+        "## Evidence manifest": "## Манифест данных",
+        "## Engineering analysis evidence": "## Данные инженерного анализа",
+        "## Anim latest diagnostics": "## Диагностика последней анимации",
+        "## Anim latest": "## Последняя анимация",
+        "## Ring closure": "## Замыкание кольца",
+        "## Desktop Mnemo events": "## События мнемосхемы",
+        "## Artifacts": "## Артефакты",
+        "## Validation": "## Проверка",
+        "- Created:": "- Создано:",
+        "- OK:": "- Успешно:",
+        "- Release:": "- Версия:",
+        "- Embedded health report:": "- Вложенный отчёт о состоянии:",
+        "- Validation report:": "- Отчёт проверки:",
+        "- Dashboard report:": "- Отчёт панели:",
+        "- Triage report:": "- Разбор замечаний:",
+        "- Anim diagnostics:": "- Диагностика анимации:",
+        "- Evidence manifest:": "- Манифест данных:",
+        "- Engineering analysis evidence:": "- Данные инженерного анализа:",
+        "- Browser perf snapshot:": "- Снимок производительности браузера:",
+        "- Browser perf previous snapshot:": "- Предыдущий снимок производительности браузера:",
+        "- Browser perf contract:": "- Контракт производительности браузера:",
+        "- Browser perf evidence report:": "- Отчёт данных производительности браузера:",
+        "- Browser perf comparison report:": "- Отчёт сравнения производительности браузера:",
+        "- Browser perf trace:": "- Трасса производительности браузера:",
+        "- Geometry acceptance:": "- Приёмка геометрии:",
+        "- Geometry acceptance gate:": "- Шлюз приёмки геометрии:",
+        "- Geometry acceptance reason:": "- Причина приёмки геометрии:",
+        "- collection_mode:": "- Режим сбора:",
+        "- trigger:": "- Запуск:",
+        "- finalization_stage:": "- Этап финализации:",
+        "- stage:": "- Этап:",
+        "- zip_sha256:": "- SHA256 ZIP:",
+        "- missing_required_count:": "- Не хватает обязательных данных:",
+        "- missing_optional_count:": "- Не хватает необязательных данных:",
+        "- missing_evidence:": "- Нет данных:",
+        "- status:": "- Состояние:",
+        "- source_path:": "- Путь источника:",
+        "- evidence_manifest_hash:": "- Хэш манифеста данных:",
+        "- influence_status:": "- Влияние:",
+        "- calibration_status:": "- Калибровка:",
+        "- analysis_status:": "- Анализ:",
+        "- sensitivity_row_count:": "- Строк чувствительности:",
+        "- handoff_contract_status:": "- Контракт передачи:",
+        "- handoff_required_path:": "- Требуемый путь передачи:",
+        "- handoff_missing_fields:": "- Не хватает полей передачи:",
+        "- available:": "- Доступно:",
+        "- visual_cache_token:": "- Токен визуального кэша:",
+        "- visual_reload_inputs:": "- Входные данные перезагрузки:",
+        "- pointer_sync_ok:": "- Указатель синхронизирован:",
+        "- reload_inputs_sync_ok:": "- Входные данные синхронизированы:",
+        "- npz_path_sync_ok:": "- Путь NPZ синхронизирован:",
+        "- npz_path:": "- Путь NPZ:",
+        "- updated_utc:": "- Обновлено UTC:",
+        "- scenario_kind:": "- Тип сценария:",
+        "- severity:": "- Важность:",
+        "- summary:": "- Сводка:",
+        "- policy:": "- Политика:",
+        "- seam_jump_m:": "- Скачок шва, м:",
+        "Analysis evidence / HO-009 context state is missing": "нет состояния контекста анализа HO-009",
+        "Geometry reference producer artifact handoff is missing": (
+            "нет передачи артефакта источника для справочника геометрии"
+        ),
+        "Run producer/solver anim_latest export": "выполните экспорт anim_latest из источника/решателя",
+        "Reference Center must not fabricate producer geometry evidence": (
+            "центр справочников не должен создавать данные геометрии за источник"
+        ),
+        "Reasons:": "Причины:",
+        "Geometry reference evidence reports missing item(s)": "данные справочника геометрии сообщают о нехватке",
+        "Geometry reference artifact context is missing": "нет контекста артефакта справочника геометрии",
+        "Geometry reference artifact freshness is missing": "нет актуальности артефакта справочника геометрии",
+        "Geometry reference packaging passport state is": "состояние паспорта упаковки справочника геометрии:",
+        "Geometry acceptance gate is": "шлюз приёмки геометрии:",
+        "Ring closure diagnostics not applicable": "диагностика замыкания кольца неприменима",
+        "True": "да",
+        "False": "нет",
+        "None": "нет данных",
+        "MISSING": "нет данных",
+        "READY": "готово",
+        "WARN": "требует внимания",
+        "BLOCKED": "заблокировано",
+        "missing": "нет данных",
+    }
+    result = text
+    for old, new in replacements.items():
+        result = result.replace(old, new)
+    return _technical_message_ru(result)
+
+
 def _guess_python_exe() -> Path:
     if sys.platform.startswith("win"):
         venv = ROOT / ".venv" / "Scripts"
@@ -142,7 +332,11 @@ class DesktopDiagnosticsCenter:
         self.sha256 = ""
         self.size_mb = 0.0
 
-        self.status_var = StringVar(value="Готово. Откройте нужный этап в одном инженерном центре.")
+        self.status_var = StringVar(value="Готово. Выберите действие слева или в верхней панели.")
+        self.process_title_var = StringVar(value="Текущий процесс: нет активной операции")
+        self.process_detail_var = StringVar(
+            value="Прогресс диагностики и сборки ZIP всегда показывается здесь, независимо от выбранного раздела."
+        )
         self.machine_state_var = StringVar(value="")
         self.context_summary_var = StringVar(
             value="Контекст: диагностика, сборка пакета и отправка доступны в одном окне."
@@ -150,9 +344,9 @@ class DesktopDiagnosticsCenter:
         self.send_title_var = StringVar(value="ZIP для отправки в чат ещё не готов.")
         self.send_path_var = StringVar(value="(ещё не готово)")
         self.send_meta_var = StringVar(value="")
-        self.analysis_evidence_status_var = StringVar(value="Analysis evidence / HO-009: MISSING")
-        self.engineering_analysis_status_var = StringVar(value="Engineering Analysis evidence / HO-007: MISSING")
-        self.geometry_reference_status_var = StringVar(value="Geometry Reference evidence: MISSING")
+        self.analysis_evidence_status_var = StringVar(value="Данные анализа HO-009: нет данных")
+        self.engineering_analysis_status_var = StringVar(value="Инженерный анализ HO-007: нет данных")
+        self.geometry_reference_status_var = StringVar(value="Справочник геометрии: нет данных")
 
         self._restore_bundle_state_from_last_center_state()
         self._restore_diagnostics_request_from_last_center_state()
@@ -260,14 +454,35 @@ class DesktopDiagnosticsCenter:
 
         header_actions = ttk.Frame(header)
         header_actions.pack(side="right", anchor="ne")
-        ttk.Button(header_actions, text="Диагностика", command=lambda: self.notebook.select(self.diag_tab)).pack(side="left")
-        ttk.Button(header_actions, text="Пакет", command=lambda: self.notebook.select(self.bundle_tab)).pack(side="left", padx=(8, 0))
-        ttk.Button(header_actions, text="Отправка", command=lambda: self.notebook.select(self.send_tab)).pack(side="left", padx=(8, 0))
+        ttk.Button(header_actions, text="1. Проверить проект", command=lambda: self.notebook.select(self.diag_tab)).pack(side="left")
+        ttk.Button(header_actions, text="2. Собрать ZIP", command=lambda: self.notebook.select(self.bundle_tab)).pack(side="left", padx=(8, 0))
+        ttk.Button(header_actions, text="3. Подготовить отправку", command=lambda: self.notebook.select(self.send_tab)).pack(side="left", padx=(8, 0))
         ttk.Button(
             header_actions,
             text="Обновить",
             command=lambda: self._refresh_bundle_views(regenerate_reports=False),
         ).pack(side="left", padx=(12, 0))
+
+        process_box = ttk.LabelFrame(outer, text="Текущий процесс", padding=8)
+        process_box.pack(fill="x", pady=(0, 10))
+        ttk.Label(
+            process_box,
+            textvariable=self.process_title_var,
+            font=("Segoe UI", 10, "bold"),
+        ).pack(anchor="w")
+        ttk.Label(
+            process_box,
+            textvariable=self.process_detail_var,
+            wraplength=940,
+            justify="left",
+        ).pack(anchor="w", pady=(2, 6))
+        self.process_progress = ttk.Progressbar(
+            process_box,
+            mode="determinate",
+            maximum=100,
+            value=0,
+        )
+        self.process_progress.pack(fill="x")
 
         workspace = ttk.Panedwindow(outer, orient="horizontal")
         workspace.pack(fill="both", expand=True)
@@ -286,12 +501,12 @@ class DesktopDiagnosticsCenter:
         quick_box.pack(fill="x", pady=(8, 0))
         ttk.Button(
             quick_box,
-            text="Собрать диагностику",
+            text="1. Запустить диагностику",
             command=self._start_run,
         ).pack(fill="x")
         ttk.Button(
             quick_box,
-            text="Собрать пакет",
+            text="2. Собрать ZIP для отправки",
             command=lambda: self._start_bundle_build(auto_copy_on_ready=False),
         ).pack(fill="x", pady=(6, 0))
         ttk.Button(
@@ -310,9 +525,9 @@ class DesktopDiagnosticsCenter:
         self.diag_tab, self.diag_body = create_scrollable_tab(self.notebook, padding=8)
         self.bundle_tab, self.bundle_body = create_scrollable_tab(self.notebook, padding=8)
         self.send_tab, self.send_body = create_scrollable_tab(self.notebook, padding=8)
-        self.notebook.add(self.diag_tab, text="Диагностика")
-        self.notebook.add(self.bundle_tab, text="Пакет и проверка")
-        self.notebook.add(self.send_tab, text="Отправка")
+        self.notebook.add(self.diag_tab, text="1. Проверить проект")
+        self.notebook.add(self.bundle_tab, text="2. Собрать ZIP")
+        self.notebook.add(self.send_tab, text="3. Подготовить отправку")
 
         self._build_diag_tab()
         self._build_bundle_tab()
@@ -331,16 +546,16 @@ class DesktopDiagnosticsCenter:
     def _build_diag_tab(self) -> None:
         pad = {"padx": 10, "pady": 6}
 
-        level_box = ttk.LabelFrame(self.diag_body, text="Уровень диагностики")
+        level_box = ttk.LabelFrame(self.diag_body, text="Сколько проверять")
         level_box.pack(fill="x", **pad)
         for value, text in [
-            ("minimal", "minimal — быстро, только sanity"),
-            ("standard", "standard — рекомендуется"),
-            ("full", "full — максимально подробно"),
+            ("minimal", "Минимально — быстро, только базовая проверка"),
+            ("standard", "Стандартно — рекомендуется"),
+            ("full", "Полностью — максимально подробно"),
         ]:
             ttk.Radiobutton(level_box, text=text, value=value, variable=self.level).pack(anchor="w", padx=10, pady=2)
 
-        options_box = ttk.LabelFrame(self.diag_body, text="Опции")
+        options_box = ttk.LabelFrame(self.diag_body, text="Дополнительные действия")
         options_box.pack(fill="x", **pad)
         ttk.Checkbutton(
             options_box,
@@ -360,9 +575,9 @@ class DesktopDiagnosticsCenter:
             text="Запустить быструю проверку оптимизации",
             variable=self.run_opt_smoke,
         ).grid(row=0, column=0, sticky="w")
-        ttk.Label(opt_row, text="minutes:").grid(row=0, column=1, sticky="e", padx=(12, 2))
+        ttk.Label(opt_row, text="минуты:").grid(row=0, column=1, sticky="e", padx=(12, 2))
         ttk.Spinbox(opt_row, from_=1, to=60, textvariable=self.opt_minutes, width=6).grid(row=0, column=2, sticky="w")
-        ttk.Label(opt_row, text="jobs:").grid(row=0, column=3, sticky="e", padx=(12, 2))
+        ttk.Label(opt_row, text="потоки:").grid(row=0, column=3, sticky="e", padx=(12, 2))
         ttk.Spinbox(opt_row, from_=1, to=32, textvariable=self.opt_jobs, width=6).grid(row=0, column=4, sticky="w")
         opt_row.columnconfigure(5, weight=1)
 
@@ -371,7 +586,7 @@ class DesktopDiagnosticsCenter:
 
         osc_row = ttk.Frame(path_box)
         osc_row.pack(fill="x", padx=10, pady=4)
-        ttk.Label(osc_row, text="Папка osc (NPZ):").pack(side="left")
+        ttk.Label(osc_row, text="Папка с NPZ:").pack(side="left")
         ttk.Entry(osc_row, textvariable=self.osc_dir).pack(side="left", fill="x", expand=True, padx=6)
         ttk.Button(osc_row, text="...", width=3, command=self._pick_osc_dir).pack(side="left")
 
@@ -383,15 +598,15 @@ class DesktopDiagnosticsCenter:
 
         ctrl = ttk.Frame(self.diag_body)
         ctrl.pack(fill="x", **pad)
-        self.btn_run = ttk.Button(ctrl, text="▶ Запустить", command=self._run)
+        self.btn_run = ttk.Button(ctrl, text="Запустить диагностику", command=self._run)
         self.btn_run.pack(side="left")
-        self.btn_stop = ttk.Button(ctrl, text="■ Остановить", command=self._stop, state="disabled")
+        self.btn_stop = ttk.Button(ctrl, text="Остановить", command=self._stop, state="disabled")
         self.btn_stop.pack(side="left", padx=8)
-        self.btn_open = ttk.Button(ctrl, text="📂 Открыть результат", command=self._open_result, state="disabled")
+        self.btn_open = ttk.Button(ctrl, text="Открыть результат", command=self._open_result, state="disabled")
         self.btn_open.pack(side="left", padx=8)
-        ttk.Button(ctrl, text="📂 Открыть папку результатов", command=self._open_diagnostics_out_root).pack(side="left", padx=8)
+        ttk.Button(ctrl, text="Открыть папку результатов", command=self._open_diagnostics_out_root).pack(side="left", padx=8)
 
-        log_box = ttk.LabelFrame(self.diag_body, text="Вывод")
+        log_box = ttk.LabelFrame(self.diag_body, text="Технический журнал диагностики")
         log_box.pack(fill="both", expand=True, **pad)
         log_body, self.txt = build_scrolled_text(log_box, wrap="word", height=16)
         log_body.pack(fill="both", expand=True)
@@ -401,48 +616,48 @@ class DesktopDiagnosticsCenter:
         top = ttk.Frame(self.bundle_body)
         top.pack(fill="x", pady=(0, 8))
         ttk.Button(top, text="Обновить сводку и проверки", command=lambda: self._refresh_bundle_views(regenerate_reports=True)).pack(side="left")
-        ttk.Button(top, text="Собрать пакет сейчас", command=lambda: self._start_bundle_build(auto_copy_on_ready=False)).pack(side="left", padx=(8, 0))
-        self.btn_open_latest_zip = ttk.Button(top, text="📂 Открыть ZIP", command=self._open_latest_bundle, state="disabled")
+        ttk.Button(top, text="Собрать ZIP сейчас", command=lambda: self._start_bundle_build(auto_copy_on_ready=False)).pack(side="left", padx=(8, 0))
+        self.btn_open_latest_zip = ttk.Button(top, text="Открыть ZIP", command=self._open_latest_bundle, state="disabled")
         self.btn_open_latest_zip.pack(side="left", padx=(8, 0))
         self.btn_open_analysis_evidence = ttk.Button(
             top,
-            text="Открыть Analysis JSON",
+            text="Открыть данные анализа",
             command=self._open_analysis_evidence,
             state="disabled",
         )
         self.btn_open_analysis_evidence.pack(side="left", padx=(8, 0))
         self.btn_open_geometry_reference_evidence = ttk.Button(
             top,
-            text="Открыть Geometry JSON",
+            text="Открыть геометрию",
             command=self._open_geometry_reference_evidence,
             state="disabled",
         )
         self.btn_open_geometry_reference_evidence.pack(side="left", padx=(8, 0))
         self.btn_open_engineering_analysis_evidence = ttk.Button(
             top,
-            text="Открыть Engineering JSON",
+            text="Открыть инженерный анализ",
             command=self._open_engineering_analysis_evidence,
             state="disabled",
         )
         self.btn_open_engineering_analysis_evidence.pack(side="left", padx=(8, 0))
-        ttk.Button(top, text="📂 Открыть папку пакетов", command=self._open_bundle_out_dir).pack(side="left", padx=(8, 0))
+        ttk.Button(top, text="Открыть папку пакетов", command=self._open_bundle_out_dir).pack(side="left", padx=(8, 0))
 
         summary_box = ttk.LabelFrame(self.bundle_body, text="Сводка и машинно-читаемые пути")
         summary_box.pack(fill="both", expand=False, pady=(0, 8))
         summary_body, self.summary_text = build_scrolled_text(summary_box, wrap="word", height=13)
         summary_body.pack(fill="both", expand=True)
 
-        evidence_box = ttk.LabelFrame(self.bundle_body, text="Evidence handoff status")
+        evidence_box = ttk.LabelFrame(self.bundle_body, text="Готовность данных для отправки")
         evidence_box.pack(fill="x", pady=(0, 8))
         evidence_box.columnconfigure(1, weight=1)
-        ttk.Label(evidence_box, text="Analysis / HO-009").grid(row=0, column=0, sticky="w", padx=(10, 8), pady=(8, 4))
+        ttk.Label(evidence_box, text="Анализ результатов / HO-009").grid(row=0, column=0, sticky="w", padx=(10, 8), pady=(8, 4))
         ttk.Label(
             evidence_box,
             textvariable=self.analysis_evidence_status_var,
             wraplength=760,
             justify="left",
         ).grid(row=0, column=1, sticky="ew", padx=(0, 10), pady=(8, 4))
-        ttk.Label(evidence_box, text="Engineering / HO-007").grid(
+        ttk.Label(evidence_box, text="Инженерный анализ / HO-007").grid(
             row=1, column=0, sticky="w", padx=(10, 8), pady=(4, 4)
         )
         ttk.Label(
@@ -451,7 +666,7 @@ class DesktopDiagnosticsCenter:
             wraplength=760,
             justify="left",
         ).grid(row=1, column=1, sticky="ew", padx=(0, 10), pady=(4, 4))
-        ttk.Label(evidence_box, text="Geometry Reference").grid(row=2, column=0, sticky="w", padx=(10, 8), pady=(4, 8))
+        ttk.Label(evidence_box, text="Справочник геометрии").grid(row=2, column=0, sticky="w", padx=(10, 8), pady=(4, 8))
         ttk.Label(
             evidence_box,
             textvariable=self.geometry_reference_status_var,
@@ -463,8 +678,8 @@ class DesktopDiagnosticsCenter:
         preview_book.pack(fill="both", expand=True)
         inspect_tab = ttk.Frame(preview_book, padding=6)
         health_tab = ttk.Frame(preview_book, padding=6)
-        preview_book.add(inspect_tab, text="Проверка пакета")
-        preview_book.add(health_tab, text="Состояние")
+        preview_book.add(inspect_tab, text="Проверка ZIP")
+        preview_book.add(health_tab, text="Состояние проекта")
 
         inspect_body, self.inspect_text = build_scrolled_text(inspect_tab, wrap="word", height=16)
         inspect_body.pack(fill="both", expand=True)
@@ -483,7 +698,7 @@ class DesktopDiagnosticsCenter:
         self.lbl_path = ttk.Label(frm, textvariable=self.send_path_var, wraplength=860)
         self.lbl_path.pack(anchor="w", pady=(2, 10))
 
-        self.pb = ttk.Progressbar(frm, mode="determinate", maximum=1.0, value=1.0)
+        self.pb = ttk.Progressbar(frm, mode="determinate", maximum=100, value=0)
         self.pb.pack(fill="x", pady=(0, 10))
 
         ttk.Label(
@@ -501,11 +716,11 @@ class DesktopDiagnosticsCenter:
 
         btn_row = ttk.Frame(frm)
         btn_row.pack(fill="x", pady=(6, 0))
-        ttk.Button(btn_row, text="Собрать или обновить пакет", command=lambda: self._start_bundle_build(auto_copy_on_ready=False)).pack(side="left")
-        self.btn_copy = ttk.Button(btn_row, text="📋 Скопировать ZIP в буфер обмена", command=self._copy)
+        ttk.Button(btn_row, text="Собрать или обновить ZIP", command=lambda: self._start_bundle_build(auto_copy_on_ready=False)).pack(side="left")
+        self.btn_copy = ttk.Button(btn_row, text="Скопировать ZIP в буфер обмена", command=self._copy)
         self.btn_copy.state(["disabled"])
         self.btn_copy.pack(side="left", padx=(8, 0), ipadx=10, ipady=6)
-        ttk.Button(btn_row, text="📂 Открыть папку пакета", command=self._open_bundle_out_dir).pack(side="left", padx=(8, 0))
+        ttk.Button(btn_row, text="Открыть папку пакета", command=self._open_bundle_out_dir).pack(side="left", padx=(8, 0))
 
     def _select_initial_tab(self, initial_tab: str) -> None:
         lookup = {
@@ -523,6 +738,41 @@ class DesktopDiagnosticsCenter:
             self.txt.update_idletasks()
         except Exception:
             pass
+
+    def _set_process_busy(self, title: str, detail: str) -> None:
+        self.process_title_var.set(title)
+        self.process_detail_var.set(detail)
+        self.status_var.set(detail)
+        if hasattr(self, "process_progress"):
+            self.process_progress.configure(mode="indeterminate", maximum=100)
+            self.process_progress.start(10)
+        if hasattr(self, "pb"):
+            self.pb.configure(mode="indeterminate", maximum=100)
+            self.pb.start(10)
+
+    def _set_process_done(self, title: str, detail: str) -> None:
+        self.process_title_var.set(title)
+        self.process_detail_var.set(detail)
+        self.status_var.set(detail)
+        if hasattr(self, "process_progress"):
+            self.process_progress.stop()
+            self.process_progress.configure(mode="determinate", maximum=100, value=100)
+        if hasattr(self, "pb"):
+            self.pb.stop()
+            self.pb.configure(mode="determinate", maximum=100, value=100)
+
+    def _set_process_idle(self, detail: str | None = None) -> None:
+        self.process_title_var.set("Текущий процесс: нет активной операции")
+        self.process_detail_var.set(
+            detail
+            or "Прогресс диагностики и сборки ZIP всегда показывается здесь, независимо от выбранного раздела."
+        )
+        if hasattr(self, "process_progress"):
+            self.process_progress.stop()
+            self.process_progress.configure(mode="determinate", maximum=100, value=0)
+        if hasattr(self, "pb"):
+            self.pb.stop()
+            self.pb.configure(mode="determinate", maximum=100, value=0)
 
     def _replace_log_text(self, text: str) -> None:
         try:
@@ -595,6 +845,8 @@ class DesktopDiagnosticsCenter:
         osc_dir = str(ui.get("osc_dir") or "").strip()
         out_root = str(ui.get("out_root") or "").strip()
         status_text = str(ui.get("status_text") or "").strip()
+        process_title_text = str(ui.get("process_title_text") or "").strip()
+        process_detail_text = str(ui.get("process_detail_text") or "").strip()
         send_title_text = str(ui.get("send_title_text") or "").strip()
         send_path_text = str(ui.get("send_path_text") or "").strip()
         send_meta_text = str(ui.get("send_meta_text") or "")
@@ -605,6 +857,10 @@ class DesktopDiagnosticsCenter:
             self.out_root.set(out_root)
         if status_text:
             self.status_var.set(status_text)
+        if process_title_text:
+            self.process_title_var.set(process_title_text)
+        if process_detail_text:
+            self.process_detail_var.set(process_detail_text)
         if send_title_text:
             self.send_title_var.set(send_title_text)
         if send_path_text:
@@ -638,6 +894,8 @@ class DesktopDiagnosticsCenter:
         return {
             "selected_tab": self._selected_tab_name(),
             "status_text": str(self.status_var.get() or ""),
+            "process_title_text": str(self.process_title_var.get() or ""),
+            "process_detail_text": str(self.process_detail_var.get() or ""),
             "machine_state_text": str(self.machine_state_var.get() or ""),
             "send_title_text": str(self.send_title_var.get() or ""),
             "send_path_text": str(self.send_path_var.get() or ""),
@@ -675,7 +933,7 @@ class DesktopDiagnosticsCenter:
     def _write_center_state_snapshot(self, bundle, *, summary_text: str) -> None:
         bundle_out_dir = Path(bundle.out_dir).expanduser().resolve()
         next_state_path = bundle_out_dir / LATEST_DESKTOP_DIAGNOSTICS_CENTER_JSON
-        self.machine_state_var.set(f"State JSON: {next_state_path}")
+        self.machine_state_var.set(f"Файл состояния окна: {next_state_path}")
         self._summary_md_path = write_desktop_diagnostics_summary_md(bundle_out_dir, summary_text)
         self._center_state_path = write_desktop_diagnostics_center_state(
             bundle_out_dir,
@@ -755,8 +1013,11 @@ class DesktopDiagnosticsCenter:
         request = self._build_request()
         cmd = self._build_cmd()
         self._current_run_lines = []
-        self._append("\n=== Запуск ===\n" + " ".join(cmd) + "\n\n")
-        self.status_var.set("Запущен автономный прогон диагностики...")
+        self._append("\n=== Запуск диагностики ===\nТехническая команда сохранена в файл состояния прогона.\n\n")
+        self._set_process_busy(
+            "Выполняется диагностика проекта",
+            "Идёт автономная диагностика. Прогресс показан здесь; вкладку менять не нужно.",
+        )
         self.btn_run.configure(state="disabled")
         self.btn_stop.configure(state="normal")
         self.btn_open.configure(state="disabled")
@@ -868,14 +1129,17 @@ class DesktopDiagnosticsCenter:
                     self.btn_run.configure(state="normal")
                     self.btn_stop.configure(state="disabled")
                     self.btn_open.configure(state="normal" if (last_zip or last_run_dir) else "disabled")
-                    self.status_var.set(f"Диагностика завершена с кодом {rc}.")
+                    self._set_process_done(
+                        "Диагностика завершена" if rc == 0 else "Диагностика завершилась с ошибкой",
+                        f"Код завершения диагностики: {rc}. Результат можно открыть кнопкой на вкладке проверки.",
+                    )
                     self._refresh_bundle_views(regenerate_reports=False)
 
                     msg = f"Диагностика завершена с кодом {rc}."
                     if last_zip:
                         msg += f"\n\nZIP: {last_zip}"
                     if last_run_dir:
-                        msg += f"\n\nDIR: {last_run_dir}"
+                        msg += f"\n\nКаталог: {last_run_dir}"
                     if self._last_run_record and self._last_run_record.state_path:
                         msg += f"\n\nФайл состояния: {self._last_run_record.state_path}"
                     if rc == 0:
@@ -910,9 +1174,12 @@ class DesktopDiagnosticsCenter:
                     self.btn_run.configure(state="normal")
                     self.btn_stop.configure(state="disabled")
                     self.btn_open.configure(state="disabled")
-                    self.status_var.set("Ошибка запуска диагностики.")
+                    self._set_process_done(
+                        "Ошибка запуска диагностики",
+                        f"Диагностика не запустилась: {_technical_message_ru(exc)}",
+                    )
                     self._refresh_bundle_views(regenerate_reports=False)
-                    messagebox.showerror("Диагностика", f"Не удалось запустить диагностику:\n{exc}")
+                    messagebox.showerror("Диагностика", f"Не удалось запустить диагностику:\n{_technical_message_ru(exc)}")
 
                 self.root.after(0, err_ui)
 
@@ -942,7 +1209,8 @@ class DesktopDiagnosticsCenter:
             )
         try:
             self._proc.terminate()
-            self._append("\n[GUI] terminate() отправлен...\n")
+            self._append("\n[Окно] Запрошена остановка процесса...\n")
+            self._set_process_busy("Останавливаю диагностику", "Команда остановки отправлена. Жду завершения процесса.")
         except Exception:
             pass
 
@@ -1002,52 +1270,52 @@ class DesktopDiagnosticsCenter:
             if str(item).strip()
         ]
         lines = [
-            "## Latest integrity proof",
-            f"- Status: {status}",
-            f"- Final latest SHA256: {getattr(bundle, 'latest_integrity_final_zip_sha256', '') or '—'}",
+            "## Проверка актуального ZIP",
+            f"- Состояние: {_status_ru(status)}",
+            f"- SHA256 актуального ZIP: {getattr(bundle, 'latest_integrity_final_zip_sha256', '') or '—'}",
             (
-                "- Latest ZIP matches original: "
-                f"{getattr(bundle, 'latest_integrity_latest_zip_matches_original', None)}"
+                "- Актуальный ZIP совпадает с исходным: "
+                f"{_bool_ru(getattr(bundle, 'latest_integrity_latest_zip_matches_original', None))}"
             ),
-            f"- SHA sidecar match: {getattr(bundle, 'latest_integrity_sha_sidecar_matches', None)}",
-            f"- Pointer target match: {getattr(bundle, 'latest_integrity_pointer_matches_original', None)}",
-            f"- Evidence sidecar: {getattr(bundle, 'latest_integrity_evidence_sidecar_path', '') or '—'}",
+            f"- SHA-файл совпадает: {_bool_ru(getattr(bundle, 'latest_integrity_sha_sidecar_matches', None))}",
+            f"- Указатель на ZIP совпадает: {_bool_ru(getattr(bundle, 'latest_integrity_pointer_matches_original', None))}",
+            f"- Файл подтверждения: {getattr(bundle, 'latest_integrity_evidence_sidecar_path', '') or '—'}",
             (
-                "- Embedded manifest scope: "
+                "- Область SHA256 во вложенном манифесте: "
                 f"{getattr(bundle, 'latest_integrity_embedded_manifest_zip_sha256_scope', '') or '—'}"
             ),
             (
-                "- Embedded manifest stage: "
+                "- Этап во вложенном манифесте: "
                 f"{getattr(bundle, 'latest_integrity_embedded_manifest_stage', '') or '—'} / "
                 f"{getattr(bundle, 'latest_integrity_embedded_manifest_finalization_stage', '') or '—'}"
             ),
             (
-                "- Trigger: "
+                "- Запуск: "
                 f"{getattr(bundle, 'latest_integrity_trigger', '') or '—'} / "
-                f"collection={getattr(bundle, 'latest_integrity_collection_mode', '') or '—'}"
+                f"сбор={getattr(bundle, 'latest_integrity_collection_mode', '') or '—'}"
             ),
-            f"- Producer warning count: {getattr(bundle, 'latest_integrity_producer_warning_count', 0)}",
+            f"- Предупреждения от источников данных: {getattr(bundle, 'latest_integrity_producer_warning_count', 0)}",
             (
-                "- Producer-owned warnings remain warning-only; "
-                "Diagnostics/SEND makes no release closure claim."
+                "- Предупреждения от источников данных остаются предупреждениями; "
+                "центр диагностики/отправки не объявляет релиз закрытым."
             ),
-            f"- No release closure claim: {getattr(bundle, 'latest_integrity_no_release_closure_claim', True)}",
+            f"- Релиз не объявлен закрытым: {_bool_ru(getattr(bundle, 'latest_integrity_no_release_closure_claim', True))}",
         ]
         for warning in warnings[:5]:
-            lines.append(f"- Warning: {warning}")
+            lines.append(f"- Предупреждение: {_technical_message_ru(warning)}")
         return lines
 
     def _self_check_silent_warnings_summary_lines(self, bundle) -> list[str]:
         return [
-            "## Self-check silent warnings snapshot",
-            f"- Status: {getattr(bundle, 'self_check_silent_warnings_status', '') or 'MISSING'}",
-            f"- Snapshot only: {getattr(bundle, 'self_check_silent_warnings_snapshot_only', True)}",
+            "## Снимок тихих предупреждений самопроверки",
+            f"- Состояние: {_status_ru(getattr(bundle, 'self_check_silent_warnings_status', '') or 'MISSING')}",
+            f"- Только снимок: {_bool_ru(getattr(bundle, 'self_check_silent_warnings_snapshot_only', True))}",
             f"- JSON: {getattr(bundle, 'self_check_silent_warnings_json_path', '') or '—'}",
             f"- Markdown: {getattr(bundle, 'self_check_silent_warnings_md_path', '') or '—'}",
-            f"- rc: {getattr(bundle, 'self_check_silent_warnings_rc', None)}",
-            f"- fail_count: {getattr(bundle, 'self_check_silent_warnings_fail_count', 0)}",
-            f"- warn_count: {getattr(bundle, 'self_check_silent_warnings_warn_count', 0)}",
-            "- Snapshot does not supersede SEND/producer warning state.",
+            f"- Код возврата: {getattr(bundle, 'self_check_silent_warnings_rc', None)}",
+            f"- Ошибки: {getattr(bundle, 'self_check_silent_warnings_fail_count', 0)}",
+            f"- Предупреждения: {getattr(bundle, 'self_check_silent_warnings_warn_count', 0)}",
+            "- Этот снимок не закрывает предупреждения SEND или источников данных.",
         ]
 
     def _analysis_evidence_summary_lines(self, bundle) -> list[str]:
@@ -1059,21 +1327,21 @@ class DesktopDiagnosticsCenter:
             if str(item).strip()
         ]
         lines = [
-            "## Analysis evidence / HO-009",
-            f"- Status: {status}",
-            f"- Context state: {context_state}",
-            f"- HO-008 analysis context: {getattr(bundle, 'analysis_context_status', '') or '—'}",
-            f"- Run ID: {getattr(bundle, 'analysis_evidence_run_id', '') or '—'}",
-            f"- Run contract hash: {getattr(bundle, 'analysis_evidence_run_contract_hash', '') or '—'}",
-            f"- Compare contract: {getattr(bundle, 'analysis_evidence_compare_contract_id', '') or '—'}",
-            f"- Artifacts: {getattr(bundle, 'analysis_evidence_artifact_count', 0)}",
-            f"- Mismatches: {getattr(bundle, 'analysis_evidence_mismatch_count', 0)}",
-            f"- Manifest: {getattr(bundle, 'latest_analysis_evidence_manifest_path', '') or '—'}",
+            "## Данные анализа результатов HO-009",
+            f"- Состояние: {_status_ru(status)}",
+            f"- Контекст: {_status_ru(context_state)}",
+            f"- Контекст анализа HO-008: {_status_ru(getattr(bundle, 'analysis_context_status', '') or '—')}",
+            f"- ID расчёта: {getattr(bundle, 'analysis_evidence_run_id', '') or '—'}",
+            f"- Хэш контракта расчёта: {getattr(bundle, 'analysis_evidence_run_contract_hash', '') or '—'}",
+            f"- Контракт сравнения: {getattr(bundle, 'analysis_evidence_compare_contract_id', '') or '—'}",
+            f"- Артефакты: {getattr(bundle, 'analysis_evidence_artifact_count', 0)}",
+            f"- Расхождения: {getattr(bundle, 'analysis_evidence_mismatch_count', 0)}",
+            f"- Манифест: {getattr(bundle, 'latest_analysis_evidence_manifest_path', '') or '—'}",
         ]
         if getattr(bundle, "analysis_selected_test_id", ""):
-            lines.append(f"- Selected test: {bundle.analysis_selected_test_id}")
+            lines.append(f"- Выбранный тест: {bundle.analysis_selected_test_id}")
         if getattr(bundle, "analysis_selected_npz_path", ""):
-            lines.append(f"- Selected NPZ: {bundle.analysis_selected_npz_path}")
+            lines.append(f"- Выбранный NPZ: {bundle.analysis_selected_npz_path}")
         capture_handoff = str(getattr(bundle, "analysis_capture_export_manifest_handoff_id", "") or "")
         capture_hash = str(getattr(bundle, "analysis_capture_hash", "") or "")
         capture_status = str(getattr(bundle, "analysis_capture_export_manifest_status", "") or "").strip().upper()
@@ -1085,20 +1353,20 @@ class DesktopDiagnosticsCenter:
             else:
                 capture_status = "MISSING"
         lines.append(
-            "- HO-010 capture/export: "
-            f"{capture_status} | handoff={capture_handoff or '—'} | capture_hash={capture_hash or '—'}"
+            "- Захват/экспорт HO-010: "
+            f"{_status_ru(capture_status)} | handoff={capture_handoff or '—'} | capture_hash={capture_hash or '—'}"
         )
         manifest_hash = str(getattr(bundle, "analysis_evidence_manifest_hash", "") or "")
         if manifest_hash:
-            lines.append(f"- Manifest hash: {manifest_hash}")
+            lines.append(f"- Хэш манифеста: {manifest_hash}")
         action = str(getattr(bundle, "analysis_evidence_action", "") or "")
         if action:
-            lines.append(f"- Action: {action}")
+            lines.append(f"- Что сделать: {_technical_message_ru(action)}")
         analysis_context_action = str(getattr(bundle, "analysis_context_action", "") or "")
         if analysis_context_action:
-            lines.append(f"- HO-008 action: {analysis_context_action}")
+            lines.append(f"- Что сделать по HO-008: {_technical_message_ru(analysis_context_action)}")
         for warning in warnings[:5]:
-            lines.append(f"- Warning: {warning}")
+            lines.append(f"- Предупреждение: {_technical_message_ru(warning)}")
         return lines
 
     def _engineering_analysis_evidence_summary_lines(self, bundle) -> list[str]:
@@ -1124,27 +1392,28 @@ class DesktopDiagnosticsCenter:
             if str(item).strip()
         ]
         lines = [
-            "## Engineering Analysis evidence / HO-007",
-            f"- Status: {status}",
-            f"- Validation status: {validation_status}",
+            "## Данные инженерного анализа HO-007",
+            f"- Состояние: {_status_ru(status)}",
+            f"- Проверка: {_status_ru(validation_status)}",
             (
-                "- HO-007 candidates: "
-                f"ready={ready_count} / missing_inputs={missing_count} / failed={failed_count} / total={candidate_count}"
+                "- Кандидаты HO-007: "
+                f"готово={ready_count} / не хватает входных данных={missing_count} / "
+                f"ошибки={failed_count} / всего={candidate_count}"
             ),
-            f"- Manifest: {getattr(bundle, 'latest_engineering_analysis_evidence_manifest_path', '') or '—'}",
+            f"- Манифест: {getattr(bundle, 'latest_engineering_analysis_evidence_manifest_path', '') or '—'}",
         ]
         manifest_hash = str(getattr(bundle, "engineering_analysis_evidence_manifest_hash", "") or "")
         if manifest_hash:
-            lines.append(f"- Manifest hash: {manifest_hash}")
+            lines.append(f"- Хэш манифеста: {manifest_hash}")
         if ready_run_dirs:
-            lines.append(f"- Ready run dir: {ready_run_dirs[0]}")
+            lines.append(f"- Каталог готового расчёта: {ready_run_dirs[0]}")
         if missing_inputs:
-            lines.append(f"- Missing inputs: {', '.join(missing_inputs[:8])}")
+            lines.append(f"- Не хватает входных данных: {', '.join(missing_inputs[:8])}")
         action = str(getattr(bundle, "engineering_analysis_evidence_action", "") or "")
         if action:
-            lines.append(f"- Action: {action}")
+            lines.append(f"- Что сделать: {_technical_message_ru(action)}")
         for warning in warnings[:5]:
-            lines.append(f"- Warning: {warning}")
+            lines.append(f"- Предупреждение: {_technical_message_ru(warning)}")
         return lines
 
     def _analysis_evidence_status_text(self, bundle) -> str:
@@ -1157,13 +1426,14 @@ class DesktopDiagnosticsCenter:
         analysis_context_status = str(getattr(bundle, "analysis_context_status", "") or "—")
         analysis_context_action = str(getattr(bundle, "analysis_context_action", "") or "")
         text = (
-            f"{status} / context={context_state} / HO-008={analysis_context_status} / "
-            f"run={run_id} / artifacts={artifacts} / mismatches={mismatches}"
+            f"{_status_ru(status)} / контекст={_status_ru(context_state)} / "
+            f"HO-008={_status_ru(analysis_context_status)} / расчёт={run_id} / "
+            f"артефакты={artifacts} / расхождения={mismatches}"
         )
         if analysis_context_action:
-            text += f"\n{analysis_context_action}"
+            text += f"\n{_technical_message_ru(analysis_context_action)}"
         if action and status != "READY":
-            text += f"\n{action}"
+            text += f"\n{_technical_message_ru(action)}"
         return text
 
     def _engineering_analysis_status_text(self, bundle) -> str:
@@ -1180,13 +1450,14 @@ class DesktopDiagnosticsCenter:
         ]
         action = str(getattr(bundle, "engineering_analysis_evidence_action", "") or "")
         text = (
-            f"{status} / validation={validation_status} / "
-            f"ho007_ready={ready_count}/{candidate_count} / missing_inputs={missing_count} / failed={failed_count}"
+            f"{_status_ru(status)} / проверка={_status_ru(validation_status)} / "
+            f"HO-007 готово={ready_count}/{candidate_count} / "
+            f"не хватает входных данных={missing_count} / ошибки={failed_count}"
         )
         if missing_inputs:
-            text += f"\nmissing_inputs={', '.join(missing_inputs[:8])}"
+            text += f"\nНе хватает входных данных: {', '.join(missing_inputs[:8])}"
         if action and status != "READY":
-            text += f"\n{action}"
+            text += f"\n{_technical_message_ru(action)}"
         return text
 
     def _geometry_reference_evidence_summary_lines(self, bundle) -> list[str]:
@@ -1202,41 +1473,41 @@ class DesktopDiagnosticsCenter:
             if str(item).strip()
         ]
         lines = [
-            "## Geometry Reference evidence",
-            f"- Status: {status}",
-            f"- Artifact status: {getattr(bundle, 'geometry_reference_artifact_status', '') or 'missing'}",
+            "## Данные справочника геометрии",
+            f"- Состояние: {_status_ru(status)}",
+            f"- Артефакт: {_status_ru(getattr(bundle, 'geometry_reference_artifact_status', '') or 'missing')}",
             (
-                "- Artifact freshness: "
-                f"{getattr(bundle, 'geometry_reference_artifact_freshness_status', '') or 'missing'} / "
-                f"relation={getattr(bundle, 'geometry_reference_artifact_freshness_relation', '') or 'missing'} / "
-                f"latest={getattr(bundle, 'geometry_reference_latest_artifact_status', '') or '—'}"
+                "- Актуальность артефакта: "
+                f"{_status_ru(getattr(bundle, 'geometry_reference_artifact_freshness_status', '') or 'missing')} / "
+                f"связь={_status_ru(getattr(bundle, 'geometry_reference_artifact_freshness_relation', '') or 'missing')} / "
+                f"последний={_status_ru(getattr(bundle, 'geometry_reference_latest_artifact_status', '') or '—')}"
             ),
             (
-                "- road_width_m: "
-                f"{getattr(bundle, 'geometry_reference_road_width_status', '') or 'missing'} / "
-                f"source={getattr(bundle, 'geometry_reference_road_width_source', '') or '—'}"
+                "- Ширина дороги, м: "
+                f"{_status_ru(getattr(bundle, 'geometry_reference_road_width_status', '') or 'missing')} / "
+                f"источник={getattr(bundle, 'geometry_reference_road_width_source', '') or '—'}"
             ),
             (
-                "- Packaging: "
-                f"{getattr(bundle, 'geometry_reference_packaging_status', '') or 'missing'} / "
-                f"mismatch={getattr(bundle, 'geometry_reference_packaging_mismatch_status', '') or 'missing'}"
+                "- Упаковка данных: "
+                f"{_status_ru(getattr(bundle, 'geometry_reference_packaging_status', '') or 'missing')} / "
+                f"расхождения={_status_ru(getattr(bundle, 'geometry_reference_packaging_mismatch_status', '') or 'missing')}"
             ),
-            f"- Packaging contract hash: {getattr(bundle, 'geometry_reference_packaging_contract_hash', '') or '—'}",
-            f"- Geometry acceptance gate: {getattr(bundle, 'geometry_reference_acceptance_gate', '') or 'MISSING'}",
+            f"- Хэш контракта упаковки: {getattr(bundle, 'geometry_reference_packaging_contract_hash', '') or '—'}",
+            f"- Приёмка геометрии: {_status_ru(getattr(bundle, 'geometry_reference_acceptance_gate', '') or 'MISSING')}",
             (
-                "- Producer artifact status: "
-                f"{getattr(bundle, 'geometry_reference_producer_artifact_status', '') or 'missing'} / "
-                f"owner={getattr(bundle, 'geometry_reference_producer_evidence_owner', '') or 'producer_export'}"
-            ),
-            (
-                "- Consumer fabrication allowed: "
-                f"{bool(getattr(bundle, 'geometry_reference_consumer_may_fabricate_geometry', False))}"
+                "- Статус артефакта источника: "
+                f"{_status_ru(getattr(bundle, 'geometry_reference_producer_artifact_status', '') or 'missing')} / "
+                f"владелец={getattr(bundle, 'geometry_reference_producer_evidence_owner', '') or 'producer_export'}"
             ),
             (
-                "- Component passport needs data: "
+                "- Потребителю разрешено создавать геометрию: "
+                f"{_bool_ru(bool(getattr(bundle, 'geometry_reference_consumer_may_fabricate_geometry', False)))}"
+            ),
+            (
+                "- Паспорту компонентов нужны данные: "
                 f"{getattr(bundle, 'geometry_reference_component_passport_needs_data', 0)}"
             ),
-            f"- Evidence JSON: {getattr(bundle, 'latest_geometry_reference_evidence_path', '') or '—'}",
+            f"- JSON данных: {getattr(bundle, 'latest_geometry_reference_evidence_path', '') or '—'}",
         ]
         action = str(getattr(bundle, "geometry_reference_action", "") or "")
         producer_readiness_reasons = [
@@ -1250,15 +1521,15 @@ class DesktopDiagnosticsCenter:
             if str(item).strip()
         ]
         if missing:
-            lines.append(f"- Missing: {', '.join(missing)}")
+            lines.append(f"- Не хватает: {', '.join(missing)}")
         if producer_readiness_reasons:
-            lines.append(f"- Producer readiness reasons: {', '.join(producer_readiness_reasons)}")
+            lines.append(f"- Причины неготовности источника: {', '.join(_technical_message_ru(x) for x in producer_readiness_reasons)}")
         if required_artifacts:
-            lines.append(f"- Required producer artifacts: {', '.join(required_artifacts)}")
+            lines.append(f"- Требуемые артефакты источника: {', '.join(required_artifacts)}")
         if action:
-            lines.append(f"- Action: {action}")
+            lines.append(f"- Что сделать: {_technical_message_ru(action)}")
         for warning in warnings[:5]:
-            lines.append(f"- Warning: {warning}")
+            lines.append(f"- Предупреждение: {_technical_message_ru(warning)}")
         return lines
 
     def _geometry_reference_status_text(self, bundle) -> str:
@@ -1282,15 +1553,17 @@ class DesktopDiagnosticsCenter:
         ]
         action = str(getattr(bundle, "geometry_reference_action", "") or "")
         text = (
-            f"{status} / artifact={artifact} / freshness={freshness}:{relation} / road_width={road} / "
-            f"packaging={packaging} / acceptance={gate} / producer={producer}"
+            f"{_status_ru(status)} / артефакт={_status_ru(artifact)} / "
+            f"актуальность={_status_ru(freshness)}:{_status_ru(relation)} / "
+            f"ширина дороги={_status_ru(road)} / упаковка={_status_ru(packaging)} / "
+            f"приёмка={_status_ru(gate)} / источник={_status_ru(producer)}"
         )
         if missing:
-            text += f"\nmissing={', '.join(missing)}"
+            text += f"\nНе хватает: {', '.join(missing)}"
         if producer_readiness_reasons:
-            text += f"\nproducer_readiness_reasons={', '.join(producer_readiness_reasons)}"
+            text += f"\nПричины неготовности источника: {', '.join(_technical_message_ru(x) for x in producer_readiness_reasons)}"
         if action and status != "READY":
-            text += f"\n{action}"
+            text += f"\n{_technical_message_ru(action)}"
         return text
 
     def _render_summary_text(self, bundle, *, bundle_out_dir: Path | None = None) -> str:
@@ -1307,8 +1580,8 @@ class DesktopDiagnosticsCenter:
                 [
                     "",
                     "## Последний прогон диагностики",
-                    f"- Успех: {self._last_run_record.ok}",
-                    f"- Состояние: {self._last_run_record.status or '—'}",
+                    f"- Успех: {_bool_ru(self._last_run_record.ok)}",
+                    f"- Состояние: {_status_ru(self._last_run_record.status or '—')}",
                     f"- Код возврата: {self._last_run_record.returncode}",
                     f"- Запущено: {self._last_run_record.started_at or '—'}",
                     f"- Завершено: {self._last_run_record.finished_at or '—'}",
@@ -1316,12 +1589,12 @@ class DesktopDiagnosticsCenter:
                     f"- Путь к ZIP: {self._last_run_record.zip_path or '—'}",
                     f"- Файл состояния: {self._last_run_record.state_path or '—'}",
                     f"- Файл журнала: {self._last_run_record.log_path or '—'}",
-                    f"- Сообщение: {self._last_run_record.last_message or '—'}",
+                    f"- Сообщение: {_technical_message_ru(self._last_run_record.last_message or '—')}",
                 ]
             )
         if bundle.summary_lines:
             lines.extend(["", "## Общая сводка"])
-            lines.extend(f"- {line}" for line in bundle.summary_lines)
+            lines.extend(f"- {_technical_message_ru(line)}" for line in bundle.summary_lines)
         lines.append("")
         lines.extend(self._latest_integrity_summary_lines(bundle))
         lines.append("")
@@ -1339,8 +1612,8 @@ class DesktopDiagnosticsCenter:
                 f"- Снимок состояния центра: {path_str(center_state_path)}",
                 f"- Последняя сводка Markdown: {path_str(summary_md_path)}",
                 f"- Последний ZIP: {bundle.latest_zip_path or '—'}",
-                f"- Указатель latest ZIP TXT: {bundle.latest_path_pointer_path or '—'}",
-                f"- SHA256 latest ZIP: {bundle.latest_sha_path or '—'}",
+                f"- Указатель актуального ZIP TXT: {bundle.latest_path_pointer_path or '—'}",
+                f"- SHA256 актуального ZIP: {bundle.latest_sha_path or '—'}",
                 f"- Метаданные пакета JSON: {bundle.latest_bundle_meta_path or '—'}",
                 f"- Проверка пакета JSON: {bundle.latest_inspection_json_path or '—'}",
                 f"- Проверка пакета Markdown: {bundle.latest_inspection_md_path or '—'}",
@@ -1349,20 +1622,20 @@ class DesktopDiagnosticsCenter:
                 f"- Проверка содержимого JSON: {bundle.latest_validation_json_path or '—'}",
                 f"- Проверка содержимого Markdown: {bundle.latest_validation_md_path or '—'}",
                 f"- Разбор замечаний Markdown: {bundle.latest_triage_md_path or '—'}",
-                f"- Evidence manifest JSON: {bundle.latest_evidence_manifest_path or '—'}",
-                f"- Latest integrity evidence sidecar JSON: {bundle.latest_integrity_evidence_sidecar_path or '—'}",
-                f"- SELF_CHECK silent warnings JSON: {bundle.self_check_silent_warnings_json_path or '—'}",
-                f"- SELF_CHECK silent warnings Markdown: {bundle.self_check_silent_warnings_md_path or '—'}",
-                f"- Analysis evidence / HO-009 JSON: {bundle.latest_analysis_evidence_manifest_path or '—'}",
+                f"- Манифест данных JSON: {bundle.latest_evidence_manifest_path or '—'}",
+                f"- Подтверждение целостности актуального ZIP JSON: {bundle.latest_integrity_evidence_sidecar_path or '—'}",
+                f"- Тихие предупреждения самопроверки JSON: {bundle.self_check_silent_warnings_json_path or '—'}",
+                f"- Тихие предупреждения самопроверки Markdown: {bundle.self_check_silent_warnings_md_path or '—'}",
+                f"- Данные анализа HO-009 JSON: {bundle.latest_analysis_evidence_manifest_path or '—'}",
                 (
-                    "- Engineering Analysis evidence / HO-007 JSON: "
+                    "- Данные инженерного анализа HO-007 JSON: "
                     f"{bundle.latest_engineering_analysis_evidence_manifest_path or '—'}"
                 ),
                 (
-                    "- latest_engineering_analysis_evidence_manifest_json: "
+                    "- Машинный путь инженерного анализа: "
                     f"{bundle.latest_engineering_analysis_evidence_manifest_path or '—'}"
                 ),
-                f"- Geometry Reference evidence JSON: {bundle.latest_geometry_reference_evidence_path or '—'}",
+                f"- Данные справочника геометрии JSON: {bundle.latest_geometry_reference_evidence_path or '—'}",
                 f"- Статус буфера обмена JSON: {bundle.latest_clipboard_status_path or '—'}",
                 f"- Диагностика указателя анимации JSON: {bundle.anim_pointer_diagnostics_path or '—'}",
                 f"- Последний файл состояния прогона JSON: {self._last_run_record.state_path if self._last_run_record else '—'}",
@@ -1397,9 +1670,13 @@ class DesktopDiagnosticsCenter:
         inspect_md = "(проверка пакета пока недоступна)"
         health_md = "(отчёт о состоянии пока недоступен)"
         if bundle.latest_inspection_md_path:
-            inspect_md = Path(bundle.latest_inspection_md_path).read_text(encoding="utf-8", errors="replace")
+            inspect_md = _operator_preview_text(
+                Path(bundle.latest_inspection_md_path).read_text(encoding="utf-8", errors="replace")
+            )
         if bundle.latest_health_md_path:
-            health_md = Path(bundle.latest_health_md_path).read_text(encoding="utf-8", errors="replace")
+            health_md = _operator_preview_text(
+                Path(bundle.latest_health_md_path).read_text(encoding="utf-8", errors="replace")
+            )
         self._set_text_widget(self.inspect_text, inspect_md)
         self._set_text_widget(self.health_text, health_md)
 
@@ -1433,29 +1710,29 @@ class DesktopDiagnosticsCenter:
             meta_bits = []
 
         if bundle.summary_lines:
-            meta_bits.extend(bundle.summary_lines)
+            meta_bits.extend(_technical_message_ru(line) for line in bundle.summary_lines)
         meta_bits.append(
-            "Latest integrity: "
-            f"{bundle.latest_integrity_status} / "
-            f"sha_sidecar={bundle.latest_integrity_sha_sidecar_matches} / "
-            f"pointer={bundle.latest_integrity_pointer_matches_original} / "
-            f"no_release_closure_claim={bundle.latest_integrity_no_release_closure_claim}"
+            "Целостность актуального ZIP: "
+            f"{_status_ru(bundle.latest_integrity_status)} / "
+            f"SHA-файл={_bool_ru(bundle.latest_integrity_sha_sidecar_matches)} / "
+            f"указатель={_bool_ru(bundle.latest_integrity_pointer_matches_original)} / "
+            f"релиз не закрывается={_bool_ru(bundle.latest_integrity_no_release_closure_claim)}"
         )
         meta_bits.append(
-            "SELF_CHECK silent warnings snapshot: "
-            f"{bundle.self_check_silent_warnings_status} / "
-            f"fail={bundle.self_check_silent_warnings_fail_count} / "
-            f"warn={bundle.self_check_silent_warnings_warn_count} / snapshot_only=True"
+            "Снимок тихих предупреждений самопроверки: "
+            f"{_status_ru(bundle.self_check_silent_warnings_status)} / "
+            f"ошибки={bundle.self_check_silent_warnings_fail_count} / "
+            f"предупреждения={bundle.self_check_silent_warnings_warn_count} / только снимок=да"
         )
-        meta_bits.append("Producer-owned warnings remain warning-only; Diagnostics/SEND does not close them.")
+        meta_bits.append("Предупреждения источников данных остаются предупреждениями; центр диагностики не закрывает релиз.")
         self.analysis_evidence_status_var.set(
-            "Analysis evidence / HO-009: " + self._analysis_evidence_status_text(bundle)
+            "Данные анализа HO-009: " + self._analysis_evidence_status_text(bundle)
         )
         self.engineering_analysis_status_var.set(
-            "Engineering Analysis evidence / HO-007: " + self._engineering_analysis_status_text(bundle)
+            "Данные инженерного анализа HO-007: " + self._engineering_analysis_status_text(bundle)
         )
         self.geometry_reference_status_var.set(
-            "Geometry Reference evidence: " + self._geometry_reference_status_text(bundle)
+            "Данные справочника геометрии: " + self._geometry_reference_status_text(bundle)
         )
         meta_bits.append(str(self.analysis_evidence_status_var.get() or ""))
         meta_bits.append(str(self.engineering_analysis_status_var.get() or ""))
@@ -1463,7 +1740,7 @@ class DesktopDiagnosticsCenter:
         if bundle.anim_pointer_diagnostics_path:
             meta_bits.append(f"Диагностика указателя анимации: {bundle.anim_pointer_diagnostics_path}")
         if bundle.clipboard_ok is not None:
-            meta_bits.append(f"Буфер обмена: ok={bundle.clipboard_ok} msg={bundle.clipboard_message}")
+            meta_bits.append(f"Буфер обмена: {_bool_ru(bundle.clipboard_ok)}; {_technical_message_ru(bundle.clipboard_message)}")
         self.send_meta_var.set("\n".join(meta_bits))
 
         self._clipboard_ok = bool(bundle.clipboard_ok) if bundle.clipboard_ok is not None else False
@@ -1473,18 +1750,18 @@ class DesktopDiagnosticsCenter:
             self.pb.start(10)
         else:
             self.pb.stop()
-            self.pb.configure(mode="determinate", maximum=1.0, value=1.0)
+            self.pb.configure(mode="determinate", maximum=100, value=100 if bundle.latest_zip_path else 0)
 
         if bundle.latest_zip_path:
             if self._clipboard_ok:
                 self.send_title_var.set("ZIP для отправки в чат готов и уже скопирован в буфер.")
-                self.btn_copy.configure(text="📋 Скопировать ZIP ещё раз")
-            elif self._clipboard_message and "Copied path as text" in self._clipboard_message:
-                self.send_title_var.set("ZIP готов. Путь к ZIP скопирован как текст; файловый clipboard не подтвердился.")
-                self.btn_copy.configure(text="📋 Скопировать ZIP в буфер обмена")
+                self.btn_copy.configure(text="Скопировать ZIP ещё раз")
+            elif self._clipboard_message and "Путь к ZIP скопирован как текст" in _technical_message_ru(self._clipboard_message):
+                self.send_title_var.set("ZIP готов. Путь к ZIP скопирован как текст; файловый буфер обмена не подтвердился.")
+                self.btn_copy.configure(text="Скопировать ZIP в буфер обмена")
             else:
                 self.send_title_var.set("ZIP для отправки в чат готов.")
-                self.btn_copy.configure(text="📋 Скопировать ZIP в буфер обмена")
+                self.btn_copy.configure(text="Скопировать ZIP в буфер обмена")
             self.btn_copy.state(["!disabled"])
         else:
             self.send_title_var.set("ZIP для отправки в чат ещё не готов.")
@@ -1506,9 +1783,10 @@ class DesktopDiagnosticsCenter:
         self.send_path_var.set("(ещё не готово)")
         self.send_meta_var.set("")
         self.btn_copy.state(["disabled"])
-        self.pb.configure(mode="indeterminate")
-        self.pb.start(10)
-        self.status_var.set("Сборка пакета отправки...")
+        self._set_process_busy(
+            "Собирается ZIP для отправки",
+            "Идёт сборка диагностического ZIP. Прогресс показан здесь и не зависит от выбранного раздела.",
+        )
 
         def worker() -> None:
             trigger = str(os.environ.get("PNEUMO_SEND_BUNDLE_TRIGGER") or "desktop_diagnostics_center")
@@ -1526,7 +1804,13 @@ class DesktopDiagnosticsCenter:
         self._bundle_busy = False
         self._worker_done = True
         self._worker_exc = None if ok else message
-        self.status_var.set("Пакет обновлён." if ok else f"Не удалось собрать пакет: {message}")
+        if ok:
+            self._set_process_done("ZIP собран", "Диагностический ZIP обновлён и готов к проверке.")
+        else:
+            self._set_process_done(
+                "Ошибка сборки ZIP",
+                f"Не удалось собрать диагностический ZIP: {_technical_message_ru(message)}",
+            )
         self._refresh_bundle_views(regenerate_reports=True)
         if zip_path:
             try:
@@ -1536,7 +1820,7 @@ class DesktopDiagnosticsCenter:
         if self._bundle_auto_copy_on_ready:
             self._attempt_clipboard_copy_once()
         if not ok and not self._host_closed:
-            messagebox.showerror("Пакет отправки", message or "Не удалось собрать пакет отправки.")
+            messagebox.showerror("Пакет отправки", _technical_message_ru(message) or "Не удалось собрать пакет отправки.")
 
     def _attempt_clipboard_copy_once(self) -> None:
         if self._clipboard_attempted:
@@ -1551,7 +1835,7 @@ class DesktopDiagnosticsCenter:
         self._clipboard_message = str(message)
         self._refresh_bundle_views(regenerate_reports=False)
         if bundle.latest_zip_path and not ok:
-            self.status_var.set("ZIP готов, но clipboard подтвердился не полностью.")
+            self.status_var.set("ZIP готов, но буфер обмена подтвердился не полностью.")
 
     def _copy(self) -> None:
         bundle, ok, message = copy_latest_bundle_to_clipboard(
@@ -1566,9 +1850,9 @@ class DesktopDiagnosticsCenter:
             messagebox.showwarning("Отправка", "ZIP ещё не готов.")
             return
         if ok:
-            messagebox.showinfo("Отправка", message)
+            messagebox.showinfo("Отправка", _technical_message_ru(message))
         else:
-            messagebox.showwarning("Отправка", message)
+            messagebox.showwarning("Отправка", _technical_message_ru(message))
 
     def on_close(self) -> None:
         try:

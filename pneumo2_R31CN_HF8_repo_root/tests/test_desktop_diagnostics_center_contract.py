@@ -252,7 +252,7 @@ def test_desktop_diagnostics_surfaces_ho008_analysis_context_warning(tmp_path: P
     assert "Engineering Analysis Center" in bundle.analysis_context_action
     assert any("HO-008 analysis context is BLOCKED" in msg for msg in bundle.analysis_evidence_warnings)
     summary_lines = DesktopDiagnosticsCenter._analysis_evidence_summary_lines(object(), bundle)
-    assert "- HO-010 capture/export: READY | handoff=HO-010 | capture_hash=capture-ho008" in summary_lines
+    assert "- Захват/экспорт HO-010: готово | handoff=HO-010 | capture_hash=capture-ho008" in summary_lines
 
     center_state = write_desktop_diagnostics_center_state(out_dir, bundle_record=bundle)
     payload = json.loads(center_state.read_text(encoding="utf-8"))
@@ -275,6 +275,38 @@ def test_desktop_diagnostics_marks_missing_analysis_evidence_with_results_action
     assert bundle.latest_analysis_evidence_manifest_path == ""
     assert "Results Center" in bundle.analysis_evidence_action
     assert any("Analysis evidence / HO-009 missing" in msg for msg in bundle.analysis_evidence_warnings)
+
+
+def test_desktop_diagnostics_operator_preview_localizes_markdown_reports() -> None:
+    from pneumo_solver_ui.tools.desktop_diagnostics_center import _operator_preview_text
+
+    raw = "\n".join(
+        [
+            "# Send bundle inspection",
+            "- OK: **False**",
+            "- Embedded health report: True",
+            "## Evidence manifest",
+            "- missing_evidence: Analysis evidence / HO-009 context state is missing.",
+            "## Engineering analysis evidence",
+            "- status: READY",
+            "## Anim latest diagnostics",
+            "- available: False",
+            "- pointer_sync_ok: None",
+        ]
+    )
+
+    translated = _operator_preview_text(raw)
+
+    assert "# Проверка ZIP для отправки" in translated
+    assert "- Успешно: **нет**" in translated
+    assert "- Вложенный отчёт о состоянии: да" in translated
+    assert "## Манифест данных" in translated
+    assert "- Нет данных: нет состояния контекста анализа HO-009." in translated
+    assert "## Данные инженерного анализа" in translated
+    assert "- Состояние: готово" in translated
+    assert "## Диагностика последней анимации" in translated
+    assert "- Доступно: нет" in translated
+    assert "- Указатель синхронизирован: нет данных" in translated
 
 
 def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_state(tmp_path: Path) -> None:
@@ -592,43 +624,43 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "ttk.Notebook" in center_src
     assert "write_desktop_diagnostics_center_state" in center_src
     assert "Машиночитаемые пути" in center_src
-    assert "Analysis evidence / HO-009" in center_src
+    assert "Данные анализа HO-009" in center_src
     assert "latest_analysis_evidence_manifest.json" in center_src
-    assert "Engineering Analysis evidence / HO-007" in center_src
+    assert "Данные инженерного анализа HO-007" in center_src
     assert "latest_engineering_analysis_evidence_manifest_path" in center_src
     assert "engineering_analysis_ready_candidate_count" in center_src
     assert "latest_engineering_analysis_evidence_manifest_json" in runtime_src
     assert "selected_run_ready_candidate_count" in runtime_src
-    assert 'text="Открыть Analysis JSON"' in center_src
+    assert 'text="Открыть данные анализа"' in center_src
     assert "self.btn_open_analysis_evidence" in center_src
     assert "def _open_analysis_evidence(self) -> None:" in center_src
-    assert 'text="Открыть Engineering JSON"' in center_src
+    assert 'text="Открыть инженерный анализ"' in center_src
     assert "self.btn_open_engineering_analysis_evidence" in center_src
     assert "def _open_engineering_analysis_evidence(self) -> None:" in center_src
     assert "def _engineering_analysis_evidence_summary_lines(self, bundle) -> list[str]:" in center_src
     assert "def _engineering_analysis_status_text(self, bundle) -> str:" in center_src
-    assert "Evidence handoff status" in center_src
-    assert "HO-008 analysis context" in center_src
-    assert "HO-010 capture/export" in center_src
+    assert "Готовность данных для отправки" in center_src
+    assert "Контекст анализа HO-008" in center_src
+    assert "Захват/экспорт HO-010" in center_src
     assert "analysis_capture_export_manifest_status" in center_src
     assert "capture_export_manifest_status" in runtime_src
     assert "analysis_context_status" in runtime_src
     assert "analysis_context_action" in runtime_src
-    assert "Geometry Reference evidence" in center_src
-    assert "Artifact freshness" in center_src
-    assert "Producer artifact status" in center_src
-    assert "Producer readiness reasons" in center_src
-    assert "Consumer fabrication allowed" in center_src
+    assert "Данные справочника геометрии" in center_src
+    assert "Актуальность артефакта" in center_src
+    assert "Статус артефакта источника" in center_src
+    assert "Причины неготовности источника" in center_src
+    assert "Потребителю разрешено создавать геометрию" in center_src
     assert "geometry_reference_artifact_freshness_relation" in center_src
-    assert "Latest integrity proof" in center_src
-    assert "Producer-owned warnings remain warning-only" in center_src
-    assert "Self-check silent warnings snapshot" in center_src
+    assert "Проверка актуального ZIP" in center_src
+    assert "Предупреждения источников данных остаются предупреждениями" in center_src
+    assert "Снимок тихих предупреждений самопроверки" in center_src
     assert "latest_integrity_proof" in runtime_src
     assert "self_check_silent_warnings" in runtime_src
     assert "geometry_reference_producer_artifact_status" in runtime_src
     assert "geometry_reference_producer_readiness_reasons" in runtime_src
     assert "consumer_may_fabricate_geometry" in runtime_src
-    assert 'text="Открыть Geometry JSON"' in center_src
+    assert 'text="Открыть геометрию"' in center_src
     assert "self.btn_open_geometry_reference_evidence" in center_src
     assert "def _open_geometry_reference_evidence(self) -> None:" in center_src
     assert "latest_geometry_reference_evidence.json" in center_src
@@ -667,9 +699,59 @@ def test_desktop_diagnostics_center_uses_split_workspace_and_sidebar_actions() -
     assert 'workspace = ttk.Panedwindow(outer, orient="horizontal")' in center_src
     assert 'context_box = ttk.LabelFrame(sidebar, text="Состояние", padding=8)' in center_src
     assert 'quick_box = ttk.LabelFrame(sidebar, text="Быстрые действия", padding=8)' in center_src
-    assert 'ttk.Button(header_actions, text="Диагностика", command=lambda: self.notebook.select(self.diag_tab)).pack(side="left")' in center_src
+    assert 'ttk.Button(header_actions, text="1. Проверить проект", command=lambda: self.notebook.select(self.diag_tab)).pack(side="left")' in center_src
+    assert 'process_box = ttk.LabelFrame(outer, text="Текущий процесс", padding=8)' in center_src
+    assert "self.process_progress = ttk.Progressbar(" in center_src
+    assert "def _set_process_busy(self, title: str, detail: str) -> None:" in center_src
     assert "def _start_run(self) -> None:" in center_src
     assert "def _open_bundle_dir(self) -> None:" in center_src
+
+
+def test_desktop_diagnostics_center_operator_text_is_russian_and_progress_global() -> None:
+    center_src = (ROOT / "pneumo_solver_ui" / "tools" / "desktop_diagnostics_center.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    required = [
+        "Текущий процесс",
+        "Прогресс диагностики и сборки ZIP всегда показывается здесь",
+        "Идёт автономная диагностика. Прогресс показан здесь",
+        "Идёт сборка диагностического ZIP. Прогресс показан здесь",
+        "Скопировать ZIP в буфер обмена",
+        "Данные анализа HO-009:",
+        "Данные инженерного анализа HO-007:",
+        "Данные справочника геометрии:",
+    ]
+    for fragment in required:
+        assert fragment in center_src
+
+    forbidden = [
+        'text="Открыть Analysis JSON"',
+        'text="Открыть Engineering JSON"',
+        'text="Открыть Geometry JSON"',
+        "Evidence handoff status",
+        "## Analysis evidence / HO-009",
+        '"Analysis evidence / HO-009: "',
+        "## Engineering Analysis evidence / HO-007",
+        '"Engineering Analysis evidence / HO-007: "',
+        "## Geometry Reference evidence",
+        '"Geometry Reference evidence: "',
+        "Latest integrity: ",
+        "SELF_CHECK silent warnings snapshot",
+        "Producer-owned warnings remain warning-only",
+        "📋",
+        "📂",
+        "▶",
+        "■",
+        "minutes:",
+        "jobs:",
+        "State JSON:",
+        "Сборка пакета отправки",
+        "Запущен автономный",
+    ]
+    for fragment in forbidden:
+        assert fragment not in center_src
 
 
 def test_test_center_integration_reuses_existing_latest_bundle_when_opening_send_center() -> None:
