@@ -16,6 +16,7 @@ from pneumo_solver_ui.desktop_geometry_reference_model import (
     build_catalog_source_summary,
     build_geometry_reference_diagnostics_handoff,
     build_producer_truth_gap_map,
+    build_solver_points_hardpoints_evidence,
     build_cylinder_match_recommendations,
     build_cylinder_force_bias_estimate,
     build_current_cylinder_package_rows,
@@ -30,6 +31,10 @@ from pneumo_solver_ui.desktop_geometry_reference_model import (
     load_camozzi_catalog_rows,
 )
 from pneumo_solver_ui.desktop_geometry_reference_runtime import DesktopGeometryReferenceRuntime
+from pneumo_solver_ui.anim_export_contract import (
+    HARDPOINTS_SOURCE_OF_TRUTH_JSON_NAME,
+    VISIBLE_SUSPENSION_FAMILIES,
+)
 from pneumo_solver_ui.suspension_family_contract import (
     cylinder_axle_geometry_key,
     cylinder_family_key,
@@ -118,7 +123,7 @@ def _write_reference_artifact(tmp_path: Path) -> dict[str, object]:
             "axis_only_honesty_mode_when_incomplete": True,
         },
     }
-    meta = {
+    meta = _producer_meta_with_solver_hardpoints({
         "geometry": {
             "road_width_m": 1.5,
             "track_m": 1.0,
@@ -127,12 +132,15 @@ def _write_reference_artifact(tmp_path: Path) -> dict[str, object]:
         "packaging": packaging,
         "anim_export_contract_artifacts": {
             "cylinder_packaging_passport": "CYLINDER_PACKAGING_PASSPORT.json",
+            "hardpoints_source_of_truth": HARDPOINTS_SOURCE_OF_TRUTH_JSON_NAME,
             "geometry_acceptance_json": "geometry_acceptance_report.json",
         },
-    }
+    })
     npz_path = tmp_path / "anim_latest.npz"
     pointer_path = tmp_path / "anim_latest.json"
     passport_path = tmp_path / "CYLINDER_PACKAGING_PASSPORT.json"
+    hardpoints_sot_path = _write_hardpoints_sot(tmp_path)
+    geometry_acceptance_path = tmp_path / "geometry_acceptance_report.json"
     np.savez_compressed(
         npz_path,
         main_cols=np.array(cols, dtype=str),
@@ -168,6 +176,20 @@ def _write_reference_artifact(tmp_path: Path) -> dict[str, object]:
         },
     }
     passport_path.write_text(json.dumps(passport, ensure_ascii=False, indent=2), encoding="utf-8")
+    geometry_acceptance_path.write_text(
+        json.dumps(
+            {
+                "schema": "geometry_acceptance_report.v1",
+                "release_gate": "PASS",
+                "release_gate_reason": "solver-point contract consistent",
+                "available": True,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    assert hardpoints_sot_path.exists()
     return {
         "anim_latest_usable": True,
         "anim_latest_pointer_json": str(pointer_path),
@@ -181,6 +203,8 @@ def _write_reference_artifact(tmp_path: Path) -> dict[str, object]:
         "anim_latest_meta": meta,
         "anim_latest_cylinder_packaging_passport_path": str(passport_path),
         "anim_latest_cylinder_packaging_passport_exists": True,
+        "anim_latest_geometry_acceptance_json_path": str(geometry_acceptance_path),
+        "anim_latest_geometry_acceptance_json_exists": True,
     }
 
 
@@ -651,23 +675,96 @@ def test_road_width_evidence_prefers_explicit_meta_and_keeps_missing_gap_warning
     assert "GAP-008" in missing.explanation
 
 
+def _complete_solver_points_hardpoints_meta() -> dict[str, object]:
+    families = {family: {"coverage": "full", "corners": {}} for family in VISIBLE_SUSPENSION_FAMILIES}
+    return {
+        "solver_points": {
+            "schema": "solver_points.contract.v1",
+            "visible_suspension_skeleton_families": list(VISIBLE_SUSPENSION_FAMILIES),
+            "partial_visible_suspension_skeleton_families": [],
+            "policy": {
+                "consumer_geometry_fabrication_allowed": False,
+                "missing_truth_state": "unavailable",
+            },
+        },
+        "hardpoints": {
+            "schema": "hardpoints.export.v1",
+            "canonical_families": list(VISIBLE_SUSPENSION_FAMILIES),
+            "partial_families": [],
+            "families": families,
+            "policy": {
+                "consumer_geometry_fabrication_allowed": False,
+                "missing_truth_state": "unavailable",
+                "legacy_alias_reconstruction_allowed": False,
+            },
+        },
+        "anim_export_contract_artifacts": {
+            "hardpoints_source_of_truth": HARDPOINTS_SOURCE_OF_TRUTH_JSON_NAME,
+        },
+    }
+
+
+def _producer_meta_with_solver_hardpoints(extra: dict[str, object] | None = None) -> dict[str, object]:
+    meta = _complete_solver_points_hardpoints_meta()
+    for key, value in dict(extra or {}).items():
+        if key == "anim_export_contract_artifacts" and isinstance(value, dict):
+            refs = dict(meta.get("anim_export_contract_artifacts") or {})
+            refs.update(value)
+            meta[key] = refs
+        else:
+            meta[key] = value
+    return meta
+
+
+def _write_hardpoints_sot(exports_dir: Path, *, complete: bool = True) -> Path:
+    exports_dir.mkdir(parents=True, exist_ok=True)
+    visible_present = list(VISIBLE_SUSPENSION_FAMILIES) if complete else list(VISIBLE_SUSPENSION_FAMILIES[:-1])
+    visible_missing = [] if complete else [VISIBLE_SUSPENSION_FAMILIES[-1]]
+    path = exports_dir / HARDPOINTS_SOURCE_OF_TRUTH_JSON_NAME
+    path.write_text(
+        json.dumps(
+            {
+                "schema": "hardpoints.source_of_truth.v1",
+                "complete": complete,
+                "visible_required_families": list(VISIBLE_SUSPENSION_FAMILIES),
+                "visible_present_families": visible_present,
+                "visible_partial_families": [],
+                "visible_missing_families": visible_missing,
+                "policy": {
+                    "consumer_geometry_fabrication_allowed": False,
+                },
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
 def _current_producer_artifact_context(
-    *, source_label: str, meta: dict[str, object] | None = None
+    *,
+    source_label: str,
+    meta: dict[str, object] | None = None,
+    exports_dir: str | Path = "C:/workspace/exports",
+    geometry_acceptance_exists: bool = True,
+    packaging_passport_exists: bool = True,
 ) -> ArtifactReferenceContext:
+    exports_text = str(exports_dir).rstrip("/\\")
     return ArtifactReferenceContext(
         status="current",
         source_label=source_label,
-        pointer_path="C:/workspace/exports/anim_latest.json",
-        npz_path="C:/workspace/exports/anim_latest.npz",
-        exports_dir="C:/workspace/exports",
+        pointer_path=f"{exports_text}/anim_latest.json",
+        npz_path=f"{exports_text}/anim_latest.npz",
+        exports_dir=exports_text,
         updated_utc="2026-04-17T00:00:00+00:00",
         visual_cache_token="token",
         meta=meta or {},
         issues=(),
-        packaging_passport_path="C:/workspace/exports/CYLINDER_PACKAGING_PASSPORT.json",
-        packaging_passport_exists=True,
-        geometry_acceptance_path="C:/workspace/exports/geometry_acceptance_report.json",
-        geometry_acceptance_exists=True,
+        packaging_passport_path=f"{exports_text}/CYLINDER_PACKAGING_PASSPORT.json",
+        packaging_passport_exists=packaging_passport_exists,
+        geometry_acceptance_path=f"{exports_text}/geometry_acceptance_report.json",
+        geometry_acceptance_exists=geometry_acceptance_exists,
     )
 
 
@@ -713,11 +810,16 @@ def _failed_geometry_acceptance_evidence():
     return build_geometry_acceptance_evidence(mapping, source_label="synthetic FAIL frame")
 
 
-def test_producer_handoff_stays_partial_when_road_width_evidence_is_missing() -> None:
+def test_producer_handoff_stays_partial_when_road_width_evidence_is_missing(tmp_path: Path) -> None:
+    exports_dir = tmp_path / "exports"
+    _write_hardpoints_sot(exports_dir)
+    artifact_meta = _producer_meta_with_solver_hardpoints()
     artifact = _current_producer_artifact_context(
-        source_label="synthetic complete artifact without road_width_m"
+        source_label="synthetic complete artifact without road_width_m",
+        meta=artifact_meta,
+        exports_dir=exports_dir,
     )
-    road_width = build_road_width_evidence({}, artifact_meta={})
+    road_width = build_road_width_evidence({}, artifact_meta=artifact_meta)
     handoff = build_geometry_reference_diagnostics_handoff(
         artifact_context=artifact,
         component_rows=(),
@@ -739,11 +841,16 @@ def test_producer_handoff_stays_partial_when_road_width_evidence_is_missing() ->
     assert handoff["producer_truth_gap_map"]["GAP-008"]["consumer_may_fabricate_geometry"] is False
 
 
-def test_producer_handoff_is_ready_with_pass_complete_packaging_and_explicit_road_width() -> None:
-    artifact_meta: dict[str, object] = {"geometry": {"road_width_m": 1.5}}
+def test_producer_handoff_is_ready_with_pass_complete_packaging_and_explicit_road_width(tmp_path: Path) -> None:
+    exports_dir = tmp_path / "exports"
+    _write_hardpoints_sot(exports_dir)
+    artifact_meta: dict[str, object] = _producer_meta_with_solver_hardpoints(
+        {"geometry": {"road_width_m": 1.5}}
+    )
     artifact = _current_producer_artifact_context(
         source_label="synthetic ready producer artifact",
         meta=artifact_meta,
+        exports_dir=exports_dir,
     )
     road_width = build_road_width_evidence({}, artifact_meta=artifact_meta)
     handoff = build_geometry_reference_diagnostics_handoff(
@@ -768,6 +875,11 @@ def test_producer_handoff_is_ready_with_pass_complete_packaging_and_explicit_roa
     assert handoff["producer_readiness_reasons"] == []
     assert handoff["evidence_missing"] == []
     assert handoff["consumer_may_fabricate_geometry"] is False
+    assert handoff["solver_points_hardpoints_evidence"]["status"] == "ready"
+    assert handoff["solver_points_hardpoints_evidence"]["hardpoints_source_of_truth"]["complete"] is True
+    assert handoff["consumer_handoff_policy"]["input"]["reference_data_is_editable_master"] is False
+    assert handoff["consumer_handoff_policy"]["animator"]["may_fabricate_geometry"] is False
+    assert handoff["consumer_handoff_policy"]["diagnostics"]["warning_policy_changed_by_reference_center"] is False
     assert set(handoff["producer_truth_gap_map"]) == {"OG-001", "OG-002", "OG-006", "GAP-008"}
     assert all(entry["status"] == "ready" for entry in handoff["producer_truth_gap_map"].values())
     assert all(
@@ -776,6 +888,86 @@ def test_producer_handoff_is_ready_with_pass_complete_packaging_and_explicit_roa
     )
     assert handoff["catalog_source"]["path"].endswith("camozzi_catalog.json")
     assert handoff["catalog_source"]["item_count"] > 0
+
+
+def test_solver_points_hardpoints_evidence_reports_missing_partial_ready_and_fail(tmp_path: Path) -> None:
+    acceptance_pass = build_geometry_acceptance_evidence(
+        _geometry_acceptance_mapping(),
+        source_label="synthetic PASS frame",
+    )
+    missing = build_solver_points_hardpoints_evidence(
+        artifact_context=_current_producer_artifact_context(
+            source_label="synthetic artifact without solver/hardpoints blocks",
+            meta={"geometry": {"road_width_m": 1.5}},
+            exports_dir=tmp_path / "missing_exports",
+        ),
+        acceptance=acceptance_pass,
+    )
+    assert missing["status"] == "missing"
+    assert "meta_solver_points_missing" in missing["blocking_reasons"]
+    assert "meta_hardpoints_missing" in missing["blocking_reasons"]
+    assert "hardpoints_source_of_truth_missing" in missing["blocking_reasons"]
+    assert missing["consumer_may_fabricate_geometry"] is False
+
+    partial_exports = tmp_path / "partial_exports"
+    _write_hardpoints_sot(partial_exports, complete=False)
+    partial = build_solver_points_hardpoints_evidence(
+        artifact_context=_current_producer_artifact_context(
+            source_label="synthetic partial hardpoints SOT",
+            meta=_producer_meta_with_solver_hardpoints({"geometry": {"road_width_m": 1.5}}),
+            exports_dir=partial_exports,
+        ),
+        acceptance=acceptance_pass,
+    )
+    assert partial["status"] == "partial"
+    assert "hardpoints_source_of_truth_not_complete" in partial["blocking_reasons"]
+    assert partial["hardpoints_source_of_truth"]["exists"] is True
+    assert partial["hardpoints_source_of_truth"]["complete"] is False
+
+    ready_exports = tmp_path / "ready_exports"
+    _write_hardpoints_sot(ready_exports)
+    ready_context = _current_producer_artifact_context(
+        source_label="synthetic ready solver/hardpoints evidence",
+        meta=_producer_meta_with_solver_hardpoints({"geometry": {"road_width_m": 1.5}}),
+        exports_dir=ready_exports,
+    )
+    ready = build_solver_points_hardpoints_evidence(
+        artifact_context=ready_context,
+        acceptance=acceptance_pass,
+    )
+    assert ready["status"] == "ready"
+    assert ready["blocking_reasons"] == []
+    assert ready["meta_solver_points"]["present"] is True
+    assert ready["meta_hardpoints"]["present"] is True
+    assert ready["hardpoints_source_of_truth"]["complete"] is True
+
+    failed = build_solver_points_hardpoints_evidence(
+        artifact_context=ready_context,
+        acceptance=_failed_geometry_acceptance_evidence(),
+    )
+    assert failed["status"] == "fail"
+    assert "geometry_acceptance_fail" in failed["blocking_reasons"]
+
+
+def test_og001_does_not_become_ready_from_acceptance_pass_alone() -> None:
+    artifact_meta: dict[str, object] = {"geometry": {"road_width_m": 1.5}}
+    gap_map = build_producer_truth_gap_map(
+        artifact_context=_current_producer_artifact_context(
+            source_label="synthetic PASS-only artifact",
+            meta=artifact_meta,
+        ),
+        road_width=build_road_width_evidence({}, artifact_meta=artifact_meta),
+        packaging=_complete_packaging_passport_evidence(),
+        acceptance=build_geometry_acceptance_evidence(
+            _geometry_acceptance_mapping(),
+            source_label="synthetic PASS frame",
+        ),
+    )
+
+    assert gap_map["OG-001"]["status"] == "missing"
+    assert "meta_solver_points_missing" in gap_map["OG-001"]["blocking_reasons"]
+    assert "meta_hardpoints_missing" in gap_map["OG-001"]["blocking_reasons"]
+    assert "hardpoints_source_of_truth_missing" in gap_map["OG-001"]["blocking_reasons"]
 
 
 def test_producer_truth_gap_map_reports_partial_packaging_without_ready() -> None:
@@ -834,11 +1026,16 @@ def test_producer_truth_gap_map_reports_packaging_hash_mismatch_as_partial() -> 
     assert "packaging_mismatch_not_match" in gap_map["OG-002"]["blocking_reasons"]
 
 
-def test_producer_truth_gap_map_reports_historical_artifact_as_partial() -> None:
-    artifact_meta: dict[str, object] = {"geometry": {"road_width_m": 1.5}}
+def test_producer_truth_gap_map_reports_historical_artifact_as_partial(tmp_path: Path) -> None:
+    exports_dir = tmp_path / "exports"
+    _write_hardpoints_sot(exports_dir)
+    artifact_meta: dict[str, object] = _producer_meta_with_solver_hardpoints(
+        {"geometry": {"road_width_m": 1.5}}
+    )
     artifact = _current_producer_artifact_context(
         source_label="synthetic historical artifact",
         meta=artifact_meta,
+        exports_dir=exports_dir,
     )
     gap_map = build_producer_truth_gap_map(
         artifact_context=artifact,
@@ -862,11 +1059,16 @@ def test_producer_truth_gap_map_reports_historical_artifact_as_partial() -> None
     assert "artifact_relation_differs_from_latest" in gap_map["OG-006"]["blocking_reasons"]
 
 
-def test_producer_truth_gap_map_reports_missing_and_failed_acceptance() -> None:
-    artifact_meta: dict[str, object] = {"geometry": {"road_width_m": 1.5}}
+def test_producer_truth_gap_map_reports_missing_and_failed_acceptance(tmp_path: Path) -> None:
+    exports_dir = tmp_path / "exports"
+    _write_hardpoints_sot(exports_dir)
+    artifact_meta: dict[str, object] = _producer_meta_with_solver_hardpoints(
+        {"geometry": {"road_width_m": 1.5}}
+    )
     artifact = _current_producer_artifact_context(
         source_label="synthetic acceptance artifact",
         meta=artifact_meta,
+        exports_dir=exports_dir,
     )
     common = {
         "artifact_context": artifact,
@@ -1009,6 +1211,12 @@ def test_desktop_geometry_reference_center_keeps_tabbed_desktop_workspace_contra
     assert "attach_tooltip" in tool_src
     assert "show_help_dialog" in tool_src
     assert "self.artifact_summary_var" in tool_src
+    assert "self.solver_points_hardpoints_summary_var" in tool_src
+    assert "self.solver_points_hardpoints_tree = self._build_tree(" in tool_src
+    assert 'text="solver_points / hardpoints producer evidence"' in tool_src
+    assert "solver_points_hardpoints_evidence" in tool_src
+    assert "Read-only reference/evidence surface" in tool_src
+    assert "hardpoints/solver_points remain producer-owned" in tool_src
     assert "self.producer_gap_summary_var" in tool_src
     assert "self.producer_gap_tree = self._build_tree(" in tool_src
     assert 'text="producer truth gap map"' in tool_src
@@ -1029,6 +1237,10 @@ def test_desktop_geometry_reference_center_keeps_tabbed_desktop_workspace_contra
     assert "artifact_geometry_acceptance_evidence" in tool_src
     assert "build_catalog_source_summary" in runtime_src
     assert "build_producer_truth_gap_map" in model_src
+    assert "build_solver_points_hardpoints_evidence" in model_src
+    assert "consumer_handoff_policy" in model_src
+    assert "reference_data_is_editable_master" in model_src
+    assert "HARDPOINTS_SOURCE_OF_TRUTH.json" in model_src
     assert "producer_truth_gap_map" in model_src
     assert "catalog_source" in model_src
     assert 'workflow_stage="reference"' in adapter_src

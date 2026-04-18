@@ -67,6 +67,10 @@ STATUS_LABELS_RU: dict[str, str] = {
     "FINISHED": "завершено",
     "RUNNING": "выполняется",
     "STOPPING": "останавливается",
+    "OPEN": "открыто",
+    "CLEAR": "чисто",
+    "PASS": "пройдено",
+    "FAIL": "ошибка",
 }
 
 
@@ -141,6 +145,10 @@ def _technical_message_ru(value: object) -> str:
         "road_width": "ширину дороги",
         "geometry acceptance warnings": "предупреждения по геометрии",
         "consumer_may_fabricate_geometry": "потребитель может создавать геометрию",
+        "influence_status": "статус влияния",
+        "calibration_status": "статус калибровки",
+        "validated_artifacts_status": "статус проверенных артефактов",
+        "handoff_contract_status": "статус контракта передачи",
     }
     result = text
     for old, new in replacements.items():
@@ -1371,6 +1379,13 @@ class DesktopDiagnosticsCenter:
 
     def _engineering_analysis_evidence_summary_lines(self, bundle) -> list[str]:
         status = str(getattr(bundle, "engineering_analysis_evidence_status", "") or "MISSING").strip().upper()
+        readiness_status = str(getattr(bundle, "engineering_analysis_readiness_status", "") or status).strip().upper()
+        open_gap_status = str(getattr(bundle, "engineering_analysis_open_gap_status", "") or "MISSING").strip().upper()
+        open_gap_reasons = [
+            str(item).strip()
+            for item in (getattr(bundle, "engineering_analysis_open_gap_reasons", None) or [])
+            if str(item).strip()
+        ]
         validation_status = str(getattr(bundle, "engineering_analysis_validation_status", "") or "MISSING")
         candidate_count = int(getattr(bundle, "engineering_analysis_candidate_count", 0) or 0)
         ready_count = int(getattr(bundle, "engineering_analysis_ready_candidate_count", 0) or 0)
@@ -1394,6 +1409,12 @@ class DesktopDiagnosticsCenter:
         lines = [
             "## Данные инженерного анализа HO-007",
             f"- Состояние: {_status_ru(status)}",
+            f"- Готовность: {_status_ru(readiness_status)}",
+            f"- Открытые разрывы: {_status_ru(open_gap_status)}",
+            (
+                "- Релиз не объявлен закрытым: "
+                f"{_bool_ru(getattr(bundle, 'engineering_analysis_no_release_closure_claim', True))}"
+            ),
             f"- Проверка: {_status_ru(validation_status)}",
             (
                 "- Кандидаты HO-007: "
@@ -1409,6 +1430,8 @@ class DesktopDiagnosticsCenter:
             lines.append(f"- Каталог готового расчёта: {ready_run_dirs[0]}")
         if missing_inputs:
             lines.append(f"- Не хватает входных данных: {', '.join(missing_inputs[:8])}")
+        if open_gap_reasons:
+            lines.append(f"- Причины открытых разрывов: {', '.join(_technical_message_ru(x) for x in open_gap_reasons[:8])}")
         action = str(getattr(bundle, "engineering_analysis_evidence_action", "") or "")
         if action:
             lines.append(f"- Что сделать: {_technical_message_ru(action)}")
@@ -1438,6 +1461,13 @@ class DesktopDiagnosticsCenter:
 
     def _engineering_analysis_status_text(self, bundle) -> str:
         status = str(getattr(bundle, "engineering_analysis_evidence_status", "") or "MISSING").strip().upper()
+        readiness_status = str(getattr(bundle, "engineering_analysis_readiness_status", "") or status).strip().upper()
+        open_gap_status = str(getattr(bundle, "engineering_analysis_open_gap_status", "") or "MISSING").strip().upper()
+        open_gap_reasons = [
+            str(item).strip()
+            for item in (getattr(bundle, "engineering_analysis_open_gap_reasons", None) or [])
+            if str(item).strip()
+        ]
         validation_status = str(getattr(bundle, "engineering_analysis_validation_status", "") or "MISSING")
         candidate_count = int(getattr(bundle, "engineering_analysis_candidate_count", 0) or 0)
         ready_count = int(getattr(bundle, "engineering_analysis_ready_candidate_count", 0) or 0)
@@ -1450,13 +1480,16 @@ class DesktopDiagnosticsCenter:
         ]
         action = str(getattr(bundle, "engineering_analysis_evidence_action", "") or "")
         text = (
-            f"{_status_ru(status)} / проверка={_status_ru(validation_status)} / "
+            f"{_status_ru(status)} / готовность={_status_ru(readiness_status)} / "
+            f"открытые разрывы={_status_ru(open_gap_status)} / проверка={_status_ru(validation_status)} / "
             f"HO-007 готово={ready_count}/{candidate_count} / "
             f"не хватает входных данных={missing_count} / ошибки={failed_count}"
         )
         if missing_inputs:
             text += f"\nНе хватает входных данных: {', '.join(missing_inputs[:8])}"
-        if action and status != "READY":
+        if open_gap_reasons:
+            text += f"\nПричины открытых разрывов: {', '.join(_technical_message_ru(x) for x in open_gap_reasons[:6])}"
+        if action and (status != "READY" or open_gap_status == "OPEN"):
             text += f"\n{_technical_message_ru(action)}"
         return text
 

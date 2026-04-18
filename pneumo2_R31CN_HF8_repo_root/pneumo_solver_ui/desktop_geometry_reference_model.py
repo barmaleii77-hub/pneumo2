@@ -9,6 +9,10 @@ from typing import Any, Mapping
 
 import numpy as np
 
+from pneumo_solver_ui.anim_export_contract import (
+    HARDPOINTS_SOURCE_OF_TRUTH_JSON_NAME,
+    VISIBLE_SUSPENSION_FAMILIES,
+)
 from pneumo_solver_ui.desktop_input_model import (
     DESKTOP_INPUT_SECTIONS,
     desktop_field_search_display_name,
@@ -65,11 +69,13 @@ GEOMETRY_REFERENCE_PRODUCER_EVIDENCE_OWNER = "producer_export"
 GEOMETRY_REFERENCE_REQUIRED_PRODUCER_ARTIFACTS: tuple[str, ...] = (
     "workspace/_pointers/anim_latest.json or workspace/exports/anim_latest.json",
     "workspace/exports/anim_latest.npz",
+    "workspace/exports/HARDPOINTS_SOURCE_OF_TRUTH.json",
     "workspace/exports/CYLINDER_PACKAGING_PASSPORT.json",
     "workspace/exports/geometry_acceptance_report.json",
 )
 GEOMETRY_REFERENCE_PRODUCER_NEXT_ACTION = (
     "Run producer/solver anim_latest export so NPZ meta.geometry/meta.packaging, "
+    "meta.solver_points/meta.hardpoints, HARDPOINTS_SOURCE_OF_TRUTH.json, "
     "CYLINDER_PACKAGING_PASSPORT.json and geometry_acceptance_report.json are written; "
     "Reference Center must not fabricate producer geometry evidence."
 )
@@ -1242,6 +1248,267 @@ def _gap_entry(
     }
 
 
+def _mapping_or_empty(value: Any) -> dict[str, Any]:
+    return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _artifact_ref_base_dir(artifact_context: ArtifactReferenceContext) -> Path | None:
+    for raw in (artifact_context.exports_dir, artifact_context.npz_path, artifact_context.pointer_path):
+        text = str(raw or "").strip()
+        if not text:
+            continue
+        try:
+            path = Path(text).expanduser().resolve(strict=False)
+        except Exception:
+            continue
+        return path if text == artifact_context.exports_dir else path.parent
+    return None
+
+
+def _resolve_artifact_ref_path(
+    artifact_context: ArtifactReferenceContext,
+    *,
+    ref_key: str,
+    default_name: str,
+) -> str:
+    meta = _mapping_or_empty(artifact_context.meta)
+    refs = _mapping_or_empty(meta.get("anim_export_contract_artifacts"))
+    raw = str(refs.get(ref_key) or default_name or "").strip()
+    if not raw:
+        return ""
+    try:
+        path = Path(raw).expanduser()
+        if not path.is_absolute():
+            base_dir = _artifact_ref_base_dir(artifact_context)
+            if base_dir is not None:
+                path = base_dir / path
+        return str(path.resolve(strict=False))
+    except Exception:
+        return raw
+
+
+def _visible_family_coverage(block: Mapping[str, Any]) -> dict[str, list[str]]:
+    required = tuple(str(item) for item in VISIBLE_SUSPENSION_FAMILIES)
+    families = _mapping_or_empty(block.get("families"))
+    present: list[str] = []
+    partial: list[str] = []
+    for family in required:
+        family_block = _mapping_or_empty(families.get(family))
+        coverage = str(family_block.get("coverage") or "").strip().lower()
+        if coverage == "full":
+            present.append(family)
+        elif coverage == "partial":
+            partial.append(family)
+    if not present:
+        present = list(_safe_strings(block.get("visible_present_families")))
+    if not present:
+        present = list(_safe_strings(block.get("visible_suspension_skeleton_families")))
+    if not partial:
+        partial = list(_safe_strings(block.get("visible_partial_families")))
+    if not partial:
+        partial = list(_safe_strings(block.get("partial_visible_suspension_skeleton_families")))
+    if not partial:
+        partial = [name for name in _safe_strings(block.get("partial_families")) if name in required]
+    present = [name for name in present if name in required]
+    partial = [name for name in partial if name in required and name not in present]
+    missing = [name for name in required if name not in present and name not in partial]
+    return {
+        "required": list(required),
+        "present": present,
+        "partial": partial,
+        "missing": missing,
+    }
+
+
+def _solver_points_coverage(block: Mapping[str, Any]) -> dict[str, list[str]]:
+    required = tuple(str(item) for item in VISIBLE_SUSPENSION_FAMILIES)
+    present = [name for name in _safe_strings(block.get("visible_suspension_skeleton_families")) if name in required]
+    partial = [
+        name
+        for name in _safe_strings(block.get("partial_visible_suspension_skeleton_families"))
+        if name in required and name not in present
+    ]
+    missing = [name for name in required if name not in present and name not in partial]
+    return {
+        "required": list(required),
+        "present": present,
+        "partial": partial,
+        "missing": missing,
+    }
+
+
+def _policy_allows_fabrication(block: Mapping[str, Any]) -> bool:
+    policy = _mapping_or_empty(block.get("policy"))
+    return bool(policy.get("consumer_geometry_fabrication_allowed"))
+
+
+def build_consumer_handoff_policy() -> dict[str, Any]:
+    return {
+        "input": {
+            "reference_data_is_editable_master": False,
+            "canonical_parameter_edits_owned_by": "input_lane",
+            "reference_center_role": "read_only_reference_and_evidence_surface",
+        },
+        "animator": {
+            "may_fabricate_geometry": False,
+            "consume_only_producer_truth": True,
+            "requires_ready_og001_for_hardpoints_solver_points": True,
+        },
+        "diagnostics": {
+            "may_read_geometry_reference_evidence": True,
+            "warning_policy_changed_by_reference_center": False,
+            "preserve_missing_partial_fail_states": True,
+        },
+    }
+
+
+def build_solver_points_hardpoints_evidence(
+    *,
+    artifact_context: ArtifactReferenceContext,
+    acceptance: GeometryAcceptanceEvidenceSnapshot,
+    artifact_freshness: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    freshness = _freshness_payload(artifact_context, artifact_freshness)
+    fresh_current = _freshness_is_current(artifact_context, freshness)
+    meta = _mapping_or_empty(artifact_context.meta)
+    solver_points = _mapping_or_empty(meta.get("solver_points"))
+    hardpoints = _mapping_or_empty(meta.get("hardpoints"))
+    solver_coverage = _solver_points_coverage(solver_points) if solver_points else {
+        "required": list(VISIBLE_SUSPENSION_FAMILIES),
+        "present": [],
+        "partial": [],
+        "missing": list(VISIBLE_SUSPENSION_FAMILIES),
+    }
+    hardpoints_coverage = _visible_family_coverage(hardpoints) if hardpoints else {
+        "required": list(VISIBLE_SUSPENSION_FAMILIES),
+        "present": [],
+        "partial": [],
+        "missing": list(VISIBLE_SUSPENSION_FAMILIES),
+    }
+    sot_path = _resolve_artifact_ref_path(
+        artifact_context,
+        ref_key="hardpoints_source_of_truth",
+        default_name=HARDPOINTS_SOURCE_OF_TRUTH_JSON_NAME,
+    )
+    sot_exists = _path_exists(sot_path)
+    sot_payload = _read_json_mapping(sot_path) if sot_exists else {}
+    sot_complete = bool(sot_payload.get("complete")) if sot_payload else False
+    sot_visible_present = list(_safe_strings(sot_payload.get("visible_present_families")))
+    sot_visible_partial = list(_safe_strings(sot_payload.get("visible_partial_families")))
+    sot_visible_missing = list(_safe_strings(sot_payload.get("visible_missing_families")))
+    sot_visible_required = list(_safe_strings(sot_payload.get("visible_required_families")))
+    if not sot_visible_required:
+        sot_visible_required = list(VISIBLE_SUSPENSION_FAMILIES)
+    if not sot_visible_present:
+        sot_visible_present = list(hardpoints_coverage["present"]) if sot_complete else []
+    if not sot_visible_missing and not sot_complete:
+        sot_visible_missing = list(hardpoints_coverage["missing"])
+
+    blocking_reasons: list[str] = []
+    if not artifact_context.npz_path:
+        blocking_reasons.append("anim_latest_npz_missing")
+    if artifact_context.status in {"missing", "stale"}:
+        blocking_reasons.append(f"artifact_context_{artifact_context.status}")
+    elif not fresh_current:
+        blocking_reasons.append("artifact_not_current_latest")
+    if not artifact_context.geometry_acceptance_path or not artifact_context.geometry_acceptance_exists:
+        blocking_reasons.append("geometry_acceptance_report_missing")
+    if acceptance.gate == "MISSING":
+        blocking_reasons.append("geometry_acceptance_missing")
+    elif acceptance.gate == "FAIL":
+        blocking_reasons.append("geometry_acceptance_fail")
+    elif acceptance.gate != "PASS":
+        blocking_reasons.append(f"geometry_acceptance_{acceptance.gate.lower()}")
+    if not solver_points:
+        blocking_reasons.append("meta_solver_points_missing")
+    elif solver_coverage["partial"] or solver_coverage["missing"]:
+        blocking_reasons.append("solver_points_visible_family_coverage_incomplete")
+    if not hardpoints:
+        blocking_reasons.append("meta_hardpoints_missing")
+    elif hardpoints_coverage["partial"] or hardpoints_coverage["missing"]:
+        blocking_reasons.append("hardpoints_visible_family_coverage_incomplete")
+    if not sot_path or not sot_exists:
+        blocking_reasons.append("hardpoints_source_of_truth_missing")
+    elif not sot_complete:
+        blocking_reasons.append("hardpoints_source_of_truth_not_complete")
+    if _policy_allows_fabrication(solver_points):
+        blocking_reasons.append("solver_points_consumer_fabrication_allowed")
+    if _policy_allows_fabrication(hardpoints):
+        blocking_reasons.append("hardpoints_consumer_fabrication_allowed")
+
+    if (
+        acceptance.gate == "FAIL"
+        or _policy_allows_fabrication(solver_points)
+        or _policy_allows_fabrication(hardpoints)
+    ):
+        status = "fail"
+    elif any(
+        reason
+        in {
+            "anim_latest_npz_missing",
+            "geometry_acceptance_report_missing",
+            "geometry_acceptance_missing",
+            "meta_solver_points_missing",
+            "meta_hardpoints_missing",
+            "hardpoints_source_of_truth_missing",
+            "artifact_context_missing",
+            "artifact_context_stale",
+        }
+        for reason in blocking_reasons
+    ):
+        status = "missing"
+    elif blocking_reasons:
+        status = "partial"
+    else:
+        status = "ready"
+
+    source_paths = {
+        "anim_latest_pointer": artifact_context.pointer_path,
+        "anim_latest_npz": artifact_context.npz_path,
+        "solver_points_meta": "meta.solver_points",
+        "hardpoints_meta": "meta.hardpoints",
+        "hardpoints_source_of_truth": sot_path,
+        "geometry_acceptance_report": artifact_context.geometry_acceptance_path,
+    }
+    return {
+        "status": status,
+        "blocking_reasons": _unique_nonempty(blocking_reasons),
+        "source_artifact_paths": source_paths,
+        "freshness_relation": freshness,
+        "geometry_acceptance_gate": acceptance.gate,
+        "geometry_acceptance_available": acceptance.available,
+        "meta_solver_points": {
+            "present": bool(solver_points),
+            "schema": str(solver_points.get("schema") or ""),
+            "visible_required_families": list(solver_coverage["required"]),
+            "visible_present_families": list(solver_coverage["present"]),
+            "visible_partial_families": list(solver_coverage["partial"]),
+            "visible_missing_families": list(solver_coverage["missing"]),
+            "consumer_geometry_fabrication_allowed": _policy_allows_fabrication(solver_points),
+        },
+        "meta_hardpoints": {
+            "present": bool(hardpoints),
+            "schema": str(hardpoints.get("schema") or ""),
+            "visible_required_families": list(hardpoints_coverage["required"]),
+            "visible_present_families": list(hardpoints_coverage["present"]),
+            "visible_partial_families": list(hardpoints_coverage["partial"]),
+            "visible_missing_families": list(hardpoints_coverage["missing"]),
+            "consumer_geometry_fabrication_allowed": _policy_allows_fabrication(hardpoints),
+        },
+        "hardpoints_source_of_truth": {
+            "path": sot_path,
+            "exists": bool(sot_exists),
+            "schema": str(sot_payload.get("schema") or ""),
+            "complete": bool(sot_complete),
+            "visible_required_families": sot_visible_required,
+            "visible_present_families": sot_visible_present,
+            "visible_partial_families": sot_visible_partial,
+            "visible_missing_families": sot_visible_missing,
+        },
+        "consumer_may_fabricate_geometry": False,
+    }
+
+
 def build_producer_truth_gap_map(
     *,
     artifact_context: ArtifactReferenceContext,
@@ -1253,30 +1520,11 @@ def build_producer_truth_gap_map(
     freshness = _freshness_payload(artifact_context, artifact_freshness)
     fresh_current = _freshness_is_current(artifact_context, freshness)
     paths = _producer_source_artifact_paths(artifact_context)
-
-    og001_reasons: list[str] = []
-    if not artifact_context.npz_path:
-        og001_reasons.append("anim_latest_npz_missing")
-    if not artifact_context.geometry_acceptance_path or not artifact_context.geometry_acceptance_exists:
-        og001_reasons.append("geometry_acceptance_report_missing")
-    if artifact_context.status in {"missing", "stale"}:
-        og001_reasons.append(f"artifact_context_{artifact_context.status}")
-    elif not fresh_current:
-        og001_reasons.append("artifact_not_current_latest")
-    if acceptance.gate == "MISSING":
-        og001_reasons.append("geometry_acceptance_missing")
-        og001_status = "missing"
-    elif acceptance.gate == "FAIL":
-        og001_reasons.append("geometry_acceptance_fail")
-        og001_status = "fail"
-    elif not og001_reasons and acceptance.gate == "PASS":
-        og001_status = "ready"
-    else:
-        if acceptance.gate != "PASS":
-            og001_reasons.append(f"geometry_acceptance_{acceptance.gate.lower()}")
-        og001_status = "partial"
-    if any(reason.endswith("_missing") for reason in og001_reasons) and og001_status != "fail":
-        og001_status = "missing"
+    solver_hardpoints_evidence = build_solver_points_hardpoints_evidence(
+        artifact_context=artifact_context,
+        acceptance=acceptance,
+        artifact_freshness=freshness,
+    )
 
     og002_reasons: list[str] = []
     if not artifact_context.packaging_passport_path or not artifact_context.packaging_passport_exists:
@@ -1334,13 +1582,9 @@ def build_producer_truth_gap_map(
 
     return {
         "OG-001": _gap_entry(
-            status=og001_status,
-            blocking_reasons=og001_reasons,
-            source_artifact_paths={
-                "anim_latest_pointer": paths["anim_latest_pointer"],
-                "anim_latest_npz": paths["anim_latest_npz"],
-                "geometry_acceptance_report": paths["geometry_acceptance_report"],
-            },
+            status=str(solver_hardpoints_evidence.get("status") or "missing"),
+            blocking_reasons=list(solver_hardpoints_evidence.get("blocking_reasons") or ()),
+            source_artifact_paths=dict(solver_hardpoints_evidence.get("source_artifact_paths") or {}),
             freshness_relation=freshness,
         ),
         "OG-002": _gap_entry(
@@ -1400,6 +1644,20 @@ def build_geometry_reference_diagnostics_handoff(
         missing.append("geometry_acceptance")
     if acceptance.gate != "PASS":
         producer_readiness_reasons.append("geometry_acceptance_not_pass")
+    solver_points_hardpoints_evidence = build_solver_points_hardpoints_evidence(
+        artifact_context=artifact_context,
+        acceptance=acceptance,
+        artifact_freshness=artifact_freshness,
+    )
+    solver_hardpoints_status = str(solver_points_hardpoints_evidence.get("status") or "missing")
+    if solver_hardpoints_status in {"missing", "fail"}:
+        missing.append("solver_points_hardpoints")
+    if solver_hardpoints_status != "ready":
+        producer_readiness_reasons.extend(
+            str(item)
+            for item in (solver_points_hardpoints_evidence.get("blocking_reasons") or ())
+            if str(item).strip()
+        )
     producer_truth_gap_map = build_producer_truth_gap_map(
         artifact_context=artifact_context,
         road_width=road_width,
@@ -1423,11 +1681,13 @@ def build_geometry_reference_diagnostics_handoff(
         "producer_evidence_owner": GEOMETRY_REFERENCE_PRODUCER_EVIDENCE_OWNER,
         "producer_artifact_status": producer_artifact_status,
         "producer_readiness_reasons": producer_readiness_reasons,
+        "solver_points_hardpoints_evidence": solver_points_hardpoints_evidence,
         "producer_truth_gap_map": producer_truth_gap_map,
         "producer_required_artifacts": list(GEOMETRY_REFERENCE_REQUIRED_PRODUCER_ARTIFACTS),
         "producer_next_action": GEOMETRY_REFERENCE_PRODUCER_NEXT_ACTION,
         "reference_center_can_close_producer_gaps": False,
         "consumer_may_fabricate_geometry": False,
+        "consumer_handoff_policy": build_consumer_handoff_policy(),
         "catalog_source": dict(catalog_source or build_catalog_source_summary()),
         "artifact_status": artifact_context.status,
         "artifact_source_label": artifact_context.source_label,
@@ -2482,10 +2742,12 @@ __all__ = [
     "build_cylinder_match_recommendations",
     "build_cylinder_pressure_estimate",
     "build_component_fit_reference_rows",
+    "build_consumer_handoff_policy",
     "build_geometry_reference_diagnostics_handoff",
     "build_geometry_reference_snapshot",
     "build_packaging_passport_evidence",
     "build_parameter_guide_rows",
+    "build_solver_points_hardpoints_evidence",
     "build_road_width_evidence",
     "build_road_width_reference",
     "cylinder_packaging_passport_key",

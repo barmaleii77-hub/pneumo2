@@ -1080,6 +1080,20 @@ from .cylinder_truth_gate import (
 from .cylinder_render_policy import (
     evaluate_cylinder_render_policy as _evaluate_cylinder_render_policy,
 )
+from .operator_text import (
+    format_cylinder_limit_line as _format_cylinder_limit_line,
+    format_direct_context_banner as _format_direct_context_banner,
+    format_loaded_status as _format_loaded_status,
+    format_load_failed_status as _format_load_failed_status,
+    format_loading_status as _format_loading_status,
+    format_playback_status as _format_playback_status,
+    format_queued_reload_status as _format_queued_reload_status,
+    format_startup_canvas_lines as _format_startup_canvas_lines,
+    format_startup_degraded_status as _format_startup_degraded_status,
+    format_truth_warning_line as _format_truth_warning_line,
+    format_validation_warning_status as _format_validation_warning_status,
+    truth_state_label as _operator_truth_state_label,
+)
 from .truth_contract import (
     ANIMATOR_FRAME_BUDGET_EVIDENCE_JSON_NAME as _ANIMATOR_FRAME_BUDGET_EVIDENCE_JSON_NAME,
     TRUTH_STATE_SOLVER_CONFIRMED as _TRUTH_STATE_SOLVER_CONFIRMED,
@@ -2816,7 +2830,7 @@ class PointerWatcher(QtCore.QObject):
 
     def start(self):
         self._timer.start()
-        self.status.emit(f"Follow: {self.pointer_path}")
+        self.status.emit(f"Слежение за anim_latest: {self.pointer_path}")
 
     def stop(self):
         self._timer.stop()
@@ -2841,7 +2855,7 @@ class PointerWatcher(QtCore.QObject):
             if npz_path is None:
                 return
             if not npz_path.exists():
-                self.status.emit(f"NPZ missing: {npz_path}")
+                self.status.emit(f"NPZ-файл не найден: {npz_path}")
                 return
             npz_sig = self._file_sig(npz_path)
             cached_road_sig = self._file_sig(self._last_road_path)
@@ -2880,10 +2894,10 @@ class PointerWatcher(QtCore.QObject):
             self._last_npz_sig = npz_sig
             self._last_road_path = road_path
             self._last_road_sig = road_sig
-            self.status.emit(f"Reload ({reason_text}): {npz_path.name}")
+            self.status.emit(f"Перезагрузка ({reason_text}): {npz_path.name}")
             self.npz_changed.emit(npz_path)
         except Exception as e:
-            self.status.emit(f"Follow error: {e}")
+            self.status.emit(f"Ошибка слежения за anim_latest: {e}")
 
 
 @dataclass
@@ -12884,7 +12898,7 @@ class Car3DWidget(QtWidgets.QWidget):
         except Exception:
             fallback_msgs = []
         if fallback_msgs:
-            lines.append(f"VALIDATION WARN: fallback channels active ({len(fallback_msgs)})")
+            lines.append(f"Предупреждение валидации: активны резервные каналы ({len(fallback_msgs)})")
         try:
             meta = dict(getattr(bundle, "meta", {}) or {})
             packaging = dict(meta.get("packaging") or {})
@@ -12902,7 +12916,7 @@ class Car3DWidget(QtWidgets.QWidget):
             extra = max(0, len(missing_spring_families) - 4)
             if extra > 0:
                 preview = f"{preview}, +{extra}"
-            lines.append(f"TODO: incomplete spring geometry from solver/export ({preview})")
+            lines.append(f"Не хватает геометрии пружин из solver/export: {preview}")
         try:
             truth_summary = dict(getattr(self, "_animator_truth_summary", {}) or {})
             truth_state = str(truth_summary.get("overall_truth_state") or "").strip()
@@ -12911,8 +12925,8 @@ class Car3DWidget(QtWidgets.QWidget):
             truth_state = ""
             truth_warnings = []
         if truth_state and truth_state != _TRUTH_STATE_SOLVER_CONFIRMED:
-            suffix = f"; warnings={len(truth_warnings)}" if truth_warnings else ""
-            lines.append(f"TRUTH BADGE: {truth_state} (approximate/unavailable graphics{suffix})")
+            # Keep the legacy guard phrase out of operator-facing text.
+            lines.append(_format_truth_warning_line(truth_state, warning_count=len(truth_warnings)))
         try:
             limited_cylinders = [
                 self._compact_canvas_warning_line(_render_cylinder_truth_gate_message(dict(gate)), max_chars=108)
@@ -12922,7 +12936,7 @@ class Car3DWidget(QtWidgets.QWidget):
         except Exception:
             limited_cylinders = []
         if limited_cylinders:
-            lines.append(f"VALIDATION LIMIT: cylinder truth reduced ({len(limited_cylinders)})")
+            lines.append(_format_cylinder_limit_line(len(limited_cylinders)))
         max_warning_lines = 3 if ring_info_lines else 4
         overlay_lines = list(lines[:max_warning_lines])
         if ring_info_lines:
@@ -22481,7 +22495,7 @@ class ReceiverTankWidget(QtWidgets.QWidget):
             "Заливка = давление выбранного ресивера/аккумулятора.\n"
             "Зелёные индикаторы = суммарный расход В выбранный объём по классифицированным рёбрам.\n"
             "Красные индикаторы = суммарный расход ИЗ выбранного объёма.\n"
-            "Если направление ребра нельзя понять честно по каноническому имени, оно не включается в мнемосхему."
+            "Если направление ребра нельзя понять честно по каноническому имени, оно не включается в индикатор ресивера."
         )
         lay.addWidget(self.canvas, 1)
 
@@ -26274,6 +26288,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.resize(1550, 920)
 
         self.bundle: Optional[DataBundle] = None
+        self._analysis_context_snapshot: object | None = None
         self._enable_gl = bool(enable_gl)
 
         # Central / dock layout
@@ -26434,7 +26449,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 except Exception:
                     pass
                 try:
-                    self._status(f"3D layout change: playback auto-paused ({reason})")
+                    self._status(f"Перестройка 3D layout: воспроизведение приостановлено ({reason})")
                 except Exception:
                     pass
             else:
@@ -26478,23 +26493,23 @@ class MainWindow(QtWidgets.QMainWindow):
                 pass
             self._arm_next_playback_tick()
             try:
-                self._status("3D layout settled: playback resumed")
+                self._status("3D layout готов: воспроизведение продолжено")
             except Exception:
                 pass
 
     def _make_toolbar(self):
-        tb = self.addToolBar("Controls")
+        tb = self.addToolBar("Управление")
         try:
             tb.setObjectName("Controls")
         except Exception:
             pass
         tb.setMovable(False)
 
-        act_open = QtGui.QAction("Open NPZ", self)
+        act_open = QtGui.QAction("Открыть NPZ", self)
         act_open.triggered.connect(self._open_dialog)
         tb.addAction(act_open)
 
-        self.act_follow = QtGui.QAction("Follow", self)
+        self.act_follow = QtGui.QAction("Следить за anim_latest", self)
         self.act_follow.setCheckable(True)
         self.act_follow.setChecked(False)
         self.act_follow.triggered.connect(self._toggle_follow)
@@ -26541,7 +26556,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.speed_box.setValue(1.0)
         self.speed_box.setPrefix("x")
         self.speed_box.valueChanged.connect(self._set_speed)
-        tb.addWidget(QtWidgets.QLabel("  speed:"))
+        tb.addWidget(QtWidgets.QLabel("  скорость:"))
         tb.addWidget(self.speed_box)
 
         tb.addSeparator()
@@ -26553,7 +26568,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.slider.sliderPressed.connect(self._slider_pressed)
         self.slider.sliderReleased.connect(self._slider_released)
         self.slider.setMinimumWidth(520)
-        tb.addWidget(QtWidgets.QLabel("  frame:"))
+        tb.addWidget(QtWidgets.QLabel("  кадр:"))
         tb.addWidget(self.slider)
 
         self.lbl_frame = QtWidgets.QLabel("0/0")
@@ -26561,7 +26576,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _make_statusbar(self):
         sb = self.statusBar()
-        self._status_label = QtWidgets.QLabel("Ready")
+        self._status_label = QtWidgets.QLabel("Готово")
         sb.addWidget(self._status_label, 1)
         self._analysis_context_label = QtWidgets.QLabel("")
         self._analysis_context_label.setObjectName("AnalysisContextBanner")
@@ -26583,25 +26598,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self._status_label.setText(str(msg))
 
     def _surface_startup_degraded_status(self, reason: str, *, detail: str = "") -> None:
-        reason_text = str(reason or "truth_absent").strip()
-        detail_text = str(detail or "").strip()
-        status_msg = f"DEGRADED: truth absent/partial ({reason_text}); solver-point axes and authored packaging meshes stay disabled until explicit NPZ truth is loaded."
-        if detail_text:
-            status_msg = f"{status_msg} {detail_text}"
-        self._status(status_msg)
+        self._status(_format_startup_degraded_status(reason, detail=detail))
         try:
             car3d = getattr(self.cockpit, "car3d", None)
             if car3d is not None:
-                car3d._set_canvas_warning_lines(
-                    [
-                        f"TRUTH ABSENT/PARTIAL: {reason_text}",
-                        "No fake geometry: solver axes and cylinder meshes wait for explicit export truth.",
-                    ]
-                )
+                car3d._set_canvas_warning_lines(_format_startup_canvas_lines(reason))
         except Exception:
             pass
 
     def set_analysis_context_snapshot(self, snapshot: object | None) -> None:
+        self._analysis_context_snapshot = snapshot
         label = getattr(self, "_analysis_context_label", None)
         if label is None:
             return
@@ -26649,6 +26655,28 @@ class MainWindow(QtWidgets.QMainWindow):
             label.setToolTip(json.dumps(snapshot.to_payload(), ensure_ascii=False, indent=2))  # type: ignore[attr-defined]
         except Exception:
             label.setToolTip(text)
+        label.show()
+
+    def _surface_direct_load_context_banner(self, path: Path) -> None:
+        snapshot = getattr(self, "_analysis_context_snapshot", None)
+        if snapshot is not None:
+            return
+        label = getattr(self, "_analysis_context_label", None)
+        if label is None:
+            return
+        text = _format_direct_context_banner(path)
+        label.setStyleSheet(
+            "QLabel#AnalysisContextBanner {"
+            " background-color: rgba(95, 72, 28, 220);"
+            " color: rgb(255, 243, 205);"
+            " border: 1px solid rgba(245, 190, 80, 170);"
+            " border-radius: 4px;"
+            " padding: 3px 8px;"
+            " font-weight: 700;"
+            "}"
+        )
+        label.setText(text)
+        label.setToolTip("Прямая загрузка разрешена для диагностики, но не является подтверждённым переходом Анализ -> Анимация.")
         label.show()
 
     def _slider_pressed(self):
@@ -26919,20 +26947,20 @@ class MainWindow(QtWidgets.QMainWindow):
             return None
 
     def _open_dialog(self):
-        fn, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Open NPZ", str(Path.cwd()), "NPZ files (*.npz)")
+        fn, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Открыть NPZ", str(Path.cwd()), "NPZ files (*.npz)")
         if fn:
             self.load_npz(Path(fn))
 
     def _toggle_follow(self, checked: bool):
         if self.pointer_watcher is None:
-            self._status("Follow unavailable (no pointer_path)")
+            self._status("Слежение недоступно: нет пути к anim_latest.json")
             self.act_follow.setChecked(False)
             return
         if checked:
             self.pointer_watcher.start()
         else:
             self.pointer_watcher.stop()
-            self._status("Follow stopped")
+            self._status("Слежение за anim_latest остановлено")
 
     def _set_speed(self, v: float):
         new_speed = float(v)
@@ -27530,12 +27558,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 except Exception:
                     v = 0.0
             if bool(getattr(self, "_runtime_validation_budget_active", False)):
-                self._status(
-                    f"VALIDATION WARN: runtime cadence underrun, secondary panels throttled | "
-                    f"t={t:.3f}s, v={v:.2f}m/s, file={b.npz_path.name}"
-                )
+                self._status(_format_playback_status(t_s=t, speed_mps=v, file_name=b.npz_path.name, cadence_warning=True))
             else:
-                self._status(f"t={t:.3f}s, v={v:.2f}m/s, file={b.npz_path.name}")
+                self._status(_format_playback_status(t_s=t, speed_mps=v, file_name=b.npz_path.name))
         except Exception:
             pass
 
@@ -27613,18 +27638,28 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         self._play_cursor_t_s = float(np.asarray(bundle.t, dtype=float)[0]) if len(bundle.t) else 0.0
         self._update_frame(0, sample_t=self._play_cursor_t_s)
+        try:
+            truth_summary = _build_animator_truth_summary(
+                dict(getattr(bundle, "meta", {}) or {}),
+                cylinder_gates=_evaluate_all_cylinder_truth_gates(dict(getattr(bundle, "meta", {}) or {})),
+            )
+            truth_state = str(truth_summary.get("overall_truth_state") or "")
+        except Exception:
+            truth_state = ""
+        context_ready = bool(getattr(getattr(self, "_analysis_context_snapshot", None), "ready_for_animator", False))
+        self._surface_direct_load_context_banner(path)
         if fallback_msgs or check_msgs or spring_todo_msgs:
-            status_msg = (
-                "VALIDATION WARN: "
-                f"fallback={len(fallback_msgs)} "
-                f"self-check={len(check_msgs)} "
-                f"spring-todo={len(spring_todo_msgs)} | {path.name}"
+            status_msg = _format_validation_warning_status(
+                fallback_count=len(fallback_msgs),
+                self_check_count=len(check_msgs),
+                spring_todo_count=len(spring_todo_msgs),
+                path=path,
             )
             if ring_info_msgs:
                 status_msg = f"{status_msg} | {ring_info_msgs[0]}"
             self._status(status_msg)
         else:
-            status_msg = f"Loaded: {path}"
+            status_msg = _format_loaded_status(path, context_ready=context_ready, truth_state=truth_state)
             if ring_info_msgs:
                 status_msg = f"{status_msg} | {ring_info_msgs[0]}"
             self._status(status_msg)
@@ -27648,7 +27683,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._bundle_load_thread = thread
         self._bundle_load_worker = worker
         self._bundle_load_active_request_id = int(request_id)
-        self._status(f"Loading: {resolved_path.name}")
+        self._status(_format_loading_status(resolved_path))
         thread.start()
 
     def _on_bundle_load_thread_finished(self) -> None:
@@ -27674,15 +27709,15 @@ class MainWindow(QtWidgets.QMainWindow):
         if int(request_id) != int(getattr(self, "_bundle_load_latest_request_id", 0)):
             return
         message = str(error_text or "unknown bundle load error")
-        self._status(f"Failed to load NPZ: {message}")
-        QtWidgets.QMessageBox.warning(self, "Failed to load NPZ", message)
+        self._status(_format_load_failed_status(message))
+        QtWidgets.QMessageBox.warning(self, "Не удалось загрузить NPZ", message)
 
     def _on_bundle_load_finished(self, request_id: int, payload_obj: object) -> None:
         if int(request_id) != int(getattr(self, "_bundle_load_latest_request_id", 0)):
             return
         if not isinstance(payload_obj, _PreparedBundleLoad):
-            self._status("Failed to load NPZ: invalid loader payload")
-            QtWidgets.QMessageBox.warning(self, "Failed to load NPZ", "Invalid loader payload")
+            self._status(_format_load_failed_status("invalid loader payload"))
+            QtWidgets.QMessageBox.warning(self, "Не удалось загрузить NPZ", "Invalid loader payload")
             return
         self._apply_loaded_bundle(payload_obj)
 
@@ -27694,7 +27729,7 @@ class MainWindow(QtWidgets.QMainWindow):
             try:
                 prepared = _prepare_loaded_bundle(resolved_path)
             except Exception as e:
-                QtWidgets.QMessageBox.warning(self, "Failed to load NPZ", f"{e}")
+                QtWidgets.QMessageBox.warning(self, "Не удалось загрузить NPZ", f"{e}")
                 return
             self._apply_loaded_bundle(prepared)
             return
@@ -27705,7 +27740,7 @@ class MainWindow(QtWidgets.QMainWindow):
         running = bool(thread is not None and thread.isRunning())
         if running:
             self._bundle_load_pending_request = (request_id, resolved_path)
-            self._status(f"Queued reload: {resolved_path.name}")
+            self._status(_format_queued_reload_status(resolved_path))
             return
         self._bundle_load_pending_request = None
         self._start_bundle_load_worker(request_id, resolved_path)
@@ -27756,14 +27791,8 @@ def run_app(
     win.show()
 
     if analysis_snapshot is not None:
-        lineage = dict(analysis_snapshot.lineage or {})
-        run_label = str(lineage.get("run_id") or "-")
         win.set_analysis_context_snapshot(analysis_snapshot)
-        win._status(
-            "Контекст анализа HO-008: "
-            f"{analysis_snapshot.status} | прогон={run_label} | "
-            f"файл={analysis_snapshot.path}"
-        )
+        win._status(format_analysis_context_banner(analysis_snapshot))
 
     if follow:
         win.act_follow.setChecked(True)
@@ -27829,27 +27858,27 @@ def _parse_args(argv: Optional[list[str]] = None):
 
     ap = argparse.ArgumentParser(
         prog="desktop_animator",
-        description="Pneumo suspension Desktop Animator (Qt).",
+        description="Desktop Animator пневмоподвески (Qt).",
     )
     ap.add_argument(
         "--npz",
         default=_os.environ.get("PNEUMO_ANIM_NPZ", ""),
-        help="Путь к .npz с траекториями/сигналами (если пусто — берем из pointer).",
+        help="Путь к .npz с траекториями/сигналами (если пусто — берём из указателя).",
     )
     ap.add_argument(
         "--pointer",
         default=_os.environ.get("PNEUMO_ANIM_POINTER", str(_default_pointer_path())),
-        help="Путь к JSON pointer (anim_latest.json).",
+        help="Путь к JSON-указателю anim_latest.json.",
     )
     ap.add_argument(
         "--analysis-context",
         default=_os.environ.get("PNEUMO_ANALYSIS_CONTEXT_PATH", ""),
-        help="Путь к frozen HO-008 analysis_context.json для выбранного optimization run.",
+        help="Путь к frozen HO-008 analysis_context.json для выбранного прогона.",
     )
     ap.add_argument(
         "--no-follow",
         action="store_true",
-        help="Не следить за pointer (отключить авто-подхват данных из Web UI).",
+        help="Не следить за указателем anim_latest.",
     )
     ap.add_argument(
         "--theme",

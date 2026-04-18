@@ -121,6 +121,62 @@ visual acceptance closure.
   second-monitor/mixed-DPI movement and long-running follow/playback stability
   were not closed by this check.
 
+## Manual Visual Labels And Reopen Check
+
+Outcome: `MANUAL_VISIBLE_LABEL_CLOSE_REOPEN_CHECK_RECORDED`, not final Windows
+visual acceptance closure.
+
+- Timestamp: `2026-04-18 16:18:21 +05:00` and reopen check
+  `2026-04-18 16:19:12 +05:00`.
+- Branch: `codex/desktop-mnemo-visual-labels`, created from
+  `origin/codex/work` at `c1b3498`.
+- Command:
+  `python -m pneumo_solver_ui.tools.desktop_main_shell_qt --open desktop_mnemo`.
+- Code change under this pass: Desktop Mnemo graphics text logic no longer
+  contains mojibake component labels for check valve/regulator/throttle,
+  diagonal/supply/line labels, garbled direction arrows, or garbled
+  open/closed state checks. The source now keeps clean Russian labels such as
+  `Обратный клапан`, `Регулятор`, `Дроссель`,
+  `Исполнительная ветвь`, and the normal `→` direction arrow.
+- Screenshot/process artifacts:
+  - `workspace/manual_visual_label_check/mnemo_visual_labels_20260418_161803/desktop_after_open.png`
+  - `workspace/manual_visual_label_check/mnemo_visual_labels_20260418_161803/manual_visual_launch_summary.json`
+  - `workspace/manual_visual_label_check/mnemo_reopen_20260418_161856/desktop_after_reopen.png`
+  - `workspace/manual_visual_label_check/mnemo_reopen_20260418_161856/manual_reopen_summary.json`
+- Observed: shell launched as a separate top-level
+  `PneumoApp - Рабочее место инженера` window and opened Desktop Mnemo as a
+  separate top-level `Мнемосхема пневмосистемы` window; Mnemo was not embedded
+  in shell.
+- Observed: the visible blank startup surface remained the specialized
+  Desktop Mnemo scheme/unavailable-state surface, not a generic service-status
+  panel.
+- Observed: visible labels in the screenshot used readable Russian UI text and
+  did not show the previously found mojibake component-label markers.
+- Observed: blank startup kept unavailable truth visible as
+  `Mnemo: unavailable pressure/state`; no fake `Mnemo: confirmed` was visible.
+- Observed: close and immediate reopen both returned control. First launch
+  exited with code `0`, second launch exited with code `0`, both shell and
+  Mnemo windows accepted `CloseMainWindow`, and `force_stopped=false` in both
+  process summaries.
+- Pending: this check did not close full visual no-overlap/readability across
+  resize/maximize/restore, Snap/restore, dock overlap/occlusion,
+  second-monitor/mixed-DPI movement, or long-running follow/playback
+  stability. The screenshot was a blank/unavailable startup check only.
+
+Runtime-proof rerun after visual-label cleanup:
+
+| proof | qt_platform | status | release_readiness | constructor_s | first_event_cycle_s | close_s | validation |
+| --- | --- | --- | --- | ---: | ---: | ---: | --- |
+| Real Windows | `windows` | `PASS` | `PENDING_REAL_WINDOWS_VISUAL_CHECK` | `0.352590` | `0.557237` | `0.008959` | `ok=true`, no missing/failed checks |
+| Offscreen CI-style | `offscreen` | `PASS` | `PENDING_REAL_WINDOWS_VISUAL_CHECK` | `0.085388` | `0.177784` | `0.006321` | `ok=true`, no missing/failed checks |
+
+Runtime-proof artifacts:
+
+- `workspace/runtime_proof_next_step/mnemo_visual_labels_windows_20260418_162104/desktop_mnemo_runtime_proof.json`
+- `workspace/runtime_proof_next_step/mnemo_visual_labels_windows_20260418_162104/desktop_mnemo_runtime_proof.md`
+- `workspace/runtime_proof_next_step/mnemo_visual_labels_offscreen_20260418_162106/desktop_mnemo_runtime_proof.json`
+- `workspace/runtime_proof_next_step/mnemo_visual_labels_offscreen_20260418_162106/desktop_mnemo_runtime_proof.md`
+
 ## Validation
 
 ```powershell
@@ -136,6 +192,22 @@ Result:
   `QTableWidgetItem.setTextAlignment`.
 - `compileall` passed.
 - `git diff --check` passed for the Mnemo-owned test and release note edits.
+
+Additional validation for the visual-label follow-up:
+
+```powershell
+python -m pytest tests/test_desktop_mnemo_launcher_contract.py tests/test_ui_text_no_mojibake_contract.py -q
+python -m compileall -q pneumo_solver_ui/desktop_mnemo
+```
+
+Result:
+
+- Focused launcher/mojibake run: `9 passed`.
+- `compileall` passed.
+- Additional runtime/window guard run:
+  `python -m pytest tests/test_desktop_mnemo_runtime_proof.py tests/test_desktop_mnemo_window_contract.py -q`
+  returned `8 passed`; expected Qt
+  `QTableWidgetItem.setTextAlignment` deprecation warnings remain.
 
 ## Manual Checks Still Pending
 

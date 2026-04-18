@@ -95,8 +95,10 @@ Operational note:
 36. [docs/context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md](./context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md)
 37. [docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
 38. [docs/gui_chat_prompts/17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md](./gui_chat_prompts/17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md)
-39. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
-40. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
+39. [docs/context/release_readiness/CHAT_WORKTREE_ACCEPTANCE_CLEANUP_2026-04-18.md](./context/release_readiness/CHAT_WORKTREE_ACCEPTANCE_CLEANUP_2026-04-18.md)
+40. [docs/gui_chat_prompts/18_POST_CHAT_WORKTREE_CLEANUP_V38_PLAN_MODE_PROMPTS.md](./gui_chat_prompts/18_POST_CHAT_WORKTREE_CLEANUP_V38_PLAN_MODE_PROMPTS.md)
+41. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
+42. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
 
 ### 3. Активные требования и рабочий backlog
 
@@ -274,6 +276,8 @@ Operational note:
 - [docs/context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md](./context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md)
 - [docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
 - [docs/gui_chat_prompts/17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md](./gui_chat_prompts/17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md)
+- [docs/context/release_readiness/CHAT_WORKTREE_ACCEPTANCE_CLEANUP_2026-04-18.md](./context/release_readiness/CHAT_WORKTREE_ACCEPTANCE_CLEANUP_2026-04-18.md)
+- [docs/gui_chat_prompts/18_POST_CHAT_WORKTREE_CLEANUP_V38_PLAN_MODE_PROMPTS.md](./gui_chat_prompts/18_POST_CHAT_WORKTREE_CLEANUP_V38_PLAN_MODE_PROMPTS.md)
 
 Что задаёт общий canon:
 
@@ -420,14 +424,19 @@ Operational note:
   desktop/docs/no-mojibake тестами без runtime-closure claims.
 - Recovery Plan-mode prompts остаются historical starter pack до приемки
   результатов 10 параллельных GUI-чатов.
-- Post-acceptance V38 Plan-mode prompts становятся текущим starter pack для
-  тех же 10 параллельных чатов после `ed9c4cd`: старт только от clean
-  `origin/codex/work`, временные worktree и исторические ветки не являются
-  рабочим источником, принятые handoffs не переизобретать, обязательно
-  проводить V38 visual/runtime acceptance и проверять соответствие
-  `PIPELINE_OPTIMIZED.dot` без лишних user-flow шагов: tree/search/selection
-  sync из главного окна является навигацией, а служебные статусы и
-  implementation labels не являются пользовательской информацией.
+- Post-acceptance V38 Plan-mode prompts остаются historical starter pack
+  после первой приемки GUI handoffs.
+- Chat-worktree acceptance cleanup фиксирует перенос полезных локальных
+  chat-worktree изменений в `codex/work`, исключение generated runtime
+  artifacts и уборку временных worktree/веток после validation.
+- Post-chat-worktree cleanup V38 Plan-mode prompts являются текущим starter
+  pack для тех же 10 параллельных чатов: старт только от clean
+  `origin/codex/work`, старые worktree/ветки не являются рабочим источником,
+  принятые handoffs не переизобретать, обязательно проводить V38
+  visual/runtime acceptance и проверять соответствие `PIPELINE_OPTIMIZED.dot`
+  без лишних user-flow шагов; tree/search/selection sync из главного окна
+  является навигацией, а служебные статусы и implementation labels не
+  являются пользовательской информацией.
 
 Связанные, но вспомогательные UX-источники:
 

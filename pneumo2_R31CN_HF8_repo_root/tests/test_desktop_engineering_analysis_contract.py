@@ -295,8 +295,18 @@ def test_engineering_analysis_runtime_validates_artifacts_and_exports_evidence(t
     assert pipeline["calibration_fit_reports"]["status"] == "READY"
     assert pipeline["influence_system"]["status"] == "READY"
     assert pipeline["sensitivity_summary"]["status"] == "READY"
+    assert pipeline["handoff_compare_viewer_boundary"]["status"] == "BLOCKED"
+    assert pipeline["boundary_results_center"]["status"] == "READY"
     assert pipeline["handoff_ho008_animator"]["status"] in {"MISSING", "BLOCKED"}
     assert payload["runtime_data_gaps"]
+    assert payload["analysis_chart_table_preview"]["schema"] == "engineering_analysis_chart_table_preview.v1"
+    assert payload["analysis_chart_table_preview"]["chart_count"] == 1
+    assert payload["analysis_chart_table_preview"]["sensitivity_table"]["status"] == "READY"
+    assert payload["compare_viewer_handoff_summary"]["consumer_surface"] == "Compare Viewer"
+    assert payload["compare_viewer_handoff_summary"]["status"] == "BLOCKED"
+    assert "missing explicit compare refs" in payload["compare_viewer_handoff_summary"]["blocking_states"]
+    assert payload["results_center_boundary_summary"]["producer_surface"] == "Results Center"
+    assert payload["results_center_boundary_summary"]["status"] == "READY"
     assert payload["validated_artifacts"]["schema"] == "engineering_analysis_validated_artifacts.v1"
     assert payload["validated_artifacts"]["status"] == "READY"
     assert payload["validated_artifacts"]["required_artifact_count"] == 3
@@ -325,6 +335,53 @@ def test_engineering_analysis_runtime_validates_artifacts_and_exports_evidence(t
     assert refreshed.diagnostics_evidence_manifest_hash == payload["evidence_manifest_hash"]
     refreshed_pipeline = {row.key: row for row in runtime.analysis_workspace_pipeline_status(refreshed)}
     assert refreshed_pipeline["handoff_ho009_diagnostics"].status == "READY"
+
+
+def test_analysis_workspace_preview_and_boundaries_are_traceable(tmp_path: Path) -> None:
+    run_dir = _build_run_dir(tmp_path)
+    contract_path = _write_selected_run_contract(tmp_path / "selected_run_contract.json", run_dir)
+    runtime = DesktopEngineeringAnalysisRuntime(repo_root=tmp_path, python_executable="python")
+    snapshot = runtime.snapshot(selected_contract_path=contract_path)
+
+    preview = runtime.analysis_workspace_chart_table_preview(snapshot, max_rows=2)
+
+    assert preview["schema"] == "engineering_analysis_chart_table_preview.v1"
+    assert preview["status"] == "READY"
+    assert preview["chart_count"] == 1
+    assert preview["charts"][0]["title"] == "Fixture compare influence"
+    assert preview["charts"][0]["feature_count"] == 2
+    assert preview["charts"][0]["target_count"] == 2
+    assert preview["charts"][0]["diagnostics"]["finite_cell_count"] == 4
+    assert preview["charts"][0]["top_cells"][0]["feature"] == "колея"
+    assert preview["sensitivity_table"]["status"] == "READY"
+    assert preview["sensitivity_table"]["row_count"] == 3
+    assert preview["sensitivity_table"]["rows"][0]["param"] == "база"
+    assert preview["sensitivity_table"]["units"]["eps_rel_used"] == "dimensionless"
+    tables = {item["key"]: item for item in preview["tables"]}
+    assert tables["system_influence_params_csv"]["status"] == "READY"
+    assert tables["system_influence_params_csv"]["columns"] == ["param", "group", "score", "eps_rel_used"]
+    assert tables["system_influence_params_csv"]["source_relpath"] == "system_influence_params.csv"
+    assert tables["system_influence_params_csv"]["row_sample"][0]["param"] == "база"
+
+    compare_boundary = runtime.analysis_compare_handoff_summary(snapshot)
+    assert compare_boundary["status"] == "BLOCKED"
+    assert compare_boundary["analysis_compare_ready_state"] == "blocked"
+    assert "missing explicit compare refs" in compare_boundary["blocking_states"]
+    assert compare_boundary["compare_surface_count"] == 1
+    assert compare_boundary["compare_surface_titles"] == ["Fixture compare influence"]
+    assert "Compare Viewer remains the executor" in compare_boundary["boundary"]
+
+    results_boundary = runtime.analysis_results_boundary_summary(snapshot)
+    assert results_boundary["status"] == "READY"
+    assert results_boundary["run_id"] == "run-analysis-001"
+    assert results_boundary["selected_run_contract_hash"] == snapshot.selected_run_contract_hash
+    assert results_boundary["results_ref_exists"] is True
+    assert "Results Center remains the owner" in results_boundary["boundary"]
+
+    manifest = runtime.build_diagnostics_evidence_manifest(snapshot)
+    assert manifest["analysis_chart_table_preview"]["table_count"] >= 3
+    assert manifest["compare_viewer_handoff_summary"]["consumer_surface"] == "Compare Viewer"
+    assert manifest["results_center_boundary_summary"]["producer_surface"] == "Results Center"
 
 
 def test_evidence_export_builds_compare_influence_surfaces_from_artifacts(tmp_path: Path) -> None:

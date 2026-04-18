@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
+from .operator_text import format_analysis_context_banner as _format_operator_analysis_context_banner
 from .truth_contract import file_sha256, stable_contract_hash
 
 
@@ -416,26 +417,15 @@ def _short_hash(value: Any, *, length: int = 10) -> str:
 
 def format_analysis_context_banner(snapshot: AnimatorAnalysisContextSnapshot | None) -> str:
     if snapshot is None:
-        return "HO-008: not loaded"
-    if not snapshot.exists:
-        return "HO-008: MISSING | analysis_context.json not found"
-    lineage = dict(snapshot.lineage or {})
-    parts = [
-        f"HO-008: {snapshot.status or 'UNKNOWN'}",
-        f"run={_text(lineage.get('run_id')) or '-'}",
-        f"test={_text(lineage.get('selected_test_id')) or '-'}",
-        f"segment={_text(lineage.get('selected_segment_id')) or '-'}",
-        f"objective={_short_hash(lineage.get('objective_contract_hash'))}",
-        f"suite={_short_hash(lineage.get('suite_snapshot_hash'))}",
-        f"problem={_short_hash(lineage.get('problem_hash'))}",
-    ]
-    if snapshot.blocking_states:
-        parts.append("blocking=" + "; ".join(snapshot.blocking_states[:3]))
-    elif snapshot.warnings:
-        parts.append("warnings=" + "; ".join(snapshot.warnings[:2]))
-    if snapshot.analysis_context_hash:
-        parts.append(f"context={_short_hash(snapshot.analysis_context_hash, length=12)}")
-    return " | ".join(parts)
+        return "HO-008: Контекст анализа не загружен"
+    return _format_operator_analysis_context_banner(
+        exists=bool(snapshot.exists),
+        status=snapshot.status,
+        lineage=dict(snapshot.lineage or {}),
+        analysis_context_hash=snapshot.analysis_context_hash,
+        blocking_states=tuple(snapshot.blocking_states or ()),
+        warnings=tuple(snapshot.warnings or ()),
+    )
 
 
 __all__ = [

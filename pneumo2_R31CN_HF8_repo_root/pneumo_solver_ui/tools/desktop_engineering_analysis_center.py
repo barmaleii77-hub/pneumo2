@@ -99,6 +99,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         self._candidate_by_iid: dict[str, dict] = {}
         self._sensitivity_by_iid: dict[str, EngineeringSensitivityRow] = {}
         self._pipeline_by_iid: dict[str, dict[str, Any]] = {}
+        self._preview_by_iid: dict[str, dict[str, Any]] = {}
         self._worker_thread: threading.Thread | None = None
 
         self.release_var = tk.StringVar(master=self, value=f"Release: {get_release(default='unknown')}")
@@ -303,10 +304,12 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         self._candidate_by_iid.clear()
         self._sensitivity_by_iid.clear()
         self._pipeline_by_iid.clear()
+        self._preview_by_iid.clear()
         self.artifact_tree.delete(*self.artifact_tree.get_children())
         self.sensitivity_tree.delete(*self.sensitivity_tree.get_children())
         pipeline_rows = self.runtime.analysis_workspace_pipeline_status(snapshot)
         runtime_gaps = self.runtime.analysis_workspace_runtime_gaps(snapshot)
+        chart_table_preview = self.runtime.analysis_workspace_chart_table_preview(snapshot)
 
         self.summary_var.set(
             " | ".join(
@@ -438,6 +441,94 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
             self._pipeline_by_iid[iid] = payload
             if row.path is not None:
                 self._path_by_iid[iid] = row.path
+
+        preview_iid = self.artifact_tree.insert(
+            run_iid,
+            "end",
+            text="Charts / tables preview",
+            values=(
+                str(chart_table_preview.get("status") or "MISSING"),
+                "analysis_previews",
+                (
+                    f"charts={chart_table_preview.get('chart_count', 0)} | "
+                    f"tables={chart_table_preview.get('table_count', 0)} | "
+                    f"max_rows={chart_table_preview.get('max_rows', 0)}"
+                ),
+            ),
+            open=True,
+        )
+        self._preview_by_iid[preview_iid] = dict(chart_table_preview)
+        charts_iid = self.artifact_tree.insert(
+            preview_iid,
+            "end",
+            text="Compare influence charts",
+            values=(
+                "READY" if chart_table_preview.get("chart_count") else "MISSING",
+                "analysis_chart_preview",
+                f"count={chart_table_preview.get('chart_count', 0)}",
+            ),
+            open=True,
+        )
+        self._preview_by_iid[charts_iid] = {
+            "kind": "compare_influence_charts",
+            "charts": list(chart_table_preview.get("charts") or []),
+        }
+        for chart in chart_table_preview.get("charts") or []:
+            if not isinstance(chart, dict):
+                continue
+            iid = self.artifact_tree.insert(
+                charts_iid,
+                "end",
+                text=str(chart.get("title") or "compare_influence"),
+                values=(
+                    str(chart.get("status") or "READY"),
+                    "analysis_chart_preview",
+                    str(chart.get("source_path") or ""),
+                ),
+            )
+            self._preview_by_iid[iid] = dict(chart)
+
+        sensitivity_preview = dict(chart_table_preview.get("sensitivity_table") or {})
+        sensitivity_iid = self.artifact_tree.insert(
+            preview_iid,
+            "end",
+            text="Sensitivity table preview",
+            values=(
+                str(sensitivity_preview.get("status") or "MISSING"),
+                "analysis_table_preview",
+                f"rows={sensitivity_preview.get('row_count', 0)}",
+            ),
+        )
+        self._preview_by_iid[sensitivity_iid] = sensitivity_preview
+        tables_iid = self.artifact_tree.insert(
+            preview_iid,
+            "end",
+            text="Artifact table previews",
+            values=(
+                "READY" if chart_table_preview.get("table_count") else "MISSING",
+                "analysis_table_preview",
+                f"count={chart_table_preview.get('table_count', 0)}",
+            ),
+            open=True,
+        )
+        self._preview_by_iid[tables_iid] = {
+            "kind": "artifact_table_previews",
+            "tables": list(chart_table_preview.get("tables") or []),
+        }
+        for table in chart_table_preview.get("tables") or []:
+            if not isinstance(table, dict):
+                continue
+            iid = self.artifact_tree.insert(
+                tables_iid,
+                "end",
+                text=str(table.get("title") or table.get("key") or "CSV table"),
+                values=(
+                    str(table.get("status") or "MISSING"),
+                    "analysis_table_preview",
+                    str(table.get("source_path") or ""),
+                ),
+            )
+            self._preview_by_iid[iid] = dict(table)
 
         group_iids: dict[str, str] = {}
         for artifact in sorted(snapshot.artifacts, key=lambda item: (item.category, item.title)):
@@ -571,6 +662,9 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
                 dict(item)
                 for item in self.runtime.analysis_workspace_runtime_gaps(snapshot)
             ],
+            "analysis_chart_table_preview": self.runtime.analysis_workspace_chart_table_preview(snapshot),
+            "compare_viewer_handoff_summary": self.runtime.analysis_compare_handoff_summary(snapshot),
+            "results_center_boundary_summary": self.runtime.analysis_results_boundary_summary(snapshot),
             "animator_handoff_summary": self.runtime.analysis_animator_handoff_summary(snapshot),
         }
         return json.dumps(payload, ensure_ascii=False, indent=2)
@@ -751,6 +845,10 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         pipeline_row = self._pipeline_by_iid.get(iid)
         if pipeline_row is not None:
             self._set_text(self.detail_text, json.dumps(pipeline_row, ensure_ascii=False, indent=2))
+            return
+        preview_payload = self._preview_by_iid.get(iid)
+        if preview_payload is not None:
+            self._set_text(self.detail_text, json.dumps(preview_payload, ensure_ascii=False, indent=2))
             return
         path = self._path_by_iid.get(iid)
         if path is not None:

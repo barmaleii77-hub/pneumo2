@@ -120,8 +120,47 @@ def test_desktop_ring_editor_is_registered_as_standalone_hosted_tool() -> None:
     spec = by_key["desktop_ring_editor"]
     assert spec.mode == "hosted"
     assert spec.group == "Встроенные окна"
+    assert spec.primary is True
+    assert spec.entry_kind == "main"
+    assert spec.workflow_stage == "scenarios"
+    assert spec.effective_workspace_role == "workspace"
+    assert spec.effective_source_of_truth_role == "master"
     assert spec.standalone_module == "pneumo_solver_ui.tools.desktop_ring_scenario_editor"
     assert spec.create_hosted is not None
+    assert "scenarios.handoff_ho004" in spec.capability_ids
+    assert "suite.source_ring_export" in spec.capability_ids
+    assert "calculation" in spec.launch_contexts
+    assert "WS-RING" in spec.description
+    assert "HO-004" in spec.description
+    assert "без дополнительной навигации" in spec.details
+    assert "ring_source_of_truth_json" in spec.details
+    assert "derived/consumer handoff" in spec.details
+    assert {"WS-RING", "HO-004", "HO-005", "source-of-truth", "validated suite"} <= set(
+        spec.effective_search_aliases
+    )
+    for handoff_key in (
+        "ring_source_of_truth_json",
+        "ring_source_hash",
+        "ring_export_set_hash",
+        "scenario_json",
+        "road_csv",
+        "axay_csv",
+        "meta_json",
+        "validated_suite_snapshot",
+        "suite_snapshot_hash",
+    ):
+        assert handoff_key in spec.effective_context_handoff_keys
+
+    v38_path = ("desktop_input_editor", "desktop_ring_editor", "test_center", "desktop_optimizer_center")
+    assert [by_key[key].workflow_stage for key in v38_path] == [
+        "data",
+        "scenarios",
+        "calculation",
+        "optimization",
+    ]
+    assert [by_key[key].nav_order for key in v38_path] == sorted(by_key[key].nav_order for key in v38_path)
+    assert "suite.handoff_ho005" in by_key["test_center"].capability_ids
+    assert "validated_suite_snapshot" in by_key["test_center"].effective_context_handoff_keys
 
     catalog_modules = {item.module for item in build_desktop_launch_catalog(include_mnemo=False)}
     assert "pneumo_solver_ui.tools.desktop_ring_scenario_editor" in catalog_modules

@@ -1358,9 +1358,10 @@ class DesktopRunSetupCenter:
         ttk.Label(
             command_frame,
             text=(
-                "Refs из WS-RING и WS-INPUTS здесь только читаются: road_csv, axay_csv, "
-                "scenario_json, segment_meta_ref, inputs_snapshot, ring_source_hash и "
-                "ring_export_set_hash не редактируются в WS-SUITE. "
+                "Generated/derived refs из WS-RING и frozen refs из WS-INPUTS здесь "
+                "только читаются: road_csv, axay_csv, scenario_json, segment_meta_ref, "
+                "inputs_snapshot, ring_source_hash и ring_export_set_hash не "
+                "редактируются в WS-SUITE. "
                 "Для правки геометрии откройте Ring Editor / WS-RING source."
             ),
             wraplength=880,

@@ -313,9 +313,9 @@ def test_bundle_canvas_warning_lines_surface_overlay_summary() -> None:
     finally:
         appmod._ring_overlay_info_messages = orig_ring
 
-    assert any("fallback channels active" in line for line in lines)
-    assert any("incomplete spring geometry" in line for line in lines)
-    assert any("cylinder truth reduced" in line for line in lines)
+    assert any("резервные каналы" in line for line in lines)
+    assert any("Не хватает геометрии пружин" in line for line in lines)
+    assert any("Ограничение цилиндров" in line for line in lines)
     assert any(line.startswith("RING: strict_exact") for line in lines)
     assert len(lines) <= 4
 
@@ -461,7 +461,7 @@ def test_road_preview_defaults_to_mesh_without_wire_overlay() -> None:
     assert "spring_todo_msgs = _mandatory_spring_geometry_todo_messages(b)" in SRC
     assert "ring_info_msgs = _ring_overlay_info_messages(b)" in SRC
     assert 'code="mandatory_spring_geometry_todo"' in SRC
-    assert 'spring-todo={len(spring_todo_msgs)}' in SRC
+    assert 'spring_todo_count=len(spring_todo_msgs)' in SRC
 
 
 def test_spring_render_uses_trimmed_translucent_geometry_without_tail_leads() -> None:
@@ -1749,7 +1749,7 @@ def test_runtime_underrun_warning_path_throttles_secondary_panels_explicitly() -
     assert 'self._set_runtime_validation_budget(' in SRC
     assert 'active = _resolve_runtime_validation_budget_state(' in SRC
     assert 'code="playback_runtime_validation_budget"' in SRC
-    assert 'VALIDATION WARN: runtime cadence underrun, secondary panels throttled | ' in SRC
+    assert '_format_playback_status(t_s=t, speed_mps=v, file_name=b.npz_path.name, cadence_warning=True)' in SRC
     assert 'cursor_f = float(cursor_f + max(0.05, float(self._speed)))' not in SRC
     assert 'cursor_f, sample_t_prepared = _advance_prepared_playback_cursor_limited(' in SRC
 

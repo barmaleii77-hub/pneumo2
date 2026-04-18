@@ -268,6 +268,9 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
             "",
             "## Engineering analysis evidence",
             f"- status: `{engineering.get('status') or 'MISSING'}`",
+            f"- readiness_status: `{engineering.get('readiness_status') or 'MISSING'}`",
+            f"- open_gap_status: `{engineering.get('open_gap_status') or 'MISSING'}`",
+            f"- no_release_closure_claim: `{engineering.get('no_release_closure_claim')}`",
             f"- source_path: `{engineering.get('source_path') or '—'}`",
             f"- evidence_manifest_hash: `{engineering.get('evidence_manifest_hash') or '—'}`",
             f"- influence_status: `{engineering.get('influence_status') or '—'}`",
@@ -279,6 +282,13 @@ def render_inspection_md(summary: Dict[str, Any]) -> str:
             f"- missing_required_artifact_count: `{engineering.get('missing_required_artifact_count')}`",
             f"- missing_required_artifacts: `{', '.join(str(x) for x in (engineering.get('missing_required_artifact_keys') or [])) or '—'}`",
         ]
+        open_gap_reasons = [
+            str(item).strip()
+            for item in (engineering.get("open_gap_reasons") or [])
+            if str(item).strip()
+        ]
+        if open_gap_reasons:
+            lines.append(f"- open_gap_reasons: `{', '.join(open_gap_reasons[:8])}`")
         requirements = dict(engineering.get("handoff_requirements") or {})
         if requirements:
             lines += [

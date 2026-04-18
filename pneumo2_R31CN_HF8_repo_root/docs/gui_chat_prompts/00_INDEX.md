@@ -79,22 +79,31 @@
    same 10 chats before the 10 GUI handoffs were accepted. Keep for historical
    comparison only.
 21. [17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md](./17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md)
-   — current post-acceptance self-contained Plan-mode starter prompts for the
+   — previous post-acceptance self-contained Plan-mode starter prompts for the
    same 10 chats after `ed9c4cd`, with clean `origin/codex/work`, no temporary
    worktree sprawl, mandatory V38 visual/runtime checks and optimized
-   user-pipeline checks. Prefer this file for all new chat starts.
-22. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
+   user-pipeline checks. Keep for historical comparison only.
+22. [CHAT_WORKTREE_ACCEPTANCE_CLEANUP_2026-04-18.md](../context/release_readiness/CHAT_WORKTREE_ACCEPTANCE_CLEANUP_2026-04-18.md)
+   — current integration note for accepting dirty local chat-worktrees into
+   `codex/work`, excluding generated runtime artifacts and cleaning old
+   worktree/branch sprawl after validation.
+23. [18_POST_CHAT_WORKTREE_CLEANUP_V38_PLAN_MODE_PROMPTS.md](./18_POST_CHAT_WORKTREE_CLEANUP_V38_PLAN_MODE_PROMPTS.md)
+   — current self-contained Plan-mode starter prompts for the same 10 chats
+   after local chat-worktree acceptance, with mandatory V38 visual checks,
+   optimized user-pipeline checks, Russian operator text and service-jargon
+   leak prevention. Prefer this file for all new chat starts.
+24. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
    и related `v3/*`
    — checked-in detailed machine-readable reference layer.
-23. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
+25. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
    и related `v13_ring_editor_migration/*`
    — специализированный addendum для `WS-RING` и handoff `WS-RING -> WS-SUITE`.
-24. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
+26. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
    — historical design-recovery layer, который возвращает проект из implementation-веток в design-first.
-25. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
+27. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
    и [gui_spec_archive_lineage.json](../context/gui_spec_archive_lineage.json)
    — lineage `v1…v13 + v37 + v38`, чтобы понимать роль каждого архива и successor supplement.
-26. `docs/gui_chat_prompts/*`
+28. `docs/gui_chat_prompts/*`
    — implementation prompts, которые должны наследовать канон, а не заменять его.
 
 ## Что считается reference layer
@@ -158,12 +167,18 @@
 - `16_RECOVERY_PLAN_MODE_START_PROMPTS` задаёт historical post-quarantine
   стартовые промты для тех же 10 чатов до приемки их результатов; использовать
   только для сравнения с текущим post-acceptance pack.
-- `17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS` задаёт текущие самодостаточные
-  стартовые промты для тех же 10 чатов после приемки GUI handoffs в
-  `codex/work`: старт только от clean `origin/codex/work`, без временных
-  worktree и исторических веток, с обязательной V38 visual/runtime проверкой,
-  проверкой `PIPELINE_OPTIMIZED.dot`, запретом service-jargon leaks и планом
-  до любых правок.
+- `17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS` задаёт historical
+  post-acceptance starter pack после первой приемки GUI handoffs; использовать
+  только для сравнения с текущим пакетом.
+- `CHAT_WORKTREE_ACCEPTANCE_CLEANUP_2026-04-18` фиксирует интеграционную
+  приемку локальных chat-worktree, исключение generated runtime artifacts и
+  правила уборки временных веток/worktree.
+- `18_POST_CHAT_WORKTREE_CLEANUP_V38_PLAN_MODE_PROMPTS` задаёт текущие
+  самодостаточные стартовые промты для тех же 10 чатов после приемки
+  локальных chat-worktree: старт только от clean `origin/codex/work`,
+  обязательная V38 visual/runtime проверка, проверка `PIPELINE_OPTIMIZED.dot`,
+  запрет service-jargon leaks, русский operator-facing текст и план до любых
+  правок.
 - `v38_github_kb_commit_ready` задаёт текущий successor KB/TZ/spec connector
   layer: consolidated technical specification, GUI_SPEC.yaml, workspace
   contract matrix, parameter catalogs, acceptance/requirements matrices, repo
@@ -203,6 +218,7 @@
 - [15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md](./15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md)
 - [16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
 - [17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md](./17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md)
+- [18_POST_CHAT_WORKTREE_CLEANUP_V38_PLAN_MODE_PROMPTS.md](./18_POST_CHAT_WORKTREE_CLEANUP_V38_PLAN_MODE_PROMPTS.md)
 
 ## Правило использования
 
@@ -220,8 +236,9 @@
   `context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md` и
   `context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md`; не
   смешивать V32-16 docs/helper patch с runtime/domain lane-пакетами; после
-  recovery-pass и приемки 10 GUI handoffs новые чаты должны брать стартовый
-  prompt из `17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md`;
+  recovery-pass и приемки локальных chat-worktree новые чаты должны брать
+  стартовый prompt из
+  `18_POST_CHAT_WORKTREE_CLEANUP_V38_PLAN_MODE_PROMPTS.md`;
 - если нужно понять исходный жёсткий intent ещё до `v1`, дополнительно читать
   `foundations/*`;
 - если lane затрагивает requirements, параметры, workspace coverage,

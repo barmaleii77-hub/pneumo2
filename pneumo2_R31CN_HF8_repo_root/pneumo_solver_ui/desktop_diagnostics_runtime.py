@@ -31,6 +31,7 @@ from pneumo_solver_ui.tools.send_bundle_evidence import (
     build_latest_integrity_proof,
     load_evidence_manifest_from_zip,
     summarize_analysis_evidence_manifest,
+    summarize_engineering_analysis_evidence,
     summarize_geometry_reference_evidence,
 )
 
@@ -167,48 +168,24 @@ def _summarize_engineering_analysis_evidence_manifest(
     source_path: str = "",
     read_warnings: list[str] | None = None,
 ) -> dict:
-    obj = dict(payload or {})
-    source = str(source_path or "").strip()
-    warnings = [str(item).strip() for item in (read_warnings or []) if str(item).strip()]
-    schema = str(obj.get("schema") or "").strip()
-    manifest_hash = str(obj.get("evidence_manifest_hash") or "").strip()
-    validation = obj.get("validation") if isinstance(obj.get("validation"), dict) else {}
-    readiness = (
-        obj.get("selected_run_candidate_readiness")
-        if isinstance(obj.get("selected_run_candidate_readiness"), dict)
-        else {}
+    summary = summarize_engineering_analysis_evidence(
+        payload,
+        source_path=source_path,
+        read_warnings=read_warnings or [],
     )
-    validation_status = str((validation or {}).get("status") or "MISSING").strip().upper()
-
-    if not source:
-        status = "MISSING"
-        warnings.append(
-            "Engineering Analysis evidence / HO-007 missing; export evidence manifest from Engineering Analysis Center before SEND."
-        )
-    else:
-        status = "READY"
-        if not obj:
-            warnings.append("Engineering Analysis evidence / HO-007 manifest is empty or unreadable.")
-        if schema and schema != "desktop_engineering_analysis_evidence_manifest":
-            warnings.append(f"Engineering Analysis evidence / HO-007 has unexpected schema: {schema}.")
-        if not manifest_hash:
-            warnings.append("Engineering Analysis evidence / HO-007 manifest has no evidence_manifest_hash.")
-        if validation_status in {"BLOCKED", "FAILED", "MISSING_INPUTS"}:
-            warnings.append(
-                f"Engineering Analysis evidence / HO-007 validation status requires attention: {validation_status}."
-            )
-        if _safe_int((readiness or {}).get("candidate_count")) and not _safe_int(
-            (readiness or {}).get("ready_candidate_count")
-        ):
-            warnings.append("HO-007 selected-run readiness has no READY optimization candidates.")
-        if warnings:
-            status = "WARN"
+    status = str(summary.get("status") or "MISSING")
+    readiness_status = str(summary.get("readiness_status") or status)
+    open_gap_status = str(summary.get("open_gap_status") or "MISSING")
+    open_gap_reasons = _clean_string_list(summary.get("open_gap_reasons"))
+    validation_status = str(summary.get("analysis_status") or "MISSING").strip().upper()
+    candidate_count = _safe_int(summary.get("selected_run_candidate_count"))
+    ready_candidate_count = _safe_int(summary.get("selected_run_ready_candidate_count"))
 
     if status == "MISSING":
         action = "Откройте Engineering Analysis Center и выполните экспорт evidence manifest перед SEND."
-    elif _safe_int((readiness or {}).get("candidate_count")) and not _safe_int(
-        (readiness or {}).get("ready_candidate_count")
-    ):
+    elif open_gap_status == "OPEN":
+        action = "Устраните HO-007 open gap(s) в Engineering Analysis Center перед SEND."
+    elif candidate_count and not ready_candidate_count:
         action = "Выберите READY optimization run или устраните missing inputs в Engineering Analysis Center."
     elif status == "WARN":
         action = "Проверьте validation/status и HO-007 readiness перед отправкой."
@@ -216,18 +193,28 @@ def _summarize_engineering_analysis_evidence_manifest(
         action = "Engineering Analysis evidence готов к включению в diagnostics/SEND."
 
     return {
-        "source_path": source,
+        "source_path": str(summary.get("source_path") or ""),
         "status": status,
-        "schema": schema,
-        "evidence_manifest_hash": manifest_hash,
+        "readiness_status": readiness_status,
+        "open_gap_status": open_gap_status,
+        "open_gap_reasons": open_gap_reasons,
+        "no_release_closure_claim": bool(summary.get("no_release_closure_claim", True)),
+        "schema": str(summary.get("schema") or ""),
+        "evidence_manifest_hash": str(summary.get("evidence_manifest_hash") or ""),
         "validation_status": validation_status,
-        "candidate_count": _safe_int((readiness or {}).get("candidate_count")),
-        "ready_candidate_count": _safe_int((readiness or {}).get("ready_candidate_count")),
-        "missing_inputs_candidate_count": _safe_int((readiness or {}).get("missing_inputs_candidate_count")),
-        "failed_candidate_count": _safe_int((readiness or {}).get("failed_candidate_count")),
-        "unique_missing_inputs": _clean_string_list((readiness or {}).get("unique_missing_inputs")),
-        "ready_run_dirs": _clean_string_list((readiness or {}).get("ready_run_dirs")),
-        "warnings": list(dict.fromkeys(warnings)),
+        "candidate_count": candidate_count,
+        "ready_candidate_count": ready_candidate_count,
+        "missing_inputs_candidate_count": _safe_int(summary.get("selected_run_missing_inputs_candidate_count")),
+        "failed_candidate_count": _safe_int(
+            dict(summary.get("selected_run_candidate_readiness") or {}).get("failed_candidate_count")
+        ),
+        "unique_missing_inputs": _clean_string_list(
+            dict(summary.get("selected_run_candidate_readiness") or {}).get("unique_missing_inputs")
+        ),
+        "ready_run_dirs": _clean_string_list(
+            dict(summary.get("selected_run_candidate_readiness") or {}).get("ready_run_dirs")
+        ),
+        "warnings": list(dict.fromkeys(str(item) for item in (summary.get("warnings") or []) if str(item).strip())),
         "action": action,
     }
 
@@ -482,6 +469,16 @@ def load_desktop_diagnostics_bundle_record(
             f"warn={self_check_snapshot.get('warn_count', 0)} "
             "snapshot_only=True"
         )
+    if str(engineering_analysis.get("open_gap_status") or "").upper() == "OPEN":
+        reasons = [
+            str(item).strip()
+            for item in (engineering_analysis.get("open_gap_reasons") or [])
+            if str(item).strip()
+        ]
+        integrity_summary_lines.append(
+            "Engineering Analysis / HO-007 open gaps remain warning-only: "
+            + (", ".join(reasons[:4]) if reasons else "readiness is not clear")
+        )
     if integrity_summary_lines:
         summary_lines = list(dict.fromkeys(integrity_summary_lines + summary_lines))
 
@@ -607,6 +604,14 @@ def load_desktop_diagnostics_bundle_record(
         latest_engineering_analysis_evidence_manifest_path=str(engineering_analysis.get("source_path") or ""),
         engineering_analysis_evidence_manifest_hash=str(engineering_analysis.get("evidence_manifest_hash") or ""),
         engineering_analysis_evidence_status=str(engineering_analysis.get("status") or "MISSING"),
+        engineering_analysis_readiness_status=str(
+            engineering_analysis.get("readiness_status") or engineering_analysis.get("status") or "MISSING"
+        ),
+        engineering_analysis_open_gap_status=str(engineering_analysis.get("open_gap_status") or "MISSING"),
+        engineering_analysis_open_gap_reasons=_clean_string_list(engineering_analysis.get("open_gap_reasons")),
+        engineering_analysis_no_release_closure_claim=bool(
+            engineering_analysis.get("no_release_closure_claim", True)
+        ),
         engineering_analysis_evidence_schema=str(engineering_analysis.get("schema") or ""),
         engineering_analysis_validation_status=str(engineering_analysis.get("validation_status") or "MISSING"),
         engineering_analysis_candidate_count=_safe_int(engineering_analysis.get("candidate_count")),
@@ -913,6 +918,10 @@ def write_desktop_diagnostics_center_state(
         },
         "engineering_analysis_evidence": {
             "status": bundle_record.engineering_analysis_evidence_status,
+            "readiness_status": bundle_record.engineering_analysis_readiness_status,
+            "open_gap_status": bundle_record.engineering_analysis_open_gap_status,
+            "open_gap_reasons": list(bundle_record.engineering_analysis_open_gap_reasons),
+            "no_release_closure_claim": bundle_record.engineering_analysis_no_release_closure_claim,
             "schema": bundle_record.engineering_analysis_evidence_schema,
             "manifest_hash": bundle_record.engineering_analysis_evidence_manifest_hash,
             "validation_status": bundle_record.engineering_analysis_validation_status,

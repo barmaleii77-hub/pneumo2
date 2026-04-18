@@ -139,6 +139,10 @@ class DesktopDiagnosticsBundleRecord:
     latest_engineering_analysis_evidence_manifest_path: str = ""
     engineering_analysis_evidence_manifest_hash: str = ""
     engineering_analysis_evidence_status: str = "MISSING"
+    engineering_analysis_readiness_status: str = "MISSING"
+    engineering_analysis_open_gap_status: str = "MISSING"
+    engineering_analysis_open_gap_reasons: list[str] = field(default_factory=list)
+    engineering_analysis_no_release_closure_claim: bool = True
     engineering_analysis_evidence_schema: str = ""
     engineering_analysis_validation_status: str = "MISSING"
     engineering_analysis_candidate_count: int = 0

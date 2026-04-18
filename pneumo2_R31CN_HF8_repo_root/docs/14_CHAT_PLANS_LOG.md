@@ -371,6 +371,13 @@ ID: `PLAN-0050`.
 Источник: chat:2026-04-18 diagnostics gui complaint.
 ID: `PLAN-0051`.
 
+52. Post-chat worktree cleanup and V38 Plan-mode prompts
+Назначение: Зафиксировать приемку локальных chat-worktree в codex/work, исключить generated runtime artifacts из канона, убрать временные worktree/ветки после validation и выдать текущий self-contained prompt-pack для 10 параллельных GUI-чатов с обязательной V38 visual/runtime проверкой, PIPELINE_OPTIMIZED.dot flow-check, русским operator-facing текстом и запретом service-jargon leaks.
+Артефакт: [gui_chat_prompts/18_POST_CHAT_WORKTREE_CLEANUP_V38_PLAN_MODE_PROMPTS.md](./gui_chat_prompts/18_POST_CHAT_WORKTREE_CLEANUP_V38_PLAN_MODE_PROMPTS.md)
+Статус: актуален.
+Источник: chat:2026-04-18 accept chat worktrees cleanup.
+ID: `PLAN-0052`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

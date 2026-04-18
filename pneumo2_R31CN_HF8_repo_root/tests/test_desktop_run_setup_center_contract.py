@@ -71,6 +71,8 @@ def test_desktop_run_setup_center_surfaces_ho003_ho004_ho005_and_readonly_ring_r
     assert "ring_stale_reasons" in src
     assert "segment_meta_ref" in src
     assert "read-only WS-RING refs" in src
+    assert "Generated/derived refs из WS-RING" in src
+    assert "frozen refs из WS-INPUTS" in src
     assert "edit geometry in Ring Editor / WS-RING source" in src
 
     block = src[src.index("def _build_suite_tab"): src.index("def _build_launch_tab")]

@@ -173,6 +173,17 @@ SERVICE_JARGON_BLOCKERS: tuple[str, ...] = (
 )
 
 
+OPERATOR_FORBIDDEN_LABELS: tuple[str, ...] = (
+    "Статус миграции",
+    "Открыть выбранный этап",
+    "Данные машины",
+    "Workspace:",
+    "required dirs",
+    "Технический модуль",
+    "desktop_gui_spec_shell",
+)
+
+
 def build_pipeline_surface_by_key() -> dict[str, ShellPipelineSurface]:
     return {surface.key: surface for surface in V38_PIPELINE_SURFACES}
 
@@ -209,5 +220,16 @@ def service_jargon_hits(texts: list[str]) -> list[str]:
         for blocker in SERVICE_JARGON_BLOCKERS:
             if blocker in text:
                 hits.append(text)
+                break
+    return sorted(set(hits))
+
+
+def forbidden_operator_label_hits(texts: list[str]) -> list[str]:
+    hits: list[str] = []
+    for text in texts:
+        text_value = str(text)
+        for label in OPERATOR_FORBIDDEN_LABELS:
+            if label in text_value:
+                hits.append(text_value)
                 break
     return sorted(set(hits))

@@ -65,6 +65,7 @@ class DesktopGeometryReferenceCenter:
         self.road_width_summary_var = tk.StringVar(master=self.root)
         self.geometry_acceptance_summary_var = tk.StringVar(master=self.root)
         self.artifact_summary_var = tk.StringVar(master=self.root)
+        self.solver_points_hardpoints_summary_var = tk.StringVar(master=self.root)
         self.producer_gap_summary_var = tk.StringVar(master=self.root)
         self.artifact_freshness_var = tk.StringVar(
             master=self.root,
@@ -177,6 +178,15 @@ class DesktopGeometryReferenceCenter:
             wraplength=980,
             justify="left",
         ).grid(row=3, column=1, columnspan=4, sticky="ew", padx=8, pady=(8, 0))
+        ttk.Label(
+            source,
+            text=(
+                "Read-only reference/evidence surface: canonical parameter edits stay in Input lane; "
+                "hardpoints/solver_points remain producer-owned until export evidence closes OG-001."
+            ),
+            wraplength=980,
+            justify="left",
+        ).grid(row=4, column=0, columnspan=5, sticky="ew", pady=(8, 0))
         self._attach_tooltip(
             export_btn,
             "Записать geometry_reference_evidence.json для Diagnostics/Send Bundle. "
@@ -272,6 +282,30 @@ class DesktopGeometryReferenceCenter:
             wraplength=1440,
             justify="left",
         ).pack(anchor="w", pady=(0, 10))
+
+        solver_frame = ttk.LabelFrame(
+            self.geometry_tab,
+            text="solver_points / hardpoints producer evidence",
+            padding=8,
+        )
+        solver_frame.pack(fill="both", expand=False, pady=(0, 10))
+        ttk.Label(
+            solver_frame,
+            textvariable=self.solver_points_hardpoints_summary_var,
+            wraplength=1440,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 8))
+        self.solver_points_hardpoints_tree = self._build_tree(
+            solver_frame,
+            columns=(
+                ("layer", "Layer", 170, "w"),
+                ("status", "Status", 90, "w"),
+                ("blockers", "Blocking reasons", 360, "w"),
+                ("coverage", "Visible family coverage", 300, "w"),
+                ("source", "Source / path", 520, "w"),
+            ),
+            height=4,
+        )
 
         gap_frame = ttk.LabelFrame(self.geometry_tab, text="producer truth gap map", padding=8)
         gap_frame.pack(fill="both", expand=False, pady=(0, 10))
@@ -958,6 +992,27 @@ class DesktopGeometryReferenceCenter:
                 parts.append(f"{key}={text}")
         return "; ".join(parts) if parts else "—"
 
+    @staticmethod
+    def _coverage_text(layer: object) -> str:
+        if not isinstance(layer, dict):
+            return "—"
+        present = tuple(str(item) for item in (layer.get("visible_present_families") or ()))
+        partial = tuple(str(item) for item in (layer.get("visible_partial_families") or ()))
+        missing = tuple(str(item) for item in (layer.get("visible_missing_families") or ()))
+        required = tuple(str(item) for item in (layer.get("visible_required_families") or ()))
+        return (
+            f"present={len(present)}/{len(required) or '—'}"
+            + (f"; partial={', '.join(partial[:4])}" if partial else "")
+            + (f"; missing={', '.join(missing[:4])}" if missing else "")
+        )
+
+    @staticmethod
+    def _evidence_blockers_text(evidence: object) -> str:
+        if not isinstance(evidence, dict):
+            return "missing"
+        blockers = tuple(str(item) for item in (evidence.get("blocking_reasons") or ()))
+        return ", ".join(blockers) if blockers else "none"
+
     def _export_evidence_for_send(self) -> None:
         try:
             artifact = self._artifact_context()
@@ -1064,6 +1119,77 @@ class DesktopGeometryReferenceCenter:
             f"{freshness.get('reason') or ''}"
             + (f" Issues: {'; '.join(freshness_issues[:2])}" if freshness_issues else "")
         )
+        solver_hardpoints = diagnostics_handoff.get("solver_points_hardpoints_evidence")
+        self._clear_tree(self.solver_points_hardpoints_tree)
+        if isinstance(solver_hardpoints, dict):
+            solver_meta = dict(solver_hardpoints.get("meta_solver_points") or {})
+            hardpoints_meta = dict(solver_hardpoints.get("meta_hardpoints") or {})
+            hardpoints_sot = dict(solver_hardpoints.get("hardpoints_source_of_truth") or {})
+            solver_blockers = self._evidence_blockers_text(solver_hardpoints)
+            solver_status = str(solver_hardpoints.get("status") or "missing")
+            solver_freshness = dict(solver_hardpoints.get("freshness_relation") or {})
+            self.solver_points_hardpoints_summary_var.set(
+                "solver_points_hardpoints_evidence: "
+                f"status={solver_status}; blockers={solver_blockers}; "
+                f"acceptance={solver_hardpoints.get('geometry_acceptance_gate') or 'MISSING'}; "
+                f"freshness={solver_freshness.get('status') or 'missing'}/"
+                f"{solver_freshness.get('relation') or 'missing'}; read-only producer evidence, no closure claim."
+            )
+            self.solver_points_hardpoints_tree.insert(
+                "",
+                "end",
+                iid="solver_points_hardpoints_overall",
+                values=(
+                    "overall / OG-001",
+                    solver_status,
+                    solver_blockers,
+                    f"acceptance={solver_hardpoints.get('geometry_acceptance_gate') or 'MISSING'}",
+                    self._source_paths_text(solver_hardpoints.get("source_artifact_paths")),
+                ),
+            )
+            self.solver_points_hardpoints_tree.insert(
+                "",
+                "end",
+                iid="solver_points_hardpoints_solver_points",
+                values=(
+                    "meta.solver_points",
+                    "present" if solver_meta.get("present") else "missing",
+                    f"consumer_geometry_fabrication_allowed={bool(solver_meta.get('consumer_geometry_fabrication_allowed'))}",
+                    self._coverage_text(solver_meta),
+                    "meta.solver_points",
+                ),
+            )
+            self.solver_points_hardpoints_tree.insert(
+                "",
+                "end",
+                iid="solver_points_hardpoints_hardpoints",
+                values=(
+                    "meta.hardpoints",
+                    "present" if hardpoints_meta.get("present") else "missing",
+                    f"consumer_geometry_fabrication_allowed={bool(hardpoints_meta.get('consumer_geometry_fabrication_allowed'))}",
+                    self._coverage_text(hardpoints_meta),
+                    "meta.hardpoints",
+                ),
+            )
+            sot_status = (
+                "complete"
+                if hardpoints_sot.get("exists") and hardpoints_sot.get("complete")
+                else ("partial" if hardpoints_sot.get("exists") else "missing")
+            )
+            self.solver_points_hardpoints_tree.insert(
+                "",
+                "end",
+                iid="solver_points_hardpoints_sot",
+                values=(
+                    "HARDPOINTS_SOURCE_OF_TRUTH.json",
+                    sot_status,
+                    f"exists={bool(hardpoints_sot.get('exists'))}; complete={bool(hardpoints_sot.get('complete'))}",
+                    self._coverage_text(hardpoints_sot),
+                    str(hardpoints_sot.get("path") or "—"),
+                ),
+            )
+        else:
+            self.solver_points_hardpoints_summary_var.set("solver_points_hardpoints_evidence: missing")
         gap_map = diagnostics_handoff.get("producer_truth_gap_map")
         self.producer_gap_summary_var.set(
             self._gap_map_status_text(gap_map)

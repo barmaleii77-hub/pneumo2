@@ -12,6 +12,7 @@ def _read(rel: str) -> str:
 
 def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log() -> None:
     src = _read("pneumo_solver_ui/tools/desktop_engineering_analysis_center.py")
+    runtime_src = _read("pneumo_solver_ui/desktop_engineering_analysis_runtime.py")
 
     assert "class DesktopEngineeringAnalysisCenter" in src
     assert "DesktopEngineeringAnalysisRuntime" in src
@@ -70,6 +71,17 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert "Influence and compare context" in src
     assert "Sensitivity / uncertainty" in src
     assert "Animator / Diagnostics handoffs" in src
+    assert "Charts / tables preview" in src
+    assert "Compare influence charts" in src
+    assert "Artifact table previews" in src
+    assert "analysis_workspace_chart_table_preview" in src
+    assert '"analysis_chart_table_preview"' in src
+    assert "Compare Viewer boundary" in runtime_src
+    assert "Results Center boundary" in runtime_src
+    assert "analysis_compare_handoff_summary" in src
+    assert "analysis_results_boundary_summary" in src
+    assert '"compare_viewer_handoff_summary"' in src
+    assert '"results_center_boundary_summary"' in src
     assert "animator_handoff_summary" in src
     assert "compare_influence_diagnostics" in src
     assert "missing_required_artifacts" in src
@@ -103,6 +115,37 @@ def test_engineering_analysis_shell_discovery_is_wired_to_module_and_aliases() -
     assert "build_desktop_engineering_analysis_center_spec" in legacy_registry
     assert "desktop_engineering_analysis_center" in adapter
     assert "DesktopEngineeringAnalysisRuntime" in adapter
+    assert "DesktopEngineeringAnalysisCenter(parent, runtime=runtime)" in adapter
+    assert "host=parent" not in adapter
+    assert "hosted=True" not in adapter
+
+
+def test_engineering_analysis_hosted_adapter_uses_current_center_constructor(monkeypatch) -> None:
+    from pneumo_solver_ui.desktop_shell.adapters import (
+        desktop_engineering_analysis_center_adapter as adapter,
+    )
+
+    calls: dict[str, object] = {}
+
+    class FakeRuntime:
+        def __init__(self, *, repo_root, python_executable) -> None:
+            calls["runtime_repo_root"] = repo_root
+            calls["runtime_python_executable"] = python_executable
+
+    class FakeCenter:
+        def __init__(self, master, *, runtime) -> None:
+            calls["center_master"] = master
+            calls["center_runtime"] = runtime
+
+    monkeypatch.setattr(adapter, "DesktopEngineeringAnalysisRuntime", FakeRuntime)
+    monkeypatch.setattr(adapter, "DesktopEngineeringAnalysisCenter", FakeCenter)
+
+    center = adapter.create_hosted_engineering_analysis_center("host-parent")
+
+    assert isinstance(center, FakeCenter)
+    assert calls["center_master"] == "host-parent"
+    assert isinstance(calls["center_runtime"], FakeRuntime)
+    assert Path(calls["runtime_repo_root"]).name == "pneumo2_R31CN_HF8_repo_root"
 
 
 def test_engineering_analysis_send_bundle_sources_reference_expected_artifacts() -> None:

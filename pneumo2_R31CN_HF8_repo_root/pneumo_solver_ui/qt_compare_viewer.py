@@ -2568,20 +2568,18 @@ class CompareViewer(QtWidgets.QMainWindow):
         source_row = QtWidgets.QHBoxLayout()
         source_row.setContentsMargins(0, 0, 0, 0)
         source_row.setSpacing(6)
-        self.lbl_compare_current_context_source = QtWidgets.QLabel("current_context_ref: -")
+        self.lbl_compare_current_context_source = QtWidgets.QLabel("Текущий контекст: нет данных")
         self.lbl_compare_current_context_source.setObjectName("compareCurrentContextSource")
         self.lbl_compare_current_context_source.setWordWrap(True)
         self.lbl_compare_current_context_source.setToolTip(
-            "Readonly current_context_ref source used for historical mismatch checks."
+            "Текущий контекст только для чтения; используется для проверки исторических расхождений."
         )
         source_row.addWidget(self.lbl_compare_current_context_source, 1)
         self.btn_open_compare_current_context_sidecar = QtWidgets.QToolButton()
         self.btn_open_compare_current_context_sidecar.setObjectName(
             "btnOpenCompareCurrentContextSidecar"
         )
-        self.btn_open_compare_current_context_sidecar.setToolTip(
-            "Open current_context_ref sidecar JSON"
-        )
+        self.btn_open_compare_current_context_sidecar.setToolTip("Открыть JSON текущего контекста")
         try:
             icon = self.style().standardIcon(
                 QtWidgets.QStyle.StandardPixmap.SP_DialogOpenButton
@@ -2657,21 +2655,21 @@ class CompareViewer(QtWidgets.QMainWindow):
         if label is not None:
             try:
                 if display_path:
-                    state = "sidecar" if status == "ready" else "sidecar missing"
-                    label.setText(f"current_context_ref {state}: {Path(display_path).name} | refs={ref_count}")
+                    state = "sidecar готов" if status == "ready" else "sidecar не найден"
+                    label.setText(f"Текущий контекст: {state} ({Path(display_path).name}) | refs={ref_count}")
                     label.setToolTip(display_path)
                 elif ref_count:
-                    label.setText(f"current_context_ref session refs={ref_count}")
-                    label.setToolTip("Readonly CompareSession.current_context_ref")
+                    label.setText(f"Текущий контекст: только refs из сессии | refs={ref_count}")
+                    label.setToolTip("Refs текущего контекста восстановлены из сессии сравнения и доступны только для чтения.")
                 else:
-                    label.setText("current_context_ref: -")
-                    label.setToolTip("No readonly current_context_ref sidecar/session payload.")
+                    label.setText("Текущий контекст: нет данных")
+                    label.setToolTip("Нет sidecar JSON или payload сессии для текущего контекста.")
             except Exception:
                 pass
         if button is not None:
             try:
                 button.setEnabled(bool(path_exists))
-                button.setToolTip(display_path if path_exists else "No sidecar JSON path is available.")
+                button.setToolTip(display_path if path_exists else "JSON текущего контекста недоступен.")
             except Exception:
                 pass
 
@@ -18179,7 +18177,7 @@ def _compare_session_npz_paths(sess: Optional['CompareSession']) -> List[Path]:
 def parse_args(argv: List[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser()
     ap.add_argument("--session", help="Path to a saved CompareSession JSON")
-    ap.add_argument("--current-context", help="Path to readonly current context sidecar JSON")
+    ap.add_argument("--current-context", help="Путь к JSON текущего контекста только для чтения")
     ap.add_argument("npz", nargs="*", help="Paths to *.npz or a CompareSession *.json")
     return ap.parse_args(argv)
 

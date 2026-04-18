@@ -25,6 +25,7 @@ SHARED_TEXT_FILES = [
     ROOT / "pneumo_solver_ui" / "ui_suite_card_panel_helpers.py",
     ROOT / "pneumo_solver_ui" / "ui_tooltips_ru.py",
     ROOT / "pneumo_solver_ui" / "ui_workflow_shell_helpers.py",
+    ROOT / "pneumo_solver_ui" / "desktop_animator" / "operator_text.py",
     ROOT / "pneumo_solver_ui" / "tools" / "make_send_bundle.py",
     ROOT / "pneumo_solver_ui" / "tools" / "triage_report.py",
 ]

@@ -100,7 +100,23 @@ def _engineering_analysis_evidence() -> dict:
         "schema": "desktop_engineering_analysis_evidence_manifest",
         "schema_version": "1.0.0",
         "evidence_manifest_hash": "engineering-hash-001",
-        "validation": {"status": "READY"},
+        "validation": {"status": "READY", "influence_status": "PASS", "calibration_status": "PASS"},
+        "validated_artifacts": {
+            "schema": "engineering_analysis_validated_artifacts.v1",
+            "status": "READY",
+            "required_artifact_count": 3,
+            "ready_required_artifact_count": 3,
+            "missing_required_artifact_count": 0,
+            "missing_required_artifacts": [],
+            "hash_ready_artifact_count": 3,
+        },
+        "handoff_requirements": {
+            "handoff_id": "HO-007",
+            "contract_status": "READY",
+            "required_contract_path": "C:/workspace/handoffs/WS-OPTIMIZATION/selected_run_contract.json",
+            "missing_fields": [],
+            "can_run_engineering_analysis": True,
+        },
         "selected_run_candidate_readiness": {
             "schema": "selected_run_candidate_readiness.v1",
             "candidate_count": 2,
@@ -409,6 +425,10 @@ def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_st
         ENGINEERING_ANALYSIS_EVIDENCE_SIDECAR_NAME
     )
     assert bundle.engineering_analysis_evidence_status == "READY"
+    assert bundle.engineering_analysis_readiness_status == "READY"
+    assert bundle.engineering_analysis_open_gap_status == "CLEAR"
+    assert bundle.engineering_analysis_open_gap_reasons == []
+    assert bundle.engineering_analysis_no_release_closure_claim is True
     assert bundle.engineering_analysis_validation_status == "READY"
     assert bundle.engineering_analysis_evidence_manifest_hash == "engineering-hash-001"
     assert bundle.engineering_analysis_candidate_count == 2
@@ -498,6 +518,10 @@ def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_st
     assert payload["analysis_evidence"]["status"] == bundle.analysis_evidence_status
     assert payload["analysis_evidence"]["context_state"] == bundle.analysis_evidence_context_state
     assert payload["engineering_analysis_evidence"]["status"] == "READY"
+    assert payload["engineering_analysis_evidence"]["readiness_status"] == "READY"
+    assert payload["engineering_analysis_evidence"]["open_gap_status"] == "CLEAR"
+    assert payload["engineering_analysis_evidence"]["open_gap_reasons"] == []
+    assert payload["engineering_analysis_evidence"]["no_release_closure_claim"] is True
     assert payload["engineering_analysis_evidence"]["validation_status"] == "READY"
     assert payload["engineering_analysis_evidence"]["manifest_hash"] == "engineering-hash-001"
     assert payload["engineering_analysis_evidence"]["selected_run_candidate_count"] == 2
@@ -528,6 +552,63 @@ def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_st
     assert loaded_center_state["ui"]["level"] == "full"
     assert loaded_center_state["ui"]["out_root"].endswith("diagnostics")
     assert loaded_center_state["ui"]["selected_tab"] == "bundle"
+
+
+def test_desktop_diagnostics_exposes_engineering_open_gap_state(tmp_path: Path) -> None:
+    from pneumo_solver_ui.tools.desktop_diagnostics_center import DesktopDiagnosticsCenter
+
+    out_dir = tmp_path / "send_bundles"
+    out_dir.mkdir()
+    payload = {
+        "schema": "desktop_engineering_analysis_evidence_manifest",
+        "schema_version": "1.0.0",
+        "evidence_manifest_hash": "engineering-hash-blocked",
+        "validation": {
+            "status": "BLOCKED",
+            "influence_status": "BLOCKED",
+            "calibration_status": "BLOCKED",
+        },
+        "handoff_requirements": {
+            "handoff_id": "HO-007",
+            "contract_status": "MISSING",
+            "required_contract_path": "workspace/handoffs/WS-OPTIMIZATION/selected_run_contract.json",
+            "missing_fields": ["selected_run_contract_hash"],
+        },
+        "selected_run_candidate_readiness": {
+            "schema": "selected_run_candidate_readiness.v1",
+            "candidate_count": 1,
+            "ready_candidate_count": 0,
+            "missing_inputs_candidate_count": 1,
+            "failed_candidate_count": 0,
+            "unique_missing_inputs": ["results_csv_path"],
+            "ready_run_dirs": [],
+        },
+    }
+    (out_dir / ENGINEERING_ANALYSIS_EVIDENCE_SIDECAR_NAME).write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    bundle = load_desktop_diagnostics_bundle_record(tmp_path, out_dir=out_dir)
+    assert bundle.engineering_analysis_evidence_status == "WARN"
+    assert bundle.engineering_analysis_readiness_status == "WARN"
+    assert bundle.engineering_analysis_open_gap_status == "OPEN"
+    assert bundle.engineering_analysis_no_release_closure_claim is True
+    assert "influence_status=BLOCKED" in bundle.engineering_analysis_open_gap_reasons
+    assert "calibration_status=BLOCKED" in bundle.engineering_analysis_open_gap_reasons
+    assert "validated_artifacts_status=MISSING" in bundle.engineering_analysis_open_gap_reasons
+    assert "handoff_contract_status=MISSING" in bundle.engineering_analysis_open_gap_reasons
+
+    center_state = write_desktop_diagnostics_center_state(out_dir, bundle_record=bundle)
+    center_payload = json.loads(center_state.read_text(encoding="utf-8"))
+    assert center_payload["engineering_analysis_evidence"]["open_gap_status"] == "OPEN"
+    assert "handoff_contract_status=MISSING" in center_payload["engineering_analysis_evidence"]["open_gap_reasons"]
+
+    summary_lines = DesktopDiagnosticsCenter._engineering_analysis_evidence_summary_lines(object(), bundle)
+    status_text = DesktopDiagnosticsCenter._engineering_analysis_status_text(object(), bundle)
+    assert "- Открытые разрывы: открыто" in summary_lines
+    assert any("Причины открытых разрывов:" in line for line in summary_lines)
+    assert "открытые разрывы=открыто" in status_text
 
 
 def test_desktop_diagnostics_prefers_latest_bundle_pointer_over_stale_meta(tmp_path: Path) -> None:

@@ -636,6 +636,20 @@ def collect_health_report(zip_path: Path) -> HealthReport:
             signals["anim_latest"] = anim_summary
             signals["mnemo_event_log"] = dict(mnemo_event_log)
             signals["ring_closure"] = dict(ring_closure)
+            engineering_signal = dict(signals.get("engineering_analysis_evidence") or {})
+            if str(engineering_signal.get("open_gap_status") or "").upper() == "OPEN":
+                reasons = [
+                    str(item).strip()
+                    for item in (engineering_signal.get("open_gap_reasons") or [])
+                    if str(item).strip()
+                ]
+                recommendation = (
+                    "Resolve Engineering Analysis / HO-007 open gap(s) before claiming SEND readiness: "
+                    + (", ".join(reasons[:4]) if reasons else "readiness is not clear")
+                    + "."
+                )
+                if recommendation not in operator_recommendations:
+                    operator_recommendations.append(recommendation)
             signals["operator_recommendations"] = list(operator_recommendations)
             perf_evidence_status = str(anim_summary.get("browser_perf_evidence_status") or "").strip()
             if perf_evidence_status and perf_evidence_status != "trace_bundle_ready":
@@ -799,6 +813,9 @@ def render_health_report_md(rep: HealthReport) -> str:
             "",
             "## Engineering analysis evidence",
             f"- status: {engineering.get('status') or 'MISSING'}",
+            f"- readiness_status: {engineering.get('readiness_status') or 'MISSING'}",
+            f"- open_gap_status: {engineering.get('open_gap_status') or 'MISSING'}",
+            f"- no_release_closure_claim: {engineering.get('no_release_closure_claim')}",
             f"- source_path: {engineering.get('source_path') or '—'}",
             f"- evidence_manifest_hash: {engineering.get('evidence_manifest_hash') or '—'}",
             f"- analysis_status: {engineering.get('analysis_status') or '—'}",
@@ -806,6 +823,13 @@ def render_health_report_md(rep: HealthReport) -> str:
             f"- calibration_status: {engineering.get('calibration_status') or '—'}",
             f"- sensitivity_row_count: {engineering.get('sensitivity_row_count')}",
         ]
+        open_gap_reasons = [
+            str(item).strip()
+            for item in (engineering.get("open_gap_reasons") or [])
+            if str(item).strip()
+        ]
+        if open_gap_reasons:
+            lines.append(f"- open_gap_reasons: {', '.join(open_gap_reasons[:8])}")
         requirements = dict(engineering.get("handoff_requirements") or {})
         if requirements:
             lines += [

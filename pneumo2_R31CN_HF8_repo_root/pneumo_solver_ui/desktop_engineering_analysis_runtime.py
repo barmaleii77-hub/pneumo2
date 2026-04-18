@@ -31,6 +31,7 @@ from pneumo_solver_ui.desktop_engineering_analysis_model import (
     EngineeringAnalysisPipelineRow,
     EngineeringAnalysisSnapshot,
     SelectedRunContractSnapshot,
+    build_analysis_compare_contract,
     build_analysis_to_animator_link_contract,
     build_compare_influence_surface,
     build_sensitivity_summary,
@@ -1501,6 +1502,248 @@ class DesktopEngineeringAnalysisRuntime:
             "selected_run_hash_match": selected_hash_match,
         }
 
+    def analysis_compare_handoff_summary(self, snapshot: EngineeringAnalysisSnapshot) -> dict[str, Any]:
+        compare_contract = build_analysis_compare_contract(
+            snapshot.selected_run_context,
+            None,
+            unit_profile=snapshot.unit_catalog,
+        )
+        ready_state = str(compare_contract.get("analysis_compare_ready_state") or "blocked")
+        blocking_states = [str(item) for item in (compare_contract.get("blocking_states") or ()) if str(item)]
+        warnings = [str(item) for item in (compare_contract.get("warnings") or ()) if str(item)]
+        try:
+            compare_surfaces = self.compare_influence_surfaces(snapshot, top_k=5)
+            compare_surface_error = ""
+        except Exception as exc:
+            compare_surfaces = ()
+            compare_surface_error = f"{type(exc).__name__}: {exc!s}"
+        context = snapshot.selected_run_context
+        if snapshot.contract_status in {"MISSING", "INVALID", "BLOCKED"} or context is None:
+            status = "BLOCKED"
+        elif ready_state == "blocked":
+            status = "BLOCKED"
+        elif ready_state == "warning":
+            status = "PARTIAL"
+        else:
+            status = "READY"
+        return {
+            "schema": "engineering_analysis_compare_handoff_summary.v1",
+            "status": status,
+            "producer_workspace": ANALYSIS_WORKSPACE_ID,
+            "consumer_workspace": "WS-COMPARE",
+            "consumer_surface": "Compare Viewer",
+            "analysis_compare_ready_state": ready_state,
+            "blocking_states": blocking_states,
+            "warnings": warnings,
+            "mismatch_banner": dict(compare_contract.get("mismatch_banner") or {}),
+            "selected_run_contract_hash": snapshot.selected_run_contract_hash,
+            "run_id": context.run_id if context else "",
+            "run_dir": str(snapshot.run_dir or ""),
+            "results_source_kind": str(compare_contract.get("results_source_kind") or "selected_run_contract"),
+            "selected_results_ref": context.results_csv_path if context else "",
+            "selected_artifact_dir": context.artifact_dir if context else "",
+            "objective_contract_hash": context.objective_contract_hash if context else "",
+            "hard_gate_key": context.hard_gate_key if context else "",
+            "active_baseline_hash": context.active_baseline_hash if context else "",
+            "suite_snapshot_hash": context.suite_snapshot_hash if context else "",
+            "compare_surface_count": len(compare_surfaces),
+            "compare_surface_titles": [str(surface.get("title") or "") for surface in compare_surfaces],
+            "compare_surface_error": compare_surface_error,
+            "analysis_compare_contract": compare_contract,
+            "boundary": (
+                "Analysis exposes public compare contract readiness and compare-influence previews; "
+                "Compare Viewer remains the executor for comparison workflows."
+            ),
+            "rules": [
+                "Do not mutate Compare Viewer internals from WS-ANALYSIS.",
+                "Do not treat analysis previews as Compare Viewer execution evidence.",
+            ],
+        }
+
+    def analysis_results_boundary_summary(self, snapshot: EngineeringAnalysisSnapshot) -> dict[str, Any]:
+        context = snapshot.selected_run_context
+        results_path = ""
+        artifact_dir = ""
+        result_exists = False
+        artifact_dir_exists = False
+        if context is not None:
+            results_path = str(context.results_csv_path or "")
+            artifact_dir = str(context.artifact_dir or context.run_dir or "")
+            if results_path:
+                try:
+                    result_exists = Path(results_path).expanduser().exists()
+                except Exception:
+                    result_exists = False
+            if artifact_dir:
+                try:
+                    artifact_dir_exists = Path(artifact_dir).expanduser().exists()
+                except Exception:
+                    artifact_dir_exists = False
+        if snapshot.contract_status in {"MISSING", "INVALID", "BLOCKED"} or context is None:
+            status = "BLOCKED"
+        elif results_path and not result_exists:
+            status = "PARTIAL"
+        elif not results_path and not artifact_dir_exists:
+            status = "PARTIAL"
+        else:
+            status = "READY"
+        return {
+            "schema": "engineering_analysis_results_boundary_summary.v1",
+            "status": status,
+            "producer_surface": "Results Center",
+            "consumer_workspace": ANALYSIS_WORKSPACE_ID,
+            "run_id": context.run_id if context else "",
+            "run_dir": str(snapshot.run_dir or ""),
+            "selected_run_contract_hash": snapshot.selected_run_contract_hash,
+            "objective_contract_hash": context.objective_contract_hash if context else "",
+            "results_csv_path": results_path,
+            "results_ref_exists": result_exists,
+            "artifact_dir": artifact_dir,
+            "artifact_dir_exists": artifact_dir_exists,
+            "contract_status": snapshot.contract_status,
+            "boundary": (
+                "Analysis consumes selected-run and result artifact references; "
+                "Results Center remains the owner of results production and full results workflows."
+            ),
+            "rules": [
+                "Do not mutate optimizer/results producer internals from WS-ANALYSIS.",
+                "Do not treat analysis previews as Results Center acceptance evidence.",
+            ],
+        }
+
+    def _artifact_source_relpath(
+        self,
+        artifact: EngineeringAnalysisArtifact,
+        snapshot: EngineeringAnalysisSnapshot,
+    ) -> str:
+        if snapshot.run_dir is None:
+            return ""
+        try:
+            return str(artifact.path.resolve().relative_to(snapshot.run_dir))
+        except Exception:
+            return ""
+
+    def _csv_artifact_preview(
+        self,
+        artifact: EngineeringAnalysisArtifact,
+        snapshot: EngineeringAnalysisSnapshot,
+        *,
+        max_rows: int,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "key": artifact.key,
+            "title": artifact.title,
+            "category": artifact.category,
+            "source_path": str(artifact.path),
+            "source_relpath": self._artifact_source_relpath(artifact, snapshot),
+            "status": "MISSING",
+            "columns": [],
+            "row_sample": [],
+            "sample_row_count": 0,
+        }
+        if not artifact.path.exists() or not artifact.path.is_file():
+            return payload
+        try:
+            with artifact.path.open("r", encoding="utf-8-sig", errors="replace", newline="") as handle:
+                reader = csv.DictReader(handle)
+                columns = [str(item or "") for item in (reader.fieldnames or [])]
+                rows: list[dict[str, Any]] = []
+                for idx, row in enumerate(reader):
+                    if idx >= max_rows:
+                        break
+                    rows.append({str(key or ""): value for key, value in dict(row).items()})
+            payload.update(
+                {
+                    "status": "READY" if columns else "EMPTY",
+                    "columns": columns,
+                    "row_sample": rows,
+                    "sample_row_count": len(rows),
+                }
+            )
+        except Exception as exc:
+            payload.update(
+                {
+                    "status": "INVALID",
+                    "error": f"{type(exc).__name__}: {exc!s}",
+                }
+            )
+        return payload
+
+    def analysis_workspace_chart_table_preview(
+        self,
+        snapshot: EngineeringAnalysisSnapshot,
+        *,
+        max_rows: int = 5,
+    ) -> dict[str, Any]:
+        max_rows = max(1, int(max_rows or 5))
+        charts: list[dict[str, Any]] = []
+        preview_warnings: list[str] = []
+        try:
+            compare_surfaces = self.compare_influence_surfaces(snapshot, top_k=max_rows)
+        except Exception as exc:
+            compare_surfaces = ()
+            preview_warnings.append(f"compare influence preview failed: {type(exc).__name__}: {exc!s}")
+        for surface in compare_surfaces:
+            axes = dict(surface.get("axes") or {})
+            charts.append(
+                {
+                    "kind": "compare_influence_surface",
+                    "status": "READY",
+                    "title": str(surface.get("title") or "compare_influence"),
+                    "source_path": str(surface.get("source") or ""),
+                    "feature_count": len(axes.get("features") or ()),
+                    "target_count": len(axes.get("targets") or ()),
+                    "axes": axes,
+                    "diagnostics": dict(surface.get("diagnostics") or {}),
+                    "top_cells": list(surface.get("top_cells") or [])[:max_rows],
+                }
+            )
+
+        sensitivity_rows = [row.to_payload() for row in snapshot.sensitivity_rows[:max_rows]]
+        sensitivity_table = {
+            "kind": "sensitivity_table",
+            "status": "READY" if snapshot.sensitivity_rows else "MISSING",
+            "source": "system_influence.json",
+            "row_count": len(snapshot.sensitivity_rows),
+            "columns": [
+                "param",
+                "group",
+                "score",
+                "status",
+                "strongest_metric",
+                "strongest_elasticity",
+                "eps_rel_used",
+            ],
+            "units": {
+                "score": str(snapshot.unit_catalog.get("score") or ""),
+                "strongest_elasticity": "dimensionless",
+                "eps_rel_used": str(snapshot.unit_catalog.get("eps_rel_used") or ""),
+            },
+            "rows": sensitivity_rows,
+        }
+
+        tables = [
+            self._csv_artifact_preview(artifact, snapshot, max_rows=max_rows)
+            for artifact in snapshot.artifacts
+            if artifact.path.suffix.lower() == ".csv"
+        ]
+        status = "READY" if charts or sensitivity_rows or tables else "MISSING"
+        return {
+            "schema": "engineering_analysis_chart_table_preview.v1",
+            "status": status,
+            "max_rows": max_rows,
+            "chart_count": len(charts),
+            "table_count": len(tables),
+            "warnings": preview_warnings,
+            "charts": charts,
+            "sensitivity_table": sensitivity_table,
+            "tables": tables,
+            "boundary": (
+                "These are traceable previews from WS-ANALYSIS artifacts; Compare Viewer and Results Center "
+                "remain authoritative for full comparison and results workflows."
+            ),
+        }
+
     def analysis_workspace_pipeline_status(
         self,
         snapshot: EngineeringAnalysisSnapshot,
@@ -1709,6 +1952,42 @@ class DesktopEngineeringAnalysisRuntime:
                     "artifact_keys": [artifact.key for artifact in uq_artifacts],
                 },
                 source="uncertainty_advisor outputs",
+            )
+        )
+
+        compare_handoff_summary = self.analysis_compare_handoff_summary(snapshot)
+        rows.append(
+            EngineeringAnalysisPipelineRow(
+                key="handoff_compare_viewer_boundary",
+                section="handoffs_evidence",
+                title="Compare Viewer boundary",
+                status=str(compare_handoff_summary.get("status") or "BLOCKED"),
+                detail=(
+                    "Analysis summarizes public compare contract readiness; "
+                    "Compare Viewer remains the compare executor."
+                ),
+                path=snapshot.selected_run_contract_path,
+                metrics=compare_handoff_summary,
+                source="build_analysis_compare_contract",
+            )
+        )
+
+        results_boundary_summary = self.analysis_results_boundary_summary(snapshot)
+        rows.append(
+            EngineeringAnalysisPipelineRow(
+                key="boundary_results_center",
+                section="handoffs_evidence",
+                title="Results Center boundary",
+                status=str(results_boundary_summary.get("status") or "BLOCKED"),
+                detail=(
+                    "Analysis consumes selected-run/result references; "
+                    "Results Center remains the owner of results production."
+                ),
+                path=Path(str(results_boundary_summary.get("results_csv_path") or ""))
+                if str(results_boundary_summary.get("results_csv_path") or "").strip()
+                else snapshot.selected_run_contract_path,
+                metrics=results_boundary_summary,
+                source="selected_run_contract results refs",
             )
         )
 
@@ -2052,6 +2331,9 @@ class DesktopEngineeringAnalysisRuntime:
             )
         pipeline_rows = [row.to_payload() for row in self.analysis_workspace_pipeline_status(snapshot)]
         runtime_data_gaps = [dict(item) for item in self.analysis_workspace_runtime_gaps(snapshot)]
+        chart_table_preview = self.analysis_workspace_chart_table_preview(snapshot)
+        compare_handoff_summary = self.analysis_compare_handoff_summary(snapshot)
+        results_boundary_summary = self.analysis_results_boundary_summary(snapshot)
         payload: dict[str, Any] = {
             "schema": ENGINEERING_ANALYSIS_EVIDENCE_SCHEMA,
             "schema_version": ENGINEERING_ANALYSIS_EVIDENCE_SCHEMA_VERSION,
@@ -2140,6 +2422,9 @@ class DesktopEngineeringAnalysisRuntime:
             "validated_artifacts": validated_artifacts,
             "analysis_workspace_pipeline": pipeline_rows,
             "runtime_data_gaps": runtime_data_gaps,
+            "analysis_chart_table_preview": chart_table_preview,
+            "compare_viewer_handoff_summary": compare_handoff_summary,
+            "results_center_boundary_summary": results_boundary_summary,
             "sensitivity_summary": [
                 row.to_payload()
                 for row in snapshot.sensitivity_rows

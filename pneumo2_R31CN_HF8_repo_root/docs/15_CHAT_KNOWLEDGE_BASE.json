@@ -1,6 +1,6 @@
 {
   "schema": "pneumo.chat_knowledge_base.v1",
-  "updated_at": "2026-04-18T12:07:17+00:00",
+  "updated_at": "2026-04-18T12:29:43+00:00",
   "requirements": [
     {
       "id": "REQ-0001",
@@ -654,6 +654,15 @@
       "details": "Закрепить в Desktop Diagnostics Center общий верхний блок Текущий процесс с progressbar для диагностики и сборки ZIP; русифицировать операторские статусы/сводки/кнопки; обновить контрактные тесты, запрещающие возврат английских UI-строк и скрытого прогресса.",
       "artifact_path": "",
       "status": "done"
+    },
+    {
+      "id": "PLAN-0052",
+      "created_at": "2026-04-18T12:29:43+00:00",
+      "source": "chat:2026-04-18 accept chat worktrees cleanup",
+      "title": "Post-chat worktree cleanup and V38 Plan-mode prompts",
+      "details": "Зафиксировать приемку локальных chat-worktree в codex/work, исключить generated runtime artifacts из канона, убрать временные worktree/ветки после validation и выдать текущий self-contained prompt-pack для 10 параллельных GUI-чатов с обязательной V38 visual/runtime проверкой, PIPELINE_OPTIMIZED.dot flow-check, русским operator-facing текстом и запретом service-jargon leaks.",
+      "artifact_path": "gui_chat_prompts/18_POST_CHAT_WORKTREE_CLEANUP_V38_PLAN_MODE_PROMPTS.md",
+      "status": "актуален"
     }
   ]
 }

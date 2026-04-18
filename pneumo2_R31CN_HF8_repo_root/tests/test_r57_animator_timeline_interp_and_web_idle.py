@@ -349,9 +349,9 @@ def test_bundle_load_surfaces_validation_fallbacks_explicitly() -> None:
     assert 'def service_fallback_messages(self) -> List[str]:' in DATA_BUNDLE
     assert 'fallback_msgs = list(getattr(b, "service_fallback_messages", lambda: [])())' in APP
     assert 'check_report = run_self_checks(b)' in APP
-    assert 'status_msg = (' in APP
-    assert '"VALIDATION WARN: "' in APP
-    assert 'f"fallback={len(fallback_msgs)} "' in APP
+    assert 'status_msg = _format_validation_warning_status(' in APP
+    assert 'fallback_count=len(fallback_msgs)' in APP
+    assert 'self_check_count=len(check_msgs)' in APP
     assert 'code="bundle_validation_fallback"' in APP
     assert 'code="bundle_self_check"' in APP
 

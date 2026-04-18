@@ -4280,11 +4280,11 @@ def _edge_zone_label(edge_name: str, edge_def: dict[str, Any]) -> str:
 def _edge_component_kind(edge_name: str, edge_def: dict[str, Any]) -> str:
     lower_name = str(edge_name).lower()
     if any(token in lower_name for token in ("обратн", "check", "chk", "клапан", "ok_")):
-        return "РћР±СЂР°С‚РЅС‹Р№ РєР»Р°РїР°РЅ"
+        return "Обратный клапан"
     if any(token in lower_name for token in ("регулятор", "regulator", "reg_")):
-        return "Р РµРіСѓР»СЏС‚РѕСЂ"
+        return "Регулятор"
     if any(token in lower_name for token in ("дроссель", "throttle", "drossel", "dr_")):
-        return "Р”СЂРѕСЃСЃРµР»СЊ"
+        return "Дроссель"
     if "обратн" in lower_name:
         return "Обратный клапан"
     if "регулятор" in lower_name:
@@ -4512,9 +4512,9 @@ def _build_edge_activity_snapshots_full(dataset: MnemoDataset | None, idx: int) 
         n1 = str(edge_def.get("n1") or "")
         n2 = str(edge_def.get("n2") or "")
         if q_now >= 0.0:
-            direction_label = f"{_short_node_label(n1)} в†’ {_short_node_label(n2)}"
+            direction_label = f"{_short_node_label(n1)} → {_short_node_label(n2)}"
         else:
-            direction_label = f"{_short_node_label(n2)} в†’ {_short_node_label(n1)}"
+            direction_label = f"{_short_node_label(n2)} → {_short_node_label(n1)}"
         corners = _edge_zone_corners(edge_name, edge_def)
         rows.append(
             EdgeActivitySnapshot(
@@ -4602,23 +4602,23 @@ def _focus_corner_from_selection(
 
 def _component_kind_short_label(kind: str) -> str:
     mapping = {
-        "РћР±СЂР°С‚РЅС‹Р№ РєР»Р°РїР°РЅ": "CHK",
-        "Р РµРіСѓР»СЏС‚РѕСЂ": "REG",
-        "Р”СЂРѕСЃСЃРµР»СЊ": "THR",
-        "РЎР±СЂРѕСЃ": "VENT",
-        "Р”РёР°РіРѕРЅР°Р»СЊ": "XOVR",
-        "РџРёС‚Р°РЅРёРµ": "SUP",
-        "РСЃРїРѕР»РЅРёС‚РµР»СЊРЅР°СЏ РІРµС‚РІСЊ": "ACT",
-        "Р›РёРЅРёСЏ": "LINE",
+        "Обратный клапан": "CHK",
+        "Регулятор": "REG",
+        "Дроссель": "THR",
+        "Сброс": "VENT",
+        "Диагональ": "XOVR",
+        "Питание": "SUP",
+        "Исполнительная ветвь": "ACT",
+        "Линия": "LINE",
     }
     return mapping.get(str(kind), "LINE")
 
 
 def _state_short_label(state_label: str) -> str:
     lowered = str(state_label).lower()
-    if "РѕС‚РєСЂ" in lowered:
+    if any(token in lowered for token in ("откр", "open")):
         return "OPEN"
-    if "Р·Р°РєСЂ" in lowered:
+    if any(token in lowered for token in ("закр", "shut", "closed", "close")):
         return "SHUT"
     return "SIG?"
 
@@ -4684,11 +4684,11 @@ def _build_component_overlay_rows(
 
     selected_name = str(selected_edge or "")
     relevant_kinds = {
-        "РћР±СЂР°С‚РЅС‹Р№ РєР»Р°РїР°РЅ",
-        "Р РµРіСѓР»СЏС‚РѕСЂ",
-        "Р”СЂРѕСЃСЃРµР»СЊ",
-        "РЎР±СЂРѕСЃ",
-        "Р”РёР°РіРѕРЅР°Р»СЊ",
+        "Обратный клапан",
+        "Регулятор",
+        "Дроссель",
+        "Сброс",
+        "Диагональ",
     }
     max_abs_flow = max((abs(float(item.q_now)) for item in all_rows), default=0.0)
     diagonal_floor = max_abs_flow * 0.08 if max_abs_flow > 1.0e-9 else 0.0
@@ -4699,7 +4699,7 @@ def _build_component_overlay_rows(
             continue
         if (
             item.edge_name != selected_name
-            and item.component_kind == "Р”РёР°РіРѕРЅР°Р»СЊ"
+            and item.component_kind == "Диагональ"
             and abs(float(item.q_now)) < diagonal_floor
         ):
             continue
@@ -4830,14 +4830,6 @@ def _component_kind_short_label(kind: str) -> str:
         "Питание": "SUP",
         "Исполнительная ветвь": "ACT",
         "Линия": "LINE",
-        "РћР±СЂР°С‚РЅС‹Р№ РєР»Р°РїР°РЅ": "CHK",
-        "Р РµРіСѓР»СЏС‚РѕСЂ": "REG",
-        "Р”СЂРѕСЃСЃРµР»СЊ": "THR",
-        "РЎР±СЂРѕСЃ": "VENT",
-        "Р”РёР°РіРѕРЅР°Р»СЊ": "XOVR",
-        "РџРёС‚Р°РЅРёРµ": "SUP",
-        "РСЃРїРѕР»РЅРёС‚РµР»СЊРЅР°СЏ РІРµС‚РІСЊ": "ACT",
-        "Р›РёРЅРёСЏ": "LINE",
     }
     return mapping.get(str(kind), "LINE")
 

@@ -3,8 +3,42 @@ from __future__ import annotations
 from pathlib import Path
 
 
+ROOT = Path(__file__).resolve().parents[1]
+DESKTOP_MNEMO_APP = ROOT / "pneumo_solver_ui" / "desktop_mnemo" / "app.py"
+
+
+def test_desktop_mnemo_graphics_labels_are_clean_russian_text() -> None:
+    app_text = DESKTOP_MNEMO_APP.read_text(encoding="utf-8")
+    mojibake_markers = (
+        "РћР±С",
+        "РµРіС",
+        "Р”СЂ",
+        "РЎР±",
+        "РџРё",
+        "Р›Рё",
+        "в†",
+    )
+
+    offenders = [marker for marker in mojibake_markers if marker in app_text]
+    c1_lines = [
+        str(lineno)
+        for lineno, line in enumerate(app_text.splitlines(), start=1)
+        if any(0x80 <= ord(ch) <= 0x9F for ch in line)
+    ]
+
+    assert not offenders, ", ".join(offenders)
+    assert not c1_lines, ", ".join(c1_lines[:10])
+    assert "Обратный клапан" in app_text
+    assert "Регулятор" in app_text
+    assert "Дроссель" in app_text
+    assert "Исполнительная ветвь" in app_text
+    assert "→" in app_text
+    assert '"откр", "open"' in app_text
+    assert '"закр", "shut", "closed", "close"' in app_text
+
+
 def test_desktop_mnemo_is_launchable_from_streamlit_shells() -> None:
-    repo = Path(__file__).resolve().parents[1]
+    repo = ROOT
     home_src = (repo / "pneumo_solver_ui" / "pneumo_ui_app.py").read_text(encoding="utf-8")
     legacy_src = (repo / "pneumo_solver_ui" / "app.py").read_text(encoding="utf-8")
 

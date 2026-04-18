@@ -17,6 +17,7 @@ from pneumo_solver_ui.desktop_animator.cylinder_truth_gate import (
 from pneumo_solver_ui.desktop_animator.cylinder_render_policy import (
     evaluate_cylinder_render_policy,
 )
+from pneumo_solver_ui.desktop_animator.operator_text import format_startup_degraded_status
 from pneumo_solver_ui.desktop_animator.truth_contract import (
     CAPTURE_EXPORT_HANDOFF_ID,
     build_animator_truth_summary,
@@ -296,6 +297,12 @@ def test_desktop_animator_source_has_no_viewer_derived_cylinder_body_length_path
     assert "cyl1_dead_height = float(cyl1_dead_cap)" not in app_src
     assert "cyl2_dead_height = float(cyl2_dead_cap)" not in app_src
     assert "_evaluate_cylinder_render_policy" in app_src
+    assert 'lines.append(f"TRUTH BADGE:' not in app_src
+    assert 'lines.append(f"VALIDATION LIMIT:' not in app_src
+    assert '"DEGRADED: truth absent/partial' not in app_src
+    assert '"No fake geometry:' not in app_src
+    assert 'status_msg = f"Loaded:' not in app_src
+    assert 'self._status(f"Loading:' not in app_src
 
 
 def test_capture_export_manifest_handoff_contains_hashes_refs_and_blocking_truth_warning(tmp_path: Path) -> None:
@@ -322,6 +329,7 @@ def test_capture_export_manifest_handoff_contains_hashes_refs_and_blocking_truth
     assert manifest["capture_hash"]
     assert manifest["analysis_context_hash"] == "analysis_hash_123"
     assert manifest["truth_mode_hash"] == truth["truth_mode_hash"]
+    assert manifest["artifact_refs"]["capture_export_manifest"] == "capture_export_manifest.json"
     assert manifest["analysis_artifact_refs"]["analysis_report_path"] == "analysis/report.json"
     assert manifest["optimizer_artifact_refs"]["optimizer_run_dir"] == "runs/opt/demo"
     assert "truth_warning_required" in manifest["blocking_states"]
@@ -518,11 +526,13 @@ def test_animator_loads_ho008_analysis_context_as_frozen_source(tmp_path: Path) 
     assert meta_refs["selected_npz_path"] == str(npz_path.resolve())
     assert meta_refs["selected_test_id"] == "T01"
     banner = format_analysis_context_banner(snapshot)
-    assert banner.startswith("HO-008: READY")
-    assert "run=run-animation-001" in banner
-    assert "objective=objective-" in banner
-    assert "suite=suite-has" in banner
-    assert "problem=problem-ha" in banner
+    assert banner.startswith("HO-008: Контекст анализа готов")
+    assert "прогон run-animation-001" in banner
+    assert "цель objective-" in banner
+    assert "набор suite-has" in banner
+    assert "задача problem-ha" in banner
+    assert "run=" not in banner
+    assert "context=" not in banner
 
 
 def test_animator_analysis_context_resolves_json_pointer_to_npz(tmp_path: Path) -> None:
@@ -559,4 +569,21 @@ def test_animator_analysis_context_blocks_pointer_hash_mismatch(tmp_path: Path) 
     assert snapshot.ready_for_animator is False
     assert "selected result artifact pointer sha256 mismatch" in snapshot.blocking_states
     assert snapshot.selected_npz_path == npz_path.resolve()
-    assert "HO-008: BLOCKED" in format_analysis_context_banner(snapshot)
+    banner = format_analysis_context_banner(snapshot)
+    assert "HO-008: Контекст анализа заблокирован" in banner
+    assert "хэш выбранного артефакта не совпадает" in banner
+
+
+def test_animator_missing_ho008_context_has_russian_degraded_operator_status(tmp_path: Path) -> None:
+    context_path = tmp_path / "workspace" / "handoffs" / "WS-ANALYSIS" / "analysis_context.json"
+
+    snapshot = load_analysis_context(context_path)
+    banner = format_analysis_context_banner(snapshot)
+    status = format_startup_degraded_status(f"HO-008 {snapshot.status}", detail="; ".join(snapshot.blocking_states))
+
+    assert snapshot.status == "MISSING"
+    assert snapshot.ready_for_animator is False
+    assert "HO-008: Контекст анализа отсутствует" in banner
+    assert "Недоступно:" in status
+    assert "контекст анализа HO-008 отсутствует" in status
+    assert "DEGRADED" not in status

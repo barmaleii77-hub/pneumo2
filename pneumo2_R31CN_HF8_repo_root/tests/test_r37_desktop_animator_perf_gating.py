@@ -116,7 +116,7 @@ def test_desktop_animator_3d_road_preview_uses_speed_magnitude_for_truthful_look
 
 def test_desktop_animator_status_line_uses_aligned_summary_speed_truth() -> None:
     src = APP.read_text(encoding="utf-8")
-    anchor = 'self._status(f"t={t:.3f}s, v={v:.2f}m/s, file={b.npz_path.name}")'
+    anchor = 'self._status(_format_playback_status(t_s=t, speed_mps=v, file_name=b.npz_path.name))'
     assert anchor in src
     status_block = src[src.index('summary = _ensure_telemetry_summary_cache(b)'):src.index(anchor)]
 

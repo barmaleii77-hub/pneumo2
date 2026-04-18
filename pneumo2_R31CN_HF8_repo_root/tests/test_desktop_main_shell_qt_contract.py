@@ -12,11 +12,15 @@ from pneumo_solver_ui.desktop_qt_shell.project_context import (
     ShellProjectContext,
     build_shell_project_context,
 )
-from pneumo_solver_ui.desktop_qt_shell.pipeline_surfaces import V38_PIPELINE_WORKSPACE_IDS
+from pneumo_solver_ui.desktop_qt_shell.pipeline_surfaces import (
+    OPERATOR_FORBIDDEN_LABELS,
+    V38_PIPELINE_WORKSPACE_IDS,
+)
 from pneumo_solver_ui.desktop_qt_shell.runtime_proof import (
     QT_MAIN_SHELL_MANUAL_CHECKLIST_JSON_NAME,
     QT_MAIN_SHELL_MANUAL_RESULTS_TEMPLATE_JSON_NAME,
     QT_MAIN_SHELL_RUNTIME_PROOF_JSON_NAME,
+    build_v38_pipeline_dot_alignment,
     validate_qt_main_shell_manual_results,
     validate_qt_main_shell_runtime_proof,
     write_qt_main_shell_manual_results_template,
@@ -333,6 +337,7 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert "build_shell_project_context()" in src
     assert "def launch_surface_coverage(self) -> dict[str, tuple[str, ...]]:" in src
     assert "def pipeline_surface_coverage(self) -> dict[str, tuple[str, ...]]:" in src
+    assert "def operator_visible_audit(self) -> dict[str, object]:" in src
     assert "def operator_surface_snapshot(self) -> dict[str, object]:" in src
     assert "def prove_v38_pipeline_selection_sync(self) -> dict[str, object]:" in src
     assert '"desktop_engineering_analysis_center"' in src
@@ -398,6 +403,20 @@ def test_desktop_shell_command_search_home_and_project_tree_actions_are_routable
     assert by_label["Открыть HO-010 capture_export_manifest.json"].action_value == (
         "animator.capture_export_manifest"
     )
+
+
+def test_desktop_qt_shell_v38_pipeline_dot_alignment_contract() -> None:
+    alignment = build_v38_pipeline_dot_alignment(ROOT)
+
+    assert alignment["ok"] is True
+    assert alignment["shell_workspace_present"] is True
+    assert set(alignment["expected_workspace_ids"]) == set(V38_PIPELINE_WORKSPACE_IDS)
+    assert set(alignment["dot_workspace_ids"]) >= set(V38_PIPELINE_WORKSPACE_IDS)
+    assert "WS-SHELL" in alignment["dot_workspace_ids"]
+    assert set(alignment["selection_sync_workspace_ids"]) >= set(V38_PIPELINE_WORKSPACE_IDS)
+    assert alignment["missing_workspace_ids_from_dot"] == []
+    assert alignment["missing_selection_sync_edges"] == []
+    assert alignment["unexpected_pipeline_workspace_ids"] == []
 
 
 def test_desktop_qt_shell_opens_animator_ho008_artifacts_from_command_surface(
@@ -564,8 +583,39 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
 
         operator_snapshot = window.operator_surface_snapshot()
         assert operator_snapshot["service_blocker_hits"] == []
+        assert operator_snapshot["forbidden_label_hits"] == []
         assert "Запустить раздел" not in operator_snapshot["toolbar_buttons"]
         assert "Запустить текущий раздел" not in operator_snapshot["toolbar_buttons"]
+        visible_audit = window.operator_visible_audit()
+        assert visible_audit["forbidden_label_hits"] == []
+        assert set(visible_audit["forbidden_labels"]) >= set(OPERATOR_FORBIDDEN_LABELS)
+        assert visible_audit["menu_titles"] == [
+            "Файл",
+            "Правка",
+            "Вид",
+            "Запуск",
+            "Анализ",
+            "Анимация",
+            "Диагностика",
+            "Инструменты",
+            "Справка",
+        ]
+        assert "Запустить GUI" in visible_audit["toolbar_buttons"]
+        assert any(
+            row.startswith("Маршрут проекта | выбор сразу показывает раздел")
+            for row in visible_audit["browser_rows"]
+        )
+        assert "Исходные данные" in visible_audit["workspace_selector_items"]
+        assert visible_audit["inspector"]["values"]["section"] == window.property_title_value.text()
+        assert visible_audit["status_strip"]["message_text"].startswith("Сообщения:")
+        catalog_labels = {
+            entry["label"] for entry in visible_audit["command_search_catalog"]
+        }
+        assert "Показать дерево проекта" in catalog_labels
+        assert any(
+            result["action_value"] == "project_tree"
+            for result in visible_audit["command_search_results"]["дерево проекта"]
+        )
         pipeline_sync = window.prove_v38_pipeline_selection_sync()
         assert pipeline_sync["missing_workspace_ids"] == []
         assert all(row["synced"] is True for row in pipeline_sync["rows"])
@@ -713,7 +763,9 @@ def test_desktop_qt_shell_runtime_proof_writes_shell_only_evidence(
     assert proof["checks"]["command_search_project_tree_route"] is True
     assert proof["checks"]["all_launchable_tools_visible_from_shell"] is True
     assert proof["checks"]["operator_surface_no_service_jargon"] is True
+    assert proof["checks"]["operator_visible_forbidden_labels_absent"] is True
     assert proof["checks"]["v38_pipeline_selection_sync"] is True
+    assert proof["checks"]["v38_pipeline_dot_alignment"] is True
     expected_launch_keys = {
         spec.key for spec in build_desktop_shell_specs() if spec.standalone_module
     }
@@ -739,7 +791,14 @@ def test_desktop_qt_shell_runtime_proof_writes_shell_only_evidence(
         "command_search": [],
     }
     assert proof["operator_surface"]["service_blocker_hits"] == []
+    assert proof["operator_surface"]["forbidden_label_hits"] == []
+    assert proof["operator_visible_audit"]["forbidden_label_hits"] == []
+    assert proof["forbidden_operator_label_hits"] == []
     assert proof["pipeline_selection_sync"]["missing_workspace_ids"] == []
+    assert proof["pipeline_dot_alignment"]["ok"] is True
+    assert proof["pipeline_dot_alignment"]["missing_workspace_ids_from_dot"] == []
+    assert proof["pipeline_dot_alignment"]["missing_selection_sync_edges"] == []
+    assert proof["pipeline_dot_alignment"]["unexpected_pipeline_workspace_ids"] == []
     assert proof["diagnostics_action"]["object_name"] == "AlwaysVisibleDiagnosticsAction"
     assert "snap_half_third_quarter" in proof["manual_verification_required"]
     validation = validate_qt_main_shell_runtime_proof(proof_path)
@@ -987,9 +1046,20 @@ def test_desktop_qt_shell_runtime_proof_validator_rejects_failed_automated_check
                 },
                 "operator_surface": {
                     "service_blocker_hits": [],
+                    "forbidden_label_hits": [],
                 },
+                "operator_visible_audit": {
+                    "forbidden_label_hits": [],
+                },
+                "forbidden_operator_label_hits": [],
                 "pipeline_selection_sync": {
                     "missing_workspace_ids": [],
+                },
+                "pipeline_dot_alignment": {
+                    "ok": True,
+                    "missing_workspace_ids_from_dot": [],
+                    "missing_selection_sync_edges": [],
+                    "unexpected_pipeline_workspace_ids": [],
                 },
                 "checks": {
                     "qmainwindow_runtime": True,
@@ -1002,7 +1072,9 @@ def test_desktop_qt_shell_runtime_proof_validator_rejects_failed_automated_check
                     "command_search_project_tree_route": True,
                     "all_launchable_tools_visible_from_shell": True,
                     "operator_surface_no_service_jargon": True,
+                    "operator_visible_forbidden_labels_absent": True,
                     "v38_pipeline_selection_sync": True,
+                    "v38_pipeline_dot_alignment": True,
                     "layout_save_restore_reset": True,
                     "no_domain_windows_launched": True,
                 },

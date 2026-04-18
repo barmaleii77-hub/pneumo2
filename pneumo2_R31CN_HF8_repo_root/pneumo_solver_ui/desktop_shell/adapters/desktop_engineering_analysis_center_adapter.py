@@ -20,12 +20,7 @@ def create_hosted_engineering_analysis_center(parent: tk.Misc) -> DesktopEnginee
         repo_root=repo_root,
         python_executable=sys.executable,
     )
-    return DesktopEngineeringAnalysisCenter(
-        host=parent,
-        runtime=runtime,
-        repo_root=repo_root,
-        hosted=True,
-    )
+    return DesktopEngineeringAnalysisCenter(parent, runtime=runtime)
 
 
 def build_spec() -> DesktopShellToolSpec:

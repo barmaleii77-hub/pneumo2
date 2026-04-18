@@ -24,6 +24,8 @@ def test_qt_compare_viewer_auto_find_npz_scans_session_workspaces_and_pointers()
     assert "--current-context" in text
     assert "startup_from_session_refs" in text
     assert "paths = _compare_session_npz_paths(session)" in text
+    assert "import streamlit" not in text
+    assert "compare_npz_web" not in text
 
 
 def test_qt_compare_viewer_loads_saved_compare_session_for_autoload(tmp_path: Path) -> None:
@@ -60,3 +62,13 @@ def test_qt_compare_viewer_page_adapters_launch_standalone_compare_viewer() -> N
     assert "run_page(" not in compare_viewer_page
     assert "pneumo_solver_ui.qt_compare_viewer" in compare_viewer_page
     assert "pneumo_solver_ui.qt_compare_viewer" in compare_npz_page
+
+
+def test_results_context_launches_standalone_compare_viewer_with_current_context() -> None:
+    runtime_text = (ROOT / "pneumo_solver_ui" / "desktop_results_runtime.py").read_text(encoding="utf-8")
+
+    assert "def launch_compare_viewer(" in runtime_text
+    assert "self.write_compare_current_context_sidecar(snapshot)" in runtime_text
+    assert '"pneumo_solver_ui.qt_compare_viewer"' in runtime_text
+    assert '"--current-context"' in runtime_text
+    assert "latest_compare_current_context.json" in runtime_text

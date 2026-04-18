@@ -496,6 +496,10 @@ def test_make_send_bundle_embeds_engineering_analysis_evidence_for_validation_an
     assert validation.ok is True, json.dumps(validation.report_json, ensure_ascii=False, indent=2)
     validation_engineering = dict(validation.report_json.get("engineering_analysis_evidence") or {})
     assert validation_engineering["status"] == "READY"
+    assert validation_engineering["readiness_status"] == "READY"
+    assert validation_engineering["open_gap_status"] == "CLEAR"
+    assert validation_engineering["open_gap_reasons"] == []
+    assert validation_engineering["no_release_closure_claim"] is True
     assert validation_engineering["evidence_manifest_hash"] == "engineering-hash-001"
     assert validation_engineering["influence_status"] == "PASS"
     assert validation_engineering["handoff_requirements"]["contract_status"] == "READY"
@@ -505,6 +509,7 @@ def test_make_send_bundle_embeds_engineering_analysis_evidence_for_validation_an
     assert validation_engineering["missing_required_artifact_keys"] == []
     assert "validated_artifacts_status" in validation.report_md
     assert "ready_required_artifact_count" in validation.report_md
+    assert "open_gap_status" in validation.report_md
     assert validation_engineering["selected_run_candidate_count"] == 2
     assert validation_engineering["selected_run_ready_candidate_count"] == 1
     assert validation_engineering["selected_run_missing_inputs_candidate_count"] == 1
@@ -513,6 +518,9 @@ def test_make_send_bundle_embeds_engineering_analysis_evidence_for_validation_an
     inspection_md = render_inspection_md(inspection)
     assert inspection["has_engineering_analysis_evidence"] is True
     inspection_engineering = dict(inspection["engineering_analysis_evidence"])
+    assert inspection_engineering["status"] == "READY"
+    assert inspection_engineering["readiness_status"] == "READY"
+    assert inspection_engineering["open_gap_status"] == "CLEAR"
     assert inspection_engineering["evidence_manifest_hash"] == "engineering-hash-001"
     assert inspection_engineering["selected_run_ready_candidate_count"] == 1
     assert inspection_engineering["validated_artifacts_status"] == "READY"
@@ -523,6 +531,7 @@ def test_make_send_bundle_embeds_engineering_analysis_evidence_for_validation_an
     assert "ready_required_artifact_count" in inspection_md
     assert "handoff_contract_status" in inspection_md
     assert "selected_run_ready_candidate_count" in inspection_md
+    assert "open_gap_status" in inspection_md
 
 
 def test_engineering_analysis_evidence_summary_surfaces_missing_validated_artifacts() -> None:
@@ -549,6 +558,9 @@ def test_engineering_analysis_evidence_summary_surfaces_missing_validated_artifa
     )
 
     assert summary["status"] == "WARN"
+    assert summary["readiness_status"] == "WARN"
+    assert summary["open_gap_status"] == "OPEN"
+    assert summary["no_release_closure_claim"] is True
     assert summary["validated_artifacts_status"] == "MISSING"
     assert summary["required_artifact_count"] == 3
     assert summary["ready_required_artifact_count"] == 1
@@ -557,7 +569,53 @@ def test_engineering_analysis_evidence_summary_surfaces_missing_validated_artifa
         "system_influence_md",
         "system_influence_params_csv",
     ]
+    assert "calibration_status=MISSING" in summary["open_gap_reasons"]
+    assert "validated_artifacts_status=MISSING" in summary["open_gap_reasons"]
+    assert "handoff_contract_status=MISSING" in summary["open_gap_reasons"]
     assert any("missing required artifact" in warning for warning in summary["warnings"])
+    assert any("HO-007 readiness remains open" in warning for warning in summary["warnings"])
+
+
+def test_engineering_analysis_evidence_summary_marks_blocked_substatuses_open() -> None:
+    summary = summarize_engineering_analysis_evidence(
+        {
+            "schema": "desktop_engineering_analysis_evidence_manifest",
+            "evidence_manifest_hash": "engineering-hash-blocked",
+            "validation": {
+                "status": "BLOCKED",
+                "influence_status": "BLOCKED",
+                "calibration_status": "BLOCKED",
+            },
+            "handoff_requirements": {
+                "handoff_id": "HO-007",
+                "contract_status": "MISSING",
+                "required_contract_path": "workspace/handoffs/WS-OPTIMIZATION/selected_run_contract.json",
+                "missing_fields": ["selected_run_contract_hash"],
+            },
+            "selected_run_candidate_readiness": {
+                "schema": "selected_run_candidate_readiness.v1",
+                "candidate_count": 1,
+                "ready_candidate_count": 0,
+                "missing_inputs_candidate_count": 1,
+                "failed_candidate_count": 0,
+                "unique_missing_inputs": ["results_csv_path"],
+            },
+        },
+        source_path=ENGINEERING_ANALYSIS_EVIDENCE_ARCNAME,
+    )
+
+    assert summary["status"] == "WARN"
+    assert summary["readiness_status"] == "WARN"
+    assert summary["open_gap_status"] == "OPEN"
+    assert summary["no_release_closure_claim"] is True
+    assert "analysis_status=BLOCKED" in summary["open_gap_reasons"]
+    assert "influence_status=BLOCKED" in summary["open_gap_reasons"]
+    assert "calibration_status=BLOCKED" in summary["open_gap_reasons"]
+    assert "validated_artifacts_status=MISSING" in summary["open_gap_reasons"]
+    assert "handoff_contract_status=MISSING" in summary["open_gap_reasons"]
+    assert "selected_run_ready_candidate_count=0" in summary["open_gap_reasons"]
+    assert any("HO-007 readiness remains open" in warning for warning in summary["warnings"])
+    assert not any("HO-009" in warning for warning in summary["warnings"])
 
 
 def test_send_bundle_evidence_analysis_handoff_prefers_latest_sidecar(tmp_path: Path) -> None:

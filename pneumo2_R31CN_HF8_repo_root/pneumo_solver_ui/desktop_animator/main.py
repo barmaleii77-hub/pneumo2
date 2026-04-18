@@ -32,22 +32,22 @@ def _default_pointer() -> Path:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="pneumo-desktop-animator")
-    ap.add_argument("--npz", type=str, default="", help="Path to NPZ log file")
-    ap.add_argument("--follow", action="store_true", help="Follow anim_latest.json pointer")
+    ap.add_argument("--npz", type=str, default="", help="Путь к NPZ-файлу анимационной выгрузки")
+    ap.add_argument("--follow", action="store_true", help="Следить за указателем anim_latest.json")
     ap.add_argument(
         "--analysis-context",
         type=str,
         default=os.environ.get("PNEUMO_ANALYSIS_CONTEXT_PATH", ""),
-        help="Frozen HO-008 analysis_context.json path",
+        help="Путь к frozen HO-008 analysis_context.json",
     )
     ap.add_argument(
         "--pointer",
         type=str,
         default="",
-        help="Pointer json path (default: current workspace global pointer, then session/local fallbacks)",
+        help="Путь к JSON-указателю anim_latest",
     )
-    ap.add_argument("--no-gl", action="store_true", help="Disable 3D OpenGL view (compat mode)")
-    ap.add_argument("--theme", type=str, default="dark", choices=["dark", "light"], help="UI theme")
+    ap.add_argument("--no-gl", action="store_true", help="Отключить 3D OpenGL вид")
+    ap.add_argument("--theme", type=str, default="dark", choices=["dark", "light"], help="Тема интерфейса")
 
     args = ap.parse_args(argv)
 
@@ -62,8 +62,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         from .app import run_app
     except Exception as e:
-        print("Failed to import Desktop Animator.")
-        print("Maybe you did not install requirements_desktop_animator.txt")
+        print("Не удалось импортировать Desktop Animator.")
+        print("Проверьте requirements_desktop_animator.txt")
         print(e)
         return 2
 

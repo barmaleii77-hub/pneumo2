@@ -487,14 +487,13 @@ def format_compare_mismatch_banner(summary: Mapping[str, Any] | None) -> str:
     banner_id = str(data.get("banner_id") or "")
     dims = [str(x) for x in (data.get("mismatch_dimensions") or []) if str(x).strip()]
     if banner_id == "BANNER-HIST-002":
-        suffix = ", ".join(dims[:6]) if dims else "contract refs"
+        suffix = ", ".join(_human_compare_dimension(dim) for dim in dims[:6]) if dims else "сохранённые refs сравнения"
         return (
-            "Текущий/исторический контекст отличается: "
-            f"{suffix}. Сравнение выполняется по зафиксированным NPZ refs; "
-            "optimizer history не изменяется."
+            "Текущий и сохранённый контекст отличаются: "
+            f"{suffix}. Сравнение остаётся историческим и использует сохранённые NPZ refs."
         )
     if banner_id == "BANNER-HIST-003":
-        suffix = ", ".join(dims[:6]) if dims else "artifact refs"
+        suffix = ", ".join(_human_compare_dimension(dim) for dim in dims[:6]) if dims else "refs артефактов"
         return (
             "Не хватает артефактов для полного compare contract: "
             f"{suffix}. Тихий fallback на текущий проект запрещен."
@@ -502,6 +501,28 @@ def format_compare_mismatch_banner(summary: Mapping[str, Any] | None) -> str:
     if banner_id == "BANNER-HIST-001":
         return "Открыт исторический compare context; refs совпадают с выбранным контекстом."
     return ""
+
+
+def _human_compare_dimension(value: Any) -> str:
+    raw = str(value or "").strip()
+    labels = {
+        "objective_contract_hash": "хэш цели",
+        "hard_gate_key": "гейт цели",
+        "hard_gate_tolerance": "допуск цели",
+        "active_baseline_hash": "хэш baseline",
+        "suite_snapshot_hash": "снимок набора испытаний",
+        "inputs_snapshot_hash": "снимок исходных данных",
+        "scenario_lineage_hash": "происхождение сценария",
+        "ring_source_hash": "хэш источника кольца",
+        "problem_hash": "хэш задачи",
+        "artifact_missing": "нет артефакта",
+    }
+    return labels.get(raw, raw.replace("_", " ") or "-")
+
+
+def _join_short(values: Sequence[str]) -> str:
+    clean = [str(value).strip() for value in values if str(value).strip()]
+    return ", ".join(clean) if clean else "-"
 
 
 def format_compare_contract_summary(contract: Mapping[str, Any] | None) -> str:
@@ -520,17 +541,32 @@ def format_compare_contract_summary(contract: Mapping[str, Any] | None) -> str:
     source_hashes = sorted({_short(ref.get("ring_source_hash")) for ref in refs if ref.get("ring_source_hash")})
     banner = _as_mapping(payload.get("mismatch_banner"))
     dims = [str(x) for x in (banner.get("mismatch_dimensions") or []) if str(x).strip()]
-    lines = [
-        f"compare_contract_hash={_short(payload.get('compare_contract_hash'), 16)}",
-        f"mode={payload.get('compare_mode') or '-'} runs={len(refs)}",
-        f"selected_run={', '.join(selected_runs[:4]) if selected_runs else '-'}",
-        f"run_refs={', '.join(run_hashes) if run_hashes else '-'}",
-        f"objective={', '.join(objective_hashes) if objective_hashes else '-'}",
-        f"baseline={', '.join(baseline_hashes) if baseline_hashes else '-'}",
-        f"source={', '.join(source_hashes) if source_hashes else '-'}",
-    ]
+    selected_table = str(payload.get("selected_table") or "-").strip() or "-"
+    signals = [str(x) for x in (payload.get("selected_signals") or payload.get("selected_metrics") or []) if str(x).strip()]
+    time_window = list(payload.get("selected_time_window") or [])
+    if len(time_window) >= 2:
+        try:
+            time_text = f"{float(time_window[0]):.3f}..{float(time_window[1]):.3f} s"
+        except Exception:
+            time_text = "-"
+    else:
+        time_text = "-"
+    mode = str(payload.get("compare_mode") or "-").replace("_", " ")
+    warning_text = "-"
     if dims:
-        lines.append(f"mismatch={banner.get('banner_id') or '-'}: {', '.join(dims[:6])}")
+        warning_text = f"контекст отличается: {', '.join(_human_compare_dimension(dim) for dim in dims[:6])}"
+    lines = [
+        f"Хэш контракта сравнения: {_short(payload.get('compare_contract_hash'), 16)}",
+        f"Режим: {mode} | Выбранных расчётов: {len(refs)}",
+        f"Метки выбранных расчётов: {_join_short(selected_runs[:4])}",
+        f"Таблица: {selected_table} | Сигналы: {len(signals)} | Окно времени: {time_text}",
+        f"Контракт расчёта: {_join_short(run_hashes)}",
+        f"Хэш цели: {_join_short(objective_hashes)}",
+        f"Хэш baseline: {_join_short(baseline_hashes)}",
+        f"Хэш источника: {_join_short(source_hashes)}",
+        f"Предупреждение: {warning_text}",
+        "Действия экспорта: сохранить сессию JSON; экспортировать compare_contract.json; экспортировать снимок workspace",
+    ]
     return "\n".join(lines)
 
 

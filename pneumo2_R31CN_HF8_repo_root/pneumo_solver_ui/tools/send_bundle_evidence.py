@@ -564,6 +564,66 @@ def _safe_int(value: Any) -> int:
         return 0
 
 
+def _engineering_open_gap_reasons(
+    *,
+    source: str,
+    validation: Mapping[str, Any],
+    validated: Mapping[str, Any],
+    readiness: Mapping[str, Any],
+    handoff_requirements: Mapping[str, Any],
+    missing_required_keys: Sequence[str],
+) -> list[str]:
+    if not source:
+        return []
+
+    reasons: list[str] = []
+
+    def _status_value(mapping: Mapping[str, Any], key: str) -> str:
+        return str(mapping.get(key) or "").strip().upper()
+
+    def _flag_non_ready(label: str, value: str, ready_values: set[str]) -> None:
+        if value and value not in ready_values:
+            reasons.append(f"{label}={value}")
+
+    _flag_non_ready(
+        "analysis_status",
+        _status_value(validation, "status"),
+        {"READY", "PASS", "OK"},
+    )
+    _flag_non_ready(
+        "influence_status",
+        _status_value(validation, "influence_status"),
+        {"READY", "PASS", "OK"},
+    )
+    _flag_non_ready(
+        "calibration_status",
+        _status_value(validation, "calibration_status"),
+        {"READY", "PASS", "OK"},
+    )
+
+    validated_status = _status_value(validated, "status")
+    if validated:
+        _flag_non_ready("validated_artifacts_status", validated_status, {"READY", "PASS", "OK"})
+    else:
+        reasons.append("validated_artifacts_status=MISSING")
+
+    handoff_status = _status_value(handoff_requirements, "contract_status")
+    if handoff_requirements:
+        _flag_non_ready("handoff_contract_status", handoff_status, {"READY", "PASS", "OK"})
+    else:
+        reasons.append("handoff_contract_status=MISSING")
+
+    if missing_required_keys:
+        reasons.append("missing_required_artifacts=" + ",".join(missing_required_keys))
+
+    candidate_count = _safe_int(readiness.get("candidate_count"))
+    ready_candidate_count = _safe_int(readiness.get("ready_candidate_count"))
+    if candidate_count and not ready_candidate_count:
+        reasons.append("selected_run_ready_candidate_count=0")
+
+    return list(dict.fromkeys(reasons))
+
+
 def _engineering_missing_artifact_records(value: Any) -> list[dict[str, Any]]:
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
         return []
@@ -604,6 +664,7 @@ def summarize_engineering_analysis_evidence(
     validation = _mapping(obj.get("validation"))
     readiness = _mapping(obj.get("selected_run_candidate_readiness"))
     validated = _mapping(obj.get("validated_artifacts"))
+    handoff_requirements = _mapping(obj.get("handoff_requirements"))
     validated_status = str(validated.get("status") or "").strip().upper()
     missing_required_artifacts = _engineering_missing_artifact_records(
         validated.get("missing_required_artifacts")
@@ -622,17 +683,17 @@ def summarize_engineering_analysis_evidence(
     if not source:
         status = "MISSING"
         warnings.append(
-            "Engineering Analysis evidence / HO-009 missing; export evidence manifest from "
+            "Engineering Analysis evidence / HO-007 missing; export evidence manifest from "
             "Engineering Analysis Center before SEND."
         )
     else:
         status = "READY" if evidence_hash else "WARN"
         if not obj:
-            warnings.append("Engineering Analysis evidence / HO-009 manifest is empty or unreadable.")
+            warnings.append("Engineering Analysis evidence / HO-007 manifest is empty or unreadable.")
         if schema and schema != "desktop_engineering_analysis_evidence_manifest":
-            warnings.append(f"Engineering Analysis evidence / HO-009 has unexpected schema: {schema}.")
+            warnings.append(f"Engineering Analysis evidence / HO-007 has unexpected schema: {schema}.")
         if not evidence_hash:
-            warnings.append("Engineering Analysis evidence / HO-009 manifest has no evidence_manifest_hash.")
+            warnings.append("Engineering Analysis evidence / HO-007 manifest has no evidence_manifest_hash.")
         if validated and validated_status and validated_status != "READY":
             warnings.append(
                 "Engineering Analysis validated artifacts require attention: "
@@ -645,11 +706,38 @@ def summarize_engineering_analysis_evidence(
             )
         for item in validation_warnings:
             warnings.append(f"Engineering Analysis validation warning: {item}")
+        open_gap_reasons = _engineering_open_gap_reasons(
+            source=source,
+            validation=validation,
+            validated=validated,
+            readiness=readiness,
+            handoff_requirements=handoff_requirements,
+            missing_required_keys=missing_required_keys,
+        )
+        if open_gap_reasons:
+            warnings.append(
+                "Engineering Analysis evidence / HO-007 readiness remains open: "
+                + "; ".join(open_gap_reasons)
+            )
         if warnings:
             status = "WARN"
+    open_gap_reasons = _engineering_open_gap_reasons(
+        source=source,
+        validation=validation,
+        validated=validated,
+        readiness=readiness,
+        handoff_requirements=handoff_requirements,
+        missing_required_keys=missing_required_keys,
+    )
+    open_gap_status = "MISSING" if not source else ("OPEN" if open_gap_reasons else "CLEAR")
+    readiness_status = "MISSING" if not source else ("WARN" if status == "WARN" or open_gap_reasons else "READY")
 
     return {
         "status": status,
+        "readiness_status": readiness_status,
+        "open_gap_status": open_gap_status,
+        "open_gap_reasons": list(open_gap_reasons),
+        "no_release_closure_claim": True,
         "source_path": source,
         "schema": schema,
         "evidence_manifest_hash": evidence_hash,
@@ -667,7 +755,7 @@ def summarize_engineering_analysis_evidence(
         "hash_ready_artifact_count": _safe_int(validated.get("hash_ready_artifact_count")),
         "missing_required_artifacts": missing_required_artifacts,
         "missing_required_artifact_keys": list(dict.fromkeys(missing_required_keys)),
-        "handoff_requirements": dict(obj.get("handoff_requirements") or {}),
+        "handoff_requirements": dict(handoff_requirements),
         "selected_run_candidate_readiness": readiness,
         "selected_run_candidate_count": _safe_int(readiness.get("candidate_count")),
         "selected_run_ready_candidate_count": _safe_int(readiness.get("ready_candidate_count")),

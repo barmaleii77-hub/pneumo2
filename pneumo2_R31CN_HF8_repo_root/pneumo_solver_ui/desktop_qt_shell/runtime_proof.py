@@ -3,11 +3,14 @@ from __future__ import annotations
 import json
 import os
 import platform
+import re
 import sys
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
+
+from pneumo_solver_ui.desktop_qt_shell.pipeline_surfaces import V38_PIPELINE_WORKSPACE_IDS
 
 
 QT_MAIN_SHELL_RUNTIME_PROOF_JSON_NAME = "qt_main_shell_runtime_proof.json"
@@ -15,6 +18,18 @@ QT_MAIN_SHELL_RUNTIME_PROOF_MD_NAME = "qt_main_shell_runtime_proof.md"
 QT_MAIN_SHELL_MANUAL_CHECKLIST_JSON_NAME = "qt_main_shell_manual_checklist.json"
 QT_MAIN_SHELL_MANUAL_CHECKLIST_MD_NAME = "qt_main_shell_manual_checklist.md"
 QT_MAIN_SHELL_MANUAL_RESULTS_TEMPLATE_JSON_NAME = "qt_main_shell_manual_results_template.json"
+
+V38_PIPELINE_DOT_RELATIVE_PATH = Path(
+    "docs/context/gui_spec_imports/v38_github_kb_commit_ready/PIPELINE_OPTIMIZED.dot"
+)
+_DOT_NODE_RE = re.compile(
+    r'^\s*([A-Za-z_][A-Za-z0-9_]*)\s+\[label="(WS-[A-Z-]+)\\n',
+    re.MULTILINE,
+)
+_DOT_SELECTION_SYNC_EDGE_RE = re.compile(
+    r'^\s*SHELL\s*->\s*([A-Za-z_][A-Za-z0-9_]*)\s+\[label="tree/search/selection sync"\]',
+    re.MULTILINE,
+)
 
 _MANUAL_CHECK_DEFINITIONS: tuple[dict[str, object], ...] = (
     {
@@ -52,6 +67,76 @@ _MANUAL_CHECK_DEFINITIONS: tuple[dict[str, object], ...] = (
 
 def _utc_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def build_v38_pipeline_dot_alignment(repo_root: Path | str | None = None) -> dict[str, object]:
+    module_repo_root = Path(__file__).resolve().parents[2]
+    root = Path(repo_root) if repo_root is not None else module_repo_root
+    dot_path = root / V38_PIPELINE_DOT_RELATIVE_PATH
+    fallback_dot_path = module_repo_root / V38_PIPELINE_DOT_RELATIVE_PATH
+    fallback_used = False
+    if repo_root is not None and not dot_path.exists() and fallback_dot_path.exists():
+        dot_path = fallback_dot_path
+        fallback_used = True
+    expected_workspace_ids = list(V38_PIPELINE_WORKSPACE_IDS)
+    try:
+        dot_text = dot_path.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        return {
+            "dot_path": str(dot_path.resolve(strict=False)),
+            "requested_repo_root": str(root.resolve(strict=False)),
+            "fallback_to_module_repo_root": fallback_used,
+            "readable": False,
+            "error": str(exc),
+            "expected_workspace_ids": expected_workspace_ids,
+            "dot_workspace_ids": [],
+            "selection_sync_workspace_ids": [],
+            "missing_workspace_ids_from_dot": expected_workspace_ids,
+            "unexpected_pipeline_workspace_ids": [],
+            "missing_selection_sync_edges": expected_workspace_ids,
+            "shell_workspace_present": False,
+            "ok": False,
+        }
+
+    node_to_workspace_id = {
+        node: workspace_id for node, workspace_id in _DOT_NODE_RE.findall(dot_text)
+    }
+    dot_workspace_ids = set(node_to_workspace_id.values())
+    sync_nodes = set(_DOT_SELECTION_SYNC_EDGE_RE.findall(dot_text))
+    selection_sync_workspace_ids = {
+        node_to_workspace_id[node]
+        for node in sync_nodes
+        if node in node_to_workspace_id
+    }
+    expected = set(V38_PIPELINE_WORKSPACE_IDS)
+    missing_workspace_ids = sorted(expected - dot_workspace_ids)
+    unexpected_pipeline_workspace_ids = sorted(
+        workspace_id
+        for workspace_id in dot_workspace_ids - expected
+        if workspace_id != "WS-SHELL"
+    )
+    missing_selection_sync_edges = sorted(expected - selection_sync_workspace_ids)
+    shell_workspace_present = "WS-SHELL" in dot_workspace_ids
+    ok = (
+        shell_workspace_present
+        and not missing_workspace_ids
+        and not unexpected_pipeline_workspace_ids
+        and not missing_selection_sync_edges
+    )
+    return {
+        "dot_path": str(dot_path.resolve(strict=False)),
+        "requested_repo_root": str(root.resolve(strict=False)),
+        "fallback_to_module_repo_root": fallback_used,
+        "readable": True,
+        "expected_workspace_ids": expected_workspace_ids,
+        "dot_workspace_ids": sorted(dot_workspace_ids),
+        "selection_sync_workspace_ids": sorted(selection_sync_workspace_ids),
+        "missing_workspace_ids_from_dot": missing_workspace_ids,
+        "unexpected_pipeline_workspace_ids": unexpected_pipeline_workspace_ids,
+        "missing_selection_sync_edges": missing_selection_sync_edges,
+        "shell_workspace_present": shell_workspace_present,
+        "ok": ok,
+    }
 
 
 @contextmanager
@@ -306,7 +391,9 @@ def validate_qt_main_shell_runtime_proof(
         "command_search_project_tree_route",
         "all_launchable_tools_visible_from_shell",
         "operator_surface_no_service_jargon",
+        "operator_visible_forbidden_labels_absent",
         "v38_pipeline_selection_sync",
+        "v38_pipeline_dot_alignment",
         "layout_save_restore_reset",
         "no_domain_windows_launched",
     }
@@ -357,6 +444,29 @@ def validate_qt_main_shell_runtime_proof(
     if service_hits:
         errors.append("runtime proof operator surface exposes service jargon: " + "; ".join(service_hits))
 
+    operator_visible_audit = proof.get("operator_visible_audit")
+    if not isinstance(operator_visible_audit, dict):
+        errors.append("runtime proof operator_visible_audit must be an object")
+        operator_visible_audit = {}
+    forbidden_hits = [
+        str(item)
+        for item in (
+            proof.get("forbidden_operator_label_hits")
+            if "forbidden_operator_label_hits" in proof
+            else operator_visible_audit.get("forbidden_label_hits")
+        )
+        or []
+    ]
+    audit_forbidden_hits = [
+        str(item) for item in operator_visible_audit.get("forbidden_label_hits") or []
+    ]
+    all_forbidden_hits = sorted(set(forbidden_hits + audit_forbidden_hits))
+    if all_forbidden_hits:
+        errors.append(
+            "runtime proof operator surface exposes forbidden label(s): "
+            + "; ".join(all_forbidden_hits)
+        )
+
     pipeline_coverage = proof.get("pipeline_surface_coverage")
     if not isinstance(pipeline_coverage, dict):
         errors.append("runtime proof pipeline_surface_coverage must be an object")
@@ -380,6 +490,31 @@ def validate_qt_main_shell_runtime_proof(
     missing_sync = [str(item) for item in pipeline_sync.get("missing_workspace_ids") or []]
     if missing_sync:
         errors.append("runtime proof V38 pipeline selection sync missing: " + ", ".join(missing_sync))
+
+    pipeline_dot_alignment = proof.get("pipeline_dot_alignment")
+    if not isinstance(pipeline_dot_alignment, dict):
+        errors.append("runtime proof pipeline_dot_alignment must be an object")
+        pipeline_dot_alignment = {}
+    if pipeline_dot_alignment.get("ok") is not True:
+        missing_dot = [
+            str(item) for item in pipeline_dot_alignment.get("missing_workspace_ids_from_dot") or []
+        ]
+        missing_edges = [
+            str(item) for item in pipeline_dot_alignment.get("missing_selection_sync_edges") or []
+        ]
+        unexpected = [
+            str(item) for item in pipeline_dot_alignment.get("unexpected_pipeline_workspace_ids") or []
+        ]
+        detail = "; ".join(
+            part
+            for part in (
+                "missing DOT workspace ids: " + ", ".join(missing_dot) if missing_dot else "",
+                "missing selection sync edges: " + ", ".join(missing_edges) if missing_edges else "",
+                "unexpected DOT workspace ids: " + ", ".join(unexpected) if unexpected else "",
+            )
+            if part
+        )
+        errors.append(f"runtime proof V38 pipeline DOT alignment failed: {detail or 'ok=false'}")
 
     manual_required = {str(item) for item in proof.get("manual_verification_required") or []}
     required_manual = set(_manual_check_ids())
@@ -577,7 +712,11 @@ def collect_qt_main_shell_runtime_proof(*, offscreen: bool = False, state_path: 
                 for surface in ("browser", "toolbar", "command_search")
             }
             operator_surface = window.operator_surface_snapshot()
+            operator_visible_audit = window.operator_visible_audit()
             pipeline_selection_sync = window.prove_v38_pipeline_selection_sync()
+            pipeline_dot_alignment = build_v38_pipeline_dot_alignment(
+                window.project_context.repo_root
+            )
             proof: dict[str, object] = {
                 "schema": "qt_main_shell_runtime_proof.v1",
                 "generated_utc": _utc_iso(),
@@ -640,7 +779,12 @@ def collect_qt_main_shell_runtime_proof(*, offscreen: bool = False, state_path: 
                 "pipeline_surface_coverage": pipeline_surface_coverage,
                 "pipeline_surface_coverage_missing": pipeline_surface_coverage_missing,
                 "operator_surface": operator_surface,
+                "operator_visible_audit": operator_visible_audit,
+                "forbidden_operator_label_hits": list(
+                    dict(operator_visible_audit).get("forbidden_label_hits") or []
+                ),
                 "pipeline_selection_sync": pipeline_selection_sync,
+                "pipeline_dot_alignment": pipeline_dot_alignment,
                 "layout": {
                     "settings_path": str(settings_path.resolve(strict=False)),
                     "saved": bool(layout_saved),
@@ -690,10 +834,16 @@ def collect_qt_main_shell_runtime_proof(*, offscreen: bool = False, state_path: 
                 "operator_surface_no_service_jargon": not bool(
                     dict(operator_surface).get("service_blocker_hits") or []
                 ),
+                "operator_visible_forbidden_labels_absent": not bool(
+                    dict(operator_visible_audit).get("forbidden_label_hits") or []
+                ),
                 "v38_pipeline_selection_sync": all(
                     not missing for missing in pipeline_surface_coverage_missing.values()
                 )
                 and not bool(dict(pipeline_selection_sync).get("missing_workspace_ids") or []),
+                "v38_pipeline_dot_alignment": bool(
+                    dict(pipeline_dot_alignment).get("ok") is True
+                ),
                 "layout_save_restore_reset": bool(layout_saved and layout_reset),
                 "no_domain_windows_launched": True,
             }

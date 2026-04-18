@@ -13,6 +13,7 @@ from pneumo_solver_ui.desktop_qt_shell.project_context import (
     build_shell_project_context,
 )
 from pneumo_solver_ui.desktop_qt_shell.pipeline_surfaces import (
+    OPERATOR_FORBIDDEN_LABELS,
     V38_PIPELINE_SURFACES,
     V38_PIPELINE_WORKSPACE_IDS,
     WORKSPACE_ARTIFACT_LABELS,
@@ -20,6 +21,7 @@ from pneumo_solver_ui.desktop_qt_shell.pipeline_surfaces import (
     artifact_state_label,
     build_pipeline_surface_by_key,
     default_surface_key_for_tool,
+    forbidden_operator_label_hits,
     operator_readiness_label,
     service_jargon_hits,
     workspace_source_label,
@@ -1001,31 +1003,129 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             visit(self.browser_tree.topLevelItem(index))
         return rows
 
-    def operator_surface_snapshot(self) -> dict[str, object]:
-        texts: list[str] = []
-        for widget in self.findChildren(QtWidgets.QLabel):
-            text = str(widget.text()).strip()
-            if text:
-                texts.append(text)
-        for widget in self.findChildren(QtWidgets.QPushButton):
-            text = str(widget.text()).strip()
-            if text:
-                texts.append(text)
-        for widget in self.findChildren(QtWidgets.QGroupBox):
-            text = str(widget.title()).strip()
-            if text:
-                texts.append(text)
-        texts.extend(self._browser_tree_texts())
-        hits = service_jargon_hits(texts)
-        return {
-            "visible_text_count": len(texts),
-            "service_blocker_hits": hits,
-            "toolbar_buttons": [
-                button.text()
-                for button in self.findChildren(QtWidgets.QPushButton)
-                if button.text().strip()
+    def operator_visible_audit(self) -> dict[str, object]:
+        command_catalog = [
+            {
+                "label": entry.label,
+                "location": entry.location,
+                "summary": entry.summary,
+                "action_kind": entry.action_kind,
+                "action_value": entry.action_value,
+            }
+            for entry in self.command_entries
+        ]
+        command_results = {
+            query: [
+                {
+                    "label": entry.label,
+                    "location": entry.location,
+                    "action_kind": entry.action_kind,
+                    "action_value": entry.action_value,
+                }
+                for entry in rank_shell_command_search_entries(query, self.command_entries)[:8]
+            ]
+            for query in (
+                "дерево проекта",
+                "исходные данные",
+                "диагностика",
+                "Engineering Analysis",
+            )
+        }
+        toolbar_buttons = [
+            button.text().strip()
+            for button in self.findChildren(QtWidgets.QPushButton)
+            if button.text().strip()
+        ]
+        inspector = {
+            "labels": [
+                "Раздел:",
+                "Поверхность:",
+                "Роль:",
+                "Источник данных:",
+                "Состояние:",
+                "Связанный GUI:",
             ],
-            "browser_rows": self._browser_tree_texts(),
+            "values": {
+                "section": self.property_title_value.text(),
+                "surface": self.property_runtime_value.text(),
+                "role": self.property_role_value.text(),
+                "source": self.property_source_value.text(),
+                "state": self.property_operator_state_value.text(),
+                "gui": self.property_module_value.text(),
+            },
+            "help_text": self.help_text.toPlainText(),
+            "warnings": [
+                self.warning_list.item(index).text()
+                for index in range(self.warning_list.count())
+            ],
+        }
+        status_strip = {
+            "status_text": self.status_label.text(),
+            "message_text": self.message_strip_label.text(),
+            "progress_format": self.status_progress_bar.format(),
+            "progress_value": int(self.status_progress_bar.value()),
+            "mode_text": self.mode_status_label.text(),
+            "bundle_text": self.bundle_status_label.text(),
+        }
+        workspace_selector_items = [
+            self.workspace_combo.itemText(index)
+            for index in range(self.workspace_combo.count())
+        ]
+        gui_module_selector_items = [
+            self.launch_tool_combo.itemText(index)
+            for index in range(self.launch_tool_combo.count())
+        ]
+        browser_rows = self._browser_tree_texts()
+        menu_titles = [action.text() for action in self.menuBar().actions()]
+        primary_visible_texts: list[str] = [
+            *menu_titles,
+            *toolbar_buttons,
+            *workspace_selector_items,
+            *gui_module_selector_items,
+            *browser_rows,
+            *inspector["labels"],
+            *dict(inspector["values"]).values(),
+            str(inspector["help_text"]),
+            *list(inspector["warnings"]),
+            *dict(status_strip).values(),
+        ]
+        command_visible_texts: list[str] = []
+        for entry in command_catalog:
+            command_visible_texts.extend(str(value) for value in entry.values())
+        for rows in command_results.values():
+            for row in rows:
+                command_visible_texts.extend(str(value) for value in row.values())
+        all_texts = [
+            str(text)
+            for text in (*primary_visible_texts, *command_visible_texts)
+            if str(text).strip()
+        ]
+        return {
+            "menu_titles": menu_titles,
+            "toolbar_buttons": toolbar_buttons,
+            "workspace_selector_items": workspace_selector_items,
+            "gui_module_selector_items": gui_module_selector_items,
+            "browser_rows": browser_rows,
+            "command_search_catalog": command_catalog,
+            "command_search_results": command_results,
+            "inspector": inspector,
+            "status_strip": status_strip,
+            "visible_text_count": len(all_texts),
+            "forbidden_labels": list(OPERATOR_FORBIDDEN_LABELS),
+            "forbidden_label_hits": forbidden_operator_label_hits(all_texts),
+            "service_blocker_hits": service_jargon_hits(
+                [str(text) for text in primary_visible_texts if str(text).strip()]
+            ),
+        }
+
+    def operator_surface_snapshot(self) -> dict[str, object]:
+        audit = self.operator_visible_audit()
+        return {
+            "visible_text_count": audit["visible_text_count"],
+            "service_blocker_hits": audit["service_blocker_hits"],
+            "forbidden_label_hits": audit["forbidden_label_hits"],
+            "toolbar_buttons": audit["toolbar_buttons"],
+            "browser_rows": audit["browser_rows"],
         }
 
     def prove_v38_pipeline_selection_sync(self) -> dict[str, object]:

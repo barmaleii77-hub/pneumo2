@@ -184,36 +184,51 @@ def _dedupe_text_items(items: list[str] | tuple[str, ...]) -> tuple[str, ...]:
     return tuple(out)
 
 
+_OPERATOR_RECOMMENDATION_TRANSLATIONS_RU: dict[str, str] = {
+    "Open Desktop Animator first and inspect Mnemo red flags before send.": (
+        "Сначала откройте Desktop Animator и проверьте красные флаги мнемосхемы перед отправкой."
+    ),
+    "Open Desktop Animator first": "Сначала откройте Desktop Animator.",
+    "Then inspect Compare Viewer": "Затем проверьте Compare Viewer.",
+    "Open Compare Viewer next": "Откройте Compare Viewer следующим шагом.",
+}
+
+
+def _operator_recommendation_ru(value: object) -> str:
+    text = str(value or "").strip()
+    return _OPERATOR_RECOMMENDATION_TRANSLATIONS_RU.get(text, text)
+
+
 _CONTEXT_FIELD_TITLES: dict[str, str] = {
-    "run_id": "Run ID",
-    "run_contract_hash": "Run contract hash",
-    "selected_run_hash": "Selected run hash",
-    "analysis_context_hash": "Analysis context hash",
-    "analysis_context_status": "Analysis context status",
-    "animator_link_contract_hash": "Animator link contract hash",
-    "selected_run_contract_hash": "Selected run contract hash",
-    "selected_run_contract_path": "Selected run contract path",
-    "run_dir": "Optimizer run directory",
-    "results_csv_path": "Optimizer results CSV",
-    "selected_test_id": "Selected test ID",
-    "selected_npz_path": "Selected animation NPZ",
-    "compare_contract_hash": "Compare contract hash",
-    "evidence_manifest_hash": "Diagnostics evidence hash",
-    "objective_contract_hash": "Objective contract hash",
-    "hard_gate_key": "Hard gate key",
-    "hard_gate_tolerance": "Hard gate tolerance",
-    "active_baseline_hash": "Active baseline hash",
-    "suite_snapshot_hash": "Suite snapshot hash",
-    "scenario_lineage_hash": "Scenario lineage hash",
-    "problem_hash": "Problem hash",
-    "problem_hash_mode": "Problem hash mode",
-    "objective_keys": "Objective keys",
-    "penalty_key": "Penalty key",
-    "penalty_tol": "Penalty tolerance",
-    "capture_export_manifest_handoff_id": "Capture manifest handoff",
-    "capture_hash": "Capture hash",
-    "truth_mode_hash": "Animator truth mode hash",
-    "visual_cache_token": "Anim visual cache token",
+    "run_id": "ID прогона",
+    "run_contract_hash": "Хэш контракта прогона",
+    "selected_run_hash": "Хэш выбранного прогона",
+    "analysis_context_hash": "Хэш контекста анализа",
+    "analysis_context_status": "Статус контекста анализа",
+    "animator_link_contract_hash": "Хэш связи с аниматором",
+    "selected_run_contract_hash": "Хэш контракта выбранного прогона",
+    "selected_run_contract_path": "Путь контракта выбранного прогона",
+    "run_dir": "Каталог прогона оптимизатора",
+    "results_csv_path": "CSV результатов оптимизатора",
+    "selected_test_id": "ID выбранного испытания",
+    "selected_npz_path": "NPZ выбранной анимации",
+    "compare_contract_hash": "Хэш контракта сравнения",
+    "evidence_manifest_hash": "Хэш evidence диагностики",
+    "objective_contract_hash": "Хэш objective-контракта",
+    "hard_gate_key": "Ключ жесткого ограничения",
+    "hard_gate_tolerance": "Допуск жесткого ограничения",
+    "active_baseline_hash": "Хэш активной базы",
+    "suite_snapshot_hash": "Хэш снимка набора испытаний",
+    "scenario_lineage_hash": "Хэш происхождения сценария",
+    "problem_hash": "Хэш задачи",
+    "problem_hash_mode": "Режим хэша задачи",
+    "objective_keys": "Ключи objective",
+    "penalty_key": "Ключ штрафа",
+    "penalty_tol": "Допуск штрафа",
+    "capture_export_manifest_handoff_id": "Идентификатор handoff захвата",
+    "capture_hash": "Хэш захвата",
+    "truth_mode_hash": "Хэш truth-режима аниматора",
+    "visual_cache_token": "Токен визуального кэша аниматора",
 }
 
 _CONTEXT_FIELD_KEYS: tuple[str, ...] = tuple(_CONTEXT_FIELD_TITLES)
@@ -622,7 +637,7 @@ def _suggested_next_step(
     gate_reason = str(optimizer_scope_gate_reason or "").strip()
 
     if validation_status == "FAIL":
-        detail = validation_errors[0] if validation_errors else gate_reason or "Validation reported blocking errors."
+        detail = validation_errors[0] if validation_errors else gate_reason or "Проверка вернула блокирующие ошибки."
         return (
             "Сначала разберите отчёт проверки, потом переходите дальше.",
             detail,
@@ -635,12 +650,12 @@ def _suggested_next_step(
             triage_recommendations[0]
             if triage_recommendations
             else (
-                "Open Desktop Animator follow and inspect the latest critical event flow."
+                "Откройте аниматор в режиме сопровождения и проверьте последний критический участок."
                 if latest_pointer_json_path is not None
-                else "Open Compare Viewer on the latest NPZ and inspect the critical result."
+                else "Откройте Compare Viewer по последнему NPZ и проверьте критический результат."
             )
         )
-        detail = triage_red_flags[0] if triage_red_flags else "Triage report marked critical findings."
+        detail = triage_red_flags[0] if triage_red_flags else "Отчет triage отметил критические находки."
         if latest_pointer_json_path is not None:
             return action, detail, "open_animator_follow", "latest_pointer"
         if latest_npz_path is not None:
@@ -656,7 +671,7 @@ def _suggested_next_step(
         )
 
     if validation_status == "WARN":
-        detail = validation_warnings[0] if validation_warnings else "Validation emitted warnings that need operator review."
+        detail = validation_warnings[0] if validation_warnings else "Проверка вернула предупреждения для просмотра оператором."
         return (
             "Сначала проверьте предупреждения, затем переходите к сравнению или визуализации.",
             detail,
@@ -668,15 +683,15 @@ def _suggested_next_step(
         action = (
             triage_recommendations[0]
             if triage_recommendations
-            else "Review triage warnings before closing validation."
+            else "Проверьте предупреждения triage перед закрытием проверки."
         )
-        detail = triage_red_flags[0] if triage_red_flags else "Triage report contains warnings/red flags."
+        detail = triage_red_flags[0] if triage_red_flags else "Отчет triage содержит предупреждения или красные флаги."
         return action, detail, "open_artifact", "triage_json"
 
     if triage_recommendations:
         return (
             triage_recommendations[0],
-            "Latest triage report suggests this as the next operator check.",
+            "Последний отчет triage предлагает это как следующую операторскую проверку.",
             "open_artifact",
             "triage_json",
         )
@@ -762,12 +777,12 @@ class DesktopResultsRuntime:
             str(line) for line in format_anim_dashboard_brief_lines(anim_dashboard)
         )
         anim_operator_recommendations = tuple(
-            str(line)
+            _operator_recommendation_ru(line)
             for line in build_anim_operator_recommendations(anim_dashboard)
             if str(line).strip()
         )
         triage_operator_recommendations = tuple(
-            str(line)
+            _operator_recommendation_ru(line)
             for line in (triage_payload.get("operator_recommendations") or [])
             if str(line).strip()
         )
@@ -976,13 +991,13 @@ class DesktopResultsRuntime:
                     triage_operator_recommendations[0]
                     if triage_operator_recommendations
                     else (
-                        "Inspect red flags"
+                        "Проверить красные флаги"
                         if triage_red_flags
-                        else "Open triage report"
+                        else "Открыть отчет triage"
                     )
                 )
                 if triage_json_path is not None or triage_md_path is not None
-                else "Generate triage report",
+                else "Сформировать отчет triage",
                 evidence_path=triage_json_path or triage_md_path,
                 action_key="open_artifact" if triage_json_path is not None or triage_md_path is not None else "open_diagnostics_gui",
                 artifact_key="triage_json" if triage_json_path is not None else "triage_md",
@@ -991,7 +1006,7 @@ class DesktopResultsRuntime:
                 key="optimizer_scope_gate",
                 title="Шлюз области оптимизации",
                 status=str(optimizer_scope_gate.get("release_gate") or "n/a"),
-                detail=str(optimizer_scope_gate.get("release_gate_reason") or "No optimizer scope gate in latest validation."),
+                detail=str(optimizer_scope_gate.get("release_gate_reason") or "В последней проверке нет шлюза области оптимизации."),
                 next_action="Проверить предупреждения" if validation_json_path is not None else "",
                 evidence_path=validation_json_path,
                 action_key="open_artifact",

@@ -94,10 +94,11 @@ def test_compare_contract_summary_surfaces_selected_run_and_source_hash() -> Non
 
     text = format_compare_contract_summary(contract)
 
-    assert "selected_run=selected-a, selected-b" in text
-    assert "source=ring-src-a, ring-src-b" in text
-    assert "objective=obj-a" in text
-    assert "baseline=base-a" in text
+    assert "Метки выбранных расчётов: selected-a, selected-b" in text
+    assert "Хэш источника: ring-src-a, ring-src-b" in text
+    assert "Хэш цели: obj-a" in text
+    assert "Хэш baseline: base-a" in text
+    assert "Действия экспорта: сохранить сессию JSON; экспортировать compare_contract.json" in text
 
 
 def test_compare_contract_sidecar_round_trips_without_rehashing_export_evidence(tmp_path: Path) -> None:
@@ -147,8 +148,8 @@ def test_current_vs_historical_mismatch_uses_historical_banner_policy() -> None:
     assert summary["severity"] == "warning"
     assert set(summary["mismatch_dimensions"]) >= {"objective_contract_hash", "hard_gate_key"}
     banner_text = format_compare_mismatch_banner(summary)
-    assert "optimizer history" in banner_text
-    assert "objective_contract_hash" in banner_text
+    assert "сохранённый контекст" in banner_text
+    assert "хэш цели" in banner_text
 
 
 def test_extract_compare_run_ref_keeps_baseline_objective_and_run_refs(tmp_path: Path) -> None:
@@ -233,13 +234,28 @@ def test_qt_compare_viewer_surfaces_compare_contract_and_mismatch_banner(monkeyp
         assert viewer.dock_compare_contract.isVisible()
         assert "Compare contract" in [action.text() for action in viewer.menu_view_docks.actions()]
         assert viewer.compare_contract_hash
-        assert "compare_contract_hash=" in viewer.txt_compare_contract.toPlainText()
-        assert "selected_run=left, right" in viewer.txt_compare_contract.toPlainText()
-        assert "source=ring-left, ring-right" in viewer.txt_compare_contract.toPlainText()
-        assert "objective_contract_hash" in viewer.txt_compare_contract.toPlainText()
+        summary_text = viewer.txt_compare_contract.toPlainText()
+        assert "Хэш контракта сравнения:" in summary_text
+        assert "Метки выбранных расчётов: left, right" in summary_text
+        assert "Контракт расчёта: run-left, run-right" in summary_text
+        assert "Хэш источника: ring-left, ring-right" in summary_text
+        assert "Хэш цели: obj-a, obj-b" in summary_text
+        assert "Хэш baseline: base-a" in summary_text
+        assert "Предупреждение: контекст отличается: хэш цели" in summary_text
+        assert "Действия экспорта: сохранить сессию JSON; экспортировать compare_contract.json" in summary_text
         assert viewer.lbl_compare_mismatch.isVisible()
-        assert "optimizer history" in viewer.lbl_compare_mismatch.text()
+        assert "сохранённый контекст" in viewer.lbl_compare_mismatch.text()
         assert "Compare " in viewer.lbl_status_quality.text()
+        visible_status = "\n".join(
+            [
+                viewer.lbl_status_selection.text(),
+                viewer.lbl_status_quality.text(),
+                viewer.lbl_status_layout.text(),
+                viewer.lbl_compare_current_context_source.text(),
+            ]
+        )
+        for raw_token in ("current_context_ref", "selected_run_contract", "--current-context"):
+            assert raw_token not in visible_status
 
         viewer._current_time_window = lambda: (0.0, 0.1)
         exports = viewer._export_workspace_snapshot_set(tmp_path / "snapshots")
@@ -299,8 +315,10 @@ def test_qt_compare_viewer_contract_dock_surfaces_current_context_sidecar(
             viewer.btn_open_compare_current_context_sidecar.objectName()
             == "btnOpenCompareCurrentContextSidecar"
         )
+        assert "Текущий контекст: sidecar готов" in viewer.lbl_compare_current_context_source.text()
         assert "latest_compare_current_context.json" in viewer.lbl_compare_current_context_source.text()
         assert "refs=" in viewer.lbl_compare_current_context_source.text()
+        assert "current_context_ref" not in viewer.lbl_compare_current_context_source.text()
         assert viewer.btn_open_compare_current_context_sidecar.isEnabled()
         assert viewer._compare_current_context_path == str(sidecar.resolve())
 
@@ -352,8 +370,9 @@ def test_qt_compare_viewer_contract_dock_marks_missing_current_context_sidecar(
         viewer.show()
         app.processEvents()
 
-        assert "sidecar missing" in viewer.lbl_compare_current_context_source.text()
+        assert "Текущий контекст: sidecar не найден" in viewer.lbl_compare_current_context_source.text()
         assert "latest_compare_current_context.json" in viewer.lbl_compare_current_context_source.text()
+        assert "current_context_ref" not in viewer.lbl_compare_current_context_source.text()
         assert not viewer.btn_open_compare_current_context_sidecar.isEnabled()
 
         payload = viewer._current_compare_contract_payload()
@@ -393,7 +412,8 @@ def test_qt_compare_viewer_contract_dock_keeps_session_only_current_context_refs
         viewer.show()
         app.processEvents()
 
-        assert "session refs=" in viewer.lbl_compare_current_context_source.text()
+        assert "Текущий контекст: только refs из сессии" in viewer.lbl_compare_current_context_source.text()
+        assert "current_context_ref" not in viewer.lbl_compare_current_context_source.text()
         assert not viewer.btn_open_compare_current_context_sidecar.isEnabled()
 
         payload = viewer._current_compare_contract_payload()

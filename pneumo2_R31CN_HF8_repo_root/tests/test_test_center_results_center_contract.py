@@ -272,10 +272,14 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert snapshot.latest_autotest_run_dir == autotest_run.resolve()
     assert snapshot.latest_diagnostics_run_dir == diagnostics_run.resolve()
     assert snapshot.anim_summary_lines == ("token=tok-123",)
-    assert snapshot.operator_recommendations[0] == "Open Desktop Animator first and inspect Mnemo red flags before send."
+    assert snapshot.operator_recommendations[0] == (
+        "Сначала откройте Desktop Animator и проверьте красные флаги мнемосхемы перед отправкой."
+    )
     assert snapshot.mnemo_current_mode == "Регуляторный коридор"
     assert snapshot.mnemo_recent_titles == ("Большой перепад давлений",)
-    assert snapshot.suggested_next_step == "Open Desktop Animator first and inspect Mnemo red flags before send."
+    assert snapshot.suggested_next_step == (
+        "Сначала откройте Desktop Animator и проверьте красные флаги мнемосхемы перед отправкой."
+    )
     assert snapshot.suggested_next_detail == "Desktop Mnemo recent: Большой перепад давлений"
     assert snapshot.suggested_next_action_key == "open_animator_follow"
     assert snapshot.suggested_next_artifact_key == "latest_pointer"
@@ -856,8 +860,8 @@ def test_desktop_results_runtime_exports_diagnostics_evidence_manifest_input(tmp
     assert payload["result_context"]["selected"]["capture_export_manifest_handoff_id"] == "HO-010"
     assert payload["result_context"]["selected"]["capture_hash"] == "capture-777"
     assert payload["result_context"]["selected"]["truth_mode_hash"] == "truth-777"
-    assert fields["analysis_context_status"].title == "Analysis context status"
-    assert fields["animator_link_contract_hash"].title == "Animator link contract hash"
+    assert fields["analysis_context_status"].title == "Статус контекста анализа"
+    assert fields["animator_link_contract_hash"].title == "Хэш связи с аниматором"
     assert fields["selected_npz_path"].selected_value == str(latest_npz)
     assert payload["result_context"]["state"] == "CURRENT"
     assert payload["mismatch_summary"]["state"] == "CURRENT"
@@ -1019,11 +1023,11 @@ def test_desktop_results_runtime_launch_compare_viewer_writes_current_context_si
         result_context_state="STALE",
         result_context_banner="Текущая постановка отличается от выбранного результата.",
         result_context_detail="objective_contract_hash",
-        result_context_action="Open Compare Viewer",
+        result_context_action="Открыть Compare Viewer",
         result_context_fields=(
             DesktopResultsContextField(
                 key="run_id",
-                title="Run ID",
+                title="ID прогона",
                 current_value="run-current",
                 selected_value="run-history",
                 status="STALE",
@@ -1031,7 +1035,7 @@ def test_desktop_results_runtime_launch_compare_viewer_writes_current_context_si
             ),
             DesktopResultsContextField(
                 key="objective_contract_hash",
-                title="Objective contract hash",
+                title="Хэш objective-контракта",
                 current_value="obj-current",
                 selected_value="obj-history",
                 status="STALE",
@@ -1132,7 +1136,7 @@ def test_desktop_results_runtime_previews_selected_result_artifacts(tmp_path: Pa
             {
                 "severity_counts": {"critical": 0, "warn": 1, "info": 0},
                 "red_flags": ["Pointer drift"],
-                "operator_recommendations": ["Open Compare Viewer next"],
+                "operator_recommendations": ["Открыть Compare Viewer следующим шагом"],
             },
             ensure_ascii=False,
             indent=2,
@@ -1148,7 +1152,7 @@ def test_desktop_results_runtime_previews_selected_result_artifacts(tmp_path: Pa
 
     assert "severity_counts={'critical': 0, 'warn': 1, 'info': 0}" in triage_preview
     assert "red_flag: Pointer drift" in triage_preview
-    assert "next: Open Compare Viewer next" in triage_preview
+    assert "next: Открыть Compare Viewer следующим шагом" in triage_preview
 
 
 def test_test_center_gui_embeds_validation_results_center_modules() -> None:
