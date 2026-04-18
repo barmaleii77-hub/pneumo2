@@ -6,6 +6,10 @@ the next wave of parallel Plan-mode chats.
 This is a coordination and hygiene artifact. It does not claim runtime closure
 and does not approve unreviewed dirty code.
 
+Update: branch/worktree state in this file has been superseded by
+`BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md`. Keep this file as the historical
+audit that explains the dirty tree that was later quarantined.
+
 ## Repository State
 
 Command snapshot:

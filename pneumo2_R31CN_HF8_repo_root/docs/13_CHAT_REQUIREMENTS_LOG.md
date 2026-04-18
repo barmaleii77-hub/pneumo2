@@ -125,6 +125,12 @@ The mixed V32/V33 dirty tree is treated as draft work across lanes; each changed
 Источник: chat + release-readiness triage.
 ID: `REQ-0019`.
 
+20. Clean branch starts for parallel GUI chats
+Новые параллельные GUI-чаты должны начинать работу только от clean origin/codex/work, не создавать ветки и не менять файлы до принятого Plan-mode плана; quarantine branch можно использовать только read-only для разбора сохраненных смешанных GUI-правок.
+Статус: active.
+Источник: chat: branch/tree recovery 2026-04-18.
+ID: `REQ-0020`.
+
 ## Как ссылаться из будущих задач
 
 Если новая задача опирается на решение из чата, но не отражена в старом каноне, сначала проверить этот файл, а затем соответствующие plan-файлы из [docs/14_CHAT_PLANS_LOG.md](./14_CHAT_PLANS_LOG.md).

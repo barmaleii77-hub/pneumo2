@@ -316,6 +316,13 @@ ID: `PLAN-0042`.
 Источник: chat: code audit and prompts 2026-04-18.
 ID: `PLAN-0043`.
 
+44. Branch tree recovery and 10 clean Plan-mode prompts
+Назначение: Зафиксировать recovery-аудит после карантина mixed GUI dirty tree, обновить PROJECT_SOURCES и GUI prompt index, а для тех же 10 параллельных чатов выдать самодостаточные стартовые промты с clean codex/work, read-only quarantine и strict owned/forbidden file boundaries.
+Артефакт: [gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
+Статус: active.
+Источник: chat: branch/tree recovery 2026-04-18.
+ID: `PLAN-0044`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

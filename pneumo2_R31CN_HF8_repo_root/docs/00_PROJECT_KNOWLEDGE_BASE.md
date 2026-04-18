@@ -86,8 +86,10 @@ Operational note:
 27. [docs/gui_chat_prompts/14_PLAN_MODE_PARALLEL_START_PROMPTS.md](./gui_chat_prompts/14_PLAN_MODE_PARALLEL_START_PROMPTS.md)
 28. [docs/context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md](./context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md)
 29. [docs/gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md)
-30. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
-31. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
+30. [docs/context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md](./context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md)
+31. [docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
+32. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
+33. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
 
 ### 3. Активные требования и рабочий backlog
 
@@ -249,6 +251,8 @@ Operational note:
 - [docs/gui_chat_prompts/14_PLAN_MODE_PARALLEL_START_PROMPTS.md](./gui_chat_prompts/14_PLAN_MODE_PARALLEL_START_PROMPTS.md)
 - [docs/context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md](./context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md)
 - [docs/gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md)
+- [docs/context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md](./context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md)
+- [docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
 
 Что задаёт общий canon:
 
@@ -359,11 +363,18 @@ Operational note:
 - Plan-mode parallel start prompts фиксируют готовые самодостаточные промты
   для новых чатов: первый запуск только в Plan mode, без правок до
   подтверждения, с owned/forbidden files и focused test expectations.
-- Code tree audit фиксирует текущие dirty-файлы по lane, prepared worktrees,
-  code hotspots и unsafe ignored-artifact cleanup boundary.
+- Code tree audit исторически фиксирует dirty-файлы по lane, prepared
+  worktrees, code hotspots и unsafe ignored-artifact cleanup boundary до
+  recovery-pass.
 - Code-audit Plan-mode prompts обновляют стартовые промты для тех же 10
-  параллельных чатов с учётом текущего dirty tree; для новых стартов
-  предпочитать `15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md`.
+  параллельных чатов с учётом dirty tree; после recovery-pass считать этот
+  файл historical comparison layer.
+- Branch/tree recovery audit фиксирует, что primary `codex/work` снова чистый,
+  локальные duplicate worktrees/branches удалены, а смешанный GUI-код сохранён
+  только в quarantine branch для read-only разбора по lane.
+- Recovery Plan-mode prompts становятся текущим starter pack для тех же 10
+  параллельных чатов: старт только от clean `origin/codex/work`, никаких веток
+  и правок до принятого плана, quarantine только read-only.
 
 Связанные, но вспомогательные UX-источники:
 

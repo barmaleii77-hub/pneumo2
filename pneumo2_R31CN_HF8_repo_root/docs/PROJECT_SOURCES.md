@@ -57,8 +57,10 @@
 - `docs/context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md` — controlled real-Windows visible startup proof for Qt main shell and Desktop Mnemo; automated startup `PASS`, manual visual/Snap/DPI/second-monitor acceptance remains pending.
 - `docs/context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md` — branch cleanup record after consolidating temporary Codex branches into `codex/work`, plus the next safe parallel-work plan.
 - `docs/gui_chat_prompts/14_PLAN_MODE_PARALLEL_START_PROMPTS.md` — copy-paste starter prompts for parallel chats whose first launch is in Plan mode, with owned/forbidden file boundaries and no-edit-before-plan rules.
-- `docs/context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md` — code-tree audit after branch cleanup: dirty files by lane, prepared worktrees, ignored-artifact cleanup boundary and code hotspots.
-- `docs/gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md` — updated self-contained starter prompts for the same 10 Plan-mode chats, now including current dirty-tree and code-audit risks.
+- `docs/context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md` — historical code-tree audit: dirty files by lane, prepared worktrees, ignored-artifact cleanup boundary and code hotspots before recovery quarantine.
+- `docs/gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md` — historical self-contained starter prompts for the same 10 Plan-mode chats before branch/tree recovery.
+- `docs/context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md` — recovery audit after quarantining the mixed GUI dirty tree and removing duplicate local worktrees/branches; current clean-start policy for new chats.
+- `docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md` — current self-contained Plan-mode starter prompts for the same 10 chats after branch/tree recovery.
 - `docs/context/gui_spec_imports/v3/README.md` — active detailed reference layer из `pneumo_gui_codex_package_v3.zip`.
 - `docs/context/gui_spec_imports/v3/pneumo_gui_codex_spec_v3_refined.json` — главный machine-readable GUI-spec.
 - `docs/context/gui_spec_imports/v3/current_macro.dot` — текущий macro workflow graph.
@@ -152,5 +154,6 @@
 - Внешние ссылки не заменяют локальный канон.
 - Для GUI-first задач сначала читать `17`, затем `18`, затем `gui_spec_imports/foundations/*`, затем `gui_spec_imports/v37_github_kb_supplement/*` для KB/TZ/spec reconciliation, затем `gui_spec_imports/v33_connector_reconciled/README.md` и `COMPLETENESS_ASSESSMENT.md`, затем `gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md`, `gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md`, затем `gui_spec_imports/v3/*`, parity docs и только потом lane-level prompts.
 - Для release-readiness merge сначала сверять `docs/context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md`, `docs/context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md`, `docs/context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md`, `docs/context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md` и `docs/context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md`, затем принимать V32-16 docs/helper patch и только после этого разбирать lane-пакеты с их evidence.
+- Для новых parallel-chat starts после recovery-pass сначала сверять `docs/context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md` и использовать `docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md`; quarantine branch допустима только для read-only inspection.
 - Imported JSON/DOT/CSV используются как reference artifacts, а не как единственный источник правды.
 - При конфликте между imported sources и текущим каноном приоритет у `17/18`.

@@ -1,6 +1,6 @@
 {
   "schema": "pneumo.chat_knowledge_base.v1",
-  "updated_at": "2026-04-18T06:29:42+00:00",
+  "updated_at": "2026-04-18T07:16:22+00:00",
   "requirements": [
     {
       "id": "REQ-0001",
@@ -153,6 +153,14 @@
       "title": "Dirty release-readiness worktree must be partitioned by V32 lane before staging.",
       "details": "The mixed V32/V33 dirty tree is treated as draft work across lanes; each changed or untracked file needs owner lane, gate/gap link, required evidence and targeted tests before release integration.",
       "status": "активно"
+    },
+    {
+      "id": "REQ-0020",
+      "created_at": "2026-04-18T07:16:13+00:00",
+      "source": "chat: branch/tree recovery 2026-04-18",
+      "title": "Clean branch starts for parallel GUI chats",
+      "details": "Новые параллельные GUI-чаты должны начинать работу только от clean origin/codex/work, не создавать ветки и не менять файлы до принятого Plan-mode плана; quarantine branch можно использовать только read-only для разбора сохраненных смешанных GUI-правок.",
+      "status": "active"
     }
   ],
   "plans": [
@@ -541,6 +549,15 @@
       "title": "Code tree audit and v2 Plan-mode prompts",
       "details": "Audit the current code tree after branch cleanup, record dirty files by lane and create updated self-contained Plan-mode starter prompts for the same 10 parallel chats with current dirty-tree risks and ownership boundaries.",
       "artifact_path": "gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md",
+      "status": "active"
+    },
+    {
+      "id": "PLAN-0044",
+      "created_at": "2026-04-18T07:16:22+00:00",
+      "source": "chat: branch/tree recovery 2026-04-18",
+      "title": "Branch tree recovery and 10 clean Plan-mode prompts",
+      "details": "Зафиксировать recovery-аудит после карантина mixed GUI dirty tree, обновить PROJECT_SOURCES и GUI prompt index, а для тех же 10 параллельных чатов выдать самодостаточные стартовые промты с clean codex/work, read-only quarantine и strict owned/forbidden file boundaries.",
+      "artifact_path": "gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md",
       "status": "active"
     }
   ]

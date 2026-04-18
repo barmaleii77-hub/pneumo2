@@ -55,25 +55,31 @@
 15. [15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md](./15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md)
    — updated self-contained Plan-mode starter prompts for the same 10 chats,
    with current code audit and dirty-tree risks. Prefer this file for new
-   chat starts.
-16. [gui_spec_imports/v37_github_kb_supplement/README.md](../context/gui_spec_imports/v37_github_kb_supplement/README.md),
+   chat starts only for historical comparison.
+16. [BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md](../context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md)
+   — recovery audit after quarantining the mixed GUI dirty tree and removing
+   duplicate local worktrees/branches.
+17. [16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
+   — current self-contained Plan-mode starter prompts for the same 10 chats.
+   Prefer this file for all new chat starts.
+18. [gui_spec_imports/v37_github_kb_supplement/README.md](../context/gui_spec_imports/v37_github_kb_supplement/README.md),
    [TECHNICAL_SPECIFICATION.md](../context/gui_spec_imports/v37_github_kb_supplement/TECHNICAL_SPECIFICATION.md)
    и [GUI_SPEC.yaml](../context/gui_spec_imports/v37_github_kb_supplement/GUI_SPEC.yaml)
    — successor GitHub KB/TZ/spec supplement. Он уточняет requirements,
    workspace contracts, parameter catalogs, acceptance и open gaps, но не
    является runtime-closure proof.
-17. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
+19. [gui_spec_imports/v3/README.md](../context/gui_spec_imports/v3/README.md)
    и related `v3/*`
    — checked-in detailed machine-readable reference layer.
-18. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
+20. [gui_spec_imports/v13_ring_editor_migration/README.md](../context/gui_spec_imports/v13_ring_editor_migration/README.md)
    и related `v13_ring_editor_migration/*`
    — специализированный addendum для `WS-RING` и handoff `WS-RING -> WS-SUITE`.
-19. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
+21. [gui_spec_imports/v12_design_recovery/README.md](../context/gui_spec_imports/v12_design_recovery/README.md)
    — historical design-recovery layer, который возвращает проект из implementation-веток в design-first.
-20. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
+22. [GUI_SPEC_ARCHIVE_LINEAGE.md](../context/GUI_SPEC_ARCHIVE_LINEAGE.md)
    и [gui_spec_archive_lineage.json](../context/gui_spec_archive_lineage.json)
    — lineage `v1…v13 + v37`, чтобы понимать роль каждого архива и successor supplement.
-21. `docs/gui_chat_prompts/*`
+23. `docs/gui_chat_prompts/*`
    — implementation prompts, которые должны наследовать канон, а не заменять его.
 
 ## Что считается reference layer
@@ -125,8 +131,15 @@
   worktrees, ignored artifact cleanup risk и code hotspots. Он не одобряет
   dirty code, а задаёт карту ownership для безопасного продолжения.
 - `15_CODE_AUDIT_PLAN_MODE_START_PROMPTS` задаёт обновлённые самодостаточные
-  стартовые промты для тех же 10 чатов; для новых стартов предпочитать его,
-  потому что он учитывает текущие dirty files и prepared worktree state.
+  стартовые промты для тех же 10 чатов; после recovery-pass использовать его
+  только как historical comparison layer.
+- `BRANCH_TREE_RECOVERY_AUDIT_2026-04-18` фиксирует текущий clean primary
+  worktree, quarantine branch, удаление локальных duplicate worktrees/branches
+  и новую политику старта параллельных чатов.
+- `16_RECOVERY_PLAN_MODE_START_PROMPTS` задаёт текущие самодостаточные
+  стартовые промты для тех же 10 чатов: старт только с clean
+  `origin/codex/work`, quarantine только read-only и без веток до принятого
+  Plan-mode плана.
 - `v37_github_kb_supplement` задаёт successor KB/TZ/spec connector layer:
   consolidated technical specification, GUI_SPEC.yaml, workspace contract
   matrix, parameter catalogs, acceptance/requirements matrices, repo canon
@@ -159,6 +172,7 @@
 - [13_RELEASE_GATES_KB_ACCEPTANCE.md](./13_RELEASE_GATES_KB_ACCEPTANCE.md)
 - [14_PLAN_MODE_PARALLEL_START_PROMPTS.md](./14_PLAN_MODE_PARALLEL_START_PROMPTS.md)
 - [15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md](./15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md)
+- [16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
 
 ## Правило использования
 
@@ -173,8 +187,11 @@
 - если lane касается текущего mixed dirty tree, дополнительно сверять
   `context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md` и
   `context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md`, а также
-  `context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md`; не
-  смешивать V32-16 docs/helper patch с runtime/domain lane-пакетами;
+  `context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md` и
+  `context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md`; не
+  смешивать V32-16 docs/helper patch с runtime/domain lane-пакетами; после
+  recovery-pass новые чаты должны брать стартовый prompt из
+  `16_RECOVERY_PLAN_MODE_START_PROMPTS.md`;
 - если нужно понять исходный жёсткий intent ещё до `v1`, дополнительно читать
   `foundations/*`;
 - если lane затрагивает requirements, параметры, workspace coverage,
