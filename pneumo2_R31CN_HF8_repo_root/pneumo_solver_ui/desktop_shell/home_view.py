@@ -20,10 +20,13 @@ WORKFLOW_KEYS: tuple[str, ...] = PRIMARY_WORKFLOW_KEYS
 
 WORKFLOW_HINTS: dict[str, str] = {
     "desktop_input_editor": "Подготовьте исходные данные, геометрию, пневматику и параметры расчета.",
-    "test_center": "Проверьте конфигурацию и соберите основной маршрут проверок из одного места.",
-    "autotest_gui": "Запускайте autotest напрямую, когда нужен отдельный контур прогона без лишних экранов.",
-    "full_diagnostics_gui": "Соберите подробную диагностику перед разбором проблем или передачей bundle.",
-    "send_results_gui": "Сформируйте итоговый архив и подготовьте результаты к отправке без возврата в WEB.",
+    "desktop_ring_editor": "Соберите сценарии кольца и проверьте, что дорога готова к расчётному набору.",
+    "test_center": "Проверьте конфигурацию и соберите основной порядок проверок из одного места.",
+    "desktop_optimizer_center": "Настройте цель, ограничения и режим оптимизации перед длительным прогоном.",
+    "desktop_results_center": "Проверьте результаты, замечания и переходы к сравнению, анализу и визуализации.",
+    "autotest_gui": "Запускайте автотест напрямую, когда нужен отдельный контур прогона без лишних экранов.",
+    "full_diagnostics_gui": "Соберите подробную диагностику перед разбором проблем или отправкой архива.",
+    "send_results_gui": "Сформируйте итоговый архив и подготовьте результаты к отправке в отдельном окне.",
 }
 
 
@@ -69,7 +72,7 @@ class ShellHomeViewController:
             self.continue_workflow_button.configure(state="normal")
         else:
             self.workflow_summary_var.set(
-                "Основной маршрут пока недоступен в текущей сборке shell."
+                "Основной порядок работы пока недоступен в текущей сборке."
             )
             self.continue_workflow_button.configure(state="disabled")
 
@@ -78,12 +81,12 @@ class ShellHomeViewController:
                 "Открыто в рабочей области" if key in open_keys else "Готов к переходу"
             )
         for key, button in self.workflow_buttons.items():
-            button.configure(text="Перейти к окну" if key in open_keys else "Перейти к разделу")
+            button.configure(text="Показать окно" if key in open_keys else "Открыть окно")
 
         if not sessions:
             self.session_summary_var.set(
-                "Пока нет открытых встроенных окон. Начните с маршрута слева "
-                "или откройте модуль через меню и toolbar."
+                "Пока нет открытых встроенных окон. Начните с порядка работы слева "
+                "или откройте модуль через меню или панель инструментов."
             )
             self.session_picker_var.set("")
             self.session_picker.configure(values=(), state="disabled")
@@ -160,16 +163,16 @@ def build_shell_home_view(
 ) -> ShellHomeViewController:
     ttk.Label(
         parent,
-        text="Pneumo Desktop Shell",
+        text="Pneumo: рабочее место инженера",
         font=("Segoe UI", 16, "bold"),
     ).pack(anchor="w")
 
     ttk.Label(
         parent,
         text=(
-            "Классическое главное окно для модульных desktop-инструментов проекта. "
-            "Tk-окна можно постепенно встраивать внутрь shell, а специализированные Qt/PySide6 "
-            "окна пока запускаются отдельно, без дублирования их логики."
+            "Классическое главное окно для рабочих окон проекта. "
+            "Часть окон открывается внутри приложения, а специализированные окна запускаются отдельно, "
+            "без дублирования их логики."
         ),
         wraplength=1100,
         justify="left",
@@ -250,7 +253,7 @@ def build_shell_home_view(
     cards.columnconfigure(0, weight=1)
     cards.columnconfigure(1, weight=1)
 
-    _build_group_box(cards, 0, "Справочники и служебные центры", tool_specs, open_tool)
+    _build_group_box(cards, 0, "Справочники, анализ и диагностика", tool_specs, open_tool)
     _build_group_box(cards, 1, "Анализ и визуализация", external_specs, open_tool)
     controller.refresh()
     return controller
@@ -263,7 +266,7 @@ def _build_workflow_box(
     open_tool: Callable[[str], None],
     continue_workflow: Callable[[], None],
 ) -> tuple[tk.StringVar, ttk.Button, dict[str, tk.StringVar], dict[str, ttk.Button]]:
-    box = ttk.LabelFrame(parent, text="Основной маршрут", padding=12)
+    box = ttk.LabelFrame(parent, text="Основной порядок работы", padding=12)
     box.grid(row=0, column=column, sticky="nsew", padx=(0, 6), pady=0)
 
     workflow_summary_var = tk.StringVar()
@@ -275,7 +278,7 @@ def _build_workflow_box(
     ).pack(anchor="w", pady=(0, 10))
     continue_workflow_button = ttk.Button(
         box,
-        text="Продолжить маршрут",
+        text="Продолжить работу",
         command=continue_workflow,
     )
     continue_workflow_button.pack(anchor="w", pady=(0, 12))
@@ -300,7 +303,7 @@ def _build_workflow_box(
         ).pack(anchor="w", pady=(0, 6))
         button = ttk.Button(
             card,
-            text="Перейти к разделу",
+            text="Открыть окно",
             command=lambda key=spec.key: open_tool(key),
         )
         button.pack(anchor="w")
@@ -395,7 +398,7 @@ def _build_group_box(
     if not specs:
         ttk.Label(
             box,
-            text="Пока нет отдельных разделов в этой группе.",
+            text="Пока нет отдельных окон в этой группе.",
             wraplength=460,
             justify="left",
         ).pack(anchor="w")

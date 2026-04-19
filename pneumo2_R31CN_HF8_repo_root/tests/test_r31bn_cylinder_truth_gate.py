@@ -114,7 +114,8 @@ def test_animator_source_uses_truth_gate_to_disable_packaging_meshes_until_contr
     assert "from .cylinder_truth_gate import" in src
     assert "self._cylinder_truth_gates = _evaluate_all_cylinder_truth_gates" in src
     assert "self._animator_truth_summary = _build_animator_truth_summary" in src
-    assert "TRUTH BADGE:" in src
+    assert "graphics_truth_badge_warning" in src
+    assert "TRUTH BADGE:" not in src
     assert "truth_gate = self._cylinder_truth_gate(cyl_index)" in src
     assert 'if bool(truth_gate.get("enabled")):' in src
     assert "_axis_only_honesty_mode" in src

@@ -29,9 +29,154 @@ def _clear_layout(layout: QtWidgets.QLayout) -> None:
         widget = item.widget()
         child_layout = item.layout()
         if widget is not None:
+            widget.hide()
+            widget.setParent(None)
             widget.deleteLater()
         elif child_layout is not None:
             _clear_layout(child_layout)
+
+
+def _baseline_field_label(field: str) -> str:
+    labels = {
+        "active_baseline_hash": "Опорный прогон",
+        "suite_snapshot_hash": "Снимок набора",
+        "inputs_snapshot_hash": "Исходные данные",
+        "ring_source_hash": "Сценарий кольца",
+        "policy_mode": "Режим",
+    }
+    return labels.get(str(field or "").strip(), str(field or "").strip())
+
+
+def _baseline_field_list(fields: Iterable[str]) -> str:
+    return ", ".join(_baseline_field_label(field) for field in fields if str(field or "").strip())
+
+
+def _baseline_action_label(action: str) -> str:
+    labels = {
+        "review": "Просмотреть",
+        "adopt": "Принять",
+        "restore": "Восстановить",
+    }
+    return labels.get(str(action or "").strip(), "Просмотреть")
+
+
+def _baseline_state_label(state: str) -> str:
+    labels = {
+        "active": "уже активен",
+        "applied": "применено",
+        "blocked": "заблокировано",
+        "cancelled": "отменено",
+        "current": "актуален",
+        "historical_mismatch": "другой контекст",
+        "historical_same_context": "тот же контекст",
+        "invalid": "требует проверки",
+        "missing": "не найден",
+        "review_only": "просмотр выполнен",
+        "stale": "устарел",
+        "unknown": "нет данных",
+    }
+    text = str(state or "").strip()
+    return labels.get(text, "нет данных" if not text else "требуется проверка")
+
+
+def _baseline_policy_label(policy_mode: str) -> str:
+    labels = {
+        "restore_only": "только восстановление",
+        "review_adopt": "просмотр и принятие",
+    }
+    text = str(policy_mode or "").strip()
+    return labels.get(text, "не задан" if not text else "особый режим")
+
+
+def _baseline_reason_label(reason: str) -> str:
+    labels = {
+        "active_baseline_hash_mismatch": "не совпала контрольная сумма",
+        "inputs_snapshot_hash_changed": "изменились исходные данные",
+        "missing_active_baseline_contract": "активный опорный прогон не найден",
+        "ring_source_hash_changed": "изменился сценарий кольца",
+        "suite_snapshot_hash_changed": "изменился набор испытаний",
+        "suite_snapshot_not_validated": "снимок набора не проверен",
+        "unsupported_active_baseline_schema": "неподдерживаемый формат записи",
+        "wrong_baseline_handoff_id": "запись относится к другой передаче",
+    }
+    text = str(reason or "").strip()
+    return labels.get(text, "требуется повторная проверка")
+
+
+def _workspace_owner_text(raw: str) -> str:
+    labels = {
+        "WS-PROJECT": "Обзор проекта",
+        "WS-INPUTS": "Исходные данные",
+        "WS-RING": "Сценарии и редактор кольца",
+        "WS-SUITE": "Набор испытаний",
+        "WS-BASELINE": "Базовый прогон",
+        "WS-OPTIMIZATION": "Оптимизация",
+        "WS-ANALYSIS": "Анализ результатов",
+        "WS-ANIMATOR": "Анимация",
+        "WS-DIAGNOSTICS": "Диагностика",
+        "WS-SETTINGS": "Параметры приложения",
+        "WS-TOOLS": "Инструменты",
+    }
+    parts = [
+        labels.get(part.strip(), part.strip())
+        for part in str(raw or "").split(";")
+        if part.strip()
+    ]
+    return "; ".join(parts) if parts else "нет данных"
+
+
+def _launch_surface_text(raw: str) -> str:
+    labels = {
+        "workspace": "встроенное окно",
+        "legacy_bridge": "отдельное окно",
+        "external_window": "отдельное специализированное окно",
+        "tooling": "инструментальное окно",
+    }
+    return labels.get(str(raw or "").strip(), "обычное окно")
+
+
+def _operator_catalog_text(raw: str) -> str:
+    text = " ".join(str(raw or "").split()).strip()
+    replacements = (
+        ("Карточка контракта baseline", "Карточка опорного прогона"),
+        ("карточка контракта baseline", "карточка опорного прогона"),
+        ("Карточка предупреждений контракта", "Карточка предупреждений условий расчёта"),
+        ("карточка предупреждений контракта", "карточка предупреждений условий расчёта"),
+        ("Индикатор контракта целей и ограничений", "Индикатор целей и ограничений"),
+        ("индикатор контракта целей и ограничений", "индикатор целей и ограничений"),
+        ("Показывает режим:", "Показывает достоверность отображения:"),
+        ("показывает режим:", "показывает достоверность отображения:"),
+        ("suite", "набор испытаний"),
+        ("Suite", "Набор испытаний"),
+        ("objective stack", "цели расчёта"),
+        ("Objective stack", "Цели расчёта"),
+        ("baseline source", "источник опорного прогона"),
+        ("objective contract", "цели расчёта"),
+        ("hard gate", "обязательное условие"),
+        ("Hard gate", "Обязательное условие"),
+        ("active mode", "активный режим"),
+        ("Active mode", "Активный режим"),
+        ("estimated stage budgets", "оценка длительности этапов"),
+        ("Estimated stage budgets", "Оценка длительности этапов"),
+        ("Лидерборд запусков", "Таблица запусков"),
+        ("лидерборд запусков", "таблица запусков"),
+        ("KPI", "показателями"),
+        ("Compare и validation", "Окно сравнения и проверка"),
+        ("validation", "проверка"),
+        ("run-ов", "запусков"),
+        ("baseline", "опорный прогон"),
+        ("contract", "контекст"),
+        ("Contract", "Контекст"),
+        ("контрактов", "условий"),
+        ("Контрактов", "Условий"),
+        ("контракта", "условий"),
+        ("Контракта", "Условий"),
+        ("контракт", "условия"),
+        ("Контракт", "Условия"),
+    )
+    for old, new in replacements:
+        text = text.replace(old, new)
+    return text
 
 
 class RuntimeWorkspacePage(QtWidgets.QWidget):
@@ -91,7 +236,7 @@ class RuntimeWorkspacePage(QtWidgets.QWidget):
         self.facts_layout = QtWidgets.QVBoxLayout(self.facts_box)
         layout.addWidget(self.facts_box)
 
-        self.evidence_box = QtWidgets.QGroupBox("Evidence / provenance")
+        self.evidence_box = QtWidgets.QGroupBox("Происхождение данных")
         self.evidence_layout = QtWidgets.QVBoxLayout(self.evidence_box)
         layout.addWidget(self.evidence_box)
 
@@ -155,7 +300,7 @@ class RuntimeWorkspacePage(QtWidgets.QWidget):
             self.facts_layout.addWidget(QtWidgets.QLabel("Сводка пока не заполнена."))
 
         _clear_layout(self.evidence_layout)
-        evidence_lines = summary.evidence_lines or ("Свежие provenance-сигналы пока не найдены.",)
+        evidence_lines = summary.evidence_lines or ("Свежие сведения о происхождении данных пока не найдены.",)
         for line in evidence_lines:
             label = QtWidgets.QLabel(f"• {line}")
             label.setWordWrap(True)
@@ -199,16 +344,16 @@ class ControlHubWorkspacePage(QtWidgets.QWidget):
         details.setStyleSheet("color: #405060;")
         layout.addWidget(details)
 
-        contract_box = QtWidgets.QGroupBox("Контракт workspace")
+        contract_box = QtWidgets.QGroupBox("Смысл и правила окна")
         contract_layout = QtWidgets.QFormLayout(contract_box)
-        contract_layout.addRow("Источник истины", QtWidgets.QLabel(workspace.source_of_truth))
-        contract_layout.addRow("Workspace owner", QtWidgets.QLabel(workspace.workspace_owner or "n/a"))
-        contract_layout.addRow("Automation ID", QtWidgets.QLabel(workspace.automation_id or "n/a"))
+        contract_layout.addRow("Источник данных", QtWidgets.QLabel(workspace.source_of_truth))
+        contract_layout.addRow("Связанная область", QtWidgets.QLabel(_workspace_owner_text(workspace.workspace_owner)))
+        contract_layout.addRow("Основная область", QtWidgets.QLabel(workspace.title))
         contract_layout.addRow("Следующий шаг", QtWidgets.QLabel(workspace.next_step))
-        contract_layout.addRow("Hard gate", QtWidgets.QLabel(workspace.hard_gate))
+        contract_layout.addRow("Обязательное условие", QtWidgets.QLabel(workspace.hard_gate))
         layout.addWidget(contract_box)
 
-        self.surface_box = QtWidgets.QGroupBox("Ключевые элементы surface")
+        self.surface_box = QtWidgets.QGroupBox("Ключевые элементы рабочего шага")
         self.surface_layout = QtWidgets.QVBoxLayout(self.surface_box)
         layout.addWidget(self.surface_box)
 
@@ -216,7 +361,7 @@ class ControlHubWorkspacePage(QtWidgets.QWidget):
         self.actions_layout = QtWidgets.QVBoxLayout(self.actions_box)
         layout.addWidget(self.actions_box)
 
-        evidence_box = QtWidgets.QGroupBox("Graphics / provenance")
+        evidence_box = QtWidgets.QGroupBox("Графика и происхождение данных")
         evidence_layout = QtWidgets.QVBoxLayout(evidence_box)
         graphics = QtWidgets.QLabel(workspace.graphics_policy)
         graphics.setWordWrap(True)
@@ -246,9 +391,9 @@ class ControlHubWorkspacePage(QtWidgets.QWidget):
             if not owner:
                 continue
             for entry in workspace_elements_by_owner().get(owner, ())[:10]:
-                text = f"{entry.title} ({entry.automation_id})"
+                text = _operator_catalog_text(entry.title)
                 if entry.purpose:
-                    text = f"{text}: {entry.purpose}"
+                    text = f"{text}: {_operator_catalog_text(entry.purpose)}"
                 labels.append(text)
         seen: set[str] = set()
         ordered: list[str] = []
@@ -267,7 +412,7 @@ class ControlHubWorkspacePage(QtWidgets.QWidget):
         elements = self._workspace_elements()
         if not elements:
             self.surface_layout.addWidget(
-                QtWidgets.QLabel("Каталог v2 для этого workspace пока не привязан к конкретным surface-элементам.")
+                QtWidgets.QLabel("Каталог элементов для этого рабочего шага пока не привязан к конкретным элементам окна.")
             )
         for line in elements:
             label = QtWidgets.QLabel(f"• {line}")
@@ -275,7 +420,7 @@ class ControlHubWorkspacePage(QtWidgets.QWidget):
             self.surface_layout.addWidget(label)
 
         if not self.action_commands:
-            self.actions_layout.addWidget(QtWidgets.QLabel("Команды для этого workspace пока не зарегистрированы."))
+            self.actions_layout.addWidget(QtWidgets.QLabel("Действия для этого рабочего шага пока не зарегистрированы."))
             return
 
         for command in self.action_commands:
@@ -299,9 +444,8 @@ class ControlHubWorkspacePage(QtWidgets.QWidget):
                     line
                     for line in (
                         command.summary,
-                        f"Маршрут: {command.route_label}",
-                        f"Surface: {command.launch_surface.replace('_', ' ')}",
-                        f"Automation ID: {command.automation_id or 'n/a'}",
+                        f"Расположение: {command.route_label}",
+                        f"Открытие: {_launch_surface_text(command.launch_surface)}",
                     )
                     if line
                 )
@@ -339,7 +483,7 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
         )
 
     def _build_extra_controls(self, layout: QtWidgets.QVBoxLayout) -> None:
-        self.baseline_center_box = QtWidgets.QGroupBox("Baseline Center: review / adopt / restore")
+        self.baseline_center_box = QtWidgets.QGroupBox("Центр опорного прогона: просмотр, принятие, восстановление")
         center_layout = QtWidgets.QVBoxLayout(self.baseline_center_box)
         center_layout.setSpacing(8)
 
@@ -356,7 +500,7 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
         self.baseline_history_table = QtWidgets.QTableWidget(0, 6)
         self.baseline_history_table.setObjectName("BL-HISTORY-TABLE")
         self.baseline_history_table.setHorizontalHeaderLabels(
-            ("Время", "Action", "Compare", "Baseline hash", "Suite hash", "Policy")
+            ("Время", "Действие", "Сверка", "Контроль прогона", "Контроль набора", "Режим")
         )
         self.baseline_history_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.baseline_history_table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
@@ -373,7 +517,7 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
         self.baseline_mismatch_matrix = QtWidgets.QTableWidget(0, 4)
         self.baseline_mismatch_matrix.setObjectName("BL-MISMATCH-MATRIX")
         self.baseline_mismatch_matrix.setHorizontalHeaderLabels(
-            ("Field", "Active", "Selected history", "Status")
+            ("Поле", "Активный прогон", "Выбранная запись", "Сверка")
         )
         self.baseline_mismatch_matrix.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.baseline_mismatch_matrix.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
@@ -383,23 +527,23 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
         center_layout.addWidget(self.baseline_mismatch_matrix)
 
         self.explicit_confirmation_checkbox = QtWidgets.QCheckBox(
-            "Explicit confirmation: разрешить apply для adopt/restore"
+            "Разрешить явное принятие или восстановление выбранного опорного прогона"
         )
         self.explicit_confirmation_checkbox.setObjectName("BL-CHECK-EXPLICIT")
         self.explicit_confirmation_checkbox.setToolTip(
-            "Adopt/restore остаются недоступны, пока этот флаг не включён явно."
+            "Принятие и восстановление недоступны, пока этот флаг не включён вручную."
         )
         self.explicit_confirmation_checkbox.toggled.connect(lambda _checked=False: self.refresh_view())
         center_layout.addWidget(self.explicit_confirmation_checkbox)
 
         button_row = QtWidgets.QHBoxLayout()
-        self.review_button = QtWidgets.QPushButton("Review")
+        self.review_button = QtWidgets.QPushButton("Просмотреть")
         self.review_button.setObjectName("BL-BTN-REVIEW")
         self.review_button.clicked.connect(lambda: self.apply_baseline_action("review"))
-        self.adopt_button = QtWidgets.QPushButton("Adopt")
+        self.adopt_button = QtWidgets.QPushButton("Принять")
         self.adopt_button.setObjectName("BL-BTN-ADOPT")
         self.adopt_button.clicked.connect(lambda: self.apply_baseline_action("adopt"))
-        self.restore_button = QtWidgets.QPushButton("Restore")
+        self.restore_button = QtWidgets.QPushButton("Восстановить")
         self.restore_button.setObjectName("BL-BTN-RESTORE")
         self.restore_button.clicked.connect(lambda: self.apply_baseline_action("restore"))
         for button in (self.review_button, self.adopt_button, self.restore_button):
@@ -444,14 +588,14 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
 
             banner = str(banner_state.get("banner") or "").strip()
             if banner:
-                self.baseline_banner_label.setText(f"Banner: {banner}")
+                self.baseline_banner_label.setText(f"Предупреждение: {banner}")
                 self.baseline_banner_label.setStyleSheet(
                     "background: #fff4e5; color: #6f4e00; padding: 8px; border: 1px solid #d9822b;"
                 )
             else:
                 self.baseline_banner_label.setText(
-                    f"HO-006 state: {active.get('state') or 'missing'} | "
-                    f"optimizer_can_consume={bool(active.get('optimizer_baseline_can_consume', False))}"
+                    f"Опорный прогон {_baseline_state_label(str(active.get('state') or 'missing'))}. "
+                    f"Доступен оптимизатору - {'да' if bool(active.get('optimizer_baseline_can_consume', False)) else 'нет'}."
                 )
                 self.baseline_banner_label.setStyleSheet(
                     "background: #e8f7ee; color: #1f5f3a; padding: 8px; border: 1px solid #64b883;"
@@ -466,11 +610,11 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
                 "\n".join(
                     line
                     for line in (
-                        f"active_baseline_hash={active_hash[:16] or '—'} | selected={selected_id or 'нет'}",
-                        f"suite_snapshot_hash={str(active.get('suite_snapshot_hash') or selected.get('suite_snapshot_hash') or '')[:16] or '—'}",
-                        f"inputs_snapshot_hash={str(active.get('inputs_snapshot_hash') or selected.get('inputs_snapshot_hash') or '')[:16] or '—'}",
-                        f"ring_source_hash={str(active.get('ring_source_hash') or selected.get('ring_source_hash') or '')[:16] or '—'}",
-                        f"selected_baseline_hash={selected_hash[:16] or '—'}",
+                        f"Активный прогон - {active_hash[:16] or '—'}; выбранная запись - {selected_id or 'нет'}",
+                        f"Набор испытаний - {str(active.get('suite_snapshot_hash') or selected.get('suite_snapshot_hash') or '')[:16] or '—'}",
+                        f"Исходные данные - {str(active.get('inputs_snapshot_hash') or selected.get('inputs_snapshot_hash') or '')[:16] or '—'}",
+                        f"Сценарий кольца: {str(active.get('ring_source_hash') or selected.get('ring_source_hash') or '')[:16] or '—'}",
+                        f"Выбранный прогон: {selected_hash[:16] or '—'}",
                     )
                     if line
                 )
@@ -478,9 +622,13 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
 
             self._populate_history_table(tuple(dict(row) for row in surface.get("history_rows") or ()))
             mismatch_fields = tuple(str(field) for field in mismatch_state.get("mismatch_fields") or ())
-            mismatch_text = ", ".join(mismatch_fields) if mismatch_fields else str(mismatch_state.get("state") or "none")
+            mismatch_text = (
+                _baseline_field_list(mismatch_fields)
+                if mismatch_fields
+                else str(mismatch_state.get("state") or "нет расхождений")
+            )
             self.baseline_mismatch_label.setText(
-                f"Mismatch state: {mismatch_text}. Silent rebinding: запрещён."
+                f"Состояние сверки: {mismatch_text}. Молчаливая подмена запрещена."
             )
             self._populate_mismatch_matrix(active, selected)
 
@@ -493,7 +641,7 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
             self.restore_button.setEnabled(explicit and bool(restore.get("enabled", False)))
             self.adopt_button.setToolTip(self._action_tooltip("adopt", adopt, explicit=explicit))
             self.restore_button.setToolTip(self._action_tooltip("restore", restore, explicit=explicit))
-            self.review_button.setToolTip("Read-only review выбранного baseline/history item.")
+            self.review_button.setToolTip("Просмотр выбранной строки истории без изменения данных.")
         finally:
             self._refreshing_baseline_controls = False
 
@@ -505,11 +653,11 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
             history_id = str(row.get("history_id") or "")
             values = (
                 str(row.get("ts_utc") or row.get("created_at_utc") or ""),
-                str(row.get("action") or ""),
-                str(row.get("compare_state") or ""),
+                _baseline_action_label(str(row.get("action") or "")),
+                _baseline_state_label(str(row.get("compare_state") or "")),
                 str(row.get("active_baseline_hash") or "")[:12],
                 str(row.get("suite_snapshot_hash") or "")[:12],
-                str(row.get("policy_mode") or ""),
+                _baseline_policy_label(str(row.get("policy_mode") or "")),
             )
             for column, value in enumerate(values):
                 item = QtWidgets.QTableWidgetItem(value or "—")
@@ -528,11 +676,11 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
         selected: dict[str, Any],
     ) -> None:
         fields = (
-            ("active_baseline_hash", "active_baseline_hash"),
-            ("suite_snapshot_hash", "suite_snapshot_hash"),
-            ("inputs_snapshot_hash", "inputs_snapshot_hash"),
-            ("ring_source_hash", "ring_source_hash"),
-            ("policy_mode", "policy_mode"),
+            ("Опорный прогон", "active_baseline_hash"),
+            ("Снимок набора", "suite_snapshot_hash"),
+            ("Исходные данные", "inputs_snapshot_hash"),
+            ("Сценарий кольца", "ring_source_hash"),
+            ("Режим", "policy_mode"),
         )
         blocker = QtCore.QSignalBlocker(self.baseline_mismatch_matrix)
         self.baseline_mismatch_matrix.setRowCount(len(fields))
@@ -540,13 +688,13 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
             active_value = str(active.get(key) or "")
             selected_value = str(selected.get(key) or "")
             if not active_value or not selected_value:
-                status = "missing"
+                status = "нет данных"
                 color = QtGui.QColor("#fff4e5")
             elif active_value == selected_value:
-                status = "match"
+                status = "совпадает"
                 color = QtGui.QColor("#e8f7ee")
             else:
-                status = "mismatch"
+                status = "расходится"
                 color = QtGui.QColor("#fdecea")
             values = (
                 label,
@@ -584,25 +732,30 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
     def _action_tooltip(self, action: str, payload: dict[str, Any], *, explicit: bool) -> str:
         policy = dict(payload.get("policy") or {})
         if not explicit and action in {"adopt", "restore"}:
-            return "Требуется explicit confirmation flag."
+            return "Сначала включите явное подтверждение."
         if bool(payload.get("enabled", False)):
-            return f"{action} выбранного baseline будет применён после confirm dialog."
+            return f"Действие «{_baseline_action_label(action)}» для выбранного опорного прогона будет применено после подтверждения."
         candidate_state = str(policy.get("candidate_state") or "unknown")
-        stale = ", ".join(str(item) for item in policy.get("candidate_stale_reasons") or ())
-        return f"Blocked: candidate_state={candidate_state}" + (f" | stale={stale}" if stale else "")
+        stale = ", ".join(_baseline_reason_label(str(item)) for item in policy.get("candidate_stale_reasons") or ())
+        return (
+            f"Недоступно: состояние выбранного прогона: {_baseline_state_label(candidate_state)}."
+            + (f" Причины: {stale}." if stale else "")
+        )
 
     def _confirm_baseline_action(self, action: str, surface: dict[str, Any]) -> bool:
         selected = dict(surface.get("selected_history") or {})
-        mismatch_fields = ", ".join(str(field) for field in selected.get("mismatch_fields") or ())
-        warning = f"\n\nWarning: mismatch fields: {mismatch_fields}" if mismatch_fields else ""
+        mismatch_fields = _baseline_field_list(
+            str(field) for field in selected.get("mismatch_fields") or ()
+        )
+        warning = f"\n\nПредупреждение: расходятся поля: {mismatch_fields}" if mismatch_fields else ""
         answer = QtWidgets.QMessageBox.question(
             self,
-            "Baseline Center",
+            "Центр опорного прогона",
             (
-                f"Подтвердить {action} для selected history item?\n\n"
-                f"history_id={surface.get('selected_history_id') or 'нет'}\n"
-                f"active_baseline_hash={str(selected.get('active_baseline_hash') or '')[:16] or '—'}"
-                f"{warning}\n\nSilent rebinding запрещён; действие будет записано явно."
+                f"Подтвердить действие «{_baseline_action_label(action)}» для выбранной строки истории?\n\n"
+                f"Строка истории: {surface.get('selected_history_id') or 'нет'}\n"
+                f"Контроль опорного прогона: {str(selected.get('active_baseline_hash') or '')[:16] or '—'}"
+                f"{warning}\n\nМолчаливая подмена запрещена; действие будет записано явно."
             ),
             QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
             QtWidgets.QMessageBox.No,
@@ -616,11 +769,11 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
         if requested_action in {"adopt", "restore"}:
             if not self.explicit_confirmation_checkbox.isChecked():
                 self.action_result_label.setText(
-                    f"{requested_action}: blocked, включите explicit confirmation flag."
+                    "Действие заблокировано: включите явное подтверждение."
                 )
                 return {"action": requested_action, "status": "blocked"}
             if not self._confirm_baseline_action(requested_action, surface):
-                self.action_result_label.setText(f"{requested_action}: cancelled by user.")
+                self.action_result_label.setText("Действие отменено пользователем.")
                 return {"action": requested_action, "status": "cancelled"}
 
         result = apply_baseline_center_action(
@@ -632,7 +785,7 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
                 and self.explicit_confirmation_checkbox.isChecked()
             ),
             actor="desktop_spec_shell",
-            note=f"explicit {requested_action} from Baseline Center",
+            note=f"explicit {requested_action} from baseline center",
         )
         self.action_result_label.setText(self._format_action_result(result))
         if requested_action in {"adopt", "restore"} and result.get("status") == "applied":
@@ -643,16 +796,16 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
     def _format_action_result(self, result: dict[str, Any]) -> str:
         policy = dict(result.get("policy") or {})
         bits = [
-            f"action={result.get('action')}",
-            f"status={result.get('status')}",
-            f"wrote_active_contract={bool(result.get('wrote_active_contract', False))}",
-            f"history_appended={bool(result.get('history_appended', False))}",
-            f"silent_rebinding_allowed={bool(result.get('silent_rebinding_allowed', False))}",
+            f"Действие: {_baseline_action_label(str(result.get('action') or ''))}",
+            f"Состояние: {_baseline_state_label(str(result.get('status') or ''))}",
+            f"Активный прогон записан: {'да' if bool(result.get('wrote_active_contract', False)) else 'нет'}",
+            f"История дополнена: {'да' if bool(result.get('history_appended', False)) else 'нет'}",
+            f"Молчаливая подмена разрешена: {'да' if bool(result.get('silent_rebinding_allowed', False)) else 'нет'}",
         ]
         banner = str(policy.get("banner") or "")
         if banner:
-            bits.append(f"banner={banner}")
-        return " | ".join(bits)
+            bits.append(f"Предупреждение: {banner}")
+        return ". ".join(bits) + "."
 
     def handle_command(self, command_id: str) -> None:
         if command_id == "baseline.center.open":

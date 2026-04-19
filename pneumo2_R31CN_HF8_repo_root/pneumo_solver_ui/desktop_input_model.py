@@ -43,6 +43,10 @@ DESKTOP_INPUT_HANDOFF_IDS: dict[str, str] = {
     "WS-RING": "HO-002",
     "WS-SUITE": "HO-003",
 }
+DESKTOP_INPUT_TARGET_LABELS: dict[str, str] = {
+    "WS-RING": "редактор сценариев колец",
+    "WS-SUITE": "набор испытаний",
+}
 
 DESKTOP_SECTION_DISPLAY_TITLES: dict[str, str] = {
     "Численные настройки": "Расчётные настройки",
@@ -521,7 +525,7 @@ DESKTOP_QUICK_PRESET_OPTIONS: tuple[tuple[str, str, str], ...] = (
     (
         "pressure_down",
         "Ниже давление",
-        "Уменьшает стартовые давления в пневмосистеме для мягкого exploratory-сдвига.",
+        "Уменьшает стартовые давления в пневмосистеме для мягкой пробной настройки.",
     ),
     (
         "draft_calc",
@@ -538,8 +542,8 @@ DESKTOP_QUICK_PRESET_OPTIONS: tuple[tuple[str, str, str], ...] = (
 DESKTOP_RUN_PRESET_OPTIONS: tuple[tuple[str, str, str], ...] = (
     (
         "sanity_check",
-        "Быстрый sanity-check",
-        "Короткий проверочный прогон без расширенного лога, чтобы быстро убедиться, что конфигурация ведёт себя ожидаемо.",
+        "Быстрая проверка",
+        "Короткий проверочный прогон без расширенного журнала, чтобы быстро убедиться, что конфигурация ведёт себя ожидаемо.",
     ),
     (
         "draft_run",
@@ -549,7 +553,7 @@ DESKTOP_RUN_PRESET_OPTIONS: tuple[tuple[str, str, str], ...] = (
     (
         "precise_run",
         "Точнее",
-        "Более подробный запуск с меньшим шагом и включённым расширенным логом.",
+        "Более подробный запуск с меньшим шагом и включённым расширенным журналом.",
     ),
 )
 
@@ -633,13 +637,18 @@ def find_desktop_invented_input_keys(
     )
 
 
+def _desktop_input_target_label(target: str) -> str:
+    clean = str(target or "").strip()
+    return DESKTOP_INPUT_TARGET_LABELS.get(clean, clean or "целевой раздел")
+
+
 def validate_desktop_input_payload_keys(payload: dict[str, Any]) -> None:
     invented_keys = find_desktop_invented_input_keys(payload)
     if invented_keys:
         preview = ", ".join(invented_keys[:8])
         suffix = "" if len(invented_keys) <= 8 else f" и ещё {len(invented_keys) - 8}"
         raise ValueError(
-            "WS-INPUTS snapshot contains keys outside default_base.json: "
+            "Снимок исходных данных содержит неизвестные параметры: "
             f"{preview}{suffix}"
         )
 
@@ -700,62 +709,70 @@ def validate_desktop_inputs_snapshot_contract(
     target_workspace: str | None = None,
 ) -> None:
     if not isinstance(snapshot, dict):
-        raise ValueError("inputs_snapshot must contain a JSON object")
+        raise ValueError("Снимок исходных данных должен быть структурированным объектом")
     if str(snapshot.get("schema_version") or "") != DESKTOP_INPUT_SNAPSHOT_SCHEMA_VERSION:
-        raise ValueError("inputs_snapshot has unsupported schema_version")
+        raise ValueError("Неподдерживаемая версия снимка исходных данных")
     if str(snapshot.get("source_workspace") or "") != "WS-INPUTS":
-        raise ValueError("inputs_snapshot source_workspace must be WS-INPUTS")
+        raise ValueError("Снимок исходных данных создан не тем разделом")
     if bool(snapshot.get("frozen", False)) is not True:
-        raise ValueError("inputs_snapshot must be frozen before handoff")
+        raise ValueError("Снимок исходных данных должен быть зафиксирован перед дальнейшей работой")
 
     target_workspaces = tuple(str(item) for item in list(snapshot.get("target_workspaces") or []))
     handoff_ids = dict(snapshot.get("handoff_ids") or {})
     for workspace, handoff_id in DESKTOP_INPUT_HANDOFF_IDS.items():
         if workspace not in target_workspaces:
-            raise ValueError(f"inputs_snapshot missing target workspace {workspace}")
+            raise ValueError(
+                f"Снимок исходных данных не содержит целевой раздел: {_desktop_input_target_label(workspace)}"
+            )
         if str(handoff_ids.get(workspace) or "") != handoff_id:
-            raise ValueError(f"inputs_snapshot has wrong handoff_id for {workspace}")
+            raise ValueError(
+                f"Снимок исходных данных содержит неверную связь для раздела: {_desktop_input_target_label(workspace)}"
+            )
     clean_target = str(target_workspace or "").strip()
     if clean_target:
         expected_handoff = DESKTOP_INPUT_HANDOFF_IDS.get(clean_target)
         if expected_handoff is None:
-            raise ValueError(f"unsupported inputs_snapshot target workspace: {clean_target}")
+            raise ValueError(
+                f"Снимок исходных данных не поддерживает выбранный целевой раздел: {_desktop_input_target_label(clean_target)}"
+            )
         if clean_target not in target_workspaces:
-            raise ValueError(f"inputs_snapshot is not addressed to {clean_target}")
+            raise ValueError(
+                f"Снимок исходных данных не предназначен для раздела: {_desktop_input_target_label(clean_target)}"
+            )
 
     inputs = snapshot.get("inputs")
     if not isinstance(inputs, dict):
-        raise ValueError("inputs_snapshot inputs must contain a JSON object")
+        raise ValueError("Исходные данные в снимке должны быть структурированным объектом")
     invented_keys = find_desktop_invented_input_keys(inputs)
     if invented_keys:
         preview = ", ".join(invented_keys[:8])
-        raise ValueError(f"inputs_snapshot inputs contain invented keys: {preview}")
+        raise ValueError(f"Снимок исходных данных содержит неизвестные параметры: {preview}")
     if list(snapshot.get("invented_keys") or []) != []:
-        raise ValueError("inputs_snapshot invented_keys must be empty")
+        raise ValueError("Список неизвестных параметров в снимке должен быть пустым")
     missing_keys = sorted(canonical_base_input_keys() - set(str(key) for key in inputs.keys()))
     if missing_keys:
         preview = ", ".join(missing_keys[:8])
-        raise ValueError(f"inputs_snapshot inputs missing canonical keys: {preview}")
+        raise ValueError(f"В снимке исходных данных не хватает обязательных параметров: {preview}")
 
     expected_payload_hash = desktop_input_payload_hash(inputs)
     if str(snapshot.get("payload_hash") or "") != expected_payload_hash:
-        raise ValueError("inputs_snapshot payload_hash does not match canonical inputs")
+        raise ValueError("Контрольная сумма снимка не совпадает с исходными данными")
     if int(snapshot.get("payload_key_count") or 0) != len(inputs):
-        raise ValueError("inputs_snapshot payload_key_count does not match inputs")
+        raise ValueError("Количество параметров в снимке не совпадает с исходными данными")
     if int(snapshot.get("field_key_count") or 0) != len(desktop_input_field_keys()):
-        raise ValueError("inputs_snapshot field_key_count does not match desktop field registry")
+        raise ValueError("Количество параметров в снимке не совпадает со списком окна исходных данных")
     expected_section_keys = {
         section.title: [spec.key for spec in section.fields]
         for section in DESKTOP_INPUT_SECTIONS
     }
     if dict(snapshot.get("section_keys") or {}) != expected_section_keys:
-        raise ValueError("inputs_snapshot section_keys do not match desktop input sections")
+        raise ValueError("Разделы снимка не совпадают с разделами окна исходных данных")
 
     expected_snapshot_hash = hashlib.sha256(
         _canonical_json_bytes({key: value for key, value in snapshot.items() if key != "snapshot_hash"})
     ).hexdigest()
     if str(snapshot.get("snapshot_hash") or "") != expected_snapshot_hash:
-        raise ValueError("inputs_snapshot snapshot_hash does not match frozen snapshot")
+        raise ValueError("Контрольная сумма снимка не совпадает с его содержимым")
 
 
 def build_desktop_inputs_snapshot_ref(
@@ -794,7 +811,7 @@ def load_desktop_inputs_snapshot(path: Path | str | None = None) -> dict[str, An
     target = Path(path).resolve() if path else desktop_inputs_snapshot_handoff_path()
     raw = json.loads(target.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
-        raise ValueError(f"Desktop inputs snapshot must contain a JSON object: {target}")
+        raise ValueError(f"Снимок исходных данных должен быть структурированным объектом: {target}")
     validate_desktop_inputs_snapshot_contract(raw)
     return raw
 
@@ -809,6 +826,7 @@ def describe_desktop_inputs_handoff_for_workspace(
 ) -> dict[str, Any]:
     clean_target = str(target_workspace or "").strip()
     handoff_id = DESKTOP_INPUT_HANDOFF_IDS.get(clean_target, "")
+    target_label = _desktop_input_target_label(clean_target)
     target = (
         Path(snapshot_path).resolve()
         if snapshot_path is not None
@@ -829,7 +847,7 @@ def describe_desktop_inputs_handoff_for_workspace(
             "state": "invalid",
             "is_stale": True,
             "stale_reasons": ["unsupported_inputs_handoff_target"],
-            "banner": f"inputs_snapshot не поддерживает target workspace: {clean_target}.",
+            "banner": f"Снимок исходных данных не поддерживает выбранный целевой раздел: {target_label}.",
         }
 
     loaded_snapshot = snapshot
@@ -841,8 +859,8 @@ def describe_desktop_inputs_handoff_for_workspace(
                 "is_stale": True,
                 "stale_reasons": ["missing_inputs_snapshot"],
                 "banner": (
-                    f"{handoff_id}: frozen inputs_snapshot.json не найден. "
-                    f"{clean_target} не должен создавать surrogate inputs."
+                    "Зафиксированный снимок исходных данных не найден. "
+                    f"Раздел «{target_label}» не должен подставлять исходные данные самостоятельно."
                 ),
             }
         try:
@@ -853,7 +871,7 @@ def describe_desktop_inputs_handoff_for_workspace(
                 "state": "invalid",
                 "is_stale": True,
                 "stale_reasons": ["invalid_inputs_snapshot"],
-                "banner": f"{handoff_id} inputs_snapshot не читается или невалиден: {exc}",
+                "banner": f"Снимок исходных данных не читается или невалиден: {exc}",
             }
 
     try:
@@ -864,7 +882,7 @@ def describe_desktop_inputs_handoff_for_workspace(
             "state": "invalid",
             "is_stale": True,
             "stale_reasons": ["invalid_inputs_snapshot"],
-            "banner": f"{handoff_id} inputs_snapshot невалиден для {clean_target}: {exc}",
+            "banner": f"Снимок исходных данных не подходит для раздела «{target_label}»: {exc}",
         }
 
     ref = build_desktop_inputs_snapshot_ref(
@@ -884,8 +902,8 @@ def describe_desktop_inputs_handoff_for_workspace(
             "is_stale": True,
             "stale_reasons": ["inputs_snapshot_hash_changed"],
             "banner": (
-                f"{handoff_id} inputs_snapshot устарел для {clean_target}: "
-                "payload_hash отличается от текущего frozen WS-INPUTS context."
+                f"Снимок исходных данных устарел для раздела «{target_label}»: "
+                "контрольная сумма отличается от текущих исходных данных."
             ),
         }
 
@@ -899,8 +917,8 @@ def describe_desktop_inputs_handoff_for_workspace(
         "stale_reasons": [],
         "can_consume": True,
         "banner": (
-            f"{handoff_id} inputs_snapshot актуален для {clean_target}; "
-            "downstream хранит ref/hash и не редактирует WS-INPUTS."
+            f"Снимок исходных данных актуален для раздела «{target_label}»; "
+            "раздел читает снимок и не редактирует исходные данные."
         ),
     }
 
@@ -921,7 +939,7 @@ def describe_desktop_inputs_snapshot_state(
             "path": str(target),
             "current_payload_hash": "",
             "snapshot_payload_hash": "",
-            "banner": f"Нельзя заморозить inputs_snapshot: {exc}",
+            "banner": f"Нельзя зафиксировать снимок исходных данных: {exc}",
         }
 
     loaded_snapshot = snapshot
@@ -934,8 +952,8 @@ def describe_desktop_inputs_snapshot_state(
                 "current_payload_hash": current_hash,
                 "snapshot_payload_hash": "",
                 "banner": (
-                    "Frozen inputs_snapshot ещё не создан. WS-RING (HO-002) и "
-                    "WS-SUITE (HO-003) должны получить замороженный снимок перед handoff."
+                    "Зафиксированный снимок исходных данных ещё не создан. "
+                    "Редактор сценариев колец и набор испытаний должны получить снимок перед расчётом."
                 ),
             }
         try:
@@ -947,7 +965,7 @@ def describe_desktop_inputs_snapshot_state(
                 "path": str(target),
                 "current_payload_hash": current_hash,
                 "snapshot_payload_hash": "",
-                "banner": f"Frozen inputs_snapshot повреждён или не читается: {exc}",
+                "banner": f"Зафиксированный снимок исходных данных повреждён или не читается: {exc}",
             }
 
     snapshot_hash = str(loaded_snapshot.get("payload_hash") or "")
@@ -960,7 +978,7 @@ def describe_desktop_inputs_snapshot_state(
             "path": str(target),
             "current_payload_hash": current_hash,
             "snapshot_payload_hash": snapshot_hash,
-            "banner": f"Frozen inputs_snapshot невалиден: {exc}",
+            "banner": f"Зафиксированный снимок исходных данных невалиден: {exc}",
         }
     is_stale = current_hash != snapshot_hash
     if is_stale:
@@ -971,9 +989,8 @@ def describe_desktop_inputs_snapshot_state(
             "current_payload_hash": current_hash,
             "snapshot_payload_hash": snapshot_hash,
             "banner": (
-                "Frozen inputs_snapshot устарел: текущие исходные данные изменились "
-                "после handoff. Обновите snapshot перед WS-RING (HO-002) или "
-                "WS-SUITE (HO-003)."
+                "Зафиксированный снимок исходных данных устарел: текущие исходные данные изменились. "
+                "Обновите снимок перед редактором сценариев колец или набором испытаний."
             ),
         }
     return {
@@ -983,8 +1000,8 @@ def describe_desktop_inputs_snapshot_state(
         "current_payload_hash": current_hash,
         "snapshot_payload_hash": snapshot_hash,
         "banner": (
-            "Frozen inputs_snapshot актуален для WS-RING (HO-002) и "
-            "WS-SUITE (HO-003). Downstream должен читать snapshot, а не редактировать WS-INPUTS."
+            "Зафиксированный снимок исходных данных актуален для редактора сценариев колец "
+            "и набора испытаний. Следующие разделы читают снимок, а не редактируют исходные данные."
         ),
     }
 
@@ -1178,7 +1195,7 @@ def describe_desktop_run_mode(run_config: dict[str, Any]) -> dict[str, str]:
     if record_full or dt <= 0.0018 or t_end >= 2.2:
         mode_key = "detailed"
         mode_label = "подробно"
-        note = "подходит для более внимательной проверки отклика и сохранения расширенного лога"
+        note = "подходит для более внимательной проверки отклика и сохранения расширенного журнала"
         cost_label = "дольше, но подробнее"
         cost_note = "времени и данных потребуется больше обычного"
         advice_label = "берите для финальной проверки"
@@ -1196,14 +1213,15 @@ def describe_desktop_run_mode(run_config: dict[str, Any]) -> dict[str, str]:
         mode_label = "быстро"
         note = "подходит для короткой проверки перед более полным расчётом"
         cost_label = "быстро и легко"
-        cost_note = "запуск обычно проходит быстрее и даёт меньше служебных данных"
-        advice_label = "берите для первого sanity-check"
+        cost_note = "запуск обычно проходит быстрее и сохраняет меньше файлов"
+        advice_label = "берите для первой быстрой проверки"
         advice_note = "удобно, когда нужно быстро понять, что конфигурация в целом живая"
 
     log_label = "включён" if record_full else "выключен"
     summary = (
         f"Ожидаемый режим: {mode_label}. "
-        f"dt={dt:.4f} с; длительность={t_end:.1f} с; расширенный лог {log_label}; {note}."
+        f"шаг по времени: {dt:.4f} с; длительность: {t_end:.1f} с; "
+        f"расширенный журнал {log_label}; {note}."
     )
     cost_summary = f"Цена запуска: {cost_label}. {cost_note}."
     advice_summary = f"Совет: {advice_label}. {advice_note}."
@@ -2179,17 +2197,18 @@ def describe_desktop_field_source_state(
         unit_label = spec.unit_label
     state = "dirty" if is_dirty else "current"
     source = str(source_label or "").strip() or "default_base.json"
+    state_label = "изменено" if is_dirty else "актуально"
     return {
         "key": clean_key,
         "label": label,
         "unit_label": unit_label,
         "source_label": source,
         "state": state,
-        "state_label": "изменено" if is_dirty else "актуально",
+        "state_label": state_label,
         "is_dirty": is_dirty,
         "current": current_value,
         "reference": reference_value,
-        "marker": f"source: {source} · state: {state}",
+        "marker": f"источник: {source} · состояние: {state_label}",
     }
 
 
@@ -2432,7 +2451,7 @@ def load_desktop_run_summary(path: Path | str) -> dict[str, Any]:
     target = desktop_run_summary_path(path)
     raw = json.loads(target.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
-        raise ValueError(f"Desktop run summary must contain a JSON object: {target}")
+        raise ValueError(f"Сводка расчёта должна быть структурированным объектом: {target}")
     return raw
 
 
@@ -2440,7 +2459,7 @@ def load_desktop_profile(path: Path | str) -> dict[str, Any]:
     target = Path(path).resolve()
     raw = json.loads(target.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
-        raise ValueError(f"Desktop profile must contain a JSON object: {target}")
+        raise ValueError(f"Профиль исходных данных должен быть структурированным объектом: {target}")
     return raw
 
 
@@ -2448,7 +2467,7 @@ def load_desktop_snapshot(path: Path | str) -> dict[str, Any]:
     target = Path(path).resolve()
     raw = json.loads(target.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
-        raise ValueError(f"Desktop snapshot must contain a JSON object: {target}")
+        raise ValueError(f"Снимок исходных данных должен быть структурированным объектом: {target}")
     return raw
 
 

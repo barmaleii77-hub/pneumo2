@@ -29,6 +29,7 @@ def test_main_window_applies_v3_shortcuts_and_docking_contracts(tmp_path, monkey
         app.processEvents()
 
         assert window._keyboard_shortcut_by_name["Поиск команд"] == "Ctrl+K"
+        assert window._keyboard_shortcut_by_name["Быстрый поиск"] == "Ctrl+K"
         assert window._keyboard_shortcut_by_name["Главное действие шага"] == "Ctrl+Enter"
         assert window._keyboard_shortcut_by_name["Собрать диагностику"] == "Ctrl+Shift+D"
         assert len(window._shortcut_objects) >= 6

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import re
 
 from PySide6 import QtWidgets
 
@@ -77,30 +78,65 @@ def test_gui_spec_workspace_runtime_builders_cover_route_critical_surfaces() -> 
     assert len(input_data.facts) >= 6
     assert any(fact.label == "Рабочая копия" for fact in input_data.facts)
     assert any(fact.label == "Следующий шаг" for fact in input_data.facts)
+    assert any(fact.label == "Готовность кластеров" for fact in input_data.facts)
+    input_visible_text = "\n".join(
+        part
+        for fact in input_data.facts
+        for part in (fact.label, fact.value, fact.detail)
+    )
+    assert "Эталон base JSON" not in input_visible_text
+    assert "готово=" not in input_visible_text
+    assert "разделов=" not in input_visible_text
 
     assert baseline.headline
     assert len(baseline.facts) >= 5
     baseline_labels = {fact.label for fact in baseline.facts}
-    assert "HO-005 -> active_baseline_contract -> HO-006" in baseline_labels
-    assert "Активный baseline" in baseline_labels
-    assert "Действия review/adopt/restore" in baseline_labels
-    assert any("Active contract:" in line for line in baseline.evidence_lines)
+    assert "Снимок набора и активный опорный прогон" in baseline_labels
+    assert "Активный опорный прогон" in baseline_labels
+    assert "Действия с опорным прогоном" in baseline_labels
+    assert any("Активный опорный прогон -" in line for line in baseline.evidence_lines)
 
     assert optimization.headline
     assert len(optimization.facts) >= 6
-    assert any(fact.label == "Objective stack" for fact in optimization.facts)
+    assert any(fact.label == "Цели оптимизации" for fact in optimization.facts)
     optimization_baseline = next(
-        fact for fact in optimization.facts if fact.label == "Baseline provenance"
+        fact for fact in optimization.facts if fact.label == "Происхождение опорного прогона"
     )
-    assert "HO-006=" in optimization_baseline.value
+    assert "Состояние опорного прогона -" in optimization_baseline.value
+    assert "состояние=" not in optimization_baseline.value
+    optimization_visible_text = "\n".join(
+        part
+        for fact in optimization.facts
+        for part in (fact.label, fact.value, fact.detail)
+    )
+    for forbidden in ("StageRunner", "staged", "missing", "включено=", "строк=", "готово="):
+        assert forbidden not in optimization_visible_text
 
     assert results.headline
     assert len(results.facts) >= 5
-    assert any(fact.label == "Валидация" for fact in results.facts)
+    assert any(fact.label == "Проверка результата" for fact in results.facts)
+    results_visible_text = "\n".join(
+        part
+        for fact in results.facts
+        for part in (fact.label, fact.value, fact.detail)
+    )
+    results_visible_text += "\n" + "\n".join(results.evidence_lines)
+    for forbidden in (
+        "Optimizer scope",
+        "Browser perf",
+        "bundle_ready",
+        "release_risk",
+        "MISSING",
+        "missing",
+        "False",
+        "True",
+        "send-bundle",
+    ):
+        assert forbidden not in results_visible_text
 
     assert diagnostics.headline
     assert len(diagnostics.facts) >= 5
-    assert any(fact.label == "Последний ZIP" for fact in diagnostics.facts)
+    assert any(fact.label == "Последний архив" for fact in diagnostics.facts)
 
 
 def test_gui_spec_main_window_uses_hosted_pages_for_runtime_and_control_hubs_for_route_pages() -> None:
@@ -116,6 +152,100 @@ def test_gui_spec_main_window_uses_hosted_pages_for_runtime_and_control_hubs_for
         assert isinstance(window._page_widget_by_workspace_id["results_analysis"], ResultsWorkspacePage)
         assert isinstance(window._page_widget_by_workspace_id["diagnostics"], DiagnosticsWorkspacePage)
         assert callable(getattr(window._page_widget_by_workspace_id["overview"], "refresh_view", None))
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_gui_spec_main_window_visible_text_hides_internal_service_terms() -> None:
+    app = _app()
+    forbidden = re.compile(
+        r"\b(workspace|legacy|hosted|surface|pipeline|source-of-truth|master-copy|"
+        r"StageRunner|staged|missing|True|False|bundle_ready|release_risk|"
+        r"Optimizer scope|Browser perf|send-bundle|validation|KPI|run-ов|"
+        r"review_only|Explicit confirmation|Selected history|Field|Status|"
+        r"suite|baseline|contract|handoff|snapshot|hash|payload|schema)\b|"
+        r"\b(Open .*refresh|current evidence status|Review|Adopt|Restore)\b|"
+        r"готово=|состояние=|строк=|включено=|level=|skip_ui_smoke|действие=|статус=|пакет готов=|"
+        r"(?-i:контроль:|сверка:|выбрано:|строк:|включено:|режим:|Режим:|"
+        r"Открыто:|Открыто окно:|Сводка окна:|Подсказка:|Обязательное условие:|"
+        r"Почему это важно:|Где виден результат:|пояснение:|Ограничение:|"
+        r"Опорный прогон:|Идентификатор прогона:|Состояние опорного прогона:|"
+        r"Набор испытаний:|Исходные данные:|Сценарий:|Доступен оптимизатору:|"
+        r"Источник данных:|"
+        r"базовых параметров:|перебираемых:|расширенных диапазонов:|служебных параметров|"
+        r"стадия [^\\n:]+:|ZIP:|готово:|ошибок:|предупреждений:|критичных:|"
+        r"справочных:|автотест:|диагностика:|объём проверки:|проверка окна:|"
+        r"проверка оптимизации:|лимит оптимизации:|задач:)|"
+        r"риск выпуска=|"
+        r"GUI-spec|Desktop Shell|Данные машины|Открыть выбранный|статус миграции|контракт|"
+        r"Элемент участвует|Берутся из источник данных|Берутся из источника данных|"
+        r"[A-Z]{2,}-BTN-[A-Z0-9-]+",
+        re.IGNORECASE,
+    )
+    window = DesktopGuiSpecMainWindow()
+    try:
+        window.resize(1600, 950)
+        window.show()
+        app.processEvents()
+
+        hits: list[str] = []
+        for workspace_id in window.workspace_by_id:
+            window.open_workspace(workspace_id)
+            app.processEvents()
+            lines: list[tuple[str, str]] = []
+
+            def add_text(where: str, raw: object) -> None:
+                text = " ".join(str(raw or "").split()).strip()
+                if text and "C:\\" not in text:
+                    lines.append((where, text))
+
+            add_text("window_title", window.windowTitle())
+            for action in window.menuBar().actions():
+                add_text("menu", action.text())
+                menu = action.menu()
+                if menu is None:
+                    continue
+                for child in menu.actions():
+                    add_text(f"menu/{action.text()}", child.text())
+                    add_text(f"menu/{action.text()}.tooltip", child.toolTip())
+
+            for widget in window.findChildren(QtWidgets.QWidget):
+                if not widget.isVisibleTo(window):
+                    continue
+                widget_name = widget.__class__.__name__
+                text_getter = getattr(widget, "text", None)
+                if callable(text_getter):
+                    add_text(widget_name, text_getter())
+                title_getter = getattr(widget, "title", None)
+                if callable(title_getter):
+                    add_text(f"{widget_name}.title", title_getter())
+                tooltip_getter = getattr(widget, "toolTip", None)
+                if callable(tooltip_getter):
+                    add_text(f"{widget_name}.tooltip", tooltip_getter())
+                if isinstance(widget, QtWidgets.QComboBox):
+                    for index in range(widget.count()):
+                        add_text(f"{widget_name}.item", widget.itemText(index))
+                if isinstance(widget, QtWidgets.QListWidget):
+                    for index in range(widget.count()):
+                        add_text(f"{widget_name}.item", widget.item(index).text())
+                if isinstance(widget, QtWidgets.QTableWidget):
+                    for column in range(widget.columnCount()):
+                        item = widget.horizontalHeaderItem(column)
+                        if item is not None:
+                            add_text(f"{widget_name}.header", item.text())
+                    for row in range(min(widget.rowCount(), 5)):
+                        for column in range(widget.columnCount()):
+                            item = widget.item(row, column)
+                            if item is not None:
+                                add_text(f"{widget_name}.cell", item.text())
+
+            for where, text in lines:
+                if forbidden.search(text):
+                    hits.append(f"{workspace_id}::{where}: {text}")
+
+        assert not hits, "\n".join(hits[:20])
     finally:
         window.close()
         window.deleteLater()
@@ -164,7 +294,7 @@ def test_control_hub_pages_render_catalog_surface_summary_and_actions() -> None:
         page.refresh_view()
         app.processEvents()
 
-        assert page.surface_box.title() == "Ключевые элементы surface"
+        assert page.surface_box.title() == "Ключевые элементы рабочего шага"
         assert page.actions_box.title() == "Основные действия"
         assert page.workspace.automation_id == "TS-TABLE"
         assert len(page.action_commands) >= 2
@@ -215,28 +345,38 @@ def test_hosted_baseline_workspace_page_requires_explicit_action_before_restore(
     try:
         app.processEvents()
 
-        assert page.baseline_center_box.title() == "Baseline Center: review / adopt / restore"
+        assert page.baseline_center_box.title() == "Центр опорного прогона: просмотр, принятие, восстановление"
+        assert page.review_button.text() == "Просмотреть"
+        assert page.adopt_button.text() == "Принять"
+        assert page.restore_button.text() == "Восстановить"
+        assert "Explicit confirmation" not in page.explicit_confirmation_checkbox.text()
+        assert page.baseline_mismatch_matrix.horizontalHeaderItem(0).text() == "Поле"
+        assert page.baseline_mismatch_matrix.horizontalHeaderItem(1).text() == "Активный прогон"
+        assert page.baseline_mismatch_matrix.horizontalHeaderItem(2).text() == "Выбранная запись"
+        assert page.baseline_mismatch_matrix.horizontalHeaderItem(3).text() == "Сверка"
         assert page.review_button.isEnabled()
         assert not page.adopt_button.isEnabled()
         assert not page.restore_button.isEnabled()
-        assert "Silent rebinding: запрещён" in page.baseline_mismatch_label.text()
+        assert "Молчаливая подмена запрещена" in page.baseline_mismatch_label.text()
         assert page.baseline_mismatch_matrix.objectName() == "BL-MISMATCH-MATRIX"
         assert page.baseline_mismatch_matrix.rowCount() == 5
         matrix_status = {
             page.baseline_mismatch_matrix.item(row, 0).text(): page.baseline_mismatch_matrix.item(row, 3).text()
             for row in range(page.baseline_mismatch_matrix.rowCount())
         }
-        assert matrix_status["active_baseline_hash"] == "mismatch"
-        assert matrix_status["suite_snapshot_hash"] == "match"
-        assert matrix_status["inputs_snapshot_hash"] == "match"
-        assert matrix_status["ring_source_hash"] == "match"
-        assert matrix_status["policy_mode"] == "match"
+        assert matrix_status["Опорный прогон"] == "расходится"
+        assert matrix_status["Снимок набора"] == "совпадает"
+        assert matrix_status["Исходные данные"] == "совпадает"
+        assert matrix_status["Сценарий кольца"] == "совпадает"
+        assert matrix_status["Режим"] == "совпадает"
 
         page.handle_command("baseline.review")
-        assert "action=review" in page.action_result_label.text()
-        assert "status=review_only" in page.action_result_label.text()
+        assert "Действие: Просмотреть" in page.action_result_label.text()
+        assert "Состояние: просмотр выполнен" in page.action_result_label.text()
+        assert "действие=" not in page.action_result_label.text()
+        assert "review_only" not in page.action_result_label.text()
         page.handle_command("baseline.restore")
-        assert "restore: blocked" in page.action_result_label.text()
+        assert "Действие заблокировано" in page.action_result_label.text()
 
         blocked = page.apply_baseline_action("restore")
         assert blocked["status"] == "blocked"
@@ -323,18 +463,18 @@ def test_hosted_baseline_workspace_page_warns_before_restore_with_context_mismat
         assert page.review_button.isEnabled()
         assert not page.adopt_button.isEnabled()
         assert not page.restore_button.isEnabled()
-        assert "suite_snapshot_hash" in page.baseline_banner_label.text()
-        assert "inputs_snapshot_hash" in page.baseline_banner_label.text()
-        assert "policy_mode" in page.baseline_banner_label.text()
-        assert "Silent rebinding: запрещён" in page.baseline_mismatch_label.text()
+        assert "Снимок набора" in page.baseline_banner_label.text()
+        assert "Исходные данные" in page.baseline_banner_label.text()
+        assert "Режим" in page.baseline_banner_label.text()
+        assert "Молчаливая подмена запрещена" in page.baseline_mismatch_label.text()
         matrix_status = {
             page.baseline_mismatch_matrix.item(row, 0).text(): page.baseline_mismatch_matrix.item(row, 3).text()
             for row in range(page.baseline_mismatch_matrix.rowCount())
         }
-        assert matrix_status["suite_snapshot_hash"] == "mismatch"
-        assert matrix_status["inputs_snapshot_hash"] == "mismatch"
-        assert matrix_status["ring_source_hash"] == "match"
-        assert matrix_status["policy_mode"] == "mismatch"
+        assert matrix_status["Снимок набора"] == "расходится"
+        assert matrix_status["Исходные данные"] == "расходится"
+        assert matrix_status["Сценарий кольца"] == "совпадает"
+        assert matrix_status["Режим"] == "расходится"
 
         blocked_restore = page.apply_baseline_action("restore")
         assert blocked_restore["status"] == "blocked"

@@ -16,6 +16,67 @@ PRIMARY_WORKFLOW_KEYS = (
     "desktop_optimizer_center",
     "desktop_results_center",
 )
+NAVIGATION_SECTION_ORDER = (
+    "Проект",
+    "Исходные данные",
+    "Сценарии",
+    "Расчёт",
+    "Оптимизация",
+    "Результаты",
+    "Анализ",
+    "Визуализация",
+    "Диагностика и инструменты",
+)
+WORKFLOW_STAGE_NAVIGATION_SECTIONS = {
+    "overview": "Проект",
+    "data": "Исходные данные",
+    "reference": "Исходные данные",
+    "scenarios": "Сценарии",
+    "calculation": "Расчёт",
+    "optimization": "Оптимизация",
+    "results": "Результаты",
+    "analysis": "Анализ",
+    "visualization": "Визуализация",
+    "tools": "Диагностика и инструменты",
+}
+
+
+def navigation_section_label(spec: DesktopShellToolSpec) -> str:
+    return (
+        WORKFLOW_STAGE_NAVIGATION_SECTIONS.get(str(spec.workflow_stage or ""))
+        or str(spec.nav_section or spec.menu_section or "").strip()
+        or "Диагностика и инструменты"
+    )
+
+
+def ordered_navigation_sections(
+    specs: tuple[DesktopShellToolSpec, ...],
+) -> tuple[tuple[str, tuple[DesktopShellToolSpec, ...]], ...]:
+    sections: dict[str, list[DesktopShellToolSpec]] = {}
+    for spec in specs:
+        sections.setdefault(navigation_section_label(spec), []).append(spec)
+
+    section_index = {label: index for index, label in enumerate(NAVIGATION_SECTION_ORDER)}
+    ordered_labels = sorted(
+        sections,
+        key=lambda label: (section_index.get(label, len(section_index)), label.lower()),
+    )
+    return tuple(
+        (
+            label,
+            tuple(
+                sorted(
+                    sections[label],
+                    key=lambda spec: (
+                        int(spec.nav_order),
+                        int(spec.menu_order),
+                        str(spec.title or "").lower(),
+                    ),
+                )
+            ),
+        )
+        for label in ordered_labels
+    )
 
 
 def ordered_hosted_sessions(
@@ -89,17 +150,17 @@ def describe_workflow_progress(
 ) -> str:
     workflow_specs = ordered_workflow_specs(specs)
     if not workflow_specs:
-        return "Основной маршрут пока недоступен в текущей сборке shell."
+        return "Основной порядок работы пока недоступен в текущей сборке."
 
     open_count = sum(1 for spec in workflow_specs if spec.key in open_keys)
     next_spec = next_workflow_spec(workflow_specs, open_keys)
     if open_count < len(workflow_specs) and next_spec is not None:
         return (
-            f"Открыто разделов маршрута: {open_count}/{len(workflow_specs)}. "
-            f"Следующий рекомендуемый раздел: {next_spec.title}."
+            f"Открыто окон основного порядка: {open_count}/{len(workflow_specs)}. "
+            f"Следующее рекомендуемое окно: {next_spec.title}."
         )
     return (
-        f"Все разделы маршрута уже открыты: {open_count}/{len(workflow_specs)}. "
+        f"Все окна основного порядка уже открыты: {open_count}/{len(workflow_specs)}. "
         "Можно вернуться к нужному шагу в любой момент."
     )
 
@@ -110,13 +171,13 @@ def describe_workflow_status(
 ) -> str:
     workflow_specs = ordered_workflow_specs(specs)
     if not workflow_specs:
-        return "Маршрут: недоступен"
+        return "Порядок работы: недоступен"
 
     open_count = sum(1 for spec in workflow_specs if spec.key in open_keys)
     next_spec = next_workflow_spec(workflow_specs, open_keys)
     if open_count < len(workflow_specs) and next_spec is not None:
-        return f"Маршрут: {open_count}/{len(workflow_specs)} -> {next_spec.title}"
-    return f"Маршрут: {open_count}/{len(workflow_specs)} открыто"
+        return f"Порядок работы: {open_count}/{len(workflow_specs)} - {next_spec.title}"
+    return f"Порядок работы: {open_count}/{len(workflow_specs)} открыто"
 
 
 def ordered_open_workflow_sessions(

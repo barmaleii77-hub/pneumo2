@@ -650,7 +650,7 @@ def collect_qt_main_shell_runtime_proof(*, offscreen: bool = False, state_path: 
             window.show()
             app.processEvents()
 
-            window.command_search_edit.setText("дерево проекта")
+            window.command_search_edit.setText("список проекта")
             app.processEvents()
             search_result_count = int(window.search_results_list.count())
             if search_result_count:
@@ -769,7 +769,7 @@ def collect_qt_main_shell_runtime_proof(*, offscreen: bool = False, state_path: 
                     else "",
                 },
                 "command_search": {
-                    "query": "дерево проекта",
+                    "query": "список проекта",
                     "result_count": search_result_count,
                     "current_surface": command_search_surface,
                     "status_text": command_search_status_text,
@@ -827,7 +827,7 @@ def collect_qt_main_shell_runtime_proof(*, offscreen: bool = False, state_path: 
                 "status_progress_messages_strip": dict(proof["status_strip"]).get("message_object_name")
                 == "ShellMessagesStrip",
                 "command_search_project_tree_route": search_result_count > 0
-                and "дерево проекта" in str(dict(proof["command_search"]).get("status_text") or ""),
+                and "список проекта" in str(dict(proof["command_search"]).get("status_text") or ""),
                 "all_launchable_tools_visible_from_shell": all(
                     not missing for missing in launch_coverage_missing.values()
                 ),

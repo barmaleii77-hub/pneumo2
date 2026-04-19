@@ -163,6 +163,43 @@ def baseline_source_short_label(source_kind: str) -> str:
     return "default-only"
 
 
+def _baseline_context_label(field: str) -> str:
+    labels = {
+        "active_baseline_hash": "Опорный прогон",
+        "suite_snapshot_hash": "Снимок набора испытаний",
+        "inputs_snapshot_hash": "Исходные данные",
+        "ring_source_hash": "Сценарий кольца",
+        "policy_mode": "Режим расчёта",
+    }
+    return labels.get(str(field or "").strip(), str(field or "").strip())
+
+
+def _baseline_context_labels(fields: tuple[str, ...] | list[str]) -> str:
+    return ", ".join(_baseline_context_label(field) for field in fields if str(field or "").strip())
+
+
+def _baseline_stale_reason_label(reason: str) -> str:
+    labels = {
+        "missing_active_baseline_contract": "активный опорный прогон не найден",
+        "unsupported_active_baseline_schema": "неподдерживаемая схема активного опорного прогона",
+        "wrong_baseline_handoff_id": "опорный прогон записан не для оптимизации",
+        "active_baseline_hash_mismatch": "контрольная сумма опорного прогона не совпадает",
+        "suite_snapshot_not_validated": "снимок набора испытаний не проверен",
+        "suite_snapshot_hash_changed": "снимок набора испытаний изменился",
+        "inputs_snapshot_hash_changed": "исходные данные изменились",
+        "ring_source_hash_changed": "сценарий кольца изменился",
+    }
+    return labels.get(str(reason or "").strip(), str(reason or "").strip())
+
+
+def _baseline_stale_reason_labels(reasons: tuple[str, ...] | list[str]) -> str:
+    return ", ".join(
+        _baseline_stale_reason_label(reason)
+        for reason in reasons
+        if str(reason or "").strip()
+    )
+
+
 def resolve_workspace_baseline_source(
     problem_hash: str | None = None,
     *,
@@ -258,7 +295,7 @@ def resolve_baseline_suite_handoff(
     repo_root: Path | str | None = None,
     current_suite_snapshot_hash: str = "",
 ) -> dict[str, Any]:
-    """Read the WS-SUITE -> WS-BASELINE HO-005 snapshot without rebinding it."""
+    """Read the frozen suite snapshot used by the baseline stage."""
 
     path = baseline_suite_handoff_snapshot_path(
         env=env,
@@ -275,8 +312,8 @@ def resolve_baseline_suite_handoff(
         "state": "missing",
         "baseline_can_consume": False,
         "banner": (
-            "HO-005 validated_suite_snapshot не найден. "
-            "Baseline должен получить frozen suite snapshot из WS-SUITE."
+            "Снимок набора испытаний не найден. "
+            "Краткий предпросмотр должен получить зафиксированный снимок набора."
         ),
     }
     if not path.exists():
@@ -288,19 +325,19 @@ def resolve_baseline_suite_handoff(
         return {
             **base_payload,
             "state": "invalid",
-            "banner": f"HO-005 validated_suite_snapshot не читается: {exc}",
+            "banner": f"Снимок набора испытаний не читается: {exc}",
         }
     if not isinstance(raw, dict):
         return {
             **base_payload,
             "state": "invalid",
-            "banner": "HO-005 validated_suite_snapshot должен быть JSON object.",
+            "banner": "Снимок набора испытаний должен быть JSON-объектом.",
         }
     if str(raw.get("schema_version") or "") != VALIDATED_SUITE_SNAPSHOT_SCHEMA_VERSION:
         return {
             **base_payload,
             "state": "invalid",
-            "banner": "HO-005 validated_suite_snapshot имеет неподдерживаемую schema_version.",
+            "banner": "Снимок набора испытаний имеет неподдерживаемую версию схемы.",
         }
 
     suite_hash = str(raw.get("suite_snapshot_hash") or "").strip()
@@ -314,7 +351,7 @@ def resolve_baseline_suite_handoff(
             "ring_source_hash": ctx["ring_source_hash"],
             "created_at_utc": str(raw.get("created_at_utc") or ""),
             "state": "stale",
-            "banner": "HO-005 suite_snapshot_hash устарел относительно текущего WS-SUITE context.",
+            "banner": "Снимок набора испытаний устарел относительно текущего набора.",
         }
     ctx = _suite_context_fields(raw)
     return {
@@ -326,9 +363,9 @@ def resolve_baseline_suite_handoff(
         "state": "current" if validated else "invalid",
         "baseline_can_consume": bool(validated),
         "banner": (
-            "HO-005 validated_suite_snapshot актуален для baseline."
+            "Снимок набора испытаний актуален для краткого предпросмотра."
             if validated
-            else "HO-005 snapshot найден, но validation не пройдена."
+            else "Снимок набора испытаний найден, но проверка не пройдена."
         ),
     }
 
@@ -342,7 +379,7 @@ def baseline_suite_handoff_launch_gate(
     repo_root: Path | str | None = None,
     current_suite_snapshot_hash: str = "",
 ) -> dict[str, Any]:
-    """Resolve whether a launch may proceed with the frozen HO-005 suite snapshot."""
+    """Resolve whether a launch may proceed with the frozen suite snapshot."""
 
     profile = str(launch_profile or "baseline").strip().lower() or "baseline"
     policy = str(runtime_policy or "").strip().lower()
@@ -364,7 +401,7 @@ def baseline_suite_handoff_launch_gate(
             "baseline_launch_allowed": True,
             "runtime_policy_can_bypass": True,
             "banner": (
-                "HO-005 не блокирует detail/full запуск. "
+                "Снимок набора испытаний не блокирует детальный и полный запуск. "
                 + str(handoff.get("banner") or "").strip()
             ).strip(),
         }
@@ -387,8 +424,8 @@ def baseline_suite_handoff_launch_gate(
         "baseline_launch_allowed": False,
         "runtime_policy_can_bypass": False,
         "banner": (
-            "Baseline launch blocked by HO-005. runtime_policy не может обойти "
-            "missing/stale/invalid validated_suite_snapshot. "
+            "Краткий предпросмотр заблокирован набором испытаний. Режим выполнения не может обойти "
+            "отсутствующий, устаревший или некорректный снимок набора. "
             + str(handoff.get("banner") or "").strip()
         ).strip(),
     }
@@ -432,7 +469,7 @@ def build_active_baseline_contract(
     note: str = "",
     created_at_utc: str | None = None,
 ) -> dict[str, Any]:
-    """Create the frozen WS-BASELINE -> WS-OPTIMIZATION HO-006 contract."""
+    """Create the frozen active baseline contract consumed by optimization."""
 
     suite_ctx = _suite_context_fields(suite_snapshot)
     policy = {
@@ -571,8 +608,8 @@ def describe_active_baseline_state(
             "banner_id": BASELINE_MISSING_BANNER_ID,
             "stale_reasons": ["missing_active_baseline_contract"],
             "banner": (
-                "HO-006 active_baseline_contract не найден. "
-                "Оптимизация не должна молча подставлять baseline_best.json."
+                "Активный опорный прогон не найден. "
+                "Оптимизация не должна молча подставлять запасной опорный прогон."
             ),
         }
 
@@ -584,7 +621,10 @@ def describe_active_baseline_state(
             "optimizer_can_consume": False,
             "banner_id": BASELINE_MISSING_BANNER_ID,
             "stale_reasons": ["unsupported_active_baseline_schema"],
-            "banner": "active_baseline_contract имеет неподдерживаемую схему; silent rebinding запрещён.",
+            "banner": (
+                "Активный опорный прогон имеет неподдерживаемую схему; "
+                "молчаливая подмена запрещена."
+            ),
         }
     if str(payload.get("handoff_id") or "") != WS_BASELINE_HANDOFF_ID:
         return {
@@ -593,7 +633,7 @@ def describe_active_baseline_state(
             "optimizer_can_consume": False,
             "banner_id": BASELINE_MISSING_BANNER_ID,
             "stale_reasons": ["wrong_baseline_handoff_id"],
-            "banner": "active_baseline_contract должен быть HO-006 для передачи WS-BASELINE -> WS-OPTIMIZATION.",
+            "banner": "Активный опорный прогон записан не для передачи в оптимизацию.",
         }
     expected_hash = _sha256_payload(_active_baseline_contract_core(payload))
     stored_hash = str(payload.get("active_baseline_hash") or "").strip()
@@ -604,7 +644,11 @@ def describe_active_baseline_state(
             "optimizer_can_consume": False,
             "banner_id": BASELINE_MISSING_BANNER_ID,
             "stale_reasons": ["active_baseline_hash_mismatch"],
-            "banner": "active_baseline_hash не совпадает с frozen payload; используйте review/adopt/restore.",
+            "banner": (
+                "Контрольная сумма активного опорного прогона не совпадает с "
+                "зафиксированными данными; используйте явное действие просмотра, "
+                "принятия или восстановления."
+            ),
         }
     if not bool(payload.get("suite_validated", False)):
         return {
@@ -616,8 +660,8 @@ def describe_active_baseline_state(
             "suite_snapshot_hash": str(payload.get("suite_snapshot_hash") or ""),
             "stale_reasons": ["suite_snapshot_not_validated"],
             "banner": (
-                "active_baseline_contract ссылается на невалидированный suite snapshot; "
-                "сначала нужен HO-005 review/adopt."
+                "Активный опорный прогон ссылается на непроверенный снимок набора "
+                "испытаний; сначала зафиксируйте и проверьте набор."
             ),
         }
 
@@ -639,9 +683,9 @@ def describe_active_baseline_state(
             "suite_snapshot_hash": str(payload.get("suite_snapshot_hash") or ""),
             "stale_reasons": stale_reasons,
             "banner": (
-                "active_baseline_contract устарел для текущего контекста: "
-                + ", ".join(stale_reasons)
-                + ". Review/adopt/restore требуется явно; silent rebinding запрещён."
+                "Активный опорный прогон устарел для текущего контекста: "
+                + _baseline_stale_reason_labels(stale_reasons)
+                + ". Требуется явное действие пользователя; молчаливая подмена запрещена."
             ),
         }
 
@@ -655,7 +699,7 @@ def describe_active_baseline_state(
         "inputs_snapshot_hash": str(payload.get("inputs_snapshot_hash") or ""),
         "ring_source_hash": str(payload.get("ring_source_hash") or ""),
         "stale_reasons": [],
-        "banner": f"HO-006 active baseline актуален: {stored_hash[:12]}.",
+        "banner": f"Активный опорный прогон актуален: {stored_hash[:12]}.",
     }
 
 
@@ -686,8 +730,8 @@ def resolve_active_baseline_handoff(
         "silent_rebinding_allowed": False,
         "banner_id": BASELINE_MISSING_BANNER_ID,
         "banner": (
-            "HO-006 active_baseline_contract не найден. "
-            "Оптимизация не должна молча подставлять baseline_best.json."
+            "Активный опорный прогон не найден. "
+            "Оптимизация не должна молча подставлять запасной опорный прогон."
         ),
     }
     if not path.exists():
@@ -698,13 +742,13 @@ def resolve_active_baseline_handoff(
         return {
             **base_payload,
             "state": "invalid",
-            "banner": f"HO-006 active_baseline_contract не читается: {exc}",
+            "banner": f"Файл активного опорного прогона не читается: {exc}",
         }
     if not isinstance(raw, dict):
         return {
             **base_payload,
             "state": "invalid",
-            "banner": "HO-006 active_baseline_contract должен быть JSON object.",
+            "banner": "Файл активного опорного прогона должен быть JSON-объектом.",
         }
 
     state = describe_active_baseline_state(
@@ -848,7 +892,7 @@ def compare_active_and_historical_baseline(
             "banner_id": BASELINE_MISSING_BANNER_ID,
             "silent_rebinding_allowed": False,
             "mismatch_fields": tuple(),
-            "banner": "Для сравнения active/historical baseline не хватает contract payload.",
+            "banner": "Для сравнения активного и исторического опорного прогона не хватает сохранённых данных.",
         }
 
     context_fields = ("suite_snapshot_hash", "inputs_snapshot_hash", "policy_mode")
@@ -870,9 +914,9 @@ def compare_active_and_historical_baseline(
             "required_action": "review_and_adopt_explicitly",
             "mismatch_fields": mismatch_fields,
             "banner": (
-                "Исторический baseline собран на другом контексте: "
-                + ", ".join(mismatch_fields)
-                + ". Silent rebinding запрещён."
+                "Исторический опорный прогон собран на другом контексте: "
+                + _baseline_context_labels(mismatch_fields)
+                + ". Молчаливая подмена запрещена."
             ),
         }
     if same_hash:
@@ -882,7 +926,7 @@ def compare_active_and_historical_baseline(
             "silent_rebinding_allowed": False,
             "requires_explicit_action": False,
             "mismatch_fields": tuple(),
-            "banner": "Выбранный baseline совпадает с active_baseline_contract.",
+            "banner": "Выбранный опорный прогон уже является активным.",
         }
     return {
         "state": "historical_same_context",
@@ -892,8 +936,8 @@ def compare_active_and_historical_baseline(
         "required_action": "restore_or_adopt_explicitly",
         "mismatch_fields": tuple(),
         "banner": (
-            "Открыт исторический baseline из того же контекста. "
-            "Restore/adopt возможен только явным действием пользователя."
+            "Открыт исторический опорный прогон из того же контекста. "
+            "Восстановление или принятие возможно только явным действием пользователя."
         ),
     }
 
@@ -1199,7 +1243,7 @@ def apply_baseline_center_action(
     actor: str = "",
     note: str = "",
 ) -> dict[str, Any]:
-    """Apply explicit Baseline Center actions; review is always read-only."""
+    """Apply explicit baseline actions; review is always read-only."""
 
     requested_action = str(action or "review").strip().lower() or "review"
     if requested_action not in {"review", "adopt", "restore"}:

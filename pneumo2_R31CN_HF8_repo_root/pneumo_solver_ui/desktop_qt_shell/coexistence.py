@@ -68,10 +68,10 @@ class ManagedExternalWindowSession:
         kind = self.spec.effective_runtime_kind
         status = self.spec.effective_migration_status
         if kind == "tk" and status == "managed_external":
-            return "Рабочее GUI-окно"
+            return "Рабочее окно"
         if kind == "qt":
-            return "Специализированное GUI-окно"
-        return "Служебный процесс"
+            return "Специализированное окно"
+        return "Дополнительное окно"
 
     def status_label(self) -> str:
         if self.is_running:
@@ -79,7 +79,7 @@ class ManagedExternalWindowSession:
         code = self.process.poll()
         if code is None:
             return "Открыто"
-        return f"Завершено ({code})"
+        return "Закрыто"
 
 
 class DesktopShellCoexistenceManager:

@@ -1,25 +1,5 @@
 # -*- coding: utf-8 -*-
-"""desktop_control_center.py
-
-Unified desktop launcher for the existing non-web GUI tools.
-
-Goal
-----
-Provide a single operator-facing entrypoint for the desktop tools that already
-exist in the project, so common workflows can be opened without going through
-the Streamlit UI.
-
-Intentionally included:
-- Test Center GUI
-- Full Diagnostics GUI
-- Send Results GUI
-- Compare Viewer (Qt)
-- Desktop Animator (PySide6)
-
-Intentionally excluded:
-- Desktop Mnemo
-  It is handled separately and should not be coupled into this launcher.
-"""
+"""Единый запуск инженерных окон без обращения к web-интерфейсу."""
 
 from __future__ import annotations
 
@@ -58,7 +38,7 @@ def _spawn_module(module: str) -> subprocess.Popen:
 class DesktopControlCenter:
     def __init__(self) -> None:
         self.root = tk.Tk()
-        self.root.title(f"Центр запуска инженерных окон — {RELEASE}")
+        self.root.title(f"Центр запуска инженерных окон - {RELEASE}")
         self.root.geometry("860x540")
         self.root.minsize(820, 500)
         self.launch_targets = build_desktop_launch_catalog(include_mnemo=False)
@@ -177,7 +157,7 @@ class DesktopControlCenter:
             )
             return
         self.details_var.set(
-            f"{target.title}\n\n{target.description}\n\nМодуль запуска: {target.module}"
+            f"{target.title}\n\n{target.description}"
         )
 
     def _selected_target(self) -> DesktopLaunchCatalogItem | None:
@@ -214,19 +194,18 @@ class DesktopControlCenter:
             else:
                 subprocess.Popen(["xdg-open", str(root)])
             self.status_var.set(f"Открыта папка проекта: {root}")
-            self._append_log(f"[open] repo: {root}")
+            self._append_log(f"Открыта папка проекта: {root}")
         except Exception as exc:
             messagebox.showerror("Центр запуска инженерных окон", f"Не удалось открыть папку проекта:\n{exc}")
-            self._append_log("[error] open repo\n" + traceback.format_exc())
+            self._append_log("Ошибка открытия папки проекта.\n" + traceback.format_exc())
 
     def _launch(self, target: DesktopLaunchCatalogItem) -> None:
         try:
             proc = _spawn_module(target.module)
             self.status_var.set(f"Запущено: {target.title}")
             self._append_log(
-                f"[spawn] {target.title}\n"
-                f"  module: {target.module}\n"
-                f"  pid: {getattr(proc, 'pid', 'n/a')}"
+                f"Запущено окно: {target.title}\n"
+                f"Идентификатор процесса: {getattr(proc, 'pid', 'нет данных')}"
             )
         except Exception as exc:
             messagebox.showerror(
@@ -234,7 +213,7 @@ class DesktopControlCenter:
                 f"Не удалось запустить «{target.title}»:\n{exc}",
             )
             self.status_var.set(f"Ошибка запуска: {target.title}")
-            self._append_log("[error] spawn\n" + traceback.format_exc())
+            self._append_log("Ошибка запуска окна.\n" + traceback.format_exc())
 
     def run(self) -> None:
         self.root.mainloop()

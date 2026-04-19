@@ -34,6 +34,7 @@ from pneumo_solver_ui.optimization_baseline_source import baseline_center_eviden
 
 from .catalogs import get_tooltip, get_ui_element
 from .contracts import DesktopWorkspaceSpec
+from .help_registry import _operator_text
 from .workspace_runtime import build_diagnostics_workspace_summary
 
 
@@ -69,18 +70,62 @@ def _apply_action_contract(widget: QtWidgets.QWidget, element_id: str) -> None:
     widget.setAccessibleName(element.title)
     tooltip = get_tooltip(element.tooltip_id)
     if tooltip is not None and tooltip.text:
-        widget.setToolTip(tooltip.text)
+        widget.setToolTip(_operator_text(tooltip.text))
 
 
 def _safe_path_text(path: str) -> str:
     text = str(path or "").strip()
-    return text if text else "not available"
+    return text if text else "нет данных"
+
+
+def _operator_message_text(raw: str) -> str:
+    text = str(raw or "").strip()
+    replacements = (
+        ("Clipboard status is stale for the current latest bundle:", "Буфер обмена устарел для текущего последнего архива:"),
+        ("Clipboard updated for latest bundle:", "Буфер обмена обновлён для последнего архива:"),
+        ("no clipboard activity", "буфер обмена не использовался"),
+        ("inspection", "проверка состава"),
+        ("health", "состояние проекта"),
+        ("validation", "проверка результата"),
+        ("triage", "разбор предупреждений"),
+    )
+    for old, new in replacements:
+        text = text.replace(old, new)
+    return text
 
 
 def _bool_marker(value: bool | None) -> str:
     if value is None:
-        return "unknown"
-    return "yes" if value else "no"
+        return "нет данных"
+    return "да" if value else "нет"
+
+
+def _state_text(raw: Any, *, fallback: str = "нет данных") -> str:
+    text = " ".join(str(raw or "").replace("_", " ").split()).strip()
+    if not text:
+        return fallback
+    labels = {
+        "current": "актуален",
+        "historical mismatch": "расходится с историей",
+        "missing": "не найден",
+        "none": "нет расхождений",
+        "ok": "готово",
+        "ready": "готово",
+        "running": "выполняется",
+        "failed": "ошибка",
+        "completed": "завершено",
+    }
+    return labels.get(text.casefold(), text)
+
+
+def _request_level_text(raw: Any) -> str:
+    labels = {
+        "minimal": "минимальная",
+        "standard": "обычная",
+        "full": "полная",
+    }
+    text = str(raw or "").strip().lower()
+    return labels.get(text, "обычная")
 
 
 def _baseline_attention_required(evidence: dict[str, Any]) -> bool:
@@ -96,21 +141,26 @@ def _baseline_attention_required(evidence: dict[str, Any]) -> bool:
 
 def _baseline_status_text(evidence: dict[str, Any]) -> str:
     if not evidence:
-        return "HO-006 baseline evidence недоступен."
+        return "Сведения об опорном прогоне недоступны."
     active = dict(evidence.get("active_baseline") or {})
     banner = dict(evidence.get("banner_state") or {})
     mismatch = dict(evidence.get("mismatch_state") or {})
-    active_state = str(active.get("state") or banner.get("active_state") or "missing").strip() or "missing"
+    active_state = _state_text(active.get("state") or banner.get("active_state"), fallback="не найден")
     active_hash = str(active.get("active_baseline_hash") or "")
-    mismatch_state = str(mismatch.get("state") or banner.get("selected_compare_state") or "none")
+    mismatch_state = _state_text(mismatch.get("state") or banner.get("selected_compare_state"), fallback="нет расхождений")
     banner_text = str(banner.get("banner") or active.get("banner") or "")
     lines = [
-        f"HO-006 state={active_state}; active_baseline_hash={active_hash[:12] or '—'}",
-        f"mismatch={mismatch_state}; send_bundle_include={bool(evidence.get('send_bundle_should_include', False))}",
-        "silent_rebinding_allowed=False",
+        f"Опорный прогон {active_state}.",
+        (
+            f"Идентификатор прогона - {active_hash[:12]}."
+            if active_hash
+            else "Идентификатор прогона пока отсутствует."
+        ),
+        f"Сверка истории: {mismatch_state}. Добавить сведения в архив: {_bool_marker(bool(evidence.get('send_bundle_should_include', False)))}.",
+        "Молчаливая подмена запрещена.",
     ]
     if banner_text:
-        lines.append(f"banner={banner_text}")
+        lines.append(f"Пояснение: {banner_text}")
     return "\n".join(lines)
 
 
@@ -218,7 +268,7 @@ class DiagnosticsShellController(QtCore.QObject):
         self._current_run_record: DesktopDiagnosticsRunRecord | None = None
         self._current_bundle: DesktopDiagnosticsBundleRecord | None = None
         self._current_snapshot: DiagnosticsWorkspaceSnapshot | None = None
-        self._status_text = "Готово. Диагностика доступна из текущего workspace."
+        self._status_text = "Готово. Диагностика доступна из текущего окна."
 
     @property
     def current_snapshot(self) -> DiagnosticsWorkspaceSnapshot | None:
@@ -266,11 +316,11 @@ class DiagnosticsShellController(QtCore.QObject):
             center_state_path=path_str(Path(bundle.out_dir) / "latest_desktop_diagnostics_center_state.json"),
             summary_md_path=path_str(Path(bundle.out_dir) / "latest_desktop_diagnostics_summary.md"),
             recommended_next_step=(
-                "Baseline HO-006 требует review в Baseline Center перед отправкой."
+                "Опорный прогон требует просмотра в центре опорного прогона перед отправкой."
                 if baseline_attention
-                else "Если bundle уже собран, проверьте inspection/health и затем переходите к отправке."
+                else "Если архив диагностики уже собран, проверьте состав и состояние, затем переходите к отправке."
                 if bundle.latest_zip_path
-                else "Сначала соберите диагностику, чтобы получить ZIP и свежие inspection/health артефакты."
+                else "Сначала соберите диагностику, чтобы получить архив и свежую проверку состава и состояния."
             ),
             baseline_evidence=baseline_evidence,
             baseline_attention_required=baseline_attention,
@@ -338,31 +388,31 @@ class DiagnosticsShellController(QtCore.QObject):
     def verify_bundle(self) -> None:
         bundle = self._current_bundle or load_desktop_diagnostics_bundle_record(self.repo_root)
         if not bundle.latest_zip_path:
-            self._set_status("Проверка bundle недоступна: сначала соберите диагностику.", busy=False)
+            self._set_status("Проверка архива диагностики недоступна: сначала соберите диагностику.", busy=False)
             self.refresh(regenerate_reports=False)
             return
-        self._set_status("Обновляю inspection / health / validation...", busy=True)
+        self._set_status("Обновляю проверку состава и состояния архива диагностики...", busy=True)
         self.refresh(regenerate_reports=True)
-        self._set_status("Проверка bundle обновлена.", busy=False)
+        self._set_status("Проверка архива диагностики обновлена.", busy=False)
 
     def send_results(self) -> None:
         bundle = self._current_bundle or load_desktop_diagnostics_bundle_record(self.repo_root)
         if not bundle.latest_zip_path:
-            self._set_status("Отправка результатов недоступна: ZIP ещё не готов.", busy=False)
+            self._set_status("Отправка результатов недоступна: архив диагностики ещё не готов.", busy=False)
             self.refresh(regenerate_reports=False)
             return
         self.spawn_module_fn("pneumo_solver_ui.tools.send_results_gui")
-        self._set_status("Открыт flow отправки результатов.", busy=False)
+        self._set_status("Открыто окно отправки результатов.", busy=False)
         self.refresh(regenerate_reports=False)
 
     def open_bundle_folder(self) -> None:
         bundle = self._current_bundle or load_desktop_diagnostics_bundle_record(self.repo_root)
         self.open_path_fn(Path(bundle.out_dir).expanduser().resolve())
-        self._set_status("Открыт каталог diagnostics artifacts.", busy=False)
+        self._set_status("Открыта папка файлов диагностики.", busy=False)
 
     def open_legacy_center(self) -> None:
         self.spawn_module_fn("pneumo_solver_ui.tools.desktop_diagnostics_center")
-        self._set_status("Открыт legacy diagnostics center.", busy=False)
+        self._set_status("Открыт центр диагностики.", busy=False)
 
     def _set_status(self, text: str, *, busy: bool) -> None:
         self._status_text = text
@@ -405,7 +455,7 @@ class DiagnosticsShellController(QtCore.QObject):
     def _on_finished(self, exit_code: int, _exit_status: QtCore.QProcess.ExitStatus) -> None:
         request = self._current_request
         if request is None:
-            self._set_status("Диагностика завершилась, но request не найден.", busy=False)
+            self._set_status("Диагностика завершилась, но сведения о запуске не найдены.", busy=False)
             self.refresh(regenerate_reports=False)
             return
 
@@ -426,7 +476,7 @@ class DiagnosticsShellController(QtCore.QObject):
                 out_root=path_str(out_root),
                 log_path=run_record.log_path if run_record else "",
                 state_path=run_record.state_path if run_record else "",
-                last_message="completed" if exit_code == 0 else "failed",
+                last_message="завершено" if exit_code == 0 else "ошибка",
             ),
             log_text="",
         )
@@ -439,20 +489,20 @@ class DiagnosticsShellController(QtCore.QObject):
     def _on_process_error(self, error: QtCore.QProcess.ProcessError) -> None:
         if self.is_busy():
             return
-        self._set_status(f"Ошибка запуска diagnostics process: {error!s}", busy=False)
+        self._set_status(f"Ошибка запуска диагностики: {error!s}", busy=False)
         self.refresh(regenerate_reports=False)
 
     def _persist_center_state(self, snapshot: DiagnosticsWorkspaceSnapshot) -> None:
         summary_text = "\n".join(
             [
-                "# Diagnostics summary",
+                "# Сводка диагностики",
                 "",
-                f"- Status: {snapshot.status_text}",
-                f"- ZIP: {_safe_path_text(snapshot.bundle.latest_zip_path)}",
-                f"- Inspection: {_safe_path_text(snapshot.bundle.latest_inspection_md_path)}",
-                f"- Health: {_safe_path_text(snapshot.bundle.latest_health_md_path)}",
-                f"- Validation: {_safe_path_text(snapshot.bundle.latest_validation_md_path)}",
-                f"- Triage: {_safe_path_text(snapshot.bundle.latest_triage_md_path)}",
+                f"- Состояние: {snapshot.status_text}",
+                f"- Архив диагностики: {_safe_path_text(snapshot.bundle.latest_zip_path)}",
+                f"- Состав архива: {_safe_path_text(snapshot.bundle.latest_inspection_md_path)}",
+                f"- Состояние проекта: {_safe_path_text(snapshot.bundle.latest_health_md_path)}",
+                f"- Проверка результата: {_safe_path_text(snapshot.bundle.latest_validation_md_path)}",
+                f"- Разбор предупреждений: {_safe_path_text(snapshot.bundle.latest_triage_md_path)}",
             ]
         )
         summary_md_path = write_desktop_diagnostics_summary_md(snapshot.bundle.out_dir, summary_text)
@@ -534,13 +584,13 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         layout.addWidget(self.status_label)
 
         self.source_label = QtWidgets.QLabel(
-            "Source of truth: desktop_diagnostics_runtime.py + desktop_diagnostics_model.py"
+            "Данные берутся из состояния диагностики приложения и модели проверки."
         )
         self.source_label.setWordWrap(True)
         self.source_label.setStyleSheet("color: #405060;")
         layout.addWidget(self.source_label)
 
-        self.bundle_box = QtWidgets.QGroupBox("Текущее состояние bundle")
+        self.bundle_box = QtWidgets.QGroupBox("Текущее состояние архива диагностики")
         bundle_layout = QtWidgets.QFormLayout(self.bundle_box)
         self.bundle_zip_value = QtWidgets.QLabel("")
         self.bundle_out_dir_value = QtWidgets.QLabel("")
@@ -553,9 +603,9 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
             self.bundle_paths_value,
         ):
             label.setWordWrap(True)
-        bundle_layout.addRow("Последний ZIP", self.bundle_zip_value)
-        bundle_layout.addRow("Каталог артефактов", self.bundle_out_dir_value)
-        bundle_layout.addRow("Clipboard / handoff", self.bundle_clipboard_value)
+        bundle_layout.addRow("Последний архив", self.bundle_zip_value)
+        bundle_layout.addRow("Папка файлов диагностики", self.bundle_out_dir_value)
+        bundle_layout.addRow("Буфер обмена", self.bundle_clipboard_value)
         bundle_layout.addRow("Связанные пути", self.bundle_paths_value)
         layout.addWidget(self.bundle_box)
 
@@ -581,7 +631,7 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         run_layout.addRow("Параметры запуска", self.request_value)
         layout.addWidget(self.run_box)
 
-        self.check_box = QtWidgets.QGroupBox("Проверка / inspection / health")
+        self.check_box = QtWidgets.QGroupBox("Проверка архива диагностики")
         check_layout = QtWidgets.QFormLayout(self.check_box)
         self.inspection_value = QtWidgets.QLabel("")
         self.health_value = QtWidgets.QLabel("")
@@ -596,19 +646,19 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
             self.next_step_value,
         ):
             label.setWordWrap(True)
-        check_layout.addRow("Inspection", self.inspection_value)
-        check_layout.addRow("Health", self.health_value)
-        check_layout.addRow("Validation", self.validation_value)
-        check_layout.addRow("Triage", self.triage_value)
+        check_layout.addRow("Состав архива", self.inspection_value)
+        check_layout.addRow("Состояние проекта", self.health_value)
+        check_layout.addRow("Проверка результата", self.validation_value)
+        check_layout.addRow("Разбор предупреждений", self.triage_value)
         check_layout.addRow("Рекомендуемый шаг", self.next_step_value)
         layout.addWidget(self.check_box)
 
-        self.baseline_box = QtWidgets.QGroupBox("Baseline HO-006")
+        self.baseline_box = QtWidgets.QGroupBox("Опорный прогон")
         baseline_layout = QtWidgets.QVBoxLayout(self.baseline_box)
         self.baseline_status_value = QtWidgets.QLabel("")
         self.baseline_status_value.setObjectName("DG-BASELINE-STATUS")
         self.baseline_status_value.setWordWrap(True)
-        self.open_baseline_center_button = QtWidgets.QPushButton("Открыть Baseline Center")
+        self.open_baseline_center_button = QtWidgets.QPushButton("Открыть центр опорного прогона")
         self.open_baseline_center_button.setObjectName("DG-BTN-OPEN-BASELINE")
         self.open_baseline_center_button.clicked.connect(self.open_baseline_center)
         baseline_layout.addWidget(self.baseline_status_value)
@@ -618,11 +668,11 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         self.actions_box = QtWidgets.QGroupBox("Действия")
         actions_layout = QtWidgets.QGridLayout(self.actions_box)
         self.collect_button = QtWidgets.QPushButton("Собрать диагностику")
-        self.verify_button = QtWidgets.QPushButton("Проверить bundle")
+        self.verify_button = QtWidgets.QPushButton("Проверить архив диагностики")
         self.send_button = QtWidgets.QPushButton("Отправить результаты")
         self.open_dir_button = QtWidgets.QPushButton("Открыть каталог")
         self.refresh_button = QtWidgets.QPushButton("Обновить состояние")
-        self.legacy_button = QtWidgets.QPushButton("Открыть legacy center")
+        self.legacy_button = QtWidgets.QPushButton("Открыть центр диагностики")
         _apply_action_contract(self.collect_button, "DG-BTN-COLLECT")
         self.collect_button.clicked.connect(lambda: self.handle_command("diagnostics.collect_bundle"))
         self.verify_button.clicked.connect(lambda: self.handle_command("diagnostics.verify_bundle"))
@@ -666,9 +716,9 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
     def open_baseline_center(self) -> None:
         if self.on_command is not None:
             self.on_command("baseline.center.open")
-            self.status_label.setText("Открыт Baseline Center из diagnostics HO-006 banner.")
+            self.status_label.setText("Открыт центр опорного прогона из окна диагностики.")
             return
-        self.status_label.setText("Baseline Center доступен из основного shell route: WS-BASELINE / HO-006.")
+        self.status_label.setText("Центр опорного прогона доступен из основного окна приложения.")
 
     def _on_controller_status(self, text: str, busy: bool) -> None:
         self.status_label.setText(text)
@@ -684,35 +734,37 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         self.bundle_zip_value.setText(_safe_path_text(snapshot.bundle.latest_zip_path))
         self.bundle_out_dir_value.setText(_safe_path_text(snapshot.bundle.out_dir))
         self.bundle_clipboard_value.setText(
-            f"ok={_bool_marker(snapshot.bundle.clipboard_ok)}; {snapshot.bundle.clipboard_message or 'no clipboard activity'}"
+            f"Буфер обмена готов - {_bool_marker(snapshot.bundle.clipboard_ok)}. {_operator_message_text(snapshot.bundle.clipboard_message) or 'Буфер обмена не использовался.'}"
         )
         self.bundle_paths_value.setText(
             "\n".join(
                 [
-                    f"meta: {_safe_path_text(snapshot.bundle.latest_bundle_meta_path)}",
-                    f"center state: {_safe_path_text(snapshot.center_state_path)}",
-                    f"summary md: {_safe_path_text(snapshot.summary_md_path)}",
+                    f"Описание архива сохранено в файле {_safe_path_text(snapshot.bundle.latest_bundle_meta_path)}",
+                    f"Настройки диагностики сохранены в файле {_safe_path_text(snapshot.center_state_path)}",
+                    f"Сводка диагностики сохранена в файле {_safe_path_text(snapshot.summary_md_path)}",
                 ]
             )
         )
 
         run_record = snapshot.run_record
         if run_record is None:
-            self.run_state_value.setText("Ещё не запускалось в текущем out_root.")
-            self.run_started_value.setText("not available")
-            self.run_finished_value.setText("not available")
-            self.run_dir_value.setText("not available")
+            self.run_state_value.setText("Диагностика ещё не запускалась в текущей папке.")
+            self.run_started_value.setText("нет данных")
+            self.run_finished_value.setText("нет данных")
+            self.run_dir_value.setText("нет данных")
         else:
             self.run_state_value.setText(
-                f"{run_record.status or 'unknown'} | ok={run_record.ok} | rc={run_record.returncode}"
+                f"Состояние запуска - {_state_text(run_record.status, fallback='нет данных')}. Успешно завершён - {_bool_marker(bool(run_record.ok))}. Код завершения - {run_record.returncode}."
             )
-            self.run_started_value.setText(run_record.started_at or "not available")
-            self.run_finished_value.setText(run_record.finished_at or "not available")
+            self.run_started_value.setText(run_record.started_at or "нет данных")
+            self.run_finished_value.setText(run_record.finished_at or "нет данных")
             self.run_dir_value.setText(_safe_path_text(run_record.run_dir))
         self.request_value.setText(
-            f"level={snapshot.request.level}; skip_ui_smoke={snapshot.request.skip_ui_smoke}; "
-            f"no_zip={snapshot.request.no_zip}; run_opt_smoke={snapshot.request.run_opt_smoke}; "
-            f"opt_minutes={snapshot.request.opt_minutes}; opt_jobs={snapshot.request.opt_jobs}"
+            f"Объём проверки - {_request_level_text(snapshot.request.level)}. "
+            f"Проверка окна будет {'пропущена' if snapshot.request.skip_ui_smoke else 'выполнена'}. "
+            f"Архив диагностики будет {'не собран' if snapshot.request.no_zip else 'собран'}. "
+            f"Проверка оптимизации будет {'выполнена' if snapshot.request.run_opt_smoke else 'пропущена'}. "
+            f"Лимит проверки оптимизации {snapshot.request.opt_minutes} мин. Задач {snapshot.request.opt_jobs}."
         )
 
         self.inspection_value.setText(_safe_path_text(snapshot.bundle.latest_inspection_md_path))

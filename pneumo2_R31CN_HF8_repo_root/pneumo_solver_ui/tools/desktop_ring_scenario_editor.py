@@ -98,12 +98,12 @@ CLOSURE_POLICY_TO_UI = {
     "closed_c1_periodic": "Гладкое замыкание",
     "closed_exact": "Строгое совпадение",
     "strict_exact": "Строгое совпадение",
-    "preview_open_only": "Открытый preview",
+    "preview_open_only": "Открытый предпросмотр",
 }
 CLOSURE_POLICY_FROM_UI = {
     "Гладкое замыкание": "closed_c1_periodic",
     "Строгое совпадение": "closed_exact",
-    "Открытый preview": "preview_open_only",
+    "Открытый предпросмотр": "preview_open_only",
 }
 
 PASSAGE_MODE_TO_UI = {
@@ -493,13 +493,13 @@ class DesktopRingScenarioEditor:
         scenario_label = Path(self.state.spec_path).name if self.state.spec_path else "в памяти"
         artifacts_label = "требуется пересборка" if self.state.export.artifacts_stale else "актуально"
         opt_suite_label = "требуется пересборка" if self.state.export.opt_suite_stale else "актуально"
-        source_state_label = "dirty in editor" if self.state.dirty else "current"
+        source_state_label = "есть несохранённые изменения" if self.state.dirty else "актуально"
         self.status_var.set(
             f"Сохранение: {dirty_label} | Сценарий: {scenario_label} | "
             f"Сегментов: {len(rows)} | Ошибок: {len(diagnostics.errors)} | Предупреждений: {len(diagnostics.warnings)} | "
             f"Каталог выгрузки: {self.state.export.output_dir or 'не выбран'} | "
-            f"WS-RING source state: {source_state_label} | Derived artifacts state: {artifacts_label} | "
-            f"HO-005 suite link state: {opt_suite_label}"
+            f"исходный сценарий: {source_state_label} | файлы выгрузки: {artifacts_label} | "
+            f"набор испытаний: {opt_suite_label}"
             + (f" | {self.state.status_message}" if self.state.status_message else "")
         )
         self._update_window_title()
@@ -511,17 +511,25 @@ class DesktopRingScenarioEditor:
             banner = str(state.get("banner") or "").strip()
             path = str(state.get("snapshot_path") or "").strip()
             payload_hash = str(state.get("payload_hash") or "").strip()
+            state_labels = {
+                "current": "актуален",
+                "missing": "не найден",
+                "stale": "устарел",
+                "invalid": "ошибка",
+            }
+            state_label = state_labels.get(str(state.get("state") or "").strip(), str(state.get("state") or "не найден"))
+            consume_label = "да" if bool(state.get("can_consume", False)) else "нет"
             lines = [
-                f"HO-002 inputs_snapshot: {state.get('state') or 'missing'}",
-                f"payload_hash={payload_hash[:12] or '—'} | can_consume={bool(state.get('can_consume', False))}",
+                f"Снимок исходных данных: {state_label}",
+                f"контроль={payload_hash[:12] or '—'} | можно использовать={consume_label}",
                 banner,
-                f"inputs_snapshot.json: {path}",
+                f"файл снимка: {path}",
             ]
             self.export_panel.inputs_handoff_var.set("\n".join(line for line in lines if line).strip())
             return state
         except Exception as exc:
             self._latest_inputs_handoff_state = {}
-            self.export_panel.inputs_handoff_var.set(f"Не удалось проверить HO-002 inputs_snapshot: {exc}")
+            self.export_panel.inputs_handoff_var.set(f"Не удалось проверить снимок исходных данных: {exc}")
             return {}
 
     def _load_state_to_form(self) -> None:
@@ -753,19 +761,19 @@ class DesktopRingScenarioEditor:
         if self.state.export.last_bundle:
             bundle = self.state.export.last_bundle
             source_state_line = (
-                "\nWS-RING source state: dirty in editor"
+                "\nИсходный сценарий: есть несохранённые изменения"
                 if self.state.dirty
-                else "\nWS-RING source state: current"
+                else "\nИсходный сценарий: актуален"
             )
             artifacts_line = (
-                "\nDerived artifacts state: stale, rebuild required"
+                "\nФайлы выгрузки: требуется пересборка"
                 if self.state.export.artifacts_stale
-                else "\nDerived artifacts state: current"
+                else "\nФайлы выгрузки: актуальны"
             )
             opt_suite_line = (
-                "\nHO-005 suite link state: stale, rebuild required"
+                "\nНабор испытаний: требуется пересборка"
                 if self.state.export.opt_suite_stale
-                else "\nHO-005 suite link state: current"
+                else "\nНабор испытаний: актуален"
             )
             meta_lines = ""
             meta = bundle.get("meta")
@@ -777,16 +785,16 @@ class DesktopRingScenarioEditor:
                     f"\nДлительность круга: {float(meta.get('lap_time_s', 0.0) or 0.0):.2f} с"
                     f"\nЧисло отсчётов: {int(meta.get('n_samples', 0) or 0)}"
                     f"\nРежим замыкания: {CLOSURE_POLICY_TO_UI.get(str(meta.get('closure_policy', '')), 'не задан')}"
-                    f"\nRaw seam before export policy: {1000.0 * float(meta.get('raw_seam_max_jump_m', 0.0) or 0.0):.1f} мм"
-                    f"\nPost-policy seam: {1000.0 * float(meta.get('seam_max_jump_m', 0.0) or 0.0):.1f} мм"
-                    f"\nClosure transform applied: {'yes' if bool(meta.get('closure_applied', False)) else 'no'}"
-                    f"\nClosure correction max L/R: {closure_left_mm:.1f} / {closure_right_mm:.1f} мм"
+                    f"\nШов до обработки: {1000.0 * float(meta.get('raw_seam_max_jump_m', 0.0) or 0.0):.1f} мм"
+                    f"\nШов после обработки: {1000.0 * float(meta.get('seam_max_jump_m', 0.0) or 0.0):.1f} мм"
+                    f"\nЗамыкание применено: {'да' if bool(meta.get('closure_applied', False)) else 'нет'}"
+                    f"\nМаксимальная коррекция слева/справа: {closure_left_mm:.1f} / {closure_right_mm:.1f} мм"
                 )
                 lineage = meta.get("lineage") if isinstance(meta.get("lineage"), dict) else {}
                 if lineage:
                     meta_lines += (
-                        f"\nWS-RING source hash: {str(lineage.get('ring_source_hash_sha256', ''))[:16]}"
-                        f"\nDerived export-set hash: {str(lineage.get('ring_export_set_hash_sha256', ''))[:16]}"
+                        f"\nКонтроль исходного сценария: {str(lineage.get('ring_source_hash_sha256', ''))[:16]}"
+                        f"\nКонтроль выгрузки: {str(lineage.get('ring_export_set_hash_sha256', ''))[:16]}"
                     )
             anim_latest_lines = ""
             if bundle.get("anim_latest_scenario_json"):
@@ -811,8 +819,8 @@ class DesktopRingScenarioEditor:
                 f"Сценарий: {bundle.get('scenario_json', '')}\n"
                 f"Профиль дороги: {bundle.get('road_csv', '')}\n"
                 f"Файл ускорений: {bundle.get('axay_csv', '')}"
-                f"\nMeta HO-004: {bundle.get('meta_json', '')}"
-                f"\nSource-of-truth WS-RING: {bundle.get('ring_source_of_truth_json', '')}"
+                f"\nОписание выгрузки: {bundle.get('meta_json', '')}"
+                f"\nИсходный сценарий: {bundle.get('ring_source_of_truth_json', '')}"
                 f"{source_state_line}"
                 f"{artifacts_line}"
                 f"{opt_suite_line}"
@@ -1022,10 +1030,10 @@ class DesktopRingScenarioEditor:
         self._open_last_generated_file("axay_csv", "Файл ускорений")
 
     def _open_last_generated_meta(self) -> None:
-        self._open_last_generated_file("meta_json", "Meta HO-004")
+        self._open_last_generated_file("meta_json", "Описание выгрузки")
 
     def _open_ring_source_of_truth(self) -> None:
-        self._open_last_generated_file("ring_source_of_truth_json", "Source-of-truth WS-RING")
+        self._open_last_generated_file("ring_source_of_truth_json", "Исходный сценарий")
 
     def _open_anim_latest_exports(self) -> None:
         bundle = self.state.export.last_bundle or {}
@@ -1126,8 +1134,8 @@ class DesktopRingScenarioEditor:
                     f"Сценарий: {bundle.get('scenario_json', '')}\n"
                     f"Профиль дороги: {bundle.get('road_csv', '')}\n"
                     f"Файл ускорений: {bundle.get('axay_csv', '')}\n"
-                    f"Meta HO-004: {bundle.get('meta_json', '')}\n"
-                    f"Source-of-truth WS-RING: {bundle.get('ring_source_of_truth_json', '')}\n\n"
+                    f"Описание выгрузки: {bundle.get('meta_json', '')}\n"
+                    f"Исходный сценарий: {bundle.get('ring_source_of_truth_json', '')}\n\n"
                     "Копия для анимации:\n"
                     f"Сценарий: {mirrored.get('scenario_json', '')}\n"
                     f"Профиль дороги: {mirrored.get('road_csv', '')}\n"
@@ -1167,13 +1175,13 @@ class DesktopRingScenarioEditor:
             self.state.export.opt_suite_stale = False
             if rebuilt_derived_from_source:
                 self.state.status_message = (
-                    "Набор оптимизации подготовлен; derived artifacts were rebuilt from current WS-RING source."
+                    "Набор оптимизации подготовлен; файлы выгрузки пересобраны из текущего сценария."
                 )
             else:
                 self.state.status_message = "Набор оптимизации подготовлен в рабочей папке."
             self._refresh_from_state()
             rebuild_line = (
-                "\nDerived artifacts were rebuilt from current WS-RING source before suite handoff.\n"
+                "\nФайлы выгрузки пересобраны из текущего сценария перед подготовкой набора.\n"
                 if rebuilt_derived_from_source
                 else ""
             )

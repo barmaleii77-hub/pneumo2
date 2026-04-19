@@ -20,7 +20,7 @@ def test_desktop_control_center_targets_core_desktop_tools_without_mnemo() -> No
     assert "spawn_module(module)" in src
 
     src_lower = src.lower()
-    assert "desktop mnemo" in src_lower
+    assert "include_mnemo=False" in src
     assert "desktop_mnemo" not in src_lower
     assert "pneumo_solver_ui.desktop_mnemo" not in src
 

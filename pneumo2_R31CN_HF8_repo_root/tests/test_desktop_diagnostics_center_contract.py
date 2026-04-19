@@ -268,7 +268,7 @@ def test_desktop_diagnostics_surfaces_ho008_analysis_context_warning(tmp_path: P
     assert "Engineering Analysis Center" in bundle.analysis_context_action
     assert any("HO-008 analysis context is BLOCKED" in msg for msg in bundle.analysis_evidence_warnings)
     summary_lines = DesktopDiagnosticsCenter._analysis_evidence_summary_lines(object(), bundle)
-    assert "- Захват/экспорт HO-010: готово | handoff=HO-010 | capture_hash=capture-ho008" in summary_lines
+    assert "- Захват для анимации: готово | хэш захвата=capture-ho008" in summary_lines
 
     center_state = write_desktop_diagnostics_center_state(out_dir, bundle_record=bundle)
     payload = json.loads(center_state.read_text(encoding="utf-8"))
@@ -294,7 +294,7 @@ def test_desktop_diagnostics_marks_missing_analysis_evidence_with_results_action
 
 
 def test_desktop_diagnostics_operator_preview_localizes_markdown_reports() -> None:
-    from pneumo_solver_ui.tools.desktop_diagnostics_center import _operator_preview_text
+    from pneumo_solver_ui.tools.desktop_diagnostics_center import _operator_log_text, _operator_preview_text
 
     raw = "\n".join(
         [
@@ -308,21 +308,34 @@ def test_desktop_diagnostics_operator_preview_localizes_markdown_reports() -> No
             "## Anim latest diagnostics",
             "- available: False",
             "- pointer_sync_ok: None",
+            "- npz_path_sync_ok: True",
+            "- npz_path: C:/workspace/exports/anim_latest.npz",
         ]
     )
 
     translated = _operator_preview_text(raw)
 
-    assert "# Проверка ZIP для отправки" in translated
+    assert "# Проверка архива для отправки" in translated
     assert "- Успешно: **нет**" in translated
     assert "- Вложенный отчёт о состоянии: да" in translated
-    assert "## Манифест данных" in translated
-    assert "- Нет данных: нет состояния контекста анализа HO-009." in translated
+    assert "## Файл состава данных" in translated
+    assert "- Нет данных: нет состояния контекста анализа результатов." in translated
     assert "## Данные инженерного анализа" in translated
     assert "- Состояние: готово" in translated
     assert "## Диагностика последней анимации" in translated
     assert "- Доступно: нет" in translated
-    assert "- Указатель синхронизирован: нет данных" in translated
+    assert "- Последняя анимация синхронизирована: нет данных" in translated
+    assert "- Файл анимации синхронизирован: да" in translated
+    assert "- Файл анимации: C:/workspace/exports/anim_latest.npz" in translated
+    assert "Путь NPZ" not in translated
+
+    log_text = _operator_log_text("Run dir: C:/tmp/run\nZip: C:/tmp/run.zip\nrc=1\n")
+    assert "Папка запуска: C:/tmp/run" in log_text
+    assert "Архив диагностики: C:/tmp/run.zip" in log_text
+    assert "код завершения 1" in log_text
+    assert "Run dir:" not in log_text
+    assert "Zip:" not in log_text
+    assert "rc=" not in log_text
 
 
 def test_desktop_diagnostics_runtime_persists_machine_readable_bundle_and_run_state(tmp_path: Path) -> None:
@@ -606,9 +619,9 @@ def test_desktop_diagnostics_exposes_engineering_open_gap_state(tmp_path: Path) 
 
     summary_lines = DesktopDiagnosticsCenter._engineering_analysis_evidence_summary_lines(object(), bundle)
     status_text = DesktopDiagnosticsCenter._engineering_analysis_status_text(object(), bundle)
-    assert "- Открытые разрывы: открыто" in summary_lines
-    assert any("Причины открытых разрывов:" in line for line in summary_lines)
-    assert "открытые разрывы=открыто" in status_text
+    assert "- Незакрытые вопросы: открыто" in summary_lines
+    assert any("Причины незакрытых вопросов:" in line for line in summary_lines)
+    assert "открытые вопросы: открыто" in status_text
 
 
 def test_desktop_diagnostics_prefers_latest_bundle_pointer_over_stale_meta(tmp_path: Path) -> None:
@@ -696,18 +709,24 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
 
     assert "DesktopDiagnosticsCenter" in diag_src
     assert 'initial_tab="diagnostics"' in diag_src
+    assert "Центр диагностики — PneumoApp" in diag_src
+    assert "Full Diagnostics (GUI)" not in diag_src
     assert "DesktopDiagnosticsCenter" in send_src
     assert 'initial_tab="send"' in send_src
     assert "latest_send_bundle_clipboard_status.json" in send_src
-    assert "ZIP для отправки в чат готов и уже скопирован в буфер." in send_src
-    assert "Anim pointer diagnostics:" in send_src
+    assert "Архив для отправки в чат готов и уже скопирован в буфер." in send_src
+    assert "Диагностика последней анимации:" in send_src
+    assert "Anim pointer diagnostics:" not in send_src
+    assert "Не удалось собрать архив отправки" in send_src
+    assert "bundle build failed" not in send_src
     assert "load_desktop_diagnostics_bundle_record" in send_src
     assert "ttk.Notebook" in center_src
     assert "write_desktop_diagnostics_center_state" in center_src
-    assert "Машиночитаемые пути" in center_src
-    assert "Данные анализа HO-009" in center_src
+    assert "Полезные файлы и отчёты" in center_src
+    assert "Сводка и полезные файлы" in center_src
+    assert "Данные анализа результатов" in center_src
     assert "latest_analysis_evidence_manifest.json" in center_src
-    assert "Данные инженерного анализа HO-007" in center_src
+    assert "Данные инженерного анализа" in center_src
     assert "latest_engineering_analysis_evidence_manifest_path" in center_src
     assert "engineering_analysis_ready_candidate_count" in center_src
     assert "latest_engineering_analysis_evidence_manifest_json" in runtime_src
@@ -721,19 +740,19 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "def _engineering_analysis_evidence_summary_lines(self, bundle) -> list[str]:" in center_src
     assert "def _engineering_analysis_status_text(self, bundle) -> str:" in center_src
     assert "Готовность данных для отправки" in center_src
-    assert "Контекст анализа HO-008" in center_src
-    assert "Захват/экспорт HO-010" in center_src
+    assert "Связь с анимацией" in center_src
+    assert "Захват для анимации" in center_src
     assert "analysis_capture_export_manifest_status" in center_src
     assert "capture_export_manifest_status" in runtime_src
     assert "analysis_context_status" in runtime_src
     assert "analysis_context_action" in runtime_src
     assert "Данные справочника геометрии" in center_src
-    assert "Актуальность артефакта" in center_src
-    assert "Статус артефакта источника" in center_src
+    assert "Актуальность данных" in center_src
+    assert "Данные источника" in center_src
     assert "Причины неготовности источника" in center_src
-    assert "Потребителю разрешено создавать геометрию" in center_src
+    assert "Справочнику разрешено достраивать геометрию" in center_src
     assert "geometry_reference_artifact_freshness_relation" in center_src
-    assert "Проверка актуального ZIP" in center_src
+    assert "Проверка актуального архива" in center_src
     assert "Предупреждения источников данных остаются предупреждениями" in center_src
     assert "Снимок тихих предупреждений самопроверки" in center_src
     assert "latest_integrity_proof" in runtime_src
@@ -783,6 +802,9 @@ def test_desktop_diagnostics_center_uses_split_workspace_and_sidebar_actions() -
     assert 'ttk.Button(header_actions, text="1. Проверить проект", command=lambda: self.notebook.select(self.diag_tab)).pack(side="left")' in center_src
     assert 'process_box = ttk.LabelFrame(outer, text="Текущий процесс", padding=8)' in center_src
     assert "self.process_progress = ttk.Progressbar(" in center_src
+    assert "preview_area = ttk.Frame(self.bundle_body)" in center_src
+    assert 'inspect_box = ttk.LabelFrame(preview_area, text="Проверка архива", padding=6)' in center_src
+    assert 'health_box = ttk.LabelFrame(preview_area, text="Состояние проекта", padding=6)' in center_src
     assert "def _set_process_busy(self, title: str, detail: str) -> None:" in center_src
     assert "def _start_run(self) -> None:" in center_src
     assert "def _open_bundle_dir(self) -> None:" in center_src
@@ -796,12 +818,18 @@ def test_desktop_diagnostics_center_operator_text_is_russian_and_progress_global
 
     required = [
         "Текущий процесс",
-        "Прогресс диагностики и сборки ZIP всегда показывается здесь",
+        "Прогресс диагностики и сборки архива всегда показывается здесь",
+        "независимо от выбранной вкладки",
         "Идёт автономная диагностика. Прогресс показан здесь",
-        "Идёт сборка диагностического ZIP. Прогресс показан здесь",
-        "Скопировать ZIP в буфер обмена",
-        "Данные анализа HO-009:",
-        "Данные инженерного анализа HO-007:",
+        "Идёт сборка диагностического архива. Прогресс показан здесь",
+        "Открыт шаг",
+        "Прогресс любой длительной операции",
+        "Скопировать архив в буфер обмена",
+        "Папка данных анимации",
+        "Выберите папку с данными анимации",
+        "- Файл анимации:",
+        "Данные анализа результатов:",
+        "Данные инженерного анализа:",
         "Данные справочника геометрии:",
     ]
     for fragment in required:
@@ -828,8 +856,30 @@ def test_desktop_diagnostics_center_operator_text_is_russian_and_progress_global
         "minutes:",
         "jobs:",
         "State JSON:",
+        "Технический журнал диагностики",
+        "Техническая команда",
+        "Файл состояния окна",
+        "self.pb",
+        "preview_book",
+        "Сводка и машинно-читаемые пути",
+        "Машиночитаемые пути",
+        "Данные анализа HO-009:",
+        "Данные инженерного анализа HO-007:",
+        'text="Анализ результатов / HO-009"',
+        'text="Инженерный анализ / HO-007"',
+        "Захват/экспорт HO-010",
+        "handoff=",
         "Сборка пакета отправки",
         "Запущен автономный",
+        "Открыт раздел",
+        "выбранного раздела",
+        'last_message="rc',
+        "Каталог прогона",
+        "Папка с NPZ",
+        "Выберите папку с NPZ",
+        "Выбранный NPZ",
+        "Путь NPZ",
+        "Каталог:",
     ]
     for fragment in forbidden:
         assert fragment not in center_src

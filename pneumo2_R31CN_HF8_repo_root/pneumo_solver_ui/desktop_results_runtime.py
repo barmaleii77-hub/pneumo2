@@ -151,6 +151,39 @@ def _short_text(text: Any, *, limit: int = 220) -> str:
     return raw[: max(0, limit - 1)].rstrip() + "..."
 
 
+def _status_ru(value: Any) -> str:
+    raw = str(value or "").strip()
+    labels = {
+        "PASS": "норма",
+        "FAIL": "ошибка",
+        "WARN": "предупреждение",
+        "READY": "готово",
+        "MISSING": "нет данных",
+        "BLOCKED": "заблокировано",
+        "CRITICAL": "критично",
+        "PARTIAL": "частично",
+        "INFO": "справка",
+        "CURRENT": "текущий",
+        "HISTORICAL": "исторический",
+        "STALE": "устарел",
+        "UNKNOWN": "не определено",
+    }
+    return labels.get(raw.upper(), raw or "—")
+
+
+def _operator_text(value: Any) -> str:
+    text = str(value or "").strip()
+    replacements = {
+        "Compare Viewer": "окно сравнения",
+        "Desktop Animator": "аниматор",
+        "Desktop Mnemo": "мнемосхема",
+        "Open ": "Открыть ",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    return text
+
+
 def _same_suffix(path: Path, suffix: str) -> bool:
     return path.suffix.lower() == str(suffix).lower()
 
@@ -200,35 +233,35 @@ def _operator_recommendation_ru(value: object) -> str:
 
 
 _CONTEXT_FIELD_TITLES: dict[str, str] = {
-    "run_id": "ID прогона",
-    "run_contract_hash": "Хэш контракта прогона",
-    "selected_run_hash": "Хэш выбранного прогона",
-    "analysis_context_hash": "Хэш контекста анализа",
-    "analysis_context_status": "Статус контекста анализа",
-    "animator_link_contract_hash": "Хэш связи с аниматором",
-    "selected_run_contract_hash": "Хэш контракта выбранного прогона",
-    "selected_run_contract_path": "Путь контракта выбранного прогона",
-    "run_dir": "Каталог прогона оптимизатора",
-    "results_csv_path": "CSV результатов оптимизатора",
-    "selected_test_id": "ID выбранного испытания",
-    "selected_npz_path": "NPZ выбранной анимации",
-    "compare_contract_hash": "Хэш контракта сравнения",
-    "evidence_manifest_hash": "Хэш evidence диагностики",
-    "objective_contract_hash": "Хэш objective-контракта",
-    "hard_gate_key": "Ключ жесткого ограничения",
-    "hard_gate_tolerance": "Допуск жесткого ограничения",
-    "active_baseline_hash": "Хэш активной базы",
-    "suite_snapshot_hash": "Хэш снимка набора испытаний",
-    "scenario_lineage_hash": "Хэш происхождения сценария",
-    "problem_hash": "Хэш задачи",
-    "problem_hash_mode": "Режим хэша задачи",
-    "objective_keys": "Ключи objective",
-    "penalty_key": "Ключ штрафа",
+    "run_id": "Номер прогона",
+    "run_contract_hash": "Идентификатор прогона",
+    "selected_run_hash": "Идентификатор выбранного прогона",
+    "analysis_context_hash": "Идентификатор данных анализа",
+    "analysis_context_status": "Состояние данных анализа",
+    "animator_link_contract_hash": "Идентификатор связи с аниматором",
+    "selected_run_contract_hash": "Идентификатор выбранного прогона",
+    "selected_run_contract_path": "Файл выбранного прогона",
+    "run_dir": "Папка прогона оптимизатора",
+    "results_csv_path": "Таблица результатов оптимизатора",
+    "selected_test_id": "Номер выбранного испытания",
+    "selected_npz_path": "Файл выбранной анимации",
+    "compare_contract_hash": "Идентификатор сравнения",
+    "evidence_manifest_hash": "Идентификатор материалов диагностики",
+    "objective_contract_hash": "Идентификатор целевого профиля",
+    "hard_gate_key": "Ограничение",
+    "hard_gate_tolerance": "Допуск ограничения",
+    "active_baseline_hash": "Идентификатор базового варианта",
+    "suite_snapshot_hash": "Идентификатор набора испытаний",
+    "scenario_lineage_hash": "Идентификатор сценария",
+    "problem_hash": "Идентификатор задачи",
+    "problem_hash_mode": "Режим идентификатора задачи",
+    "objective_keys": "Показатели цели",
+    "penalty_key": "Штраф",
     "penalty_tol": "Допуск штрафа",
-    "capture_export_manifest_handoff_id": "Идентификатор handoff захвата",
-    "capture_hash": "Хэш захвата",
-    "truth_mode_hash": "Хэш truth-режима аниматора",
-    "visual_cache_token": "Токен визуального кэша аниматора",
+    "capture_export_manifest_handoff_id": "Идентификатор передачи захвата",
+    "capture_hash": "Идентификатор захвата",
+    "truth_mode_hash": "Идентификатор режима отображения",
+    "visual_cache_token": "Метка визуального кэша аниматора",
 }
 
 _CONTEXT_FIELD_KEYS: tuple[str, ...] = tuple(_CONTEXT_FIELD_TITLES)
@@ -365,24 +398,24 @@ def _optimizer_selected_contract_info(
     if contract_path is None:
         status = "MISSING"
         if pointer_path is None:
-            banner = "Контекст выбранного оптимизационного прогона пока недоступен."
+            banner = "Данные выбранного оптимизационного прогона пока недоступны."
         else:
-            banner = "Контекст анализа есть, но selected_run_contract.json не найден."
+            banner = "Данные анализа есть, но файл выбранного прогона не найден."
     elif blocking_states or ready_state == "blocked":
         status = "BLOCKED"
-        banner = "Selected optimizer run contract has blocking handoff states."
+        banner = "Выбранный прогон оптимизации заблокирован для анализа."
     elif warnings or ready_state == "warning":
         status = "WARN"
-        banner = "Selected optimizer run contract is available with warnings."
+        banner = "Выбранный прогон оптимизации доступен с предупреждениями."
     elif pointer_path is None:
         status = "WARN"
         banner = (
-            "selected_run_contract.json найден как доказательство выбранного прогона; "
-            "закреплённый контекст анализа отсутствует."
+            "Файл выбранного прогона найден; "
+            "закреплённые данные анализа отсутствуют."
         )
     else:
         status = "READY"
-        banner = "Selected optimizer run contract is available for results evidence."
+        banner = "Выбранный прогон оптимизации готов для анализа результатов."
 
     selected_context: dict[str, Any] = {
         "selected_run_contract_hash": selected_run_contract_hash,
@@ -551,11 +584,11 @@ def _extract_result_context(
                 status = "CURRENT"
             else:
                 status = "STALE"
-                detail = f"{key}: current={current_value} | selected={selected_value}"
+                detail = f"{key}: текущее: {current_value}; выбранное: {selected_value}"
                 mismatches.append(key)
         elif current_value and not selected_value:
             status = "MISSING"
-            detail = f"{key}: current context exists, selected result did not publish it"
+            detail = f"{key}: текущее значение есть, выбранный результат его не опубликовал"
         fields.append(
             DesktopResultsContextField(
                 key=key,
@@ -580,31 +613,31 @@ def _extract_result_context(
         state = "STALE"
         banner = "Текущая постановка отличается от выбранного результата."
         detail = "Различаются поля: " + ", ".join(mismatches)
-        action = "Откройте compare contract или переключите контекст; diagnostics export сохранит оба контекста."
+        action = "Откройте окно сравнения или переключите выбранные данные; сохранение материалов диагностики оставит оба набора данных."
     elif explicit_state in {"CURRENT", "HISTORICAL", "STALE"}:
         state = explicit_state
         banner = {
-            "CURRENT": "Выбранный результат соответствует текущему контексту.",
-            "HISTORICAL": "Открыт исторический результат с frozen context.",
-            "STALE": "Текущий контекст помечен как stale для выбранного результата.",
+            "CURRENT": "Выбранный результат соответствует текущим данным.",
+            "HISTORICAL": "Открыт исторический результат с закреплёнными данными.",
+            "STALE": "Текущие данные помечены как устаревшие для выбранного результата.",
         }[state]
         detail = str(result_context.get("detail") or result_context.get("banner_detail") or "")
         action = str(result_context.get("action") or result_context.get("required_action") or "")
     elif selected_has_signal and current_has_signal and comparable_count > 0:
         state = "CURRENT"
-        banner = "Выбранный результат соответствует текущему контексту."
-        detail = "Совпали опубликованные context/hash поля."
-        action = "Можно переходить к compare, animator или diagnostics evidence export."
+        banner = "Выбранный результат соответствует текущим данным."
+        detail = "Совпали опубликованные поля данных и идентификаторов."
+        action = "Можно переходить к сравнению, аниматору или сохранению материалов диагностики."
     elif selected_has_signal:
         state = "HISTORICAL"
-        banner = "Открыт исторический результат с frozen context."
-        detail = "Текущий контекст не опубликован для полной сверки; результат остаётся historical, не silently current."
-        action = "Для актуализации откройте текущий run или экспортируйте evidence как historical."
+        banner = "Открыт исторический результат с закреплёнными данными."
+        detail = "Текущие данные не опубликованы для полной сверки; результат остаётся историческим."
+        action = "Для актуализации откройте текущий прогон или сохраните материалы как исторический результат."
     else:
         state = "MISSING"
-        banner = "Контекст результата отсутствует."
-        detail = "Validation report/run summary не опубликовали run/context hashes."
-        action = "Запустите диагностику или соберите пакет отправки со свежими result context fields."
+        banner = "Данные результата отсутствуют."
+        detail = "Отчёт проверки не опубликовал идентификаторы прогона и результата."
+        action = "Запустите диагностику или подготовьте архив отправки со свежими данными результата."
 
     return {
         "state": state,
@@ -652,10 +685,10 @@ def _suggested_next_step(
             else (
                 "Откройте аниматор в режиме сопровождения и проверьте последний критический участок."
                 if latest_pointer_json_path is not None
-                else "Откройте Compare Viewer по последнему NPZ и проверьте критический результат."
+                else "Откройте окно сравнения по последнему файлу анимации и проверьте критический результат."
             )
         )
-        detail = triage_red_flags[0] if triage_red_flags else "Отчет triage отметил критические находки."
+        detail = triage_red_flags[0] if triage_red_flags else "Разбор замечаний отметил критические находки."
         if latest_pointer_json_path is not None:
             return action, detail, "open_animator_follow", "latest_pointer"
         if latest_npz_path is not None:
@@ -664,8 +697,8 @@ def _suggested_next_step(
 
     if gate and gate not in {"PASS", "OK", "READY"}:
         return (
-            "Перед отправкой проверьте шлюз оптимизации.",
-            gate_reason or f"release_gate={gate}",
+            "Перед отправкой проверьте ограничения оптимизации.",
+            gate_reason or f"Ограничение оптимизации: {_status_ru(gate)}",
             "open_artifact",
             "validation_json",
         )
@@ -683,15 +716,15 @@ def _suggested_next_step(
         action = (
             triage_recommendations[0]
             if triage_recommendations
-            else "Проверьте предупреждения triage перед закрытием проверки."
+            else "Проверьте предупреждения разбора замечаний перед закрытием проверки."
         )
-        detail = triage_red_flags[0] if triage_red_flags else "Отчет triage содержит предупреждения или красные флаги."
+        detail = triage_red_flags[0] if triage_red_flags else "Разбор замечаний содержит предупреждения или красные флаги."
         return action, detail, "open_artifact", "triage_json"
 
     if triage_recommendations:
         return (
             triage_recommendations[0],
-            "Последний отчет triage предлагает это как следующую операторскую проверку.",
+            "Последний разбор замечаний предлагает это как следующую операторскую проверку.",
             "open_artifact",
             "triage_json",
         )
@@ -720,7 +753,7 @@ def _suggested_next_step(
 
     if latest_npz_path is not None:
         return (
-            "Откройте сравнение по последнему NPZ.",
+            "Откройте сравнение по последнему файлу анимации.",
             latest_npz_path.name,
             "open_compare_viewer",
             "latest_npz",
@@ -736,15 +769,15 @@ def _suggested_next_step(
 
     if latest_zip_path is not None:
         return (
-            "Откройте центр отправки и проверьте свежие материалы пакета.",
+            "Откройте центр отправки и проверьте свежие материалы архива.",
             latest_zip_path.name,
             "open_send_center",
             "send_bundle_zip",
         )
 
     return (
-        "Сначала запустите диагностику или соберите пакет отправки.",
-        "Свежие артефакты проверки и результатов пока не появились.",
+        "Сначала запустите диагностику или подготовьте архив отправки.",
+        "Свежие материалы проверки и результатов пока не появились.",
         "open_diagnostics_gui",
         "",
     )
@@ -857,22 +890,22 @@ class DesktopResultsRuntime:
         )
 
         items: list[DesktopResultsArtifact] = []
-        _append_artifact(items, key="send_bundle_zip", title="Последний ZIP пакета отправки", category="bundle", path=latest_zip_path)
-        _append_artifact(items, key="validation_json", title="Проверка в JSON", category="validation", path=validation_json_path)
-        _append_artifact(items, key="validation_md", title="Проверка в Markdown", category="validation", path=validation_md_path)
-        _append_artifact(items, key="triage_json", title="Разбор замечаний в JSON", category="triage", path=triage_json_path)
-        _append_artifact(items, key="triage_md", title="Разбор замечаний в Markdown", category="triage", path=triage_md_path)
-        _append_artifact(items, key="dashboard_html", title="Сводная HTML-страница", category="results", path=dashboard_html_path)
-        _append_artifact(items, key="anim_diag_json", title="Диагностика визуализации в JSON", category="anim_latest", path=anim_diag_json_path)
-        _append_artifact(items, key="latest_npz", title="Последний NPZ анимации", category="results", path=latest_npz_path)
-        _append_artifact(items, key="latest_pointer", title="Последний указатель анимации", category="results", path=latest_pointer_json_path)
+        _append_artifact(items, key="send_bundle_zip", title="Последний архив отправки", category="bundle", path=latest_zip_path)
+        _append_artifact(items, key="validation_json", title="Данные проверки", category="validation", path=validation_json_path)
+        _append_artifact(items, key="validation_md", title="Отчёт проверки", category="validation", path=validation_md_path)
+        _append_artifact(items, key="triage_json", title="Данные разбора замечаний", category="triage", path=triage_json_path)
+        _append_artifact(items, key="triage_md", title="Отчёт разбора замечаний", category="triage", path=triage_md_path)
+        _append_artifact(items, key="dashboard_html", title="Сводная страница результатов", category="results", path=dashboard_html_path)
+        _append_artifact(items, key="anim_diag_json", title="Диагностика визуализации", category="anim_latest", path=anim_diag_json_path)
+        _append_artifact(items, key="latest_npz", title="Последний файл анимации", category="results", path=latest_npz_path)
+        _append_artifact(items, key="latest_pointer", title="Данные последней анимации", category="results", path=latest_pointer_json_path)
         _append_artifact(
             items,
             key="capture_export_manifest",
-            title="HO-010 capture/export manifest",
+            title="Запись экспорта анимации",
             category="evidence",
             path=latest_capture_export_manifest_path,
-            detail="HO-010 WS-ANIMATOR capture/export lineage",
+            detail="Связь экспорта анимации с выбранным результатом.",
         )
         _append_artifact(items, key="mnemo_event_log", title="Журнал событий мнемосхемы", category="results", path=latest_mnemo_event_log_path)
         _append_artifact(items, key="autotest_run", title="Последний каталог автотеста", category="runs", path=latest_autotest_run_dir)
@@ -880,34 +913,34 @@ class DesktopResultsRuntime:
         _append_artifact(
             items,
             key="diagnostics_evidence_manifest",
-            title="Доказательства диагностики",
+            title="Материалы диагностики",
             category="evidence",
             path=diagnostics_evidence_manifest_path,
-            detail="HO-009 WS-ANALYSIS -> WS-DIAGNOSTICS",
+            detail="Материалы для связи анализа и диагностики.",
         )
         _append_artifact(
             items,
             key="compare_current_context_sidecar",
-            title="Compare current context handoff",
+            title="Данные для окна сравнения",
             category="evidence",
             path=compare_current_context_sidecar_path,
-            detail="HO-009 WS-ANALYSIS -> CompareViewer current_context_ref",
+            detail="Материалы для передачи выбранного результата в окно сравнения.",
         )
         _append_artifact(
             items,
             key="selected_optimizer_run_contract",
-            title="Selected optimizer run contract",
+            title="Выбранный прогон оптимизации",
             category="evidence",
             path=optimizer_contract_info.get("contract_path"),
-            detail="HO-007 WS-OPTIMIZATION -> WS-ANALYSIS selected-run provenance",
+            detail="Источник выбранного прогона для анализа результатов.",
         )
         _append_artifact(
             items,
             key="latest_optimizer_pointer",
-            title="Закреплённый оптимизационный контекст",
+            title="Закреплённые данные оптимизации",
             category="evidence",
             path=latest_optimizer_pointer_path,
-            detail="Durable analysis context for the selected optimization run",
+            detail="Закреплённый выбранный расчёт для анализа результатов.",
         )
 
         validation_status = _validation_status(
@@ -966,11 +999,11 @@ class DesktopResultsRuntime:
         overview_rows: list[DesktopResultsOverviewRow] = [
             DesktopResultsOverviewRow(
                 key="send_bundle_validation",
-                title="Проверка пакета отправки",
+                title="Проверка архива отправки",
                 status=validation_status,
                 detail=(
-                    f"errors={len(validation_payload.get('errors') or [])} | "
-                    f"warnings={len(validation_payload.get('warnings') or [])}"
+                    f"ошибок: {len(validation_payload.get('errors') or [])}; "
+                    f"предупреждений: {len(validation_payload.get('warnings') or [])}"
                 ),
                 next_action="Открыть отчёт проверки" if validation_json_path is not None else "Сначала запустить диагностику",
                 evidence_path=validation_json_path or validation_md_path,
@@ -982,10 +1015,10 @@ class DesktopResultsRuntime:
                 title="Разбор замечаний",
                 status=triage_status,
                 detail=(
-                    f"critical={triage_critical_count} | "
-                    f"warn={triage_warn_count} | "
-                    f"info={triage_info_count} | "
-                    f"red_flags={len(triage_red_flags)}"
+                    f"критично: {triage_critical_count}; "
+                    f"предупреждений: {triage_warn_count}; "
+                    f"информация: {triage_info_count}; "
+                    f"красных флагов: {len(triage_red_flags)}"
                 ),
                 next_action=(
                     triage_operator_recommendations[0]
@@ -993,20 +1026,20 @@ class DesktopResultsRuntime:
                     else (
                         "Проверить красные флаги"
                         if triage_red_flags
-                        else "Открыть отчет triage"
+                        else "Открыть разбор замечаний"
                     )
                 )
                 if triage_json_path is not None or triage_md_path is not None
-                else "Сформировать отчет triage",
+                else "Сформировать разбор замечаний",
                 evidence_path=triage_json_path or triage_md_path,
                 action_key="open_artifact" if triage_json_path is not None or triage_md_path is not None else "open_diagnostics_gui",
                 artifact_key="triage_json" if triage_json_path is not None else "triage_md",
             ),
             DesktopResultsOverviewRow(
                 key="optimizer_scope_gate",
-                title="Шлюз области оптимизации",
-                status=str(optimizer_scope_gate.get("release_gate") or "n/a"),
-                detail=str(optimizer_scope_gate.get("release_gate_reason") or "В последней проверке нет шлюза области оптимизации."),
+                title="Ограничения оптимизации",
+                status=str(optimizer_scope_gate.get("release_gate") or "MISSING"),
+                detail=str(optimizer_scope_gate.get("release_gate_reason") or "В последней проверке нет ограничений области оптимизации."),
                 next_action="Проверить предупреждения" if validation_json_path is not None else "",
                 evidence_path=validation_json_path,
                 action_key="open_artifact",
@@ -1014,30 +1047,30 @@ class DesktopResultsRuntime:
             ),
             DesktopResultsOverviewRow(
                 key="selected_result_context",
-                title="Контекст выбранного результата",
+                title="Данные выбранного результата",
                 status=str(context.get("state") or "MISSING"),
                 detail=str(context.get("banner") or ""),
-                next_action=str(context.get("action") or "Экспортировать доказательства диагностики"),
+                next_action=str(context.get("action") or "Сохранить материалы диагностики"),
                 evidence_path=diagnostics_evidence_manifest_path,
                 action_key="export_diagnostics_evidence",
                 artifact_key="diagnostics_evidence_manifest",
             ),
             DesktopResultsOverviewRow(
                 key="selected_optimizer_run_contract",
-                title="Контекст оптимизации для анализа",
+                title="Выбранный прогон оптимизации",
                 status=str(optimizer_contract_info.get("status") or "MISSING"),
                 detail=(
                     str(optimizer_contract_info.get("banner") or "")
-                    + " hash="
+                    + " Идентификатор: "
                     + _short_text(
                         optimizer_contract_info.get("selected_run_contract_hash"),
                         limit=18,
                     )
                 ),
                 next_action=(
-                    "Открыть selected_run_contract"
+                    "Показать файл выбранного прогона"
                     if optimizer_contract_info.get("contract_path") is not None
-                    else "Выбрать прогон в Optimizer Center"
+                    else "Выбрать прогон в окне оптимизации"
                 ),
                 evidence_path=optimizer_contract_info.get("contract_path"),
                 action_key=(
@@ -1051,7 +1084,7 @@ class DesktopResultsRuntime:
                 key="anim_latest_results",
                 title="Последний результат анимации",
                 status="READY" if latest_npz_path is not None else "MISSING",
-                detail=str(latest_npz_path.name if latest_npz_path is not None else "anim_latest NPZ is not available."),
+                detail=str(latest_npz_path.name if latest_npz_path is not None else "Файл последней анимации недоступен."),
                 next_action="Открыть сравнение" if latest_npz_path is not None else "Запустить автотест или диагностику",
                 evidence_path=latest_npz_path,
                 action_key="open_compare_viewer" if latest_npz_path is not None else "open_diagnostics_gui",
@@ -1059,32 +1092,31 @@ class DesktopResultsRuntime:
             ),
             DesktopResultsOverviewRow(
                 key="animator_pointer",
-                title="Контекст аниматора",
+                title="Данные для аниматора",
                 status="READY" if latest_pointer_json_path is not None else "MISSING",
                 detail=str(
                     latest_pointer_json_path.name
                     if latest_pointer_json_path is not None
-                    else "Контекст анимации пока недоступен."
+                    else "Данные анимации пока недоступны."
                 ),
-                next_action="Открыть аниматор" if latest_pointer_json_path is not None else "Сформировать контекст анимации",
+                next_action="Открыть аниматор" if latest_pointer_json_path is not None else "Сформировать данные анимации",
                 evidence_path=latest_pointer_json_path,
                 action_key="open_animator_follow" if latest_pointer_json_path is not None else "open_diagnostics_gui",
                 artifact_key="latest_pointer",
             ),
             DesktopResultsOverviewRow(
                 key="capture_export_manifest",
-                title="HO-010 capture/export manifest",
+                title="Запись экспорта анимации",
                 status=capture_manifest_status,
                 detail=(
-                    f"handoff={capture_export_manifest_handoff_id or '—'} | "
-                    f"capture_hash={_short_text(capture_hash, limit=18) or '—'} | "
-                    f"analysis_context={capture_analysis_context_status or '—'} | "
-                    f"truth={capture_truth_state or '—'}"
+                    f"идентификатор захвата: {_short_text(capture_hash, limit=18) or '—'}; "
+                    f"данные анализа: {_status_ru(capture_analysis_context_status)}; "
+                    f"достоверность: {_status_ru(capture_truth_state)}"
                 ),
                 next_action=(
-                    "Открыть capture/export manifest"
+                    "Открыть запись экспорта анимации"
                     if latest_capture_export_manifest_path is not None
-                    else "Экспортировать выбранную анимацию из Animator"
+                    else "Экспортировать выбранную анимацию из аниматора"
                 ),
                 evidence_path=latest_capture_export_manifest_path,
                 action_key=(
@@ -1101,7 +1133,7 @@ class DesktopResultsRuntime:
                 detail=str(
                     latest_mnemo_event_log_path.name
                     if latest_mnemo_event_log_path is not None
-                    else "Event log not found for latest result."
+                    else "Журнал событий для последнего результата не найден."
                 ),
                 next_action="Посмотреть свежие события" if latest_mnemo_event_log_path is not None else "Открыть мнемосхему и выгрузить журнал",
                 evidence_path=latest_mnemo_event_log_path,
@@ -1110,18 +1142,18 @@ class DesktopResultsRuntime:
             ),
             DesktopResultsOverviewRow(
                 key="bundle_sidecars",
-                title="Материалы пакета",
+                title="Материалы архива отправки",
                 status=(
                     "READY"
                     if latest_zip_path is not None and triage_md_path is not None and dashboard_html_path is not None
                     else "PARTIAL"
                 ),
                 detail=(
-                    f"zip={'yes' if latest_zip_path is not None else 'no'} | "
-                    f"triage={'yes' if triage_md_path is not None else 'no'} | "
-                    f"dashboard={'yes' if dashboard_html_path is not None else 'no'}"
+                    f"архив: {'есть' if latest_zip_path is not None else 'нет'}; "
+                    f"разбор: {'есть' if triage_md_path is not None else 'нет'}; "
+                    f"панель: {'есть' if dashboard_html_path is not None else 'нет'}"
                 ),
-                next_action="Открыть центр отправки" if latest_zip_path is not None else "Собрать пакет отправки",
+                next_action="Открыть центр отправки" if latest_zip_path is not None else "Подготовить архив отправки",
                 evidence_path=latest_zip_path or triage_md_path or dashboard_html_path,
                 action_key="open_send_center" if latest_zip_path is not None else "open_send_bundles",
                 artifact_key=(
@@ -1351,37 +1383,37 @@ class DesktopResultsRuntime:
 
         append_current(
             "session_send_bundle_zip",
-            "ZIP текущего прогона",
+            "Архив текущего прогона",
             handoff.zip_path,
             category="bundle",
         )
         append_current(
             "session_autotest_run",
-            "Каталог автотеста текущего прогона",
+            "Папка автотеста текущего прогона",
             handoff.autotest_run_dir,
             category="runs",
         )
         append_current(
             "session_diagnostics_run",
-            "Каталог диагностики текущего прогона",
+            "Папка диагностики текущего прогона",
             handoff.diagnostics_run_dir,
             category="runs",
         )
 
         pinned_map = (
-            ("validation_json", "Проверка текущего прогона в JSON"),
-            ("validation_md", "Проверка текущего прогона в Markdown"),
-            ("triage_json", "Разбор замечаний текущего прогона в JSON"),
-            ("triage_md", "Разбор замечаний текущего прогона в Markdown"),
-            ("dashboard_html", "HTML-сводка текущего прогона"),
+            ("validation_json", "Данные проверки текущего прогона"),
+            ("validation_md", "Отчёт проверки текущего прогона"),
+            ("triage_json", "Данные разбора замечаний текущего прогона"),
+            ("triage_md", "Отчёт разбора замечаний текущего прогона"),
+            ("dashboard_html", "Сводная страница текущего прогона"),
             ("anim_diag_json", "Диагностика анимации текущего прогона"),
-            ("latest_npz", "NPZ текущего прогона"),
-            ("latest_pointer", "Контекст аниматора текущего прогона"),
-            ("capture_export_manifest", "HO-010 manifest текущего прогона"),
+            ("latest_npz", "Файл анимации текущего прогона"),
+            ("latest_pointer", "Данные аниматора текущего прогона"),
+            ("capture_export_manifest", "Запись экспорта текущего прогона"),
             ("mnemo_event_log", "Журнал мнемосхемы текущего прогона"),
-            ("compare_current_context_sidecar", "Compare handoff текущего прогона"),
-            ("selected_optimizer_run_contract", "Контекст оптимизации для анализа текущего прогона"),
-            ("latest_optimizer_pointer", "Закреплённый оптимизационный контекст текущего прогона"),
+            ("compare_current_context_sidecar", "Данные сравнения текущего прогона"),
+            ("selected_optimizer_run_contract", "Выбранный прогон оптимизации для текущих результатов"),
+            ("latest_optimizer_pointer", "Закреплённые данные оптимизации текущего прогона"),
         )
         for artifact_key, title in pinned_map:
             artifact = self.artifact_by_key(snapshot, artifact_key)
@@ -1393,7 +1425,7 @@ class DesktopResultsRuntime:
                     title=title,
                     category=artifact.category,
                     path=artifact.path,
-                    detail="Pinned from latest local run handoff.",
+                    detail="Закреплено из последнего локального прогона.",
                 )
             )
         return tuple(items)
@@ -1775,11 +1807,11 @@ class DesktopResultsRuntime:
     def artifact_preview_lines(self, artifact: DesktopResultsArtifact) -> tuple[str, ...]:
         path = artifact.path
         if not path.exists():
-            return ("Артефакт отсутствует на диске.",)
+            return ("Материал отсутствует на диске.",)
 
         if path.is_dir():
             children = sorted(path.iterdir(), key=lambda item: item.name.lower())
-            lines = [f"Directory entries: {len(children)}"]
+            lines = [f"Элементов в папке: {len(children)}"]
             for child in children[:6]:
                 label = child.name + ("/" if child.is_dir() else "")
                 lines.append(label)
@@ -1793,18 +1825,17 @@ class DesktopResultsRuntime:
                     selected = obj.get("selected_artifact_list") or []
                     mismatch = dict(obj.get("mismatch_summary") or {})
                     lines = [
-                        f"schema={obj.get('schema')}",
-                        f"handoff_id={obj.get('handoff_id')}",
-                        f"context_state={mismatch.get('state') or '—'}",
-                        f"artifacts={len(selected) if isinstance(selected, list) else 0}",
+                        "Тип: материалы диагностики",
+                        f"Состояние данных: {_status_ru(mismatch.get('state'))}",
+                        f"Материалов: {len(selected) if isinstance(selected, list) else 0}",
                     ]
                     if obj.get("evidence_manifest_hash"):
                         lines.append(
-                            "manifest_hash="
+                            "Идентификатор материалов: "
                             + _short_text(obj.get("evidence_manifest_hash"), limit=36)
                         )
                     if mismatch.get("banner"):
-                        lines.append("banner=" + _short_text(mismatch.get("banner")))
+                        lines.append("Сводка: " + _short_text(mismatch.get("banner")))
                     return tuple(lines)
 
                 if artifact.key == "compare_current_context_sidecar":
@@ -1813,38 +1844,36 @@ class DesktopResultsRuntime:
                     result_context = dict(obj.get("result_context") or {})
                     mismatch = dict(obj.get("mismatch_banner") or {})
                     lines = [
-                        f"schema={obj.get('schema')}",
-                        f"handoff_id={obj.get('handoff_id')}",
-                        f"context_state={result_context.get('state') or '—'}",
-                        f"current_refs={len(current)}",
-                        f"selected_refs={len(selected)}",
-                        f"mismatch={mismatch.get('banner_id') or '—'}",
+                        "Тип: данные сравнения",
+                        f"Состояние данных: {_status_ru(result_context.get('state'))}",
+                        f"Текущих ссылок: {len(current)}",
+                        f"Выбранных ссылок: {len(selected)}",
+                        f"Согласование: {_short_text(mismatch.get('banner_id') or '—')}",
                     ]
                     if obj.get("current_context_ref_hash"):
                         lines.append(
-                            "current_context_ref_hash="
+                            "Идентификатор текущих данных: "
                             + _short_text(obj.get("current_context_ref_hash"), limit=36)
                         )
                     return tuple(lines)
 
                 if artifact.key == "selected_optimizer_run_contract":
                     lines = [
-                        f"schema_version={obj.get('schema_version')}",
-                        f"handoff_id={obj.get('handoff_id')}",
-                        f"run_id={obj.get('run_id') or '—'}",
-                        "selected_run_contract_hash="
+                        "Тип: выбранный прогон оптимизации",
+                        f"Прогон: {obj.get('run_id') or '—'}",
+                        "Идентификатор прогона: "
                         + _short_text(obj.get("selected_run_contract_hash"), limit=36),
-                        "objective_contract_hash="
+                        "Целевой профиль: "
                         + _short_text(obj.get("objective_contract_hash"), limit=36),
-                        "problem_hash=" + _short_text(obj.get("problem_hash"), limit=36),
-                        "active_baseline_hash="
+                        "Задача: " + _short_text(obj.get("problem_hash"), limit=36),
+                        "Базовый прогон: "
                         + _short_text(obj.get("active_baseline_hash"), limit=36),
-                        f"analysis_handoff={obj.get('analysis_handoff_ready_state') or '—'}",
+                        f"Готовность анализа: {_status_ru(obj.get('analysis_handoff_ready_state'))}",
                     ]
                     blocking = [str(item) for item in (obj.get("blocking_states") or ()) if str(item).strip()]
                     warnings = [str(item) for item in (obj.get("warnings") or ()) if str(item).strip()]
-                    lines.append(f"blocking_states={len(blocking)}")
-                    lines.append(f"warnings={len(warnings)}")
+                    lines.append(f"Блокировок: {len(blocking)}")
+                    lines.append(f"Предупреждений: {len(warnings)}")
                     return tuple(lines)
 
                 if artifact.key == "capture_export_manifest":
@@ -1856,27 +1885,30 @@ class DesktopResultsRuntime:
                         if str(item).strip()
                     ]
                     lines = [
-                        f"schema={obj.get('schema')}",
-                        f"handoff_id={obj.get('handoff_id')}",
-                        "capture_hash="
+                        "Тип: экспорт анимации",
+                        "Идентификатор захвата: "
                         + _short_text(obj.get("capture_hash"), limit=36),
-                        "analysis_context_status="
+                        "Данные анализа: "
                         + _short_text(
-                            obj.get("analysis_context_status")
+                            _status_ru(
+                                obj.get("analysis_context_status")
                             or analysis_refs.get("analysis_context_status")
                             or "—"
+                            )
                         ),
-                        "truth_state="
+                        "Состояние достоверности: "
                         + _short_text(
-                            truth_summary.get("overall_truth_state")
+                            _status_ru(
+                                truth_summary.get("overall_truth_state")
                             or obj.get("truth_state")
                             or "—"
+                            )
                         ),
-                        f"blocking_states={len(blocking)}",
+                        f"Блокировок: {len(blocking)}",
                     ]
                     if analysis_refs.get("selected_test_id"):
                         lines.append(
-                            "selected_test_id="
+                            "Испытание: "
                             + _short_text(analysis_refs.get("selected_test_id"))
                         )
                     return tuple(lines)
@@ -1886,18 +1918,18 @@ class DesktopResultsRuntime:
                     warnings = [str(item) for item in (obj.get("warnings") or []) if str(item).strip()]
                     gate = dict(obj.get("optimizer_scope_gate") or {})
                     lines = [
-                        f"ok={obj.get('ok')}",
-                        f"errors={len(errors)}",
-                        f"warnings={len(warnings)}",
+                        f"Проверка: {'пройдена' if obj.get('ok') else 'требует внимания'}",
+                        f"Ошибок: {len(errors)}",
+                        f"Предупреждений: {len(warnings)}",
                     ]
                     if gate:
-                        lines.append(f"optimizer_gate={gate.get('release_gate') or 'n/a'}")
+                        lines.append(f"Оптимизация: {_status_ru(gate.get('release_gate'))}")
                         if gate.get("release_gate_reason"):
                             lines.append(_short_text(gate.get("release_gate_reason")))
                     for item in errors[:3]:
-                        lines.append("error: " + _short_text(item))
+                        lines.append("Ошибка: " + _short_text(item))
                     for item in warnings[:3]:
-                        lines.append("warning: " + _short_text(item))
+                        lines.append("Предупреждение: " + _short_text(item))
                     return tuple(lines)
 
                 if artifact.key == "triage_json":
@@ -1910,19 +1942,22 @@ class DesktopResultsRuntime:
                     ]
                     dist = dict(obj.get("dist_progress") or {})
                     lines = [
-                        "severity_counts=" + _short_text(severity),
-                        f"red_flags={len(red_flags)}",
+                        "Замечания: "
+                        + f"критичных: {_to_int(severity.get('critical'))}; "
+                        + f"предупреждений: {_to_int(severity.get('warn'))}; "
+                        + f"справочных: {_to_int(severity.get('info'))}",
+                        f"Красных флагов: {len(red_flags)}",
                     ]
                     if dist:
                         lines.append(
                             _short_text(
-                                f"dist_progress: status={dist.get('status')} completed={dist.get('completed')} in_flight={dist.get('in_flight')}"
+                                f"Распределенный расчет: состояние {_status_ru(dist.get('status'))}, завершено {dist.get('completed')}, в работе {dist.get('in_flight')}"
                             )
                         )
                     for item in red_flags[:3]:
-                        lines.append("red_flag: " + _short_text(item))
+                        lines.append("Красный флаг: " + _short_text(_operator_text(item)))
                     for item in recommendations[:2]:
-                        lines.append("next: " + _short_text(item))
+                        lines.append("Следующий шаг: " + _short_text(_operator_text(item)))
                     return tuple(lines)
 
                 if artifact.key in {"anim_diag_json", "latest_pointer"}:
@@ -1931,22 +1966,22 @@ class DesktopResultsRuntime:
                     npz_path = obj.get("anim_latest_npz_path") or obj.get("npz_path")
                     lines = []
                     if token:
-                        lines.append(f"token={token}")
+                        lines.append(f"Метка визуального кэша: {token}")
                     if reload_inputs:
-                        lines.append("reload_inputs=" + _short_text(reload_inputs))
+                        lines.append("Входные данные перезагрузки: " + _short_text(reload_inputs))
                     if npz_path:
-                        lines.append("npz=" + _short_text(Path(str(npz_path)).name))
+                        lines.append("Файл анимации: " + _short_text(Path(str(npz_path)).name))
                     if obj.get("anim_latest_mnemo_event_log_current_mode"):
                         lines.append(
-                            "mnemo_mode="
+                            "Режим мнемосхемы: "
                             + _short_text(obj.get("anim_latest_mnemo_event_log_current_mode"))
                         )
                     if obj.get("updated_utc") or obj.get("anim_latest_updated_utc"):
                         lines.append(
-                            "updated="
+                            "Обновлено: "
                             + _short_text(obj.get("updated_utc") or obj.get("anim_latest_updated_utc"))
                         )
-                    return tuple(lines[:6] or ["JSON preview available."])
+                    return tuple(lines[:6] or ["Предпросмотр данных доступен."])
 
                 if artifact.key == "mnemo_event_log":
                     recent_events = obj.get("recent_events") or []
@@ -1956,18 +1991,17 @@ class DesktopResultsRuntime:
                             if isinstance(item, dict) and str(item.get("title") or "").strip():
                                 titles.append(str(item.get("title")))
                     lines = [
-                        f"mode={obj.get('current_mode') or '—'}",
-                        f"event_count={obj.get('event_count')}",
-                        f"active_latch={obj.get('active_latch_count')}",
-                        f"acknowledged_latch={obj.get('acknowledged_latch_count')}",
+                        f"Режим: {obj.get('current_mode') or '—'}",
+                        f"Событий: {obj.get('event_count')}",
+                        f"Активных фиксаций: {obj.get('active_latch_count')}",
+                        f"Подтвержденных фиксаций: {obj.get('acknowledged_latch_count')}",
                     ]
                     for item in titles:
-                        lines.append("recent: " + _short_text(item))
+                        lines.append("Недавнее событие: " + _short_text(item))
                     return tuple(lines)
 
-                keys = sorted(str(key) for key in obj.keys())[:8]
-                return ("json_keys=" + ", ".join(keys),)
-            return ("Предпросмотр JSON недоступен.",)
+                return (f"Файл данных: полей {len(obj)}. Откройте файл для технических деталей.",)
+            return ("Предпросмотр данных недоступен.",)
 
         if suffix in {".md", ".txt", ".html"}:
             try:
@@ -1983,8 +2017,8 @@ class DesktopResultsRuntime:
             except Exception:
                 size_bytes = 0
             return (
-                f"NPZ-пакет: {path.name}",
-                f"size_bytes={size_bytes}",
+                f"Файл анимации: {path.name}",
+                f"Размер: {size_bytes} байт",
                 "Для подробного разбора откройте сравнение или аниматор.",
             )
 
@@ -1994,7 +2028,7 @@ class DesktopResultsRuntime:
             size_bytes = 0
         return (
             f"Файл: {path.name}",
-            f"size_bytes={size_bytes}",
+            f"Размер: {size_bytes} байт",
         )
 
 

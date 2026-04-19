@@ -118,6 +118,8 @@ try:
 except Exception:
     RELEASE = os.environ.get("PNEUMO_RELEASE", "UNIFIED_v6_67") or "UNIFIED_v6_67"
 
+DIALOG_TITLE = "Ввод исходных данных"
+
 
 class ScrollableSection(ScrollableFrame):
     pass
@@ -192,14 +194,14 @@ class DesktopInputEditor:
         self.active_snapshot_path: Path | None = None
         self.handoff_snapshot_var = tk.StringVar(
             value=(
-                "Frozen inputs_snapshot ещё не создан. WS-RING (HO-002) и "
-                "WS-SUITE (HO-003) должны получить замороженный снимок перед handoff."
+                "Зафиксированный снимок исходных данных ещё не создан. "
+                "Сценарии колец и набор испытаний должны получить снимок перед дальнейшей работой."
             )
         )
         self.suite_handoff_var = tk.StringVar(
             value=(
-                "HO-005 validated_suite_snapshot ещё не проверен. "
-                "Откройте Run Setup -> Набор испытаний / HO-005."
+                "Проверенный набор испытаний ещё не проверен. "
+                "Откройте настройки расчёта -> Набор испытаний."
             )
         )
         self._latest_suite_handoff_context: dict[str, object] = {}
@@ -259,7 +261,7 @@ class DesktopInputEditor:
         self.field_search_mode = "idle"
         self._field_search_display_to_key: dict[str, str] = {}
         self.run_scenario_key_to_label = {
-            "worldroad": "Дорога: текущий профиль preview",
+            "worldroad": "Дорога: текущий профиль предпросмотра",
             "roll": "Инерция: крен",
             "pitch": "Инерция: тангаж",
             "micro_sync": "Микро: синфаза",
@@ -310,14 +312,14 @@ class DesktopInputEditor:
         self._service_container: ttk.Frame | None = None
         self._service_toggle_anchor: ttk.Frame | None = None
         self._service_panels_visible = False
-        self.service_toggle_text_var = tk.StringVar(value="Показать сервисные панели")
+        self.service_toggle_text_var = tk.StringVar(value="Показать дополнительные действия")
         self.status_var = tk.StringVar()
         self.path_var = tk.StringVar()
         self._task_running = False
         self._host_closed = False
         self._initial_load_done = False
         self._initial_load_after_id: str | None = None
-        self._set_status("Подготавливаю экран данных на основе default_base.json…")
+        self._set_status("Подготавливаю экран данных на основе исходного шаблона...")
         self._configure_launch_summary_styles()
         self._configure_route_button_styles()
         self._build_ui()
@@ -361,7 +363,7 @@ class DesktopInputEditor:
         self._refresh_handoff_snapshot_state()
         self._refresh_suite_handoff_state()
         self._initial_load_done = True
-        self._set_status("Готово. Открыт черновик на основе default_base.json.")
+        self._set_status("Готово. Открыт черновик на основе исходного шаблона.")
 
     def _set_service_panels_visible(self, visible: bool) -> None:
         container = self._service_container
@@ -375,12 +377,12 @@ class DesktopInputEditor:
                 pack_kwargs["after"] = anchor
             if not container.winfo_manager():
                 container.pack(**pack_kwargs)
-            self.service_toggle_text_var.set("Скрыть сервисные панели")
-            self._set_status("Открыт сервисный слой: файлы, профили, история и запуск.")
+            self.service_toggle_text_var.set("Скрыть дополнительные действия")
+            self._set_status("Открыты дополнительные действия: файлы, профили, история и запуск.")
             return
         if container.winfo_manager():
             container.pack_forget()
-        self.service_toggle_text_var.set("Показать сервисные панели")
+        self.service_toggle_text_var.set("Показать дополнительные действия")
 
     def _toggle_service_panels(self) -> None:
         self._set_service_panels_visible(not self._service_panels_visible)
@@ -619,8 +621,12 @@ class DesktopInputEditor:
             return str(self._field_source_state_info(spec.key, payload).get("marker") or "")
         section = self.section_by_title.get(section_title)
         field_keys = [field.key for field in tuple(getattr(section, "fields", ()) or ())]
-        state = "dirty" if any(key in self.source_reference_diffs_by_key for key in field_keys) else "current"
-        return f"source: {self._display_source_name()} · state: {state}"
+        state_label = (
+            "изменено"
+            if any(key in self.source_reference_diffs_by_key for key in field_keys)
+            else "актуально"
+        )
+        return f"источник: {self._display_source_name()} · состояние: {state_label}"
 
     def _build_related_field_items(self, spec: DesktopInputFieldSpec) -> list[tuple[str, str]]:
         same_section = [
@@ -818,7 +824,7 @@ class DesktopInputEditor:
             f"Изменено шагов: {changed_sections}. "
             f"Следующий шаг с замечанием: {self._display_section_title(next_attention_title) if next_attention_title else 'не найден'}. "
             f"Следующий изменённый шаг: {self._display_section_title(next_changed_title) if next_changed_title else 'не найден'}. "
-            f"Статус шага: {desktop_section_status_label(str(current_row.get('status') or ''))}. "
+            f"Состояние шага: {desktop_section_status_label(str(current_row.get('status') or ''))}. "
             f"Замечаний шага: {current_issue_count}. "
             f"Замечания шага: {str(current_issue_card.get('summary') or 'замечаний нет').strip()}. "
             f"{str(current_row.get('summary') or '').strip()} "
@@ -892,11 +898,11 @@ class DesktopInputEditor:
             change_focus_label = str(change_card.get("focus_label") or "").strip()
             text = headline
             if details:
-                text = f"{headline}\nСтатус кластера: {status_text}. {details}"
+                text = f"{headline}\nСостояние кластера: {status_text}. {details}"
             elif headline:
-                text = f"{headline}\nСтатус кластера: {status_text}."
+                text = f"{headline}\nСостояние кластера: {status_text}."
             else:
-                text = f"Статус кластера: {status_text}."
+                text = f"Состояние кластера: {status_text}."
             text = f"{text}\nИзменено от рабочей точки: {change_summary}."
             if focus_reason:
                 text = f"{text}\nПервое замечание: {focus_reason}"
@@ -1006,7 +1012,7 @@ class DesktopInputEditor:
             self._set_status(f"Раздел «{display_title}» уже совпадает с рабочей точкой.")
             return
         if not messagebox.askyesno(
-            "Desktop Input Editor",
+            DIALOG_TITLE,
             f"Вернуть раздел «{display_title}» к рабочей точке?",
         ):
             return
@@ -1053,7 +1059,7 @@ class DesktopInputEditor:
             var.set(spec.to_ui(reference_value))
         except Exception as exc:
             messagebox.showerror(
-                "Desktop Input Editor",
+                DIALOG_TITLE,
                 f"Не удалось вернуть параметр «{spec.label}» к рабочей точке:\n{exc}",
             )
             return
@@ -1588,7 +1594,7 @@ class DesktopInputEditor:
                 key = self._selected_field_search_key()
         if key is None:
             messagebox.showinfo(
-                "Desktop Input Editor",
+                DIALOG_TITLE,
                 "Сначала введите запрос и выберите параметр для перехода.",
             )
             return
@@ -1602,14 +1608,14 @@ class DesktopInputEditor:
         quick_actions.pack(fill="x", pady=(0, 10))
         ttk.Label(
             quick_actions,
-            text="Setup / Исходные данные",
+            text="Исходные данные",
             font=("Segoe UI", 13, "bold"),
         ).pack(side="left")
         ttk.Button(quick_actions, text="Загрузить данные...", command=self._load_json).pack(side="left")
         ttk.Button(quick_actions, text="Сохранить рабочую копию", command=self._save_working_copy).pack(side="left", padx=(8, 0))
         ttk.Button(
             quick_actions,
-            text="Заморозить inputs_snapshot",
+            text="Зафиксировать снимок",
             command=self._save_inputs_handoff_snapshot,
         ).pack(side="left", padx=(8, 0))
         ttk.Button(
@@ -1617,7 +1623,7 @@ class DesktopInputEditor:
             textvariable=self.service_toggle_text_var,
             command=self._toggle_service_panels,
         ).pack(side="left", padx=(8, 0))
-        ttk.Button(quick_actions, text="Baseline и проверки", command=self._open_run_setup_center).pack(side="left", padx=(8, 0))
+        ttk.Button(quick_actions, text="Настройки расчёта и проверки", command=self._open_run_setup_center).pack(side="left", padx=(8, 0))
         ttk.Button(quick_actions, text="Справочники и геометрия", command=self._open_geometry_reference_center).pack(
             side="left",
             padx=(8, 0),
@@ -1693,7 +1699,7 @@ class DesktopInputEditor:
             overview_frame,
             text=(
                 "Этот экран остаётся основным местом редактирования параметров модели и расчётных настроек. "
-                "Предпросмотр, профили, базовый прогон, история и артефакты вынесены в отдельные панели, "
+                "Предпросмотр, профили, базовый прогон, история, результаты и журналы вынесены в отдельные панели, "
                 "чтобы не смешивать ввод исходных данных с производными представлениями."
             ),
             wraplength=1040,
@@ -1713,8 +1719,8 @@ class DesktopInputEditor:
             padx=(8, 0),
         )
 
-        ttk.Button(toolbar, text="Загрузить JSON...", command=self._load_json).grid(row=1, column=0, pady=(10, 0), sticky="w")
-        ttk.Button(toolbar, text="Вернуть default_base.json", command=self._reset_to_default).grid(row=1, column=1, pady=(10, 0), sticky="w", padx=(8, 0))
+        ttk.Button(toolbar, text="Загрузить файл данных...", command=self._load_json).grid(row=1, column=0, pady=(10, 0), sticky="w")
+        ttk.Button(toolbar, text="Вернуть исходный шаблон", command=self._reset_to_default).grid(row=1, column=1, pady=(10, 0), sticky="w", padx=(8, 0))
         ttk.Button(toolbar, text="Сохранить рабочую копию", command=self._save_working_copy).grid(row=1, column=2, pady=(10, 0), sticky="w", padx=(8, 0))
         ttk.Button(toolbar, text="Сохранить как...", command=self._save_as).grid(row=1, column=3, pady=(10, 0), sticky="w", padx=(8, 0))
         ttk.Button(toolbar, text="Открыть папку проекта", command=self._open_repo_root).grid(row=1, column=4, pady=(10, 0), sticky="e", padx=(8, 0))
@@ -1859,14 +1865,14 @@ class DesktopInputEditor:
         ).grid(row=3, column=0, columnspan=6, sticky="w", pady=(10, 0))
         handoff_box = ttk.LabelFrame(
             snapshots,
-            text="Frozen handoff в WS-RING / WS-SUITE",
+            text="Зафиксированный снимок для сценариев и набора испытаний",
             padding=8,
         )
         handoff_box.grid(row=4, column=0, columnspan=6, sticky="ew", pady=(12, 0))
         handoff_box.columnconfigure(1, weight=1)
         ttk.Button(
             handoff_box,
-            text="Заморозить inputs_snapshot.json",
+            text="Зафиксировать снимок исходных данных",
             command=self._save_inputs_handoff_snapshot,
         ).grid(row=0, column=0, sticky="w")
         ttk.Label(
@@ -1878,12 +1884,12 @@ class DesktopInputEditor:
         ).grid(row=0, column=1, sticky="ew", padx=(12, 0))
         ttk.Button(
             handoff_box,
-            text="Открыть inputs_snapshot.json",
+            text="Открыть снимок исходных данных",
             command=self._open_inputs_handoff_snapshot,
         ).grid(row=1, column=0, sticky="w", pady=(8, 0))
         ttk.Button(
             handoff_box,
-            text="Открыть папку WS-INPUTS",
+            text="Открыть папку снимка",
             command=self._open_inputs_handoff_dir,
         ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(8, 0))
 
@@ -1984,7 +1990,7 @@ class DesktopInputEditor:
         actions = ttk.LabelFrame(actions_right_col, text="Проверка и расчёт", padding=10)
         actions.pack(fill="x")
 
-        run_setup_frame = ttk.LabelFrame(actions, text="Отдельный run setup", padding=10)
+        run_setup_frame = ttk.LabelFrame(actions, text="Отдельные настройки расчёта", padding=10)
         run_setup_frame.grid(row=0, column=0, columnspan=6, sticky="ew")
         ttk.Label(
             run_setup_frame,
@@ -2066,7 +2072,7 @@ class DesktopInputEditor:
         artifacts_notebook = ttk.Notebook(actions)
         artifacts_notebook.grid(row=4, column=0, columnspan=6, sticky="ew", pady=(12, 0))
         latest_preview_frame = ttk.Frame(artifacts_notebook, padding=10)
-        artifacts_notebook.add(latest_preview_frame, text="Preview")
+        artifacts_notebook.add(latest_preview_frame, text="Предпросмотр")
         latest_preview_frame.columnconfigure(0, weight=1)
         ttk.Label(
             latest_preview_frame,
@@ -2077,17 +2083,17 @@ class DesktopInputEditor:
         ).grid(row=0, column=0, columnspan=3, sticky="w")
         ttk.Button(
             latest_preview_frame,
-            text="Обновить preview-сводку",
+            text="Обновить сводку предпросмотра",
             command=self._refresh_latest_preview_summary,
         ).grid(row=1, column=0, sticky="w", pady=(10, 0))
         ttk.Button(
             latest_preview_frame,
-            text="Открыть preview_report.json",
+            text="Открыть отчёт предпросмотра",
             command=self._open_latest_preview_report_json,
         ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
             latest_preview_frame,
-            text="Открыть preview-лог",
+            text="Открыть журнал предпросмотра",
             command=self._open_latest_preview_log,
         ).grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
 
@@ -2103,17 +2109,17 @@ class DesktopInputEditor:
         ).grid(row=0, column=0, columnspan=3, sticky="w")
         ttk.Button(
             latest_selfcheck_frame,
-            text="Обновить selfcheck-сводку",
+            text="Обновить сводку самопроверки",
             command=self._refresh_latest_selfcheck_summary,
         ).grid(row=1, column=0, sticky="w", pady=(10, 0))
         ttk.Button(
             latest_selfcheck_frame,
-            text="Открыть selfcheck_report.json",
+            text="Открыть отчёт самопроверки",
             command=self._open_latest_selfcheck_report_json,
         ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
             latest_selfcheck_frame,
-            text="Открыть selfcheck-лог",
+            text="Открыть журнал самопроверки",
             command=self._open_latest_selfcheck_log,
         ).grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
 
@@ -2139,12 +2145,12 @@ class DesktopInputEditor:
         ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
             latest_run_frame,
-            text="Открыть run_summary.json",
+            text="Открыть сводку расчёта",
             command=self._open_latest_run_summary_json,
         ).grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
             latest_run_frame,
-            text="Открыть run-лог",
+            text="Открыть журнал запуска",
             command=self._open_latest_run_log,
         ).grid(row=1, column=3, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
@@ -2154,23 +2160,18 @@ class DesktopInputEditor:
         ).grid(row=1, column=4, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
             latest_run_frame,
-            text="Открыть df_main.csv",
+            text="Открыть основную таблицу результатов",
             command=self._open_latest_df_main_csv,
         ).grid(row=2, column=0, sticky="w", pady=(10, 0))
         ttk.Button(
             latest_run_frame,
-            text="Открыть NPZ bundle",
+            text="Открыть файл анимации",
             command=self._open_latest_npz_bundle,
         ).grid(row=2, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
-        ttk.Button(
-            latest_run_frame,
-            text="Открыть cache entry",
-            command=self._open_latest_run_cache_dir,
-        ).grid(row=2, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
 
         ttk.Label(
             actions,
-            text="Для полного маршрута запуска и артефактов используйте отдельный run setup.",
+            text="Для полного маршрута запуска, результатов и журналов используйте отдельное окно настроек расчёта.",
             foreground="#555555",
         ).grid(row=5, column=0, columnspan=6, sticky="w", pady=(12, 0))
 
@@ -2185,8 +2186,8 @@ class DesktopInputEditor:
                 "Быстрый маршрут помогает идти по кластерам: сначала геометрия, затем пневматика, "
                 "массы, механика, статическая настройка, компоненты, справочные данные "
                 "и расчётные настройки. "
-                "Это только навигация по текущему editor "
-                "и не дублирует отдельные окна Animator, Compare Viewer или Mnemo."
+                "Это только навигация по текущему окну "
+                "и не дублирует отдельные окна аниматора, сравнения результатов или мнемосхемы."
             ),
             wraplength=1040,
             justify="left",
@@ -2614,7 +2615,9 @@ class DesktopInputEditor:
         log_body, self.run_log = build_scrolled_text(log_frame, height=12, wrap="word")
         log_body.pack(fill="both", expand=True)
         self.run_log.configure(state="disabled")
-        self._append_run_log("Editor готов. Можно менять исходные данные и сразу запускать проверку или preview-расчёт.")
+        self._append_run_log(
+            "Окно готово. Можно менять исходные данные и сразу запускать проверку или расчёт предпросмотра."
+        )
         self._set_service_panels_visible(False)
 
         footer = ttk.Frame(outer)
@@ -2622,7 +2625,7 @@ class DesktopInputEditor:
         ttk.Label(footer, textvariable=self.status_var).pack(side="left", anchor="w")
         ttk.Label(
             footer,
-            text="Подсказка: default_base.json не перезаписывается автоматически.",
+            text="Подсказка: исходный шаблон не перезаписывается автоматически.",
             foreground="#555555",
         ).pack(side="right", anchor="e")
         ttk.Sizegrip(footer).pack(side="right", anchor="se", padx=(12, 0))
@@ -2843,6 +2846,8 @@ class DesktopInputEditor:
     def _display_source_name(self) -> str:
         path = self.current_source_path
         try:
+            if path.resolve() == default_base_json_path():
+                return "исходный шаблон"
             return path.name or str(path)
         except Exception:
             return str(path)
@@ -2851,15 +2856,18 @@ class DesktopInputEditor:
         try:
             info = describe_desktop_inputs_snapshot_state(self._gather_payload())
             banner = str(info.get("banner") or "").strip()
-            path = str(info.get("path") or "").strip()
             state = str(info.get("state") or "").strip()
-            if path:
-                banner = f"{banner}\ninputs_snapshot.json: {path}"
             if state:
-                banner = f"{banner}\nСостояние handoff: {state}"
+                state_label = {
+                    "missing": "не создан",
+                    "invalid": "требует проверки",
+                    "stale": "устарел",
+                    "current": "актуален",
+                }.get(state, state)
+                banner = f"{banner}\nСостояние снимка: {state_label}"
             self.handoff_snapshot_var.set(banner.strip())
         except Exception as exc:
-            self.handoff_snapshot_var.set(f"Не удалось проверить frozen inputs_snapshot: {exc}")
+            self.handoff_snapshot_var.set(f"Не удалось проверить зафиксированный снимок исходных данных: {exc}")
 
     def _save_inputs_handoff_snapshot(self) -> None:
         try:
@@ -2870,33 +2878,33 @@ class DesktopInputEditor:
             )
             self._refresh_handoff_snapshot_state()
             self._refresh_suite_handoff_state()
-            self._set_status(f"Frozen inputs_snapshot сохранён для WS-RING/WS-SUITE: {target.name}")
+            self._set_status(f"Снимок исходных данных зафиксирован для сценариев и набора испытаний: {target.name}")
             self._append_run_log(
-                f"[handoff] WS-INPUTS -> WS-RING/WS-SUITE: inputs_snapshot.json сохранён: {target}"
+                f"[snapshot] Снимок исходных данных сохранён для сценариев и набора испытаний: {target}"
             )
             messagebox.showinfo(
-                "Desktop Input Editor",
+                DIALOG_TITLE,
                 (
-                    "Frozen inputs_snapshot.json сохранён для WS-RING (HO-002) "
-                    f"и WS-SUITE (HO-003):\n{target}"
+                    "Снимок исходных данных сохранён для сценариев колец "
+                    f"и набора испытаний:\n{target}"
                 ),
             )
         except Exception as exc:
             self._refresh_handoff_snapshot_state()
             messagebox.showerror(
-                "Desktop Input Editor",
-                f"Не удалось заморозить inputs_snapshot.json:\n{exc}",
+                DIALOG_TITLE,
+                f"Не удалось зафиксировать снимок исходных данных:\n{exc}",
             )
 
     def _open_inputs_handoff_snapshot(self) -> None:
         target = desktop_inputs_snapshot_handoff_path()
         if not target.exists():
-            messagebox.showinfo("Desktop Input Editor", "inputs_snapshot.json пока не создан.")
+            messagebox.showinfo(DIALOG_TITLE, "Снимок исходных данных пока не создан.")
             return
         self._open_path(
             target,
-            success_text=f"Открыт inputs_snapshot.json: {target}",
-            error_title="Не удалось открыть inputs_snapshot.json",
+            success_text=f"Открыт снимок исходных данных: {target}",
+            error_title="Не удалось открыть снимок исходных данных",
         )
 
     def _open_inputs_handoff_dir(self) -> None:
@@ -2904,8 +2912,8 @@ class DesktopInputEditor:
         target.mkdir(parents=True, exist_ok=True)
         self._open_path(
             target,
-            success_text=f"Открыта папка WS-INPUTS: {target}",
-            error_title="Не удалось открыть папку WS-INPUTS",
+            success_text=f"Открыта папка снимков исходных данных: {target}",
+            error_title="Не удалось открыть папку снимков исходных данных",
         )
 
     def _current_suite_rows_for_handoff(self) -> tuple[list[dict[str, object]], Path, str]:
@@ -2951,7 +2959,7 @@ class DesktopInputEditor:
             return context
         except Exception as exc:
             self._latest_suite_handoff_context = {}
-            self.suite_handoff_var.set(f"Не удалось проверить HO-005 validated_suite_snapshot: {exc}")
+            self.suite_handoff_var.set(f"Не удалось проверить набор испытаний: {exc}")
             return {}
 
     def _suite_preview_rows(self, context: dict[str, object] | None = None) -> list[tuple[str, str, str, str, str, str, str]]:
@@ -2975,13 +2983,13 @@ class DesktopInputEditor:
             )
             rows.append(
                 (
-                    "yes" if bool(row.get("включен", row.get("enabled", True))) else "no",
+                    "да" if bool(row.get("включен", row.get("enabled", True))) else "нет",
                     name,
                     str(row.get("стадия", row.get("stage", 0)) or 0),
                     str(row.get("тип", row.get("type", "")) or ""),
                     str(row.get("dt", "")),
                     str(row.get("t_end", row.get("t_end_s", ""))),
-                    refs or ("missing_refs" if missing_by_row.get(name) else "—"),
+                    refs or ("не хватает ссылок" if missing_by_row.get(name) else "—"),
                 )
             )
         return rows
@@ -2989,8 +2997,8 @@ class DesktopInputEditor:
     def _check_suite_handoff_snapshot(self) -> None:
         context = self._refresh_suite_handoff_state()
         banner = "\n".join(format_desktop_suite_status_lines(context)).strip() if context else self.suite_handoff_var.get()
-        self._append_run_log(f"[handoff] HO-005 check:\n{banner}")
-        messagebox.showinfo("Набор испытаний / HO-005", banner)
+        self._append_run_log(f"[набор испытаний] проверка:\n{banner}")
+        messagebox.showinfo("Набор испытаний", banner)
 
     def _freeze_suite_handoff_snapshot(self) -> None:
         try:
@@ -3006,40 +3014,40 @@ class DesktopInputEditor:
             self._latest_suite_handoff_context = dict(context)
             self.suite_handoff_var.set("\n".join(format_desktop_suite_status_lines(context)).strip())
             target = Path(str(context.get("written_path") or context.get("handoff_path") or ""))
-            self._append_run_log(f"[handoff] WS-SUITE -> WS-BASELINE HO-005 saved: {target}")
+            self._append_run_log(f"[набор испытаний] снимок сохранён: {target}")
             state = dict(context.get("state") or {})
             if bool(state.get("handoff_ready", False)):
-                self._set_status(f"HO-005 validated_suite_snapshot сохранён: {target.name}")
-                messagebox.showinfo("Набор испытаний / HO-005", f"HO-005 сохранён:\n{target}")
+                self._set_status(f"Снимок набора испытаний сохранён: {target.name}")
+                messagebox.showinfo("Набор испытаний", f"Снимок набора испытаний сохранён:\n{target}")
             else:
-                self._set_status("HO-005 сохранён, но validation не пройдена.")
+                self._set_status("Снимок набора испытаний сохранён, но проверка не пройдена.")
                 messagebox.showwarning(
-                    "Набор испытаний / HO-005",
-                    "validated_suite_snapshot сохранён как evidence, но baseline будет заблокирован:\n\n"
+                    "Набор испытаний",
+                    "Снимок набора испытаний сохранён, но краткий предпросмотр будет заблокирован:\n\n"
                     + str(state.get("banner") or ""),
                 )
         except Exception as exc:
             self._refresh_suite_handoff_state()
-            messagebox.showerror("Набор испытаний / HO-005", f"Не удалось заморозить HO-005:\n{exc}")
+            messagebox.showerror("Набор испытаний", f"Не удалось зафиксировать набор испытаний:\n{exc}")
 
     def _reset_suite_overrides(self) -> None:
         try:
             target = reset_desktop_suite_overrides()
             self._refresh_suite_handoff_state()
-            self._set_status(f"WS-SUITE overrides сброшены: {target.name}")
-            self._append_run_log(f"[handoff] WS-SUITE overrides reset: {target}")
+            self._set_status(f"Ручные изменения набора испытаний сброшены: {target.name}")
+            self._append_run_log(f"[набор испытаний] ручные изменения сброшены: {target}")
         except Exception as exc:
-            messagebox.showerror("Набор испытаний / HO-005", f"Не удалось сбросить overrides:\n{exc}")
+            messagebox.showerror("Набор испытаний", f"Не удалось сбросить ручные изменения:\n{exc}")
 
     def _open_suite_handoff_snapshot(self) -> None:
         target = desktop_suite_handoff_path()
         if not target.exists():
-            messagebox.showinfo("Набор испытаний / HO-005", "validated_suite_snapshot.json пока не найден.")
+            messagebox.showinfo("Набор испытаний", "Снимок набора испытаний пока не найден.")
             return
         self._open_path(
             target,
-            success_text=f"Открыт validated_suite_snapshot.json: {target}",
-            error_title="Не удалось открыть validated_suite_snapshot.json",
+            success_text=f"Открыт снимок набора испытаний: {target}",
+            error_title="Не удалось открыть снимок набора испытаний",
         )
 
     def _open_suite_handoff_dir(self) -> None:
@@ -3047,8 +3055,8 @@ class DesktopInputEditor:
         target.mkdir(parents=True, exist_ok=True)
         self._open_path(
             target,
-            success_text=f"Открыта папка HO-005: {target}",
-            error_title="Не удалось открыть папку HO-005",
+            success_text=f"Открыта папка набора испытаний: {target}",
+            error_title="Не удалось открыть папку набора испытаний",
         )
 
     def _baseline_suite_gate_allows_launch(self, run_label: str) -> bool:
@@ -3062,15 +3070,15 @@ class DesktopInputEditor:
         state = str(gate.get("state") or "missing")
         if bool(gate.get("baseline_launch_allowed", False)):
             self._append_run_log(
-                f"[handoff] HO-005 OK for baseline: {gate.get('banner') or ''}"
+                f"[набор испытаний] краткий предпросмотр разрешён: {gate.get('banner') or ''}"
             )
             return True
         banner = str(gate.get("banner") or self.suite_handoff_var.get() or "").strip()
-        self._append_run_log(f"[handoff] {run_label}: baseline launch blocked by HO-005 state={state}. {banner}")
-        self._set_status("Baseline заблокирован: HO-005 не актуален.")
+        self._append_run_log(f"[набор испытаний] {run_label}: краткий предпросмотр заблокирован, состояние={state}. {banner}")
+        self._set_status("Краткий предпросмотр заблокирован: набор испытаний не актуален.")
         messagebox.showwarning(
-            "Набор испытаний / HO-005",
-            "Baseline не будет запущен без актуального validated_suite_snapshot.\n\n" + banner,
+            "Набор испытаний",
+            "Краткий предпросмотр не будет запущен без актуального снимка набора испытаний.\n\n" + banner,
         )
         return False
 
@@ -3104,7 +3112,7 @@ class DesktopInputEditor:
                     f"Последний снимок: {active_snapshot}",
                     f"Сравнение с профилем: {compare_profile}",
                     f"Автоснимок перед запуском: {snapshot_policy}",
-                    f"Run setup: {run_profile_label(run_profile_key)}; cache {cache_policy_label(str(self.run_cache_policy_var.get() or 'reuse'))}; runtime policy {runtime_policy_label(str(self.run_runtime_policy_var.get() or 'balanced'))}.",
+                    f"Настройки расчёта: {run_profile_label(run_profile_key)}; повторное использование: {cache_policy_label(str(self.run_cache_policy_var.get() or 'reuse'))}; поведение при предупреждениях: {runtime_policy_label(str(self.run_runtime_policy_var.get() or 'balanced'))}.",
                 )
             )
         )
@@ -3273,7 +3281,7 @@ class DesktopInputEditor:
                 "\n".join(
                     (
                         f"Последний запуск: {latest_dir.name}",
-                        "run_summary.json пока не найден.",
+                        "Сводка расчёта пока не найдена.",
                         f"Папка запуска: {latest_dir}",
                     )
                 )
@@ -3290,8 +3298,8 @@ class DesktopInputEditor:
                 "\n".join(
                     (
                         f"Последний запуск: {latest_dir.name}",
-                        f"Не удалось прочитать run_summary.json: {exc}",
-                        f"Путь к summary: {summary_path}",
+                        f"Не удалось прочитать сводку расчёта: {exc}",
+                        f"Путь к сводке: {summary_path}",
                     )
                 )
             )
@@ -3307,7 +3315,7 @@ class DesktopInputEditor:
         )
         artifact_line = str(info.get("artifact_line") or "").strip()
         if not artifact_line:
-            artifact_line = f"Папка артефактов: {summary.get('outdir') or latest_dir}"
+            artifact_line = f"Папка результатов: {summary.get('outdir') or latest_dir}"
         self.latest_run_summary_var.set(
             "\n".join(
                 (
@@ -3445,10 +3453,10 @@ class DesktopInputEditor:
         cache_key = str(self.run_cache_policy_var.get() or "").strip().lower() or "reuse"
         runtime_policy_key = str(self.run_runtime_policy_var.get() or "").strip().lower() or "balanced"
         self.run_cache_hint_var.set(
-            f"Cache: {cache_policy_label(cache_key)}. {cache_policy_description(cache_key)}"
+            f"Повторное использование результата: {cache_policy_label(cache_key)}. {cache_policy_description(cache_key)}"
         )
         self.run_runtime_policy_hint_var.set(
-            f"Runtime policy: {runtime_policy_label(runtime_policy_key)}. {runtime_policy_description(runtime_policy_key)}"
+            f"Режим запуска: {runtime_policy_label(runtime_policy_key)}. {runtime_policy_description(runtime_policy_key)}"
         )
 
     def _apply_run_setup_profile(self, profile_key: str) -> None:
@@ -3476,11 +3484,11 @@ class DesktopInputEditor:
         )
         self._restore_run_settings_snapshot(updated)
         self.run_preset_hint_var.set(
-            f"Профиль запуска «{label}» применён. {description} Изменено runtime-настроек: {len(changed_keys)}."
+            f"Профиль запуска «{label}» применён. {description} Изменено расчётных настроек: {len(changed_keys)}."
         )
         self._set_status(f"Применён профиль запуска: {label}")
         self._append_run_log(
-            f"[run-profile] {label}: изменено runtime-настроек {len(changed_keys)}"
+            f"[профиль запуска] {label}: изменено расчётных настроек {len(changed_keys)}"
         )
 
     def _open_run_setup_center(self) -> None:
@@ -3577,20 +3585,20 @@ class DesktopInputEditor:
                 f"начальная скорость {vx0:.2f} м/с."
             ),
             (
-                f"Preview: {preview_label}; dt={float(self.preview_dt_var.get()):.3f} с; "
-                f"длительность={float(self.preview_t_end_var.get()):.1f} с; "
-                f"длина участка={float(self.preview_road_len_var.get()):.1f} м."
+                f"Предпросмотр: {preview_label}; шаг по времени: {float(self.preview_dt_var.get()):.3f} с; "
+                f"длительность: {float(self.preview_t_end_var.get()):.1f} с; "
+                f"длина участка: {float(self.preview_road_len_var.get()):.1f} м."
             ),
             (
-                f"Подробный расчёт: {run_label}; dt={float(self.run_dt_var.get()):.3f} с; "
-                f"длительность={float(self.run_t_end_var.get()):.1f} с; "
-                f"расширенный лог={'включён' if bool(self.run_record_full_var.get()) else 'выключен'}."
+                f"Подробный расчёт: {run_label}; шаг по времени: {float(self.run_dt_var.get()):.3f} с; "
+                f"длительность: {float(self.run_t_end_var.get()):.1f} с; "
+                f"расширенный журнал: {'включён' if bool(self.run_record_full_var.get()) else 'выключен'}."
             ),
             (
-                f"Run setup: {run_profile_label(self._selected_run_profile_key())}; "
-                f"cache={cache_policy_label(str(self.run_cache_policy_var.get() or 'reuse'))}; "
-                f"NPZ={'да' if bool(self.run_export_npz_var.get()) else 'нет'}; "
-                f"auto-check={'да' if bool(self.run_auto_check_var.get()) else 'нет'}."
+                f"Настройки расчёта: {run_profile_label(self._selected_run_profile_key())}; "
+                f"повторное использование: {cache_policy_label(str(self.run_cache_policy_var.get() or 'reuse'))}; "
+                f"файл анимации: {'да' if bool(self.run_export_npz_var.get()) else 'нет'}; "
+                f"самопроверка: {'да' if bool(self.run_auto_check_var.get()) else 'нет'}."
             ),
         ]
         self.config_summary_var.set("\n".join(lines))
@@ -3767,7 +3775,7 @@ class DesktopInputEditor:
     def _undo_last_safe_action(self) -> None:
         if not self._safe_action_history:
             messagebox.showinfo(
-                "Desktop Input Editor",
+                DIALOG_TITLE,
                 "В истории пока нет безопасных действий для отмены.",
             )
             return
@@ -3962,18 +3970,18 @@ class DesktopInputEditor:
     def _save_named_snapshot(self) -> None:
         raw_name = str(self.snapshot_name_var.get() or "").strip()
         if not raw_name:
-            messagebox.showinfo("Desktop Input Editor", "Введите имя снимка перед сохранением.")
+            messagebox.showinfo(DIALOG_TITLE, "Введите имя снимка перед сохранением.")
             return
         try:
             target = self._save_snapshot(raw_name)
             self._set_status(f"Снимок сохранён: {target.name}")
         except Exception as exc:
-            messagebox.showerror("Desktop Input Editor", f"Не удалось сохранить снимок:\n{exc}")
+            messagebox.showerror(DIALOG_TITLE, f"Не удалось сохранить снимок:\n{exc}")
 
     def _load_selected_snapshot(self) -> None:
         target = self._selected_snapshot_path()
         if target is None:
-            messagebox.showinfo("Desktop Input Editor", "Сначала выберите снимок для загрузки.")
+            messagebox.showinfo(DIALOG_TITLE, "Сначала выберите снимок для загрузки.")
             return
         try:
             payload = load_desktop_snapshot(target)
@@ -3990,7 +3998,7 @@ class DesktopInputEditor:
             self._append_run_log(f"[snapshot] Загружен снимок: {target}")
             self._refresh_run_context_summary()
         except Exception as exc:
-            messagebox.showerror("Desktop Input Editor", f"Не удалось загрузить снимок:\n{exc}")
+            messagebox.showerror(DIALOG_TITLE, f"Не удалось загрузить снимок:\n{exc}")
 
     def _open_snapshot_dir(self) -> None:
         root = desktop_snapshot_dir_path()
@@ -4004,7 +4012,7 @@ class DesktopInputEditor:
                 subprocess.Popen(["xdg-open", str(root)])
             self._set_status(f"Открыта папка снимков: {root}")
         except Exception as exc:
-            messagebox.showerror("Desktop Input Editor", f"Не удалось открыть папку снимков:\n{exc}")
+            messagebox.showerror(DIALOG_TITLE, f"Не удалось открыть папку снимков:\n{exc}")
 
     def _open_path(self, target: Path, *, success_text: str, error_title: str) -> bool:
         try:
@@ -4017,13 +4025,13 @@ class DesktopInputEditor:
             self._set_status(success_text)
             return True
         except Exception as exc:
-            messagebox.showerror("Desktop Input Editor", f"{error_title}:\n{exc}")
+            messagebox.showerror(DIALOG_TITLE, f"{error_title}:\n{exc}")
             return False
 
     def _open_latest_run_dir(self) -> None:
         latest_dir = self._current_latest_run_dir()
         if latest_dir is None:
-            messagebox.showinfo("Desktop Input Editor", "Папка последнего запуска пока не найдена.")
+            messagebox.showinfo(DIALOG_TITLE, "Папка последнего запуска пока не найдена.")
             return
         self._open_path(
             latest_dir,
@@ -4035,24 +4043,24 @@ class DesktopInputEditor:
         report_path = self._runtime_preview_report_path()
         self.active_preview_report_path = report_path
         if not report_path.exists():
-            messagebox.showinfo("Desktop Input Editor", "preview_report.json пока не найден.")
+            messagebox.showinfo(DIALOG_TITLE, "Отчёт предпросмотра пока не найден.")
             return
         self._open_path(
             report_path,
-            success_text=f"Открыт preview_report.json: {report_path}",
-            error_title="Не удалось открыть preview_report.json",
+            success_text=f"Открыт отчёт предпросмотра: {report_path}",
+            error_title="Не удалось открыть отчёт предпросмотра",
         )
 
     def _open_latest_selfcheck_report_json(self) -> None:
         report_path = self._runtime_selfcheck_report_path()
         self.active_selfcheck_report_path = report_path
         if not report_path.exists():
-            messagebox.showinfo("Desktop Input Editor", "selfcheck_report.json пока не найден.")
+            messagebox.showinfo(DIALOG_TITLE, "Отчёт самопроверки пока не найден.")
             return
         self._open_path(
             report_path,
-            success_text=f"Открыт selfcheck_report.json: {report_path}",
-            error_title="Не удалось открыть selfcheck_report.json",
+            success_text=f"Открыт отчёт самопроверки: {report_path}",
+            error_title="Не удалось открыть отчёт самопроверки",
         )
 
     def _open_latest_selfcheck_log(self) -> None:
@@ -4066,18 +4074,18 @@ class DesktopInputEditor:
                 pass
         log_path = self.active_selfcheck_log_path
         if log_path is None:
-            messagebox.showinfo("Desktop Input Editor", "Лог последнего selfcheck пока не найден.")
+            messagebox.showinfo(DIALOG_TITLE, "Журнал последней самопроверки пока не найден.")
             return
         if not log_path.exists():
             messagebox.showinfo(
-                "Desktop Input Editor",
-                f"Файл лога последнего selfcheck не найден:\n{log_path}",
+                DIALOG_TITLE,
+                f"Файл журнала последней самопроверки не найден:\n{log_path}",
             )
             return
         self._open_path(
             log_path,
-            success_text=f"Открыт selfcheck-лог: {log_path}",
-            error_title="Не удалось открыть selfcheck-лог",
+            success_text=f"Открыт журнал самопроверки: {log_path}",
+            error_title="Не удалось открыть журнал самопроверки",
         )
 
     def _open_latest_preview_log(self) -> None:
@@ -4091,18 +4099,18 @@ class DesktopInputEditor:
                 pass
         log_path = self.active_preview_log_path
         if log_path is None:
-            messagebox.showinfo("Desktop Input Editor", "Лог последнего preview пока не найден.")
+            messagebox.showinfo(DIALOG_TITLE, "Журнал последнего предпросмотра пока не найден.")
             return
         if not log_path.exists():
             messagebox.showinfo(
-                "Desktop Input Editor",
-                f"Файл лога последнего preview не найден:\n{log_path}",
+                DIALOG_TITLE,
+                f"Файл журнала последнего предпросмотра не найден:\n{log_path}",
             )
             return
         self._open_path(
             log_path,
-            success_text=f"Открыт preview-лог: {log_path}",
-            error_title="Не удалось открыть preview-лог",
+            success_text=f"Открыт журнал предпросмотра: {log_path}",
+            error_title="Не удалось открыть журнал предпросмотра",
         )
 
     def _open_run_setup_cache_root(self) -> None:
@@ -4110,8 +4118,8 @@ class DesktopInputEditor:
         root.mkdir(parents=True, exist_ok=True)
         self._open_path(
             root,
-            success_text=f"Открыта папка runtime-cache: {root}",
-            error_title="Не удалось открыть папку runtime-cache",
+            success_text=f"Открыта папка готовых результатов: {root}",
+            error_title="Не удалось открыть папку готовых результатов",
         )
 
     def _open_run_setup_log_root(self) -> None:
@@ -4119,23 +4127,23 @@ class DesktopInputEditor:
         root.mkdir(parents=True, exist_ok=True)
         self._open_path(
             root,
-            success_text=f"Открыта папка runtime-логов: {root}",
-            error_title="Не удалось открыть папку runtime-логов",
+            success_text=f"Открыта папка журналов запуска: {root}",
+            error_title="Не удалось открыть папку журналов запуска",
         )
 
     def _open_latest_run_summary_json(self) -> None:
         latest_dir = self._current_latest_run_dir()
         if latest_dir is None:
-            messagebox.showinfo("Desktop Input Editor", "run_summary.json пока не найден.")
+            messagebox.showinfo(DIALOG_TITLE, "Сводка расчёта пока не найдена.")
             return
         summary_path = desktop_run_summary_path(latest_dir)
         if not summary_path.exists():
-            messagebox.showinfo("Desktop Input Editor", "run_summary.json пока не найден.")
+            messagebox.showinfo(DIALOG_TITLE, "Сводка расчёта пока не найдена.")
             return
         self._open_path(
             summary_path,
-            success_text=f"Открыт run_summary.json: {summary_path}",
-            error_title="Не удалось открыть run_summary.json",
+            success_text=f"Открыта сводка расчёта: {summary_path}",
+            error_title="Не удалось открыть сводку расчёта",
         )
 
     def _open_latest_run_log(self) -> None:
@@ -4149,18 +4157,18 @@ class DesktopInputEditor:
                 pass
         log_path = self.active_run_log_path
         if log_path is None:
-            messagebox.showinfo("Desktop Input Editor", "Лог последнего запуска пока не найден.")
+            messagebox.showinfo(DIALOG_TITLE, "Лог последнего запуска пока не найден.")
             return
         if not log_path.exists():
             messagebox.showinfo(
-                "Desktop Input Editor",
+                DIALOG_TITLE,
                 f"Файл лога последнего запуска не найден:\n{log_path}",
             )
             return
         self._open_path(
             log_path,
-            success_text=f"Открыт run-лог: {log_path}",
-            error_title="Не удалось открыть run-лог",
+            success_text=f"Открыт журнал расчёта: {log_path}",
+            error_title="Не удалось открыть журнал расчёта",
         )
 
     def _open_latest_run_cache_dir(self) -> None:
@@ -4173,18 +4181,18 @@ class DesktopInputEditor:
                 pass
         cache_dir = self.active_run_cache_dir
         if cache_dir is None:
-            messagebox.showinfo("Desktop Input Editor", "Cache entry последнего запуска пока не найден.")
+            messagebox.showinfo(DIALOG_TITLE, "Готовый результат последнего расчёта пока не найден.")
             return
         if not cache_dir.exists():
             messagebox.showinfo(
-                "Desktop Input Editor",
-                f"Папка cache entry последнего запуска не найдена:\n{cache_dir}",
+                DIALOG_TITLE,
+                f"Готовый результат последнего расчёта не найден:\n{cache_dir}",
             )
             return
         self._open_path(
             cache_dir,
-            success_text=f"Открыта папка cache entry: {cache_dir}",
-            error_title="Не удалось открыть папку cache entry",
+            success_text=f"Открыта папка готового результата: {cache_dir}",
+            error_title="Не удалось открыть готовый результат последнего расчёта",
         )
 
     def _open_latest_saved_file(self, key: str, *, label: str) -> None:
@@ -4197,11 +4205,11 @@ class DesktopInputEditor:
                 pass
         target = self._latest_saved_file_path(key)
         if target is None:
-            messagebox.showinfo("Desktop Input Editor", f"{label} последнего запуска пока не найден.")
+            messagebox.showinfo(DIALOG_TITLE, f"{label} последнего запуска пока не найден.")
             return
         if not target.exists():
             messagebox.showinfo(
-                "Desktop Input Editor",
+                DIALOG_TITLE,
                 f"Файл {label} последнего запуска не найден:\n{target}",
             )
             return
@@ -4212,10 +4220,10 @@ class DesktopInputEditor:
         )
 
     def _open_latest_df_main_csv(self) -> None:
-        self._open_latest_saved_file("df_main", label="df_main.csv")
+        self._open_latest_saved_file("df_main", label="основная таблица результатов")
 
     def _open_latest_npz_bundle(self) -> None:
-        self._open_latest_saved_file("npz_bundle", label="NPZ bundle")
+        self._open_latest_saved_file("npz_bundle", label="файл анимации")
 
     def _open_desktop_runs_dir(self) -> None:
         root = desktop_runs_dir_path()
@@ -4347,7 +4355,7 @@ class DesktopInputEditor:
     def _compare_selected_profile(self) -> None:
         target = self._selected_profile_path()
         if target is None:
-            messagebox.showinfo("Desktop Input Editor", "Сначала выберите профиль для сравнения.")
+            messagebox.showinfo(DIALOG_TITLE, "Сначала выберите профиль для сравнения.")
             return
         self.compare_target_path = target.resolve()
         self._refresh_profile_comparison()
@@ -4470,7 +4478,7 @@ class DesktopInputEditor:
         self.run_primary_label_var.set("Доп. параметр не нужен")
         self.run_secondary_label_var.set("Доп. параметр не нужен")
         self.run_summary_var.set(
-            "Запуск одного дорожного сценария с текущим профилем preview. Подходит для полного расчёта с сохранением таблиц."
+            "Запуск одного дорожного сценария с текущим профилем предпросмотра. Подходит для полного расчёта с сохранением таблиц."
         )
         self._set_spinbox_state(self.run_primary_spin, False)
         self._set_spinbox_state(self.run_secondary_spin, False)
@@ -4488,7 +4496,7 @@ class DesktopInputEditor:
         self.current_source_path = source_path.resolve()
         if refresh_source_reference:
             self.source_reference_payload = dict(payload)
-        self.path_var.set(str(self.current_source_path))
+        self.path_var.set(self._display_source_name())
         if source_path.name.endswith(".json"):
             self.profile_name_var.set(source_path.stem)
         for section in DESKTOP_INPUT_SECTIONS:
@@ -4521,7 +4529,7 @@ class DesktopInputEditor:
         if not fields:
             return
         if not messagebox.askyesno(
-            "Desktop Input Editor",
+            DIALOG_TITLE,
             f"Вернуть раздел «{display_title}» к значениям по умолчанию?",
         ):
             return
@@ -4550,7 +4558,7 @@ class DesktopInputEditor:
         self._refresh_profile_comparison()
         self._set_status(f"Раздел «{display_title}» возвращён к значениям по умолчанию.")
         self._append_run_log(
-            f"[section-reset] Раздел «{display_title}» сброшен к default_base.json; полей: {changed_count}"
+            f"[section-reset] Раздел «{display_title}» сброшен к исходному шаблону; полей: {changed_count}"
         )
 
     def _gather_payload(self) -> dict[str, object]:
@@ -4565,9 +4573,9 @@ class DesktopInputEditor:
 
     def _load_json(self) -> None:
         path = filedialog.askopenfilename(
-            title="Открыть JSON параметров",
+            title="Открыть файл данных",
             initialdir=str(repo_root()),
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+            filetypes=[("Файлы данных", "*.json"), ("Все файлы", "*.*")],
         )
         if not path:
             return
@@ -4579,12 +4587,12 @@ class DesktopInputEditor:
             self._load_into_vars(payload, target, refresh_source_reference=True)
             self._set_status(f"Загружен файл параметров: {target.name}")
         except Exception as exc:
-            messagebox.showerror("Desktop Input Editor", f"Не удалось открыть JSON:\n{exc}")
+            messagebox.showerror(DIALOG_TITLE, f"Не удалось открыть файл данных:\n{exc}")
 
     def _save_named_profile(self) -> None:
         raw_name = str(self.profile_name_var.get() or "").strip()
         if not raw_name:
-            messagebox.showinfo("Desktop Input Editor", "Введите имя профиля перед сохранением.")
+            messagebox.showinfo(DIALOG_TITLE, "Введите имя профиля перед сохранением.")
             return
         try:
             target = self._save_profile_payload(raw_name)
@@ -4592,7 +4600,7 @@ class DesktopInputEditor:
             self._append_run_log(f"[profile] Сохранён профиль: {target}")
             self._refresh_profile_comparison()
         except Exception as exc:
-            messagebox.showerror("Desktop Input Editor", f"Не удалось сохранить профиль:\n{exc}")
+            messagebox.showerror(DIALOG_TITLE, f"Не удалось сохранить профиль:\n{exc}")
 
     def _save_run_context_profile(self) -> None:
         raw_name = self._suggest_run_context_profile_name()
@@ -4604,14 +4612,14 @@ class DesktopInputEditor:
             self._refresh_profile_comparison()
         except Exception as exc:
             messagebox.showerror(
-                "Desktop Input Editor",
+                DIALOG_TITLE,
                 f"Не удалось сохранить рабочую точку как профиль:\n{exc}",
             )
 
     def _load_selected_profile(self) -> None:
         target = self._selected_profile_path()
         if target is None:
-            messagebox.showinfo("Desktop Input Editor", "Сначала выберите профиль для загрузки.")
+            messagebox.showinfo(DIALOG_TITLE, "Сначала выберите профиль для загрузки.")
             return
         try:
             payload = load_desktop_profile(target)
@@ -4622,15 +4630,15 @@ class DesktopInputEditor:
             self._set_status(f"Загружен профиль: {target.name}")
             self._append_run_log(f"[profile] Загружен профиль: {target}")
         except Exception as exc:
-            messagebox.showerror("Desktop Input Editor", f"Не удалось загрузить профиль:\n{exc}")
+            messagebox.showerror(DIALOG_TITLE, f"Не удалось загрузить профиль:\n{exc}")
 
     def _delete_selected_profile(self) -> None:
         target = self._selected_profile_path()
         if target is None:
-            messagebox.showinfo("Desktop Input Editor", "Сначала выберите профиль для удаления.")
+            messagebox.showinfo(DIALOG_TITLE, "Сначала выберите профиль для удаления.")
             return
         if not messagebox.askyesno(
-            "Desktop Input Editor",
+            DIALOG_TITLE,
             f"Удалить профиль?\n{target.name}",
         ):
             return
@@ -4643,7 +4651,7 @@ class DesktopInputEditor:
             self._append_run_log(f"[profile] Удалён профиль: {target}")
             self._refresh_run_context_summary()
         except Exception as exc:
-            messagebox.showerror("Desktop Input Editor", f"Не удалось удалить профиль:\n{exc}")
+            messagebox.showerror(DIALOG_TITLE, f"Не удалось удалить профиль:\n{exc}")
 
     def _reset_to_default(self) -> None:
         try:
@@ -4655,9 +4663,9 @@ class DesktopInputEditor:
                 default_base_json_path(),
                 refresh_source_reference=True,
             )
-            self._set_status("Загружены значения по умолчанию из default_base.json.")
+            self._set_status("Загружены значения по умолчанию из исходного шаблона.")
         except Exception as exc:
-            messagebox.showerror("Desktop Input Editor", f"Не удалось загрузить default_base.json:\n{exc}")
+            messagebox.showerror(DIALOG_TITLE, f"Не удалось загрузить исходный шаблон:\n{exc}")
 
     def _save_working_copy(self) -> None:
         target = default_working_copy_path()
@@ -4668,7 +4676,7 @@ class DesktopInputEditor:
             self.current_payload = dict(payload)
             self._refresh_source_reference_diff_state()
             self.current_source_path = target
-            self.path_var.set(str(target))
+            self.path_var.set(self._display_source_name())
             self._refresh_run_context_summary()
             for key in self._widget_handles:
                 self._refresh_value_label(key)
@@ -4676,9 +4684,9 @@ class DesktopInputEditor:
             self._refresh_active_field_search_view()
             self._refresh_handoff_snapshot_state()
             self._set_status(f"Рабочая копия сохранена: {target}")
-            messagebox.showinfo("Desktop Input Editor", f"Рабочая копия сохранена:\n{target}")
+            messagebox.showinfo(DIALOG_TITLE, f"Рабочая копия сохранена:\n{target}")
         except Exception as exc:
-            messagebox.showerror("Desktop Input Editor", f"Не удалось сохранить рабочую копию:\n{exc}")
+            messagebox.showerror(DIALOG_TITLE, f"Не удалось сохранить рабочую копию:\n{exc}")
 
     def _runtime_base_path(self) -> Path:
         return (repo_root() / "workspace" / "ui_state" / "desktop_input_runtime_base.json").resolve()
@@ -4732,7 +4740,7 @@ class DesktopInputEditor:
                 "auto_t_end_from_len": False,
                 "road_surface": road_surface,
                 "vx0_м_с": float(vx0),
-                "описание": f"Временный desktop preview-сценарий: {surface_label}.",
+                "описание": f"Временный сценарий предпросмотра: {surface_label}.",
             }
         ]
 
@@ -4759,7 +4767,7 @@ class DesktopInputEditor:
                     "t_end": t_end,
                     "t_step": secondary,
                     "ay": primary,
-                    "описание": "Desktop single-run: инерция по крену.",
+                    "описание": "Подробный расчёт: инерция по крену.",
                 }
             ]
         if scenario_key == "pitch":
@@ -4772,7 +4780,7 @@ class DesktopInputEditor:
                     "t_end": t_end,
                     "t_step": secondary,
                     "ax": primary,
-                    "описание": "Desktop single-run: инерция по тангажу.",
+                    "описание": "Подробный расчёт: инерция по тангажу.",
                 }
             ]
         if scenario_key == "micro_sync":
@@ -4785,7 +4793,7 @@ class DesktopInputEditor:
                     "t_end": t_end,
                     "A": primary,
                     "f": secondary,
-                    "описание": "Desktop single-run: микро-синфаза.",
+                    "описание": "Подробный расчёт: микро-синфаза.",
                 }
             ]
 
@@ -4809,7 +4817,7 @@ class DesktopInputEditor:
                 "auto_t_end_from_len": False,
                 "road_surface": road_surface,
                 "vx0_м_с": float(vx0),
-                "описание": f"Desktop single-run: {preview_surface_label(surface_key)}.",
+                "описание": f"Подробный расчёт: {preview_surface_label(surface_key)}.",
             }
         ]
 
@@ -4834,13 +4842,13 @@ class DesktopInputEditor:
         persist_stdout_json: bool = False,
     ) -> None:
         if self._task_running:
-            messagebox.showinfo("Desktop Input Editor", "Дождитесь завершения текущей проверки или расчёта.")
+            messagebox.showinfo(DIALOG_TITLE, "Дождитесь завершения текущей проверки или расчёта.")
             return
 
         self._task_running = True
         self._set_status(f"Выполняется: {title}")
         self._append_run_log(f"[start] {title}")
-        self._append_run_log("  " + " ".join(cmd))
+        self._append_run_log("  Команда подготовлена; технические детали сохранены в журнале процесса.")
 
         def _worker() -> None:
             try:
@@ -4877,24 +4885,24 @@ class DesktopInputEditor:
                                 stdout=stdout,
                                 stderr=stderr,
                             )
-                            self._append_run_log(f"[log] subprocess-лог сохранён: {log_file_path}")
+                            self._append_run_log(f"[журнал] Журнал процесса сохранён: {log_file_path}")
                         except Exception as exc:
-                            self._append_run_log(f"[warn] Не удалось записать subprocess-лог: {exc}")
+                            self._append_run_log(f"[warn] Не удалось записать журнал процесса: {exc}")
                     if proc.returncode == 0:
                         if persist_stdout_json and result_path is not None:
                             saved = write_json_report_from_stdout(stdout, result_path)
                             if saved is None:
-                                self._append_run_log("[warn] Не удалось выделить JSON из stdout команды.")
+                                self._append_run_log("[warn] Не удалось разобрать отчёт команды.")
                         self._set_status(f"Готово: {title}")
                         if callable(on_success):
                             try:
                                 on_success(result_path)
                             except Exception as exc:
-                                self._append_run_log(f"[warn] post-process failed: {exc}")
+                                self._append_run_log(f"[warn] Не удалось выполнить обработку результата: {exc}")
                     else:
                         self._set_status(f"Ошибка: {title}")
                         messagebox.showerror(
-                            "Desktop Input Editor",
+                            DIALOG_TITLE,
                             f"Команда завершилась с ошибкой ({proc.returncode}):\n{title}",
                         )
 
@@ -4907,7 +4915,7 @@ class DesktopInputEditor:
                     self._task_running = False
                     self._set_status(f"Ошибка запуска: {title}")
                     self._append_run_log(f"[error] {exc}")
-                    messagebox.showerror("Desktop Input Editor", f"Не удалось запустить команду:\n{exc}")
+                    messagebox.showerror(DIALOG_TITLE, f"Не удалось запустить команду:\n{exc}")
 
                 self.root.after(0, _fail)
 
@@ -4920,12 +4928,12 @@ class DesktopInputEditor:
         log_file_path: Path | None = None,
     ) -> None:
         if report_path is None or not report_path.exists():
-            self._append_run_log("[warn] report_json не найден после проверки конфигурации.")
+            self._append_run_log("[warn] Сводка проверки конфигурации не найдена.")
             return
         try:
             report = json.loads(report_path.read_text(encoding="utf-8"))
             if not isinstance(report, dict):
-                raise ValueError("selfcheck_report.json должен содержать JSON object")
+                raise ValueError("сводка самопроверки должна быть структурированным отчётом")
             report["ui_subject_signature"] = self._current_selfcheck_subject_signature()
             if log_file_path is not None:
                 report["ui_subprocess_log"] = str(log_file_path.resolve())
@@ -4940,15 +4948,15 @@ class DesktopInputEditor:
             warnings = list(report.get("warnings") or [])
             self._append_run_log(
                 f"[summary] Проверка конфигурации: {'OK' if ok else 'FAIL'}; "
-                f"errors={len(errors)}; warnings={len(warnings)}"
+                f"ошибок={len(errors)}; предупреждений={len(warnings)}"
             )
             for msg in errors[:5]:
-                self._append_run_log(f"  error: {msg}")
+                self._append_run_log(f"  ошибка: {msg}")
             for msg in warnings[:5]:
-                self._append_run_log(f"  warn: {msg}")
+                self._append_run_log(f"  предупреждение: {msg}")
         except Exception as exc:
             self.active_selfcheck_log_path = None
-            self._append_run_log(f"[warn] Не удалось разобрать report_json: {exc}")
+            self._append_run_log(f"[warn] Не удалось разобрать сводку самопроверки: {exc}")
         self._refresh_latest_selfcheck_summary()
 
     def _preview_log_path_from_report(self, report: dict[str, object] | None) -> Path | None:
@@ -4977,8 +4985,8 @@ class DesktopInputEditor:
             self.latest_selfcheck_summary_var.set(
                 "\n".join(
                     (
-                        "Auto-check / selfcheck ещё не запускался.",
-                        f"Ожидаемый JSON отчёт: {report_path}",
+                        "Автоматическая самопроверка ещё не запускалась.",
+                        f"Ожидаемый отчёт: {report_path}",
                     )
                 )
             )
@@ -4987,14 +4995,14 @@ class DesktopInputEditor:
         try:
             report = json.loads(report_path.read_text(encoding="utf-8"))
             if not isinstance(report, dict):
-                raise ValueError("selfcheck_report.json должен содержать JSON object")
+                raise ValueError("сводка самопроверки должна быть структурированным отчётом")
         except Exception as exc:
             self.active_selfcheck_log_path = None
             self.latest_selfcheck_summary_var.set(
                 "\n".join(
                     (
-                        "Последний auto-check найден, но отчёт не читается.",
-                        f"Не удалось прочитать selfcheck_report.json: {exc}",
+                        "Последняя автопроверка найдена, но отчёт не читается.",
+                        f"Не удалось прочитать сводку самопроверки: {exc}",
                         f"Путь к отчёту: {report_path}",
                     )
                 )
@@ -5029,8 +5037,8 @@ class DesktopInputEditor:
             self.latest_preview_summary_var.set(
                 "\n".join(
                     (
-                        "Preview ещё не запускался.",
-                        f"Ожидаемый JSON отчёт: {report_path}",
+                        "Предпросмотр ещё не запускался.",
+                        f"Ожидаемый отчёт: {report_path}",
                     )
                 )
             )
@@ -5038,14 +5046,14 @@ class DesktopInputEditor:
         try:
             report = json.loads(report_path.read_text(encoding="utf-8"))
             if not isinstance(report, dict):
-                raise ValueError("preview_report.json должен содержать JSON object")
+                raise ValueError("сводка предпросмотра должна быть структурированным отчётом")
         except Exception as exc:
             self.active_preview_log_path = None
             self.latest_preview_summary_var.set(
                 "\n".join(
                     (
-                        "Последний preview найден, но отчёт не читается.",
-                        f"Не удалось прочитать preview_report.json: {exc}",
+                        "Последний предпросмотр найден, но отчёт не читается.",
+                        f"Не удалось прочитать сводку предпросмотра: {exc}",
                         f"Путь к отчёту: {report_path}",
                     )
                 )
@@ -5073,12 +5081,12 @@ class DesktopInputEditor:
         log_file_path: Path | None = None,
     ) -> None:
         if report_path is None or not report_path.exists():
-            self._append_run_log("[warn] JSON preview-расчёта не найден.")
+            self._append_run_log("[warn] Сводка предпросмотра не найдена.")
             return
         try:
             report = json.loads(report_path.read_text(encoding="utf-8"))
             if not isinstance(report, dict):
-                raise ValueError("preview_report.json должен содержать JSON object")
+                raise ValueError("сводка предпросмотра должна быть структурированным отчётом")
             report["preview_surface_key"] = self._selected_preview_surface_key()
             report["preview_surface_label"] = preview_surface_label(self._selected_preview_surface_key())
             report["preview_road_len_m"] = float(self.preview_road_len_var.get())
@@ -5092,23 +5100,23 @@ class DesktopInputEditor:
             self.active_preview_log_path = self._preview_log_path_from_report(report)
             self._append_run_log(
                 "[summary] "
-                f"roll_max={float(report.get('max_abs_phi_deg', 0.0)):.2f} deg; "
-                f"pitch_max={float(report.get('max_abs_theta_deg', 0.0)):.2f} deg; "
-                f"min_tire_Fz={float(report.get('min_tire_Fz_N', 0.0)):.1f} N; "
-                f"max_tire_pen={float(report.get('max_tire_pen_m', 0.0)):.4f} m"
+                f"макс. крен={float(report.get('max_abs_phi_deg', 0.0)):.2f} град; "
+                f"макс. тангаж={float(report.get('max_abs_theta_deg', 0.0)):.2f} град; "
+                f"мин. реакция шины={float(report.get('min_tire_Fz_N', 0.0)):.1f} Н; "
+                f"макс. сжатие шины={float(report.get('max_tire_pen_m', 0.0)):.4f} м"
             )
             self._append_run_log(
                 "[summary] "
-                f"preview={report.get('preview_surface_label') or '—'}; "
-                f"dt={float(report.get('dt_s', 0.0) or 0.0):.3f} с; "
-                f"t_end={float(report.get('t_end_s', 0.0) or 0.0):.1f} с; "
-                f"steps={int(report.get('n_steps', 0) or 0)}"
+                f"предпросмотр={report.get('preview_surface_label') or '—'}; "
+                f"шаг по времени: {float(report.get('dt_s', 0.0) or 0.0):.3f} с; "
+                f"длительность: {float(report.get('t_end_s', 0.0) or 0.0):.1f} с; "
+                f"шагов: {int(report.get('n_steps', 0) or 0)}"
             )
             if self.active_preview_log_path is not None:
-                self._append_run_log(f"[summary] UI preview-лог: {self.active_preview_log_path}")
+                self._append_run_log(f"[summary] Журнал предпросмотра: {self.active_preview_log_path}")
         except Exception as exc:
             self.active_preview_log_path = None
-            self._append_run_log(f"[warn] Не удалось разобрать JSON preview-расчёта: {exc}")
+            self._append_run_log(f"[warn] Не удалось разобрать сводку предпросмотра: {exc}")
         self._refresh_latest_preview_summary()
 
     def _summarize_single_run_report(
@@ -5118,14 +5126,14 @@ class DesktopInputEditor:
         log_file_path: Path | None = None,
     ) -> None:
         if report_path is None or not report_path.exists():
-            self._append_run_log("[warn] JSON подробного расчёта не найден.")
+            self._append_run_log("[warn] Сводка подробного расчёта не найдена.")
             return
         self.active_run_summary_path = report_path.resolve()
         self.active_run_dir = report_path.resolve().parent
         try:
             report = json.loads(report_path.read_text(encoding="utf-8"))
             if not isinstance(report, dict):
-                raise ValueError("run_summary.json должен содержать JSON object")
+                raise ValueError("сводка расчёта должна быть структурированным отчётом")
             if log_file_path is not None:
                 report["ui_subprocess_log"] = str(log_file_path.resolve())
                 report_path.write_text(
@@ -5145,10 +5153,10 @@ class DesktopInputEditor:
             self._append_run_log(
                 "[summary] "
                 f"профиль={run_profile_label(str(report.get('run_profile') or 'detail'))}; "
-                f"cache={cache_policy_label(str(report.get('cache_policy') or 'off'))}; "
-                f"cache-hit={'да' if bool(report.get('cache_hit')) else 'нет'}; "
-                f"CSV={'да' if bool(report.get('export_csv', True)) else 'нет'}; "
-                f"NPZ={'да' if bool(report.get('export_npz', False)) else 'нет'}"
+                f"повторное использование: {cache_policy_label(str(report.get('cache_policy') or 'off'))}; "
+                f"использован готовый результат={'да' if bool(report.get('cache_hit')) else 'нет'}; "
+                f"таблица результатов={'да' if bool(report.get('export_csv', True)) else 'нет'}; "
+                f"файл анимации={'да' if bool(report.get('export_npz', False)) else 'нет'}"
             )
             mech_ok = report.get("mech_selfcheck_ok")
             mech_msg = str(report.get("mech_selfcheck_msg") or "").strip()
@@ -5159,16 +5167,16 @@ class DesktopInputEditor:
             if mech_msg:
                 self._append_run_log(f"[summary] Сообщение: {mech_msg}")
             if self.active_run_log_path is not None:
-                self._append_run_log(f"[summary] UI subprocess-лог: {self.active_run_log_path}")
+                self._append_run_log(f"[summary] Журнал процесса: {self.active_run_log_path}")
             if self.active_run_cache_dir is not None:
-                self._append_run_log(f"[summary] Cache entry: {self.active_run_cache_dir}")
+                self._append_run_log(f"[summary] Папка готового результата: {self.active_run_cache_dir}")
             outdir = str(report.get("outdir") or "").strip()
             if outdir:
-                self._append_run_log(f"[summary] Артефакты расчёта: {outdir}")
+                self._append_run_log(f"[summary] Папка результатов: {outdir}")
         except Exception as exc:
             self.active_run_log_path = None
             self.active_run_cache_dir = None
-            self._append_run_log(f"[warn] Не удалось разобрать JSON подробного расчёта: {exc}")
+            self._append_run_log(f"[warn] Не удалось разобрать сводку подробного расчёта: {exc}")
         self._refresh_latest_run_summary()
 
     def _build_action_log_path(self, action_label: str) -> Path | None:
@@ -5177,7 +5185,7 @@ class DesktopInputEditor:
         try:
             return build_run_log_path(action_label)
         except Exception as exc:
-            self._append_run_log(f"[warn] Не удалось подготовить путь для subprocess-лога: {exc}")
+            self._append_run_log(f"[warn] Не удалось подготовить путь для журнала процесса: {exc}")
             return None
 
     def _current_selfcheck_subject_signature(self) -> str:
@@ -5209,41 +5217,41 @@ class DesktopInputEditor:
         report_path = self._runtime_selfcheck_report_path()
         report = self._load_selfcheck_report(report_path)
         if report is None:
-            issue_text = "последний сохранённый auto-check не найден"
+            issue_text = "последняя сохранённая автопроверка не найдена"
             if runtime_policy == "force":
                 self._append_run_log(
-                    f"[auto-check] {run_label}: {issue_text}, продолжаем без повторной проверки по policy=force."
+                    f"[автопроверка] {run_label}: {issue_text}, продолжаем без повторной проверки по режиму force."
                 )
                 return True
             if runtime_policy == "strict":
                 self._append_run_log(
-                    f"[auto-check] {run_label}: {issue_text}, запуск остановлен по policy=strict."
+                    f"[автопроверка] {run_label}: {issue_text}, запуск остановлен по режиму strict."
                 )
                 self._set_status(f"Запуск остановлен: {run_label}")
                 messagebox.showwarning(
-                    "Desktop Input Editor",
+                    DIALOG_TITLE,
                     (
-                        f"Автоматический auto-check перед «{run_label}» выключен.\n\n"
-                        "Последний сохранённый auto-check не найден.\n\n"
-                        "Режим strict блокирует запуск без актуальной проверки. "
+                        f"Автопроверка перед «{run_label}» выключена.\n\n"
+                        "Последняя сохранённая автопроверка не найдена.\n\n"
+                        "Строгий режим блокирует запуск без актуальной проверки. "
                         "Сначала выполните «Проверить конфигурацию»."
                     ),
                 )
                 return False
             if messagebox.askyesno(
-                "Desktop Input Editor",
+                DIALOG_TITLE,
                 (
-                    f"Автоматический auto-check перед «{run_label}» выключен.\n\n"
-                    "Последний сохранённый auto-check не найден.\n\n"
+                    f"Автопроверка перед «{run_label}» выключена.\n\n"
+                    "Последняя сохранённая автопроверка не найдена.\n\n"
                     "Продолжить запуск без повторной проверки?"
                 ),
             ):
                 self._append_run_log(
-                    f"[auto-check] {run_label}: запуск подтверждён без сохранённого auto-check."
+                    f"[автопроверка] {run_label}: запуск подтверждён без сохранённой автопроверки."
                 )
                 return True
             self._append_run_log(
-                f"[auto-check] {run_label}: запуск отменён пользователем без сохранённого auto-check."
+                f"[автопроверка] {run_label}: запуск отменён пользователем без сохранённой автопроверки."
             )
             self._set_status(f"Запуск отменён: {run_label}")
             return False
@@ -5251,44 +5259,44 @@ class DesktopInputEditor:
         has_signature, is_stale = self._selfcheck_freshness_state(report)
         if not has_signature or is_stale:
             issue_text = (
-                "последний сохранённый auto-check устарел для текущих настроек"
+                "последняя сохранённая автопроверка устарела для текущих настроек"
                 if is_stale
-                else "последний сохранённый auto-check не привязан к текущей конфигурации"
+                else "последняя сохранённая автопроверка не привязана к текущей конфигурации"
             )
             if runtime_policy == "force":
                 self._append_run_log(
-                    f"[auto-check] {run_label}: {issue_text}, продолжаем без повторной проверки по policy=force."
+                    f"[автопроверка] {run_label}: {issue_text}, продолжаем без повторной проверки по режиму force."
                 )
                 return True
             if runtime_policy == "strict":
                 self._append_run_log(
-                    f"[auto-check] {run_label}: {issue_text}, запуск остановлен по policy=strict."
+                    f"[автопроверка] {run_label}: {issue_text}, запуск остановлен по режиму strict."
                 )
                 self._set_status(f"Запуск остановлен: {run_label}")
                 messagebox.showwarning(
-                    "Desktop Input Editor",
+                    DIALOG_TITLE,
                     (
-                        f"Автоматический auto-check перед «{run_label}» выключен.\n\n"
+                        f"Автопроверка перед «{run_label}» выключена.\n\n"
                         f"{issue_text.capitalize()}.\n\n"
-                        "Режим strict блокирует запуск без актуальной проверки. "
+                        "Строгий режим блокирует запуск без актуальной проверки. "
                         "Сначала выполните «Проверить конфигурацию»."
                     ),
                 )
                 return False
             if messagebox.askyesno(
-                "Desktop Input Editor",
+                DIALOG_TITLE,
                 (
-                    f"Автоматический auto-check перед «{run_label}» выключен.\n\n"
+                    f"Автопроверка перед «{run_label}» выключена.\n\n"
                     f"{issue_text.capitalize()}.\n\n"
                     "Продолжить запуск без повторной проверки?"
                 ),
             ):
                 self._append_run_log(
-                    f"[auto-check] {run_label}: запуск подтверждён несмотря на то, что {issue_text}."
+                    f"[автопроверка] {run_label}: запуск подтверждён несмотря на то, что {issue_text}."
                 )
                 return True
             self._append_run_log(
-                f"[auto-check] {run_label}: запуск отменён пользователем, потому что {issue_text}."
+                f"[автопроверка] {run_label}: запуск отменён пользователем, потому что {issue_text}."
             )
             self._set_status(f"Запуск отменён: {run_label}")
             return False
@@ -5298,47 +5306,47 @@ class DesktopInputEditor:
         warnings = list(report.get("warnings") or [])
         if ok:
             self._append_run_log(
-                f"[auto-check] {run_label}: используем актуальный сохранённый selfcheck; warnings={len(warnings)}."
+                f"[автопроверка] {run_label}: используем актуальную сохранённую самопроверку; предупреждений={len(warnings)}."
             )
             return True
 
         if runtime_policy == "force":
             self._append_run_log(
-                f"[auto-check] {run_label}: актуальный сохранённый selfcheck содержит ошибки, продолжаем по policy=force."
+                f"[автопроверка] {run_label}: актуальная сохранённая самопроверка содержит ошибки, продолжаем по режиму force."
             )
             return True
         if runtime_policy == "strict":
             self._append_run_log(
-                f"[auto-check] {run_label}: актуальный сохранённый selfcheck содержит ошибки, запуск остановлен по policy=strict."
+                f"[автопроверка] {run_label}: актуальная сохранённая самопроверка содержит ошибки, запуск остановлен по режиму strict."
             )
             self._set_status(f"Запуск остановлен: {run_label}")
             preview_errors = "\n".join(f"- {msg}" for msg in errors[:4]) or "- Без деталей"
             messagebox.showwarning(
-                "Desktop Input Editor",
+                DIALOG_TITLE,
                 (
-                    f"Автоматический auto-check перед «{run_label}» выключен, но есть актуальный selfcheck с ошибками.\n\n"
+                    f"Автопроверка перед «{run_label}» выключена, но есть актуальная самопроверка с ошибками.\n\n"
                     + preview_errors
-                    + "\n\nРежим strict блокирует запуск, пока проблемы не будут исправлены."
+                    + "\n\nСтрогий режим блокирует запуск, пока проблемы не будут исправлены."
                 ),
             )
             return False
 
         preview_errors = "\n".join(f"- {msg}" for msg in errors[:4]) or "- Без деталей"
         if messagebox.askyesno(
-            "Desktop Input Editor",
+            DIALOG_TITLE,
             (
-                f"Автоматический auto-check перед «{run_label}» выключен, "
-                "но актуальный сохранённый selfcheck нашёл проблемы:\n\n"
+                f"Автопроверка перед «{run_label}» выключена, "
+                "но актуальная сохранённая самопроверка нашла проблемы:\n\n"
                 f"{preview_errors}\n\n"
                 "Продолжить запуск без повторной проверки?"
             ),
         ):
             self._append_run_log(
-                f"[auto-check] {run_label}: запуск подтверждён несмотря на ошибки в актуальном сохранённом selfcheck."
+                f"[автопроверка] {run_label}: запуск подтверждён несмотря на ошибки в актуальной сохранённой самопроверке."
             )
             return True
         self._append_run_log(
-            f"[auto-check] {run_label}: запуск отменён пользователем после чтения актуального сохранённого selfcheck."
+            f"[автопроверка] {run_label}: запуск отменён пользователем после чтения актуальной сохранённой самопроверки."
         )
         self._set_status(f"Запуск отменён: {run_label}")
         return False
@@ -5348,15 +5356,15 @@ class DesktopInputEditor:
         report = self._load_selfcheck_report(report_path)
         if report is None:
             if runtime_policy == "force":
-                self._append_run_log(f"[auto-check] {run_label}: отчёт недоступен, продолжаем по policy=force.")
+                self._append_run_log(f"[автопроверка] {run_label}: отчёт недоступен, продолжаем по режиму force.")
                 return True
             if runtime_policy == "strict":
-                self._append_run_log(f"[auto-check] {run_label}: отчёт недоступен, запуск остановлен по policy=strict.")
+                self._append_run_log(f"[автопроверка] {run_label}: отчёт недоступен, запуск остановлен по режиму strict.")
                 self._set_status(f"Запуск остановлен: {run_label}")
                 return False
             return messagebox.askyesno(
-                "Desktop Input Editor",
-                f"Отчёт auto-check для «{run_label}» не найден.\n\nПродолжить запуск?",
+                DIALOG_TITLE,
+                f"Отчёт автопроверки для «{run_label}» не найден.\n\nПродолжить запуск?",
             )
 
         ok = bool(report.get("ok", False))
@@ -5364,27 +5372,27 @@ class DesktopInputEditor:
         warnings = list(report.get("warnings") or [])
         if ok:
             self._append_run_log(
-                f"[auto-check] {run_label}: отчёт OK; warnings={len(warnings)}."
+                f"[автопроверка] {run_label}: отчёт в норме; предупреждений={len(warnings)}."
             )
             return True
 
         if runtime_policy == "force":
             self._append_run_log(
-                f"[auto-check] {run_label}: продолжаем несмотря на ошибки по policy=force."
+                f"[автопроверка] {run_label}: продолжаем несмотря на ошибки по режиму force."
             )
             return True
         if runtime_policy == "strict":
             self._append_run_log(
-                f"[auto-check] {run_label}: запуск остановлен по policy=strict; errors={len(errors)}."
+                f"[автопроверка] {run_label}: запуск остановлен по режиму strict; ошибок={len(errors)}."
             )
             self._set_status(f"Запуск остановлен: {run_label}")
             return False
 
         preview_errors = "\n".join(f"- {msg}" for msg in errors[:4]) or "- Без деталей"
         return messagebox.askyesno(
-            "Desktop Input Editor",
+            DIALOG_TITLE,
             (
-                f"Auto-check перед «{run_label}» нашёл проблемы:\n\n"
+                f"Автопроверка перед «{run_label}» нашла проблемы:\n\n"
                 f"{preview_errors}\n\n"
                 "Продолжить запуск?"
             ),
@@ -5408,10 +5416,10 @@ class DesktopInputEditor:
             if self._auto_check_allows_launch(report_path, run_label):
                 launch_callback(log_file_path)
             else:
-                self._append_run_log(f"[auto-check] {run_label}: запуск отменён после auto-check.")
+                self._append_run_log(f"[автопроверка] {run_label}: запуск отменён после автопроверки.")
 
         self._run_config_check(
-            title=f"Auto-check перед «{run_label}»",
+            title=f"Автопроверка перед «{run_label}»",
             on_success=_after_check,
             log_file_path=log_file_path,
         )
@@ -5435,20 +5443,20 @@ class DesktopInputEditor:
             detail_lines.append(f"- И ещё разделов с замечаниями: {len(warn_rows) - 4}")
         if policy_key == "force":
             self._append_run_log(
-                f"[preflight] {run_label}: найдены предупреждения, но policy=force разрешает запуск."
+                f"[preflight] {run_label}: найдены предупреждения, но режим force разрешает запуск."
             )
             return True
         if policy_key == "strict":
             self._append_run_log(
-                f"[preflight] {run_label}: запуск остановлен по policy=strict."
+                f"[preflight] {run_label}: запуск остановлен по режиму strict."
             )
             self._set_status(f"Запуск остановлен: {run_label}")
             messagebox.showwarning(
-                "Desktop Input Editor",
+                DIALOG_TITLE,
                 (
                     f"Перед запуском «{run_label}» есть шаги, требующие внимания:\n\n"
                     + "\n".join(detail_lines)
-                    + "\n\nРежим strict блокирует запуск, пока проблемы не будут исправлены."
+                    + "\n\nСтрогий режим блокирует запуск, пока проблемы не будут исправлены."
                 ),
             )
             return False
@@ -5458,7 +5466,7 @@ class DesktopInputEditor:
             + "\n".join(detail_lines)
             + "\n\nЗапустить всё равно?"
         )
-        if messagebox.askyesno("Desktop Input Editor", prompt):
+        if messagebox.askyesno(DIALOG_TITLE, prompt):
             self._append_run_log(
                 f"[preflight] {run_label}: запуск подтверждён несмотря на предупреждения."
             )
@@ -5515,7 +5523,7 @@ class DesktopInputEditor:
         )
 
     def _run_quick_preview(self, *, prechecked: bool = False) -> None:
-        if self._selected_run_profile_key() == "baseline" and not self._baseline_suite_gate_allows_launch("Baseline / preview"):
+        if self._selected_run_profile_key() == "baseline" and not self._baseline_suite_gate_allows_launch("Базовый прогон / предпросмотр"):
             return
         log_file_path = self._build_action_log_path("quick_preview")
 
@@ -5526,7 +5534,7 @@ class DesktopInputEditor:
             report_path = self._runtime_preview_report_path()
             save_base_payload(suite_path, self._build_preview_suite())
             self._append_run_log(
-                f"[preview] Профиль дороги: {preview_surface_label(self._selected_preview_surface_key())}"
+                f"[предпросмотр] Профиль дороги: {preview_surface_label(self._selected_preview_surface_key())}"
             )
             cmd = [
                 self._python_cli_exe(),
@@ -5634,7 +5642,7 @@ class DesktopInputEditor:
             initialdir=str(repo_root()),
             initialfile="desktop_input_base.json",
             defaultextension=".json",
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+            filetypes=[("Файлы данных", "*.json"), ("Все файлы", "*.*")],
         )
         if not path:
             return
@@ -5646,7 +5654,7 @@ class DesktopInputEditor:
             self.current_payload = dict(payload)
             self._refresh_source_reference_diff_state()
             self.current_source_path = target
-            self.path_var.set(str(target))
+            self.path_var.set(self._display_source_name())
             self._refresh_run_context_summary()
             for key in self._widget_handles:
                 self._refresh_value_label(key)
@@ -5654,9 +5662,9 @@ class DesktopInputEditor:
             self._refresh_active_field_search_view()
             self._refresh_handoff_snapshot_state()
             self._set_status(f"Параметры сохранены: {target}")
-            messagebox.showinfo("Desktop Input Editor", f"Параметры сохранены:\n{target}")
+            messagebox.showinfo(DIALOG_TITLE, f"Параметры сохранены:\n{target}")
         except Exception as exc:
-            messagebox.showerror("Desktop Input Editor", f"Не удалось сохранить JSON:\n{exc}")
+            messagebox.showerror(DIALOG_TITLE, f"Не удалось сохранить файл данных:\n{exc}")
 
     def _open_repo_root(self) -> None:
         root = repo_root()
@@ -5673,7 +5681,7 @@ class DesktopInputEditor:
                 subprocess.Popen(["xdg-open", str(root)])
             self._set_status(f"Открыта папка проекта: {root}")
         except Exception as exc:
-            messagebox.showerror("Desktop Input Editor", f"Не удалось открыть папку проекта:\n{exc}")
+            messagebox.showerror(DIALOG_TITLE, f"Не удалось открыть папку проекта:\n{exc}")
 
     def _open_profile_dir(self) -> None:
         root = desktop_profile_dir_path()
@@ -5687,7 +5695,7 @@ class DesktopInputEditor:
                 subprocess.Popen(["xdg-open", str(root)])
             self._set_status(f"Открыта папка профилей: {root}")
         except Exception as exc:
-            messagebox.showerror("Desktop Input Editor", f"Не удалось открыть папку профилей:\n{exc}")
+            messagebox.showerror(DIALOG_TITLE, f"Не удалось открыть папку профилей:\n{exc}")
 
     def run(self) -> None:
         if self._owns_root:

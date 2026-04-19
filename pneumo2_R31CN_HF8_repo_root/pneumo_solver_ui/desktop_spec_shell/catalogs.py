@@ -180,25 +180,43 @@ def _row_value(row: dict[str, Any], *keys: str) -> Any:
     return ""
 
 
+def _legacy_mojibake_key(key: str) -> str:
+    try:
+        return str(key).encode("utf-8").decode("cp1251")
+    except Exception:
+        return str(key)
+
+
+def legacy_key_aliases(*keys: str) -> tuple[str, ...]:
+    aliases: list[str] = []
+    seen: set[str] = set()
+    for key in keys:
+        for alias in (str(key), _legacy_mojibake_key(str(key))):
+            if alias and alias not in seen:
+                aliases.append(alias)
+                seen.add(alias)
+    return tuple(aliases)
+
+
+def _row_value_ru(row: dict[str, Any], *keys: str) -> Any:
+    return _row_value(row, *legacy_key_aliases(*keys))
+
+
 def _help_payload_and_title(row: dict[str, Any]) -> tuple[str, dict[str, Any]]:
-    title = _safe_text(_row_value(row, "название", "РЅР°Р·РІР°РЅРёРµ"))
+    title = _safe_text(_row_value_ru(row, "название"))
     payload_obj = _safe_literal(
-        _row_value(
-            row,
-            "структура_развёрнутого_описания",
-            "СЃС‚СЂСѓРєС‚СѓСЂР°_СЂР°Р·РІС‘СЂРЅСѓС‚РѕРіРѕ_РѕРїРёСЃР°РЅРёСЏ",
-        )
+        _row_value_ru(row, "структура_развёрнутого_описания")
     )
     if not isinstance(payload_obj, dict):
         return title, {}
-    nested_payload = payload_obj.get("структура_развёрнутого_описания")
+    nested_payload = _row_value_ru(payload_obj, "структура_развёрнутого_описания")
     if isinstance(nested_payload, dict):
         return (
-            title or _safe_text(payload_obj.get("название")),
+            title or _safe_text(_row_value_ru(payload_obj, "название")),
             nested_payload,
         )
     return (
-        title or _safe_text(payload_obj.get("название")),
+        title or _safe_text(_row_value_ru(payload_obj, "название")),
         payload_obj,
     )
 
@@ -210,26 +228,20 @@ def load_ui_element_catalog() -> dict[str, UiElementCatalogEntry]:
         element = UiElementCatalogEntry(
             element_id=_safe_text(_row_value(row, "id")),
             automation_id=_safe_text(_row_value(row, "automation_id")),
-            title=_safe_text(_row_value(row, "название", "РЅР°Р·РІР°РЅРёРµ")),
-            kind=_safe_text(_row_value(row, "тип", "С‚РёРї")),
-            region=_safe_text(_row_value(row, "регион", "СЂРµРіРёРѕРЅ")),
+            title=_safe_text(_row_value_ru(row, "название")),
+            kind=_safe_text(_row_value_ru(row, "тип")),
+            region=_safe_text(_row_value_ru(row, "регион")),
             tooltip_id=_safe_text(_row_value(row, "tooltip_id")),
             help_id=_safe_text(_row_value(row, "help_id")),
-            purpose=_safe_text(_row_value(row, "назначение", "РЅР°Р·РЅР°С‡РµРЅРёРµ")),
-            pipeline_node=_safe_text(_row_value(row, "узел_пайплайна", "СѓР·РµР»_РїР°Р№РїР»Р°Р№РЅР°")),
-            visibility=_safe_text(_row_value(row, "видимость", "РІРёРґРёРјРѕСЃС‚СЊ")),
-            availability=_safe_text(_row_value(row, "доступность", "РґРѕСЃС‚СѓРїРЅРѕСЃС‚СЊ")),
-            access_key=_safe_text(_row_value(row, "клавиша_доступа", "РєР»Р°РІРёС€Р°_РґРѕСЃС‚СѓРїР°")),
-            hotkey=_safe_text(_row_value(row, "горячая_клавиша", "РіРѕСЂСЏС‡Р°СЏ_РєР»Р°РІРёС€Р°")),
+            purpose=_safe_text(_row_value_ru(row, "назначение")),
+            pipeline_node=_safe_text(_row_value_ru(row, "узел_пайплайна")),
+            visibility=_safe_text(_row_value_ru(row, "видимость")),
+            availability=_safe_text(_row_value_ru(row, "доступность")),
+            access_key=_safe_text(_row_value_ru(row, "клавиша_доступа")),
+            hotkey=_safe_text(_row_value_ru(row, "горячая_клавиша")),
             tab_index=_safe_float(_row_value(row, "tab_index")),
             workspace_owner=_safe_text(_row_value(row, "workspace_owner")),
-            rect=_safe_literal(
-                _row_value(
-                    row,
-                    "прямоугольник_в_базовом_окне",
-                    "РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРє_РІ_Р±Р°Р·РѕРІРѕРј_РѕРєРЅРµ",
-                )
-            ),
+            rect=_safe_literal(_row_value_ru(row, "прямоугольник_в_базовом_окне")),
         )
         if element.element_id:
             entries[element.element_id] = element
@@ -242,14 +254,14 @@ def load_field_catalog() -> dict[str, FieldCatalogEntry]:
     for row in _load_csv_rows(FIELD_CATALOG_PATH):
         entry = FieldCatalogEntry(
             field_id=_safe_text(_row_value(row, "id")),
-            title=_safe_text(_row_value(row, "название", "РЅР°Р·РІР°РЅРёРµ")),
-            field_type=_safe_text(_row_value(row, "тип", "С‚РёРї")),
-            required=_safe_bool(_row_value(row, "обязательное", "РѕР±СЏР·Р°С‚РµР»СЊРЅРѕРµ")),
+            title=_safe_text(_row_value_ru(row, "название")),
+            field_type=_safe_text(_row_value_ru(row, "тип")),
+            required=_safe_bool(_row_value_ru(row, "обязательное")),
             help_id=_safe_text(_row_value(row, "help_id")),
-            short_hint=_safe_text(_row_value(row, "короткая_подсказка", "РєРѕСЂРѕС‚РєР°СЏ_РїРѕРґСЃРєР°Р·РєР°")),
-            catalog=_safe_text(_row_value(row, "каталог", "РєР°С‚Р°Р»РѕРі")),
-            options=_tuple_from_scalar_or_list(_row_value(row, "варианты", "РІР°СЂРёР°РЅС‚С‹")),
-            unit=_safe_text(_row_value(row, "единица_измерения", "РµРґРёРЅРёС†Р°_РёР·РјРµСЂРµРЅРёСЏ")),
+            short_hint=_safe_text(_row_value_ru(row, "короткая_подсказка")),
+            catalog=_safe_text(_row_value_ru(row, "каталог")),
+            options=_tuple_from_scalar_or_list(_row_value_ru(row, "варианты")),
+            unit=_safe_text(_row_value_ru(row, "единица_измерения")),
         )
         if entry.field_id:
             entries[entry.field_id] = entry
@@ -277,9 +289,9 @@ def load_tooltip_catalog() -> dict[str, TooltipCatalogEntry]:
     for row in _load_csv_rows(TOOLTIP_CATALOG_PATH):
         entry = TooltipCatalogEntry(
             tooltip_id=_safe_text(_row_value(row, "id")),
-            text=_safe_text(_row_value(row, "текст", "С‚РµРєСЃС‚")),
-            rule=_safe_text(_row_value(row, "правило", "РїСЂР°РІРёР»Рѕ")),
-            related_help_id=_safe_text(_row_value(row, "связанная_помощь", "СЃРІСЏР·Р°РЅРЅР°СЏ_РїРѕРјРѕС‰СЊ")),
+            text=_safe_text(_row_value_ru(row, "текст")),
+            rule=_safe_text(_row_value_ru(row, "правило")),
+            related_help_id=_safe_text(_row_value_ru(row, "связанная_помощь")),
         )
         if entry.tooltip_id:
             entries[entry.tooltip_id] = entry
@@ -293,21 +305,15 @@ def load_migration_matrix() -> tuple[MigrationMatrixEntry, ...]:
         entries.append(
             MigrationMatrixEntry(
                 web_feature_id=_safe_text(_row_value(row, "web_feature_id")),
-                title=_safe_text(_row_value(row, "название_функции", "РЅР°Р·РІР°РЅРёРµ_С„СѓРЅРєС†РёРё")),
-                old_place=_safe_text(_row_value(row, "старое_место", "СЃС‚Р°СЂРѕРµ_РјРµСЃС‚Рѕ")),
-                new_place=_safe_text(_row_value(row, "новое_место", "РЅРѕРІРѕРµ_РјРµСЃС‚Рѕ")),
+                title=_safe_text(_row_value_ru(row, "название_функции")),
+                old_place=_safe_text(_row_value_ru(row, "старое_место")),
+                new_place=_safe_text(_row_value_ru(row, "новое_место")),
                 workspace_codes=_split_workspace_codes(_row_value(row, "workspace")),
                 source_of_truth=_safe_text(_row_value(row, "source_of_truth")),
-                preserved_fully=_safe_bool(_row_value(row, "сохранена_полностью", "СЃРѕС…СЂР°РЅРµРЅР°_РїРѕР»РЅРѕСЃС‚СЊСЋ")),
-                improvements=_safe_text(_row_value(row, "улучшения", "СѓР»СѓС‡С€РµРЅРёСЏ")),
-                search_hint=_safe_text(
-                    _row_value(
-                        row,
-                        "как_найти_через_поиск_команд",
-                        "РєР°Рє_РЅР°Р№С‚Рё_С‡РµСЂРµР·_РїРѕРёСЃРє_РєРѕРјР°РЅРґ",
-                    )
-                ),
-                migration_status=_safe_text(_row_value(row, "статус_миграции", "СЃС‚Р°С‚СѓСЃ_РјРёРіСЂР°С†РёРё")),
+                preserved_fully=_safe_bool(_row_value_ru(row, "сохранена_полностью")),
+                improvements=_safe_text(_row_value_ru(row, "улучшения")),
+                search_hint=_safe_text(_row_value_ru(row, "как_найти_через_поиск_команд")),
+                migration_status=_safe_text(_row_value_ru(row, "статус_миграции")),
             )
         )
     return tuple(entries)
@@ -319,12 +325,12 @@ def load_keyboard_matrix() -> tuple[KeyboardMatrixEntry, ...]:
     for row in _load_csv_rows(KEYBOARD_MATRIX_PATH):
         entries.append(
             KeyboardMatrixEntry(
-                kind=_safe_text(_row_value(row, "тип", "С‚РёРї")),
-                order=int(_safe_float(_row_value(row, "порядок", "РїРѕСЂСЏРґРѕРє")) or 0)
-                if _safe_float(_row_value(row, "порядок", "РїРѕСЂСЏРґРѕРє")) is not None
+                kind=_safe_text(_row_value_ru(row, "тип")),
+                order=int(_safe_float(_row_value_ru(row, "порядок")) or 0)
+                if _safe_float(_row_value_ru(row, "порядок")) is not None
                 else None,
-                value=_safe_text(_row_value(row, "значение", "Р·РЅР°С‡РµРЅРёРµ")),
-                keys=_safe_text(_row_value(row, "клавиши", "РєР»Р°РІРёС€Рё")),
+                value=_safe_text(_row_value_ru(row, "значение")),
+                keys=_safe_text(_row_value_ru(row, "клавиши")),
             )
         )
     return tuple(entries)
@@ -353,7 +359,7 @@ def load_ui_state_matrix() -> dict[str, UiStateMatrixEntry]:
     for row in _load_csv_rows(UI_STATE_MATRIX_PATH):
         entry = UiStateMatrixEntry(
             state_id=_safe_text(_row_value(row, "id")),
-            title=_safe_text(_row_value(row, "название", "РЅР°Р·РІР°РЅРёРµ")),
+            title=_safe_text(_row_value_ru(row, "название")),
             border=_safe_text(_row_value(row, "рамка")),
             background=_safe_text(_row_value(row, "фон")),
             text=_safe_text(_row_value(row, "текст")),
@@ -417,6 +423,8 @@ def keyboard_shortcuts_by_name() -> dict[str, str]:
             continue
         if entry.value and entry.keys:
             mapping[entry.value] = entry.keys
+            if entry.value == "Поиск команд":
+                mapping["Быстрый поиск"] = entry.keys
     return mapping
 
 

@@ -121,9 +121,9 @@ def test_desktop_optimizer_center_uses_workspace_layout_instead_of_big_intro_pan
     )
 
     assert 'workspace = ttk.Panedwindow(outer, orient="horizontal")' in src
-    assert 'context_frame = ttk.LabelFrame(sidebar, text="Контекст", padding=8)' in src
+    assert 'context_frame = ttk.LabelFrame(sidebar, text="Сводка", padding=8)' in src
     assert 'nav_frame = ttk.LabelFrame(sidebar, text="Переходы", padding=8)' in src
-    assert 'text="Открыть Baseline Center", command=self.open_baseline_center' in src
+    assert 'text="Открыть центр опорного прогона", command=self.open_baseline_center' in src
     assert "PNEUMO_GUI_SPEC_SHELL_OPEN_WORKSPACE" in src
     assert '"baseline_run"' in src
     assert '"pneumo_solver_ui.tools.desktop_gui_spec_shell"' in src
@@ -136,9 +136,9 @@ def test_desktop_optimizer_contract_tab_links_blocked_ho006_to_baseline_center()
         errors="replace",
     )
 
-    assert '"HO-006 active baseline"' in src
+    assert '"Активный опорный прогон"' in src
     assert "optimizer_baseline_can_consume" in src
-    assert 'text="Открыть Baseline Center"' in src
+    assert 'text="Открыть центр опорного прогона"' in src
     assert "command=controller.open_baseline_center" in src
 
 
@@ -263,7 +263,7 @@ def test_desktop_optimizer_contract_snapshot_blocks_stale_active_baseline_withou
     assert snapshot.active_baseline_hash == active["active_baseline_hash"]
     assert snapshot.active_baseline_suite_snapshot_hash == old_suite["suite_snapshot_hash"]
     assert snapshot.optimizer_baseline_can_consume is False
-    assert "suite_snapshot_hash_changed" in snapshot.active_baseline_banner
+    assert "снимок набора испытаний изменился" in snapshot.active_baseline_banner
     assert contract_path.read_text(encoding="utf-8") == before
 
 
@@ -434,13 +434,13 @@ def test_desktop_optimizer_runtime_builds_launch_readiness_summary(tmp_path: Pat
     }
 
     assert readiness["warn_count"] >= 1
-    assert readiness["headline"] == "Review blockers before launch."
-    assert readiness["next_action"] == "Baseline Center"
-    assert by_title["Active baseline HO-006"]["status"] == "warn"
-    assert by_title["Active baseline HO-006"]["optimizer_baseline_can_consume"] is False
-    assert by_title["Packaging evidence"]["status"] == "warn"
-    assert by_title["Selected run alignment"]["status"] == "info"
-    assert by_title["Runtime state"]["status"] == "ok"
+    assert readiness["headline"] == "Перед запуском нужно разобрать блокировки."
+    assert readiness["next_action"] == "Центр опорного прогона"
+    assert by_title["Активный опорный прогон"]["status"] == "warn"
+    assert by_title["Активный опорный прогон"]["optimizer_baseline_can_consume"] is False
+    assert by_title["Сведения по упаковке"]["status"] == "warn"
+    assert by_title["Согласованность выбранного запуска"]["status"] == "info"
+    assert by_title["Состояние выполнения"]["status"] == "ok"
 
 
 def test_desktop_optimizer_runtime_launch_readiness_blocks_stale_ho006(
@@ -466,14 +466,14 @@ def test_desktop_optimizer_runtime_launch_readiness_blocks_stale_ho006(
         str(row.get("title") or ""): dict(row)
         for row in tuple(readiness.get("rows") or ())
     }
-    ho006_row = by_title["Active baseline HO-006"]
+    ho006_row = by_title["Активный опорный прогон"]
 
-    assert readiness["headline"] == "Review blockers before launch."
-    assert readiness["next_action"] == "Baseline Center"
+    assert readiness["headline"] == "Перед запуском нужно разобрать блокировки."
+    assert readiness["next_action"] == "Центр опорного прогона"
     assert ho006_row["status"] == "warn"
     assert ho006_row["state"] == "stale"
     assert ho006_row["optimizer_baseline_can_consume"] is False
-    assert "suite_snapshot_hash_changed" in ho006_row["summary"]
+    assert "снимок набора испытаний изменился" in ho006_row["summary"]
     assert contract_path.read_text(encoding="utf-8") == before
 
 
@@ -535,11 +535,11 @@ def test_desktop_optimizer_runtime_blocks_resume_preflight_for_mismatched_select
 
     assert identity["state"] == "BLOCKED"
     assert identity["resume_requested"] is True
-    assert "problem scope mismatch" in ", ".join(identity["blocking_reasons"])
+    assert "область задачи не совпадает" in ", ".join(identity["blocking_reasons"])
     assert preflight["can_launch"] is False
-    assert "problem scope mismatch" in ", ".join(preflight["blocking_reasons"])
-    assert by_title["Run identity & resume safety"]["status"] == "warn"
-    assert by_title["Run identity & resume safety"]["state"] == "BLOCKED"
+    assert "область задачи не совпадает" in ", ".join(preflight["blocking_reasons"])
+    assert by_title["Идентичность запуска и безопасное продолжение"]["status"] == "warn"
+    assert by_title["Идентичность запуска и безопасное продолжение"]["state"] == "BLOCKED"
 
 
 def test_desktop_optimizer_center_formats_stale_ho006_as_blocked_summary() -> None:
@@ -558,10 +558,10 @@ def test_desktop_optimizer_center_formats_stale_ho006_as_blocked_summary() -> No
 
     text = center._format_baseline_summary_text()
 
-    assert "HO-006: stale (blocked)" in text
-    assert "HO-006: stale (current)" not in text
-    assert "active_baseline_hash: abcdef123456" in text
-    assert "Автообновление baseline: включено" in text
+    assert "Состояние активного прогона - устарел (заблокирован)" in text
+    assert "Состояние активного прогона - устарел (актуален)" not in text
+    assert "Контроль активного прогона - abcdef123456" in text
+    assert "Автообновление опорного прогона включено" in text
 
 
 def test_desktop_optimizer_runtime_tracks_latest_pointer_flow(tmp_path: Path) -> None:
@@ -794,7 +794,7 @@ def test_desktop_optimizer_center_selection_materializes_analysis_handoff(tmp_pa
     ]
     assert runtime.bound_run_dirs[-1] == str(run_dir)
     assert "Передача в анализ обновлена" in center.status_var.value
-    assert "selected_run_contract.json=ready" in center.status_var.value
+    assert "паспорт выбранного запуска - готов" in center.status_var.value
 
 
 def test_desktop_optimizer_runtime_blocks_cleanup_while_job_is_active(tmp_path: Path) -> None:
@@ -882,13 +882,37 @@ def test_desktop_optimizer_runtime_builds_selected_run_next_step_summary(tmp_pat
         for row in tuple(summary.get("rows") or ())
     }
 
-    assert summary["headline"] == "Selected staged run is ready for coordinator continuation."
-    assert summary["next_action"] == "Handoff"
+    assert summary["headline"] == "Поэтапный запуск готов к продолжению координатором."
+    assert summary["next_action"] == "Передача стадий"
     assert summary["next_action_kind"] == "show_handoff_tab"
-    assert by_title["Packaging route"]["status"] == "ok"
-    assert by_title["Continuation route"]["status"] == "ok"
-    assert by_title["Analysis handoff"]["action_kind"] == "show_history_tab"
-    assert "selected_run_contract.json" in by_title["Analysis handoff"]["summary"]
+    assert by_title["Готовность выпуска"]["status"] == "ok"
+    assert by_title["Продолжение расчёта"]["status"] == "ok"
+    assert by_title["Передача в анализ"]["action_kind"] == "show_history_tab"
+    assert "данные для анализа" in by_title["Передача в анализ"]["summary"]
+    visible_summary = "\n".join(
+        [
+            str(summary.get("headline") or ""),
+            str(summary.get("next_action") or ""),
+            *[
+                " ".join(
+                    str(row.get(key) or "")
+                    for key in ("title", "summary", "action")
+                )
+                for row in tuple(summary.get("rows") or ())
+            ],
+        ]
+    )
+    for forbidden in (
+        "Selected run",
+        "Packaging",
+        "Handoff",
+        "Analysis handoff",
+        "Runtime state",
+        "selected_run_contract.json",
+        "GUI",
+        "artifacts",
+    ):
+        assert forbidden not in visible_summary
 
 
 def test_desktop_optimizer_runtime_builds_finished_jobs_packaging_view(tmp_path: Path) -> None:
@@ -1190,8 +1214,8 @@ def test_desktop_optimizer_center_keeps_tabbed_modular_architecture() -> None:
     assert "def make_selected_run_latest_pointer(self) -> None:" in tool_src
     assert "def _materialize_selected_run_for_analysis(self, selected_from: str) -> str:" in tool_src
     assert "def _refresh_after_run_selection(self, status_text: str = \"\") -> None:" in tool_src
-    assert "selected_run_contract.json будет создан автоматически" in tool_src
-    assert "Контракт запуска" in tool_src
+    assert "Паспорт выбранного запуска будет создан автоматически" in tool_src
+    assert "Настройки запуска" in tool_src
     assert "self.runtime.bind_selected_run_dir(self._selected_run_dir)" in tool_src
     assert "self.runtime.save_run_pointer(" in tool_src
     assert "def open_selected_results(self) -> None:" in tool_src
@@ -1237,6 +1261,19 @@ def test_desktop_optimizer_center_keeps_tabbed_modular_architecture() -> None:
     assert "def launch_preflight_summary(self) -> dict[str, Any]:" in runtime_src
     assert "def apply_run_contract(self, summary: OptimizationRunSummary) -> dict[str, Any]:" in runtime_src
     assert "def selected_run_details(" in runtime_src
+    for forbidden_runtime_text in (
+        "Selected run is",
+        "Packaging route",
+        "Continuation route",
+        "Analysis handoff",
+        "Runtime state",
+        "selected_run_contract.json is ready",
+        "Selecting this run in the GUI",
+        "Packaging verdicts are not materialized",
+        "Контракт и область задачи",
+        "изменился контракт целей",
+    ):
+        assert forbidden_runtime_text not in runtime_src
 
     assert "class HandoffTreePanel" in panels_src
     assert "class PackagingTreePanel" in panels_src
@@ -1249,16 +1286,16 @@ def test_desktop_optimizer_center_keeps_tabbed_modular_architecture() -> None:
     assert "class DesktopOptimizerHandoffTab" in handoff_tab_src
     assert "class DesktopOptimizerPackagingTab" in packaging_tab_src
     assert 'text="Расхождение выбранного прогона с текущим запуском"' in contract_tab_src
-    assert 'text="Применить контракт"' in contract_tab_src
+    assert 'text="Применить настройки запуска"' in contract_tab_src
     assert 'text="Быстрые переходы"' in dashboard_tab_src
     assert 'text="Состояние рабочей области"' in dashboard_tab_src
-    assert 'text="Готовность к запуску и checklist"' in dashboard_tab_src
-    assert 'text="Последний указатель оптимизации"' in dashboard_tab_src
+    assert 'text="Готовность к запуску"' in dashboard_tab_src
+    assert 'text="Текущий прогон для анализа"' in dashboard_tab_src
     assert 'text="Следующий шаг по выбранному прогону"' in dashboard_tab_src
-    assert 'text="Последний указатель"' in dashboard_tab_src
+    assert 'text="Текущий прогон анализа"' in dashboard_tab_src
     assert 'text="Следующий шаг выбранного прогона"' in dashboard_tab_src
     assert 'text="Лучший прогон для выпуска"' in dashboard_tab_src
-    assert 'values=("stable", "legacy")' in contract_tab_src
+    assert 'values=tuple(PROBLEM_HASH_MODE_LABELS.values())' in contract_tab_src
     assert 'text="Профили запуска"' in runtime_tab_src
     assert 'text="Применить профиль"' in runtime_tab_src
     assert 'text="Готовность к запуску"' in runtime_tab_src
@@ -1267,16 +1304,74 @@ def test_desktop_optimizer_center_keeps_tabbed_modular_architecture() -> None:
     assert "HANDOFF_SORT_OPTIONS" in history_tab_src
     assert 'text="Сводка по передаче"' in history_tab_src
     assert 'text="Открыть результаты"' in history_tab_src
-    assert 'text="Контракт целей"' in history_tab_src
-    assert 'text="Применить контракт"' in history_tab_src
-    assert 'text="Сделать текущим указателем"' in history_tab_src
+    assert 'text="Паспорт целей"' in history_tab_src
+    assert 'text="Применить настройки"' in history_tab_src
+    assert 'text="Передать в анализ"' in history_tab_src
     assert 'text="План передачи"' in history_tab_src
     assert 'text="Фильтры готовых прогонов"' in finished_tab_src
-    assert 'text="Сделать текущим указателем"' in finished_tab_src
+    assert 'text="Передать в анализ"' in finished_tab_src
     assert 'text="Ранжирование для выпуска"' in finished_tab_src
     assert 'text="Фильтры кандидатов на передачу"' in handoff_tab_src
-    assert 'text="Сделать текущим указателем"' in handoff_tab_src
+    assert 'text="Передать в анализ"' in handoff_tab_src
     assert 'text="Ранжирование продолжения"' in handoff_tab_src
     assert 'text="Фильтры выпуска"' in packaging_tab_src
-    assert 'text="Сделать текущим указателем"' in packaging_tab_src
+    assert 'text="Передать в анализ"' in packaging_tab_src
     assert 'text="Ранжирование по готовности"' in packaging_tab_src
+
+
+def test_desktop_optimizer_center_visible_text_uses_operator_language() -> None:
+    visible_sources = "\n".join(
+        path.read_text(encoding="utf-8", errors="replace")
+        for path in (
+            UI_ROOT / "tools" / "desktop_optimizer_center.py",
+            UI_ROOT / "desktop_optimizer_tabs" / "contract_tab.py",
+            UI_ROOT / "desktop_optimizer_tabs" / "dashboard_tab.py",
+            UI_ROOT / "desktop_optimizer_tabs" / "finished_tab.py",
+            UI_ROOT / "desktop_optimizer_tabs" / "handoff_tab.py",
+            UI_ROOT / "desktop_optimizer_tabs" / "history_tab.py",
+            UI_ROOT / "desktop_optimizer_tabs" / "packaging_tab.py",
+            UI_ROOT / "desktop_optimizer_tabs" / "runtime_tab.py",
+        )
+    )
+    for forbidden in (
+        'text="Контракт целей"',
+        'text="Применить контракт"',
+        'text="Контракт выпуска выбранного прогона"',
+        "Контракт запуска",
+        "selected_run_contract.json=ready",
+        "selected_run_contract.json будет создан автоматически",
+        "Desktop Optimizer Center",
+        "Launch profile",
+        "optimization job",
+        "Dask mode",
+        "Ray mode",
+        "Finished Jobs readiness",
+        "Packaging: packaging evidence",
+        "StageRunner runtime policy",
+        "Selected run context",
+        "results artifact",
+        "run dir",
+        "Пакет кандидатов",
+        "пакет кандидатов",
+        "Подготовленные артефакты",
+        "Команды запуска",
+        "Предпросмотр команды",
+        "Открыть лог",
+        "без WEB",
+        "Маршрут:",
+        'text="Контекст"',
+        'text="Последний указатель"',
+        'text="Сделать текущим указателем"',
+    ):
+        assert forbidden not in visible_sources
+
+    for required in (
+        "Порядок работы:",
+        "Подготовленные файлы",
+        "Группа кандидатов",
+        "Открыть журнал",
+        "Порядок запуска",
+        "Открыть папку прогона",
+        "запуск из этого окна",
+    ):
+        assert required in visible_sources

@@ -1,6 +1,6 @@
 {
   "schema": "pneumo.chat_knowledge_base.v1",
-  "updated_at": "2026-04-18T12:29:43+00:00",
+  "updated_at": "2026-04-18T19:53:55+00:00",
   "requirements": [
     {
       "id": "REQ-0001",
@@ -192,6 +192,14 @@
       "source": "chat:2026-04-18 diagnostics gui complaint",
       "title": "Diagnostics GUI: видимый прогресс и русский операторский текст",
       "details": "Окно диагностики должно быть простым и последовательным: любые длительные действия показывают прогресс в общей видимой зоне того же окна независимо от выбранной вкладки; пользовательские подписи, статусы и сообщения должны быть на русском; английские технические ключи допустимы только в машинно-читаемых JSON/log артефактах и не должны вытекать в операторский интерфейс.",
+      "status": "active"
+    },
+    {
+      "id": "REQ-0025",
+      "created_at": "2026-04-18T19:53:55+00:00",
+      "source": "chat:2026-04-19 semantic GUI audit",
+      "title": "GUI-кнопки и надписи должны смыслово соответствовать V38 и оптимизированному пользовательскому pipeline",
+      "details": "Все operator-facing кнопки, заголовки, статусы, подсказки и диалоги desktop GUI должны вести пользователя по графу PIPELINE_OPTIMIZED.dot без лишних этапов, без service-jargon leaks, без английских служебных терминов и без подмены доменной логики. Animator, Desktop Mnemo и Compare Viewer не являются запрещёнными зонами: их можно развивать, но нельзя ломать рабочее поведение и нельзя дублировать их ответственность в чужих окнах.",
       "status": "active"
     }
   ],
@@ -663,6 +671,15 @@
       "details": "Зафиксировать приемку локальных chat-worktree в codex/work, исключить generated runtime artifacts из канона, убрать временные worktree/ветки после validation и выдать текущий self-contained prompt-pack для 10 параллельных GUI-чатов с обязательной V38 visual/runtime проверкой, PIPELINE_OPTIMIZED.dot flow-check, русским operator-facing текстом и запретом service-jargon leaks.",
       "artifact_path": "gui_chat_prompts/18_POST_CHAT_WORKTREE_CLEANUP_V38_PLAN_MODE_PROMPTS.md",
       "status": "актуален"
+    },
+    {
+      "id": "PLAN-0053",
+      "created_at": "2026-04-18T19:53:55+00:00",
+      "source": "chat:2026-04-19 semantic GUI audit",
+      "title": "Семантический аудит всех GUI-кнопок и надписей относительно V38 и PIPELINE_OPTIMIZED.dot",
+      "details": "Сформирован локальный audit-документ с нормализованным pipeline, найденными неоднозначностями V38, высоковероятными нарушениями текста и приоритетным порядком исправлений.",
+      "artifact_path": "docs/context/release_readiness/GUI_TEXT_SEMANTIC_AUDIT_2026-04-19.md",
+      "status": "active"
     }
   ]
 }

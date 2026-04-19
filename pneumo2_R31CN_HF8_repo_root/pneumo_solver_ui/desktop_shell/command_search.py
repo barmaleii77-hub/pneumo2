@@ -27,72 +27,72 @@ def build_shell_command_search_entries(
     entries: list[ShellCommandSearchEntry] = [
         ShellCommandSearchEntry(
             label="Обзор рабочего места",
-            location="Главное окно -> Обзор",
-            summary="Открывает обзор shell с основным инженерным маршрутом и быстрыми переходами.",
+            location="Главное окно / Обзор",
+            summary="Открывает обзор рабочего места с основным порядком работы и быстрыми переходами.",
             action_kind="home",
             action_value="home",
-            keywords=("главная", "обзор", "маршрут", "рабочее место"),
+            keywords=("главная", "обзор", "порядок работы", "рабочее место"),
         ),
         ShellCommandSearchEntry(
-            label="Показать дерево проекта",
-            location="Главное окно -> Обзор проекта",
-            summary="Переводит фокус в левое дерево проекта, маршрута и артефактов.",
+            label="Показать список рабочих окон",
+            location="Главное окно / Список рабочих окон",
+            summary="Переводит фокус в левый список проекта, порядка работы и результатов.",
             action_kind="focus",
             action_value="project_tree",
-            keywords=("проект", "дерево", "project", "browser", "navigator", "обзор проекта"),
+            keywords=("проект", "список", "рабочие окна", "project", "browser", "navigator", "обзор проекта"),
         ),
         ShellCommandSearchEntry(
             label="Собрать диагностику",
-            location="Главное окно -> Верхняя командная зона",
-            summary="Открывает центр диагностики и отправки как главный глобальный путь для health-check и bundle.",
+            location="Главное окно / Быстрые действия",
+            summary="Открывает центр диагностики и отправки для проверки состояния и подготовки архива.",
             action_kind="tool",
             action_value="desktop_diagnostics_center",
             keywords=("diagnostics", "bundle", "отправка", "health", "self-check"),
         ),
         ShellCommandSearchEntry(
             label="Открыть в аниматоре",
-            location="Главное окно -> Верхняя командная зона",
-            summary="Запускает Desktop Animator для текущего инженерного контекста.",
+            location="Главное окно / Быстрые действия",
+            summary="Запускает аниматор для выбранного результата и текущих настроек.",
             action_kind="tool",
             action_value="desktop_animator",
             keywords=("3d", "анимация", "animation", "viewport", "viewcube"),
         ),
         ShellCommandSearchEntry(
-            label="Открыть HO-008 analysis_context.json",
-            location="Анимация -> HO-008 handoff",
-            summary="Открывает frozen analysis context, который Desktop Animator использует как источник выбранного run.",
+            label="Показать данные для аниматора",
+            location="Анимация / Подготовка",
+            summary="Открывает сохраненные данные, по которым аниматор показывает выбранный результат.",
             action_kind="open_artifact",
             action_value="animator.analysis_context",
             keywords=("HO-008", "analysis_context", "analysis context", "frozen context", "animator handoff"),
         ),
         ShellCommandSearchEntry(
-            label="Открыть HO-008 animator_link_contract.json",
-            location="Анимация -> HO-008 handoff",
-            summary="Открывает link contract от WS-ANALYSIS к WS-ANIMATOR для выбранного optimization run.",
+            label="Показать связь анализа и аниматора",
+            location="Анимация / Подготовка",
+            summary="Открывает запись связи между выбранным результатом анализа и окном анимации.",
             action_kind="open_artifact",
             action_value="animator.animator_link_contract",
             keywords=("HO-008", "animator_link_contract", "link contract", "analysis to animator"),
         ),
         ShellCommandSearchEntry(
-            label="Открыть selected result artifact pointer",
-            location="Анимация -> HO-008 selected artifact",
-            summary="Открывает explicit selected result artifact pointer из frozen analysis context.",
+            label="Открыть выбранный результат",
+            location="Анимация / Выбранный результат",
+            summary="Открывает файл выбранного расчётного результата.",
             action_kind="open_artifact",
             action_value="animator.selected_result_artifact_pointer",
             keywords=("HO-008", "selected_result_artifact_pointer", "selected pointer", "artifact pointer"),
         ),
         ShellCommandSearchEntry(
-            label="Открыть selected animation NPZ",
-            location="Анимация -> HO-008 selected artifact",
-            summary="Открывает resolved selected NPZ, переданный Animator через frozen analysis context.",
+            label="Открыть файл анимации",
+            location="Анимация / Выбранный результат",
+            summary="Открывает файл анимации, выбранный для просмотра в аниматоре.",
             action_kind="open_artifact",
             action_value="animator.selected_npz_path",
             keywords=("HO-008", "selected_npz_path", "npz", "animation npz", "anim_latest"),
         ),
         ShellCommandSearchEntry(
-            label="Открыть HO-010 capture_export_manifest.json",
-            location="Анимация -> HO-010 capture/export",
-            summary="Открывает frozen capture/export manifest для выбранной анимации и её HO-008 lineage.",
+            label="Открыть сведения об экспорте анимации",
+            location="Анимация / Экспорт",
+            summary="Открывает сохраненные сведения об экспорте выбранной анимации.",
             action_kind="open_artifact",
             action_value="animator.capture_export_manifest",
             keywords=(
@@ -106,8 +106,8 @@ def build_shell_command_search_entries(
         ),
         ShellCommandSearchEntry(
             label="Открыть сравнение прогонов",
-            location="Главное окно -> Верхняя командная зона",
-            summary="Запускает Compare Viewer для сравнения результатов и артефактов.",
+            location="Главное окно / Быстрые действия",
+            summary="Открывает окно сравнения результатов.",
             action_kind="tool",
             action_value="compare_viewer",
             keywords=("compare", "сравнение", "npz", "results"),
@@ -115,7 +115,7 @@ def build_shell_command_search_entries(
     ]
     for spec in specs:
         label = spec.title
-        location = f"{spec.menu_section} -> {spec.title}"
+        location = f"{spec.menu_section} / {spec.title}"
         summary = spec.details or spec.description
         keywords = tuple(
             sorted(

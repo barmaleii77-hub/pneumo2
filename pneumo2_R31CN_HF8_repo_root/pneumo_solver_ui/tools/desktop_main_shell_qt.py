@@ -1,4 +1,4 @@
-"""Launcher for the desktop main shell with a legacy fallback."""
+"""Запуск главного desktop-окна с проверочным Tk-вариантом."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from pneumo_solver_ui.desktop_shell.registry import build_desktop_shell_specs
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="desktop_main_shell_qt",
-        description="Windows desktop main shell for orchestrating PneumoApp GUI tools.",
+        description="Главное Windows-окно для управления GUI-окнами PneumoApp.",
     )
     parser.add_argument(
         "--open",
@@ -22,56 +22,56 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         metavar="KEY",
-        help="Open a shell tool by registry key on startup. Can be repeated.",
+        help="Открыть GUI-окно по ключу реестра при запуске. Можно указать несколько раз.",
     )
     parser.add_argument(
         "--list-tools",
         action="store_true",
-        help="Print available shell tool keys and exit.",
+        help="Вывести доступные ключи GUI-окон и завершить работу.",
     )
     parser.add_argument(
         "--legacy-tk-shell",
         action="store_true",
-        help="Run the historical shell instead of the current desktop shell.",
+        help="Запустить проверочное Tk-окно вместо текущего главного desktop-окна.",
     )
     parser.add_argument(
         "--runtime-proof",
         metavar="DIR",
-        help="Write a desktop main shell runtime evidence JSON/MD pair and exit without launching domain windows.",
+        help="Записать JSON/MD-подтверждение работы главного окна и выйти без запуска доменных окон.",
     )
     parser.add_argument(
         "--runtime-proof-offscreen",
         action="store_true",
-        help="Collect --runtime-proof using QT_QPA_PLATFORM=offscreen for CI/headless checks.",
+        help="Собрать --runtime-proof через QT_QPA_PLATFORM=offscreen для CI/headless-проверок.",
     )
     parser.add_argument(
         "--runtime-proof-manual-results",
         metavar="JSON",
         help=(
-            "Merge operator-confirmed Snap/DPI/second-monitor results into --runtime-proof. "
-            "The JSON may contain a 'checks' object keyed by manual check id."
+            "Добавить подтвержденные оператором проверки Snap/DPI/второго монитора в --runtime-proof. "
+            "JSON может содержать объект 'checks' с ключами ручных проверок."
         ),
     )
     parser.add_argument(
         "--runtime-proof-manual-template",
         metavar="DIR",
-        help="Write a fillable manual-results JSON template for Snap/DPI/second-monitor evidence and exit.",
+        help="Записать заполняемый JSON-шаблон ручных проверок Snap/DPI/второго монитора и выйти.",
     )
     parser.add_argument(
         "--runtime-proof-validate",
         metavar="JSON",
-        help="Validate an existing desktop main shell runtime proof JSON and exit.",
+        help="Проверить существующий JSON-пруф главного окна и выйти.",
     )
     parser.add_argument(
         "--runtime-proof-require-manual-pass",
         action="store_true",
-        help="Make --runtime-proof-validate fail unless manual Snap/DPI/second-monitor checks are PASS.",
+        help="Считать --runtime-proof-validate неуспешным, если ручные Snap/DPI/второй монитор не PASS.",
     )
     return parser
 
 
 def format_tool_catalog() -> str:
-    lines = ["Desktop shell tools:"]
+    lines = ["GUI-окна рабочего места:"]
     for spec in build_desktop_shell_specs():
         lines.append(
             "\t".join(
@@ -95,8 +95,8 @@ def resolve_startup_tool_keys(keys: Sequence[str]) -> tuple[str, ...]:
         valid_keys = ", ".join(sorted(allowed_keys))
         invalid_keys = ", ".join(invalid)
         raise SystemExit(
-            f"Unknown desktop shell tool key(s): {invalid_keys}. "
-            f"Available keys: {valid_keys}"
+            f"Неизвестный ключ GUI-окна: {invalid_keys}. "
+            f"Доступные ключи: {valid_keys}"
         )
     return normalized
 
@@ -160,7 +160,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         from pneumo_solver_ui.desktop_qt_shell.main_window import main as run_qt_shell_main
     except Exception as exc:
         print(
-            f"[desktop_main_shell_qt] current shell is unavailable, fallback to historical shell: {exc}",
+            f"[desktop_main_shell_qt] текущее главное окно недоступно, запускаю проверочное Tk-окно: {exc}",
             file=sys.stderr,
         )
         return _run_legacy_shell(startup_tool_keys=startup_tool_keys)

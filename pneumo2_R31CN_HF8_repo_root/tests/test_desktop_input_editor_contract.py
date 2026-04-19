@@ -136,9 +136,28 @@ def test_desktop_input_graphic_contexts_are_registered_and_canonical() -> None:
         errors="replace",
     )
     assert "source_marker_var" in graphics_src
-    assert "Источник: WS-INPUTS live" in graphics_src
+    assert "источник: текущие исходные данные" in graphics_src
+    assert "источник: исходный шаблон" in graphics_src
     assert "режим: По исходным данным" in graphics_src
     assert '"Расчётные настройки"' in graphics_src
+    assert "ЦМ X:" in graphics_src
+    assert "ЦМ Y:" in graphics_src
+    assert "Запас до смыкания витков:" in graphics_src
+    assert "Автопроверка:" in graphics_src
+    assert "Самопроверка механики:" in graphics_src
+
+    forbidden_graphics_fragments = [
+        "Источник: WS-INPUTS live",
+        "source: default_base.json",
+        "state: current",
+        "CG X:",
+        "CG Y:",
+        "coil bind:",
+        "Autoverif:",
+        "Mechanics selfcheck:",
+    ]
+    for fragment in forbidden_graphics_fragments:
+        assert fragment not in graphics_src
 
 
 def test_desktop_input_numeric_controls_have_units_and_physical_ranges() -> None:
@@ -228,8 +247,10 @@ def test_desktop_inputs_snapshot_freezes_handoff_for_ring_and_suite(tmp_path: Pa
     state = describe_desktop_inputs_snapshot_state(payload, snapshot=snapshot, snapshot_path=target)
     assert state["state"] == "current"
     assert state["is_stale"] is False
-    assert "HO-002" in state["banner"]
-    assert "HO-003" in state["banner"]
+    assert "редактора сценариев колец" in state["banner"]
+    assert "набора испытаний" in state["banner"]
+    assert "HO-002" not in state["banner"]
+    assert "HO-003" not in state["banner"]
 
 
 def test_desktop_inputs_handoff_resolver_returns_refs_not_live_inputs(tmp_path: Path) -> None:
@@ -264,6 +285,9 @@ def test_desktop_inputs_handoff_resolver_returns_refs_not_live_inputs(tmp_path: 
     assert suite_state["can_consume"] is True
     assert suite_state["ref"]["payload_hash"] == snapshot["payload_hash"]
     assert "inputs" not in suite_state
+    assert "набор испытаний" in suite_state["banner"]
+    assert "WS-SUITE" not in suite_state["banner"]
+    assert "handoff" not in suite_state["banner"].lower()
 
 
 def test_desktop_inputs_handoff_resolver_reports_missing_stale_and_invalid(tmp_path: Path) -> None:
@@ -271,7 +295,10 @@ def test_desktop_inputs_handoff_resolver_reports_missing_stale_and_invalid(tmp_p
     missing = describe_desktop_inputs_handoff_for_workspace("WS-RING", workspace_dir=workspace)
     assert missing["state"] == "missing"
     assert missing["can_consume"] is False
-    assert "surrogate inputs" in missing["banner"]
+    assert "не должен подставлять исходные данные самостоятельно" in missing["banner"]
+    assert "редактор сценариев колец" in missing["banner"]
+    assert "WS-RING" not in missing["banner"]
+    assert "handoff" not in missing["banner"].lower()
 
     payload = load_base_defaults()
     snapshot = build_desktop_inputs_snapshot(payload, created_at_utc="2026-04-17T00:00:00Z")
@@ -288,7 +315,8 @@ def test_desktop_inputs_handoff_resolver_reports_missing_stale_and_invalid(tmp_p
     invalid = describe_desktop_inputs_handoff_for_workspace("WS-SUITE", snapshot=invalid_snapshot)
     assert invalid["state"] == "invalid"
     assert invalid["can_consume"] is False
-    assert "frozen" in invalid["banner"]
+    assert "зафиксирован" in invalid["banner"]
+    assert "WS-SUITE" not in invalid["banner"]
 
 
 def test_desktop_inputs_snapshot_marks_stale_and_blocks_invented_keys() -> None:
@@ -308,7 +336,27 @@ def test_desktop_inputs_snapshot_marks_stale_and_blocks_invented_keys() -> None:
     assert find_desktop_invented_input_keys(with_invented) == ("invented_shadow_key",)
     invalid = describe_desktop_inputs_snapshot_state(with_invented, snapshot=snapshot)
     assert invalid["state"] == "invalid"
-    assert "outside default_base.json" in invalid["banner"]
+    assert "неизвестные параметры" in invalid["banner"]
+    assert "default_base.json" not in invalid["banner"]
+    assert "WS-INPUTS" not in invalid["banner"]
+
+    model_src = (ROOT / "pneumo_solver_ui" / "desktop_input_model.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    forbidden_snapshot_messages = [
+        "WS-INPUTS snapshot contains keys outside default_base.json",
+        "inputs_snapshot must contain a JSON object",
+        "inputs_snapshot has unsupported schema_version",
+        "inputs_snapshot source_workspace must be WS-INPUTS",
+        "inputs_snapshot must be frozen before handoff",
+        "unsupported inputs_snapshot target workspace",
+        "Desktop run summary must contain a JSON object",
+        "Desktop profile must contain a JSON object",
+        "Desktop snapshot must contain a JSON object",
+    ]
+    for fragment in forbidden_snapshot_messages:
+        assert fragment not in model_src
 
 
 def test_desktop_input_specs_do_not_invent_keys() -> None:
@@ -428,7 +476,7 @@ def test_desktop_field_source_state_helper_reports_current_and_dirty_markers() -
     )
     assert current_state["state"] == "current"
     assert current_state["is_dirty"] is False
-    assert current_state["marker"] == "source: demo_source.json · state: current"
+    assert current_state["marker"] == "источник: demo_source.json · состояние: актуально"
 
     current["база"] = float(reference["база"]) + 0.25
     dirty_state = describe_desktop_field_source_state(
@@ -441,7 +489,7 @@ def test_desktop_field_source_state_helper_reports_current_and_dirty_markers() -
     assert dirty_state["is_dirty"] is True
     assert dirty_state["label"] == "Колёсная база"
     assert dirty_state["unit_label"] == "м"
-    assert dirty_state["marker"] == "source: demo_source.json · state: dirty"
+    assert dirty_state["marker"] == "источник: demo_source.json · состояние: изменено"
 
 
 def test_desktop_quick_presets_modify_expected_parameter_groups() -> None:
@@ -486,10 +534,10 @@ def test_desktop_quick_presets_modify_expected_parameter_groups() -> None:
 
 def test_desktop_run_presets_modify_expected_run_settings() -> None:
     labels = {key: label for key, label, _desc in DESKTOP_RUN_PRESET_OPTIONS}
-    assert labels["sanity_check"] == "Быстрый sanity-check"
+    assert labels["sanity_check"] == "Быстрая проверка"
     assert labels["draft_run"] == "Черновой запуск"
     assert run_preset_label("precise_run") == "Точнее"
-    assert "расширенного лога" in run_preset_description("sanity_check")
+    assert "расширенного журнала" in run_preset_description("sanity_check")
 
     base = {
         "scenario_key": "worldroad",
@@ -523,9 +571,13 @@ def test_desktop_run_mode_summary_is_operator_friendly() -> None:
     assert "Ожидаемый режим: быстро." in fast["summary"]
     assert fast["cost_label"] == "быстро и легко"
     assert "Цена запуска: быстро и легко." in fast["cost_summary"]
-    assert fast["advice_label"] == "берите для первого sanity-check"
+    assert fast["advice_label"] == "берите для первой быстрой проверки"
     assert "конфигурация в целом живая" in fast["advice_summary"]
-    assert "Когда запускать: берите для первого sanity-check." in fast["usage_summary"]
+    assert "Когда запускать: берите для первой быстрой проверки." in fast["usage_summary"]
+    assert "dt=" not in fast["summary"]
+    assert "длительность=" not in fast["summary"]
+    assert "sanity-check" not in fast["advice_summary"]
+    assert "служебных данных" not in fast["cost_summary"]
     assert balanced["mode_key"] == "balanced"
     assert balanced["mode_label"] == "сбалансировано"
     assert "обычного рабочего прогона" in balanced["summary"]
@@ -534,7 +586,7 @@ def test_desktop_run_mode_summary_is_operator_friendly() -> None:
     assert "Когда запускать: берите для основной работы." in balanced["usage_summary"]
     assert detailed["mode_key"] == "detailed"
     assert detailed["mode_label"] == "подробно"
-    assert "расширенный лог включён" in detailed["summary"]
+    assert "расширенный журнал включён" in detailed["summary"]
     assert detailed["cost_label"] == "дольше, но подробнее"
     assert "времени и данных потребуется больше" in detailed["cost_summary"]
     assert detailed["advice_label"] == "берите для финальной проверки"
@@ -862,7 +914,10 @@ def test_desktop_input_editor_is_wired_into_desktop_control_center() -> None:
     assert "build_desktop_launch_catalog(include_mnemo=False)" in src
     assert "pneumo_solver_ui.tools.desktop_input_editor" in launcher_modules
     assert "Исходные данные" in launcher_titles
-    assert "default_base.json" in editor_src
+    assert "исходный шаблон" in editor_src
+    assert "default_base.json" not in editor_src
+    assert "Загрузить файл данных..." in editor_src
+    assert "Вернуть исходный шаблон" in editor_src
     assert "Сохранить рабочую копию" in editor_src
     assert "Рабочие профили" in editor_src
     assert 'profile_details_notebook.add(snapshots, text="Снимки")' in editor_src
@@ -953,7 +1008,8 @@ def test_desktop_input_editor_is_wired_into_desktop_control_center() -> None:
     assert "Замечаний шага:" in editor_src
     assert "Замечания шага:" in editor_src
     assert "Изменения шага:" in editor_src
-    assert "Статус шага:" in editor_src
+    assert "Состояние шага:" in editor_src
+    assert "Статус шага:" not in editor_src
     assert "_build_section_route_state" in editor_src
     assert "_find_next_section_title" in editor_src
     assert "_refresh_section_route_summary" in editor_src
@@ -964,7 +1020,8 @@ def test_desktop_input_editor_is_wired_into_desktop_control_center() -> None:
     assert "_go_next_section" in editor_src
     assert "_go_next_attention_section" in editor_src
     assert "_go_next_changed_section" in editor_src
-    assert "не дублирует отдельные окна Animator, Compare Viewer или Mnemo" in editor_src
+    assert "не дублирует отдельные окна аниматора, сравнения результатов или мнемосхемы" in editor_src
+    assert "Compare Viewer" not in editor_src
     assert "Сводка по текущему кластеру" in editor_src
     assert "section_summary_vars" in editor_src
     assert "section_issue_buttons" in editor_src
@@ -979,16 +1036,21 @@ def test_desktop_input_editor_is_wired_into_desktop_control_center() -> None:
     assert "inspector_source_state_var" in editor_src
     assert "Источник/состояние:" in editor_src
     assert "Source/state:" not in editor_src
-    assert "source: {source} · state: {state}" in (
+    assert "источник: {source} · состояние: {state_label}" in (
         ROOT / "pneumo_solver_ui" / "desktop_input_model.py"
     ).read_text(encoding="utf-8", errors="replace")
-    assert "source: {self._display_source_name()} · state: {state}" in editor_src
+    assert "источник: {self._display_source_name()} · состояние: {state_label}" in editor_src
+    assert "source: {source} · state: {state}" not in (
+        ROOT / "pneumo_solver_ui" / "desktop_input_model.py"
+    ).read_text(encoding="utf-8", errors="replace")
+    assert "source: {self._display_source_name()} · state:" not in editor_src
     assert "_build_field_restore_button" in editor_src
     assert "_refresh_section_header_summaries" in editor_src
     assert "_jump_to_section_issue" in editor_src
     assert "_reset_section_to_source_reference" in editor_src
     assert "_restore_field_to_source_reference" in editor_src
-    assert "Статус кластера:" in editor_src
+    assert "Состояние кластера:" in editor_src
+    assert "Статус кластера:" not in editor_src
     assert "Изменено от рабочей точки:" in editor_src
     assert "Первое изменение:" in editor_src
     assert "Перейти к замечанию" in editor_src
@@ -1000,8 +1062,8 @@ def test_desktop_input_editor_is_wired_into_desktop_control_center() -> None:
     assert "· изменено и от рабочей точки" in editor_src
     assert 'text="К рабочей точке"' in editor_src
     assert 'text="Совпадает"' in editor_src
-    assert "Открыть inputs_snapshot.json" in editor_src
-    assert "Открыть папку WS-INPUTS" in editor_src
+    assert "Открыть снимок исходных данных" in editor_src
+    assert "Открыть папку снимка" in editor_src
     assert "_open_inputs_handoff_snapshot" in editor_src
     assert "_open_inputs_handoff_dir" in editor_src
     assert "desktop_inputs_snapshot_handoff_path" in editor_src
@@ -1047,7 +1109,7 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
         errors="replace",
     )
 
-    assert 'text="Setup / Исходные данные"' in editor_src
+    assert 'text="Исходные данные"' in editor_src
     assert 'ttk.Panedwindow(outer, orient="horizontal")' in editor_src
     assert 'text="Дерево разделов"' in editor_src
     assert "build_scrolled_treeview(" in editor_src
@@ -1114,9 +1176,15 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "_run_quick_preview(self, *, prechecked: bool = False)" in editor_src
     assert "_run_single_desktop_run(self, *, prechecked: bool = False)" in editor_src
     assert "run_auto_check_var" in editor_src
-    assert "Auto-check перед «" in editor_src
-    assert "последний сохранённый auto-check" in editor_src
+    assert "Автопроверка перед «" in editor_src
+    assert "последняя сохранённая автопроверка" in editor_src
     assert "persist_stdout_json=True" in editor_src
+    assert '"  " + " ".join(cmd)' not in editor_src
+    assert "Команда подготовлена; технические детали сохранены в журнале процесса." in editor_src
+    assert "CSV={'да'" not in editor_src
+    assert "NPZ={'да'" not in editor_src
+    assert "таблица результатов={'да'" in editor_src
+    assert "файл анимации={'да'" in editor_src
     assert "Вернуть раздел к значениям по умолчанию" in editor_src
     assert "_reset_section_to_defaults" in editor_src
     assert "[section-reset]" in editor_src
@@ -1134,8 +1202,8 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "DesktopRunSetupCenter" in editor_src
     assert "run_launch_summary_var" in editor_src
     assert "_refresh_run_launch_summary" in editor_src
-    assert "Preview:" in editor_src
-    assert "Run setup:" in editor_src
+    assert "Предпросмотр:" in editor_src
+    assert "Настройки расчёта:" in editor_src
     assert "Подробный расчёт:" in editor_src
     assert "describe_selfcheck_gate_status" in editor_src
     assert "_current_selfcheck_subject_signature" in editor_src
@@ -1144,14 +1212,14 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "и расчётные настройки" in editor_src
     assert "автоснимок включён" in run_setup_model_src
     assert 'artifacts_notebook = ttk.Notebook(actions)' in editor_src
-    assert 'artifacts_notebook.add(latest_preview_frame, text="Preview")' in editor_src
+    assert 'artifacts_notebook.add(latest_preview_frame, text="Предпросмотр")' in editor_src
     assert "latest_preview_summary_var" in editor_src
     assert "active_preview_report_path" in editor_src
     assert "active_preview_log_path" in editor_src
     assert "_refresh_latest_preview_summary" in editor_src
-    assert "Обновить preview-сводку" in editor_src
-    assert "Открыть preview_report.json" in editor_src
-    assert "Открыть preview-лог" in editor_src
+    assert "Обновить сводку предпросмотра" in editor_src
+    assert "Открыть отчёт предпросмотра" in editor_src
+    assert "Открыть журнал предпросмотра" in editor_src
     assert "_open_latest_preview_report_json" in editor_src
     assert "_open_latest_preview_log" in editor_src
     assert "_open_run_setup_cache_root" in editor_src
@@ -1162,9 +1230,9 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "active_selfcheck_report_path" in editor_src
     assert "active_selfcheck_log_path" in editor_src
     assert "_refresh_latest_selfcheck_summary" in editor_src
-    assert "Обновить selfcheck-сводку" in editor_src
-    assert "Открыть selfcheck_report.json" in editor_src
-    assert "Открыть selfcheck-лог" in editor_src
+    assert "Обновить сводку самопроверки" in editor_src
+    assert "Открыть отчёт самопроверки" in editor_src
+    assert "Открыть журнал самопроверки" in editor_src
     assert "_open_latest_selfcheck_report_json" in editor_src
     assert "_open_latest_selfcheck_log" in editor_src
     assert "_runtime_selfcheck_report_path" in editor_src
@@ -1183,16 +1251,15 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "self._initial_load_after_id" in editor_src
     assert "Обновить сводку" in editor_src
     assert "Открыть папку запуска" in editor_src
-    assert "Открыть run_summary.json" in editor_src
-    assert "Открыть run-лог" in editor_src
-    assert "Открыть df_main.csv" in editor_src
-    assert "Открыть NPZ bundle" in editor_src
-    assert "Открыть cache entry" in editor_src
+    assert "Открыть сводку расчёта" in editor_src
+    assert "Открыть журнал запуска" in editor_src
+    assert "Открыть основную таблицу результатов" in editor_src
+    assert "Открыть файл анимации" in editor_src
     assert "Открыть папку всех запусков" in editor_src
     assert "Подробные расчёты ещё не запускались." in editor_src
-    assert "run_summary.json пока не найден." in editor_src
-    assert "Папка артефактов:" in run_setup_model_src
-    assert "Лог запуска:" in run_setup_model_src
+    assert "Сводка расчёта пока не найдена." in editor_src
+    assert "Папка результатов:" in run_setup_model_src
+    assert "Журнал запуска:" in run_setup_model_src
     assert "_open_latest_run_dir" in editor_src
     assert "_open_latest_run_summary_json" in editor_src
     assert "_open_latest_run_log" in editor_src
@@ -1237,14 +1304,80 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "preview_surface_label" in editor_src
     assert "pneumo_solver_ui.opt_selfcheck_v1" in editor_src
     assert "pneumo_solver_ui.tools.worldroad_compile_only_demo" in editor_src
+
+    forbidden_visible_editor_fragments = [
+        'text="Setup / Исходные данные"',
+        'artifacts_notebook.add(latest_preview_frame, text="Preview")',
+        "Auto-check перед «",
+        "последний сохранённый auto-check",
+        "Preview:",
+        "Дорога: текущий профиль preview",
+        "Editor готов",
+        "preview-расчёт",
+        "профилем preview",
+        "Временный desktop preview-сценарий",
+        "Desktop single-run:",
+        "[preview] Профиль дороги",
+        "Run setup:",
+        "Обновить preview-сводку",
+        "Открыть preview_report.json",
+        "Открыть preview-лог",
+        "Обновить selfcheck-сводку",
+        "Открыть selfcheck_report.json",
+        "Открыть selfcheck-лог",
+        "Открыть run-лог",
+        "Открыть лог предпросмотра",
+        "Открыть лог самопроверки",
+        "Открыть лог запуска",
+        "Открыть run_summary.json",
+        "Открыть df_main.csv",
+        "run_summary.json пока не найден",
+        "Открыть NPZ bundle",
+        "Открыть основную таблицу CSV",
+        "Открыть NPZ-пакет",
+        "Открыть набор NPZ",
+        "Открыть кэш последнего расчёта",
+        "Открыть общий кэш расчётов",
+        "Открыть папку кэша",
+        "Открыть cache entry",
+        "Desktop Input Editor",
+        "Frozen inputs_snapshot",
+        "Frozen handoff",
+        "Состояние handoff",
+        "Baseline и проверки",
+        "Заморозить inputs_snapshot",
+        "Runtime policy:",
+        "Cache entry последнего запуска",
+        "runtime-cache",
+        "runtime-лог",
+        "HO-005",
+        "validated_suite",
+        "subprocess-лог",
+        "Показать сервисные панели",
+        "Скрыть сервисные панели",
+        "сервисный слой",
+        "Загрузить JSON",
+        "Открыть JSON параметров",
+        "Не удалось открыть JSON",
+        "Не удалось сохранить JSON",
+        "Вернуть default_base.json",
+        "default_base.json не перезаписывается",
+        "артефакты",
+        "dt=",
+        "длительность=",
+        "расширенный лог=",
+    ]
+    for fragment in forbidden_visible_editor_fragments:
+        assert fragment not in editor_src
+
     assert "Профиль запуска" in run_setup_src
-    assert "Профиль preview-дороги" in run_setup_src
+    assert "Профиль дороги для предпросмотра" in run_setup_src
     assert "Настройки запуска расчёта" in run_setup_src
     assert "Пресеты запуска" in run_setup_src
-    assert "Cache, export и runtime policy" in run_setup_src
+    assert "Повторное использование, выгрузка и режим выполнения" in run_setup_src
     assert "Будет запущено сейчас" in run_setup_src
     assert "Проверить и запустить" in run_setup_src
-    assert "Запустить выбранный режим" in run_setup_src
+    assert "Запустить расчёт" in run_setup_src
     assert "_run_selected_profile_with_check" in run_setup_src
     assert "Рекомендуемая кнопка:" in run_setup_src
     assert "Целевой запуск:" in run_setup_src or "Обычный запуск" in run_setup_src
@@ -1252,25 +1385,49 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "недоступно" in run_setup_src
     assert "_refresh_launch_action_hint" in run_setup_src
     assert "prechecked=True" in run_setup_src
-    assert "Последние runtime-артефакты" in run_setup_src
-    assert "Последний baseline / preview" in run_setup_src
-    assert "Последний auto-check / selfcheck" in run_setup_src
-    assert "Последний detail / full" in run_setup_src
-    assert "Открыть preview_report.json" in run_setup_src
-    assert "Открыть preview-лог" in run_setup_src
-    assert "Открыть selfcheck_report.json" in run_setup_src
-    assert "Открыть selfcheck-лог" in run_setup_src
-    assert "Открыть run_summary.json" in run_setup_src
-    assert "Открыть run-лог" in run_setup_src
-    assert "Открыть cache entry" in run_setup_src
-    assert "Открыть cache runtime" in run_setup_src
-    assert "Открыть папку логов" in run_setup_src
+    assert "Последние результаты и журналы" in run_setup_src
+    assert "Последний предпросмотр" in run_setup_src
+    assert "Последняя самопроверка" in run_setup_src
+    assert "Последний подробный расчёт" in run_setup_src
+    assert "Открыть сводку" in run_setup_src
+    assert "Открыть журнал" in run_setup_src
+    assert "Открыть готовый результат" in run_setup_src
+    assert "Открыть папку готовых результатов" in run_setup_src
+    assert "Открыть папку журналов" in run_setup_src
     assert "Обновить все сводки" in run_setup_src
     assert "_refresh_runtime_summaries" in run_setup_src
-    assert "Экспортировать CSV-таблицы для detail/full" in run_setup_src
-    assert "Экспортировать NPZ bundle для detail/full" in run_setup_src
-    assert "Автоматический auto-check перед запуском" in run_setup_src
-    assert "Писать subprocess-лог в файл" in run_setup_src
+    assert "Сохранять таблицы результатов для подробных режимов" in run_setup_src
+    assert "Сохранять файл анимации для подробных режимов" in run_setup_src
+    assert "Запускать самопроверку перед расчётом" in run_setup_src
+    assert "Сохранять журнал процесса в файл" in run_setup_src
+    forbidden_visible_run_setup_fragments = [
+        "Профиль preview-дороги",
+        "Cache, export и runtime policy",
+        "Последние runtime-артефакты",
+        "Последний baseline / preview",
+        "Последний auto-check / selfcheck",
+        "Открыть preview_report.json",
+        "Открыть selfcheck_report.json",
+        "Открыть сводку (JSON)",
+        "Открыть cache entry",
+        "Открыть cache runtime",
+        "Открыть кэш последнего расчёта",
+        "Открыть общий кэш расчётов",
+        "Выгружать CSV-таблицы для подробных режимов",
+        "Выгружать таблицы CSV для подробных режимов",
+        "Выгружать набор NPZ для подробных режимов",
+        "Кэш и выгрузка важны для подробных режимов.",
+        "Открыть снимок набора (JSON)",
+        "Экспортировать NPZ bundle",
+        "Автоматический auto-check",
+        "Писать subprocess-лог",
+        "HO-005",
+        "validated_suite_snapshot",
+        "Открыть папку handoff",
+        "Preview матрицы",
+    ]
+    for fragment in forbidden_visible_run_setup_fragments:
+        assert fragment not in run_setup_src
     assert "DESKTOP_RUN_PROFILE_OPTIONS" in run_setup_model_src
     assert "DESKTOP_RUN_CACHE_POLICY_OPTIONS" in run_setup_model_src
     assert "DESKTOP_RUN_RUNTIME_POLICY_OPTIONS" in run_setup_model_src
@@ -1288,16 +1445,38 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "describe_latest_selfcheck_summary" in run_setup_model_src
     assert "describe_run_setup_snapshot" in run_setup_model_src
     assert "artifact_state_line" in run_setup_model_src
-    assert "Cache entry:" in run_setup_model_src
-    assert "Последний auto-check:" in run_setup_model_src
+    assert "Повторное использование результата:" in run_setup_model_src
+    assert "Последняя самопроверка:" in run_setup_model_src
     assert "Маршрут запуска:" in run_setup_model_src
     assert "Прогноз обычного запуска:" in run_setup_model_src
     assert "Рекомендация:" in run_setup_model_src
-    assert "CSV таблиц=" in run_setup_model_src
-    assert "JSON отчёт preview:" in run_setup_model_src
-    assert "Лог preview:" in run_setup_model_src
-    assert "JSON отчёт selfcheck:" in run_setup_model_src
-    assert "Лог auto-check:" in run_setup_model_src
+    assert "таблиц результатов:" in run_setup_model_src
+    assert "Сводка предпросмотра:" in run_setup_model_src
+    assert "Журнал предпросмотра:" in run_setup_model_src
+    assert "Сводка самопроверки:" in run_setup_model_src
+    assert "Журнал самопроверки:" in run_setup_model_src
+    forbidden_visible_run_setup_model_fragments = [
+        "Cache entry:",
+        "Последний auto-check:",
+        "JSON отчёт preview:",
+        "Лог preview:",
+        "JSON отчёт selfcheck:",
+        "Лог auto-check:",
+        "Baseline / preview",
+        "NPZ bundle:",
+        "Выгрузка CSV:",
+        "Выгрузка NPZ:",
+        "CSV:",
+        "NPZ:",
+        "таблиц CSV:",
+        "Сводка предпросмотра (JSON):",
+        "Сводка самопроверки (JSON):",
+        "Не использовать кэш",
+        "cache-hit",
+        "policy=",
+    ]
+    for fragment in forbidden_visible_run_setup_model_fragments:
+        assert fragment not in run_setup_model_src
     assert '"baseline"' in run_setup_model_src
     assert '"detail"' in run_setup_model_src
     assert '"full"' in run_setup_model_src
@@ -1322,7 +1501,7 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "mirror_tree" in single_run_src
     assert "remap_saved_files_to_dir" in single_run_src
     assert "full_log_bundle.npz" in single_run_src
-    assert "Desktop Mnemo" in src
+    assert "build_desktop_launch_catalog(include_mnemo=False)" in src
     assert "desktop_mnemo" not in editor_src.lower()
 
 
@@ -1372,11 +1551,11 @@ def test_desktop_input_editor_hard_gates_baseline_with_ho005_suite_handoff() -> 
     assert "write_desktop_suite_handoff_snapshot" in editor_src
     assert "baseline_suite_handoff_launch_gate" in editor_src
     assert "_baseline_suite_gate_allows_launch" in editor_src
-    assert "runtime_policy не может обойти" in (
+    assert "Режим выполнения не может обойти" in (
         ROOT / "pneumo_solver_ui" / "optimization_baseline_source.py"
     ).read_text(encoding="utf-8", errors="replace")
     assert 'self._selected_run_profile_key() == "baseline"' in editor_src
-    assert 'Baseline / preview' in editor_src
+    assert 'Базовый прогон / предпросмотр' in editor_src
 
 
 def test_desktop_input_editor_uses_dense_field_rows_instead_of_large_cards() -> None:

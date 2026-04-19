@@ -32,6 +32,21 @@ from pneumo_solver_ui.tools.send_bundle_contract import (
     load_latest_send_bundle_anim_dashboard,
 )
 
+try:
+    from pneumo_solver_ui.release_info import get_release
+
+    RELEASE = get_release()
+except Exception:
+    RELEASE = os.environ.get("PNEUMO_RELEASE", "UNIFIED_v6_67") or "UNIFIED_v6_67"
+
+
+AUTOTEST_LEVELS = {
+    "Быстро": "quick",
+    "Стандартно": "standard",
+    "Полностью": "full",
+}
+AUTOTEST_LEVEL_LABELS_BY_KEY = {value: label for label, value in AUTOTEST_LEVELS.items()}
+
 
 @dataclass
 class RunState:
@@ -57,6 +72,34 @@ def _guess_python() -> str:
     return sys.executable or "python"
 
 
+def _autotest_level_key(label: str) -> str:
+    text = str(label or "").strip()
+    return AUTOTEST_LEVELS.get(text, text if text in AUTOTEST_LEVEL_LABELS_BY_KEY else "standard")
+
+
+def _autotest_level_label(value: str) -> str:
+    return AUTOTEST_LEVEL_LABELS_BY_KEY.get(str(value or "").strip(), "Стандартно")
+
+
+def _operator_output_line(line: str) -> str:
+    text = str(line)
+    replacements = {
+        "CMD:": "Команда запуска:",
+        "Run dir:": "Папка результата:",
+        "Zip:": "Архив:",
+        "ZIP:": "Архив:",
+        "[process exit code:": "[код завершения процесса:",
+        "[STOP requested]": "[запрошена остановка]",
+        "=== AUTOTEST FINISHED ===": "=== АВТОТЕСТ ЗАВЕРШЁН ===",
+        "AUTOTEST": "АВТОТЕСТ",
+        "Autotest": "Автотест",
+        "ready": "готово",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    return text
+
+
 def _open_in_file_manager(path: str) -> None:
     """Best-effort open folder in OS file manager."""
     try:
@@ -79,10 +122,10 @@ class App:
         self._hosted = bool(hosted or not self._owns_root)
         self.root = host if host is not None else Tk()
         if self._owns_root:
-            self.root.title(f"Autotest Harness GUI ({RELEASE})")
+            self.root.title(f"Автотесты проекта ({RELEASE})")
             self.root.geometry("920x620")
 
-        self.level = StringVar(value="standard")
+        self.level = StringVar(value=_autotest_level_label("standard"))
         self.no_zip = BooleanVar(value=False)
         self.open_send_gui = BooleanVar(value=True)
         self.auto_open_folder = BooleanVar(value=False)
@@ -90,9 +133,12 @@ class App:
         self.q: "queue.Queue[str]" = queue.Queue()
         self.state = RunState()
         self._host_closed = False
+        self._tick_after_id: str | None = None
 
         self._build_ui()
-        self.root.after(100, self._tick)
+        if self._owns_root:
+            self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+        self._schedule_tick()
 
     def _build_ui(self) -> None:
         top = ttk.Frame(self.root, padding=10)
@@ -102,14 +148,14 @@ class App:
         lvl = ttk.Combobox(
             top,
             textvariable=self.level,
-            values=["quick", "standard", "full"],
-            width=12,
+            values=list(AUTOTEST_LEVELS),
+            width=14,
             state="readonly",
         )
         lvl.pack(side="left", padx=(6, 16))
 
-        ttk.Checkbutton(top, text="Не создавать ZIP (no_zip)", variable=self.no_zip).pack(side="left", padx=(0, 16))
-        ttk.Checkbutton(top, text="После завершения открыть Send Bundle GUI", variable=self.open_send_gui).pack(
+        ttk.Checkbutton(top, text="Не создавать архив", variable=self.no_zip).pack(side="left", padx=(0, 16))
+        ttk.Checkbutton(top, text="После завершения открыть подготовку отправки", variable=self.open_send_gui).pack(
             side="left", padx=(0, 16)
         )
         ttk.Checkbutton(top, text="Открыть папку результата", variable=self.auto_open_folder).pack(side="left")
@@ -117,13 +163,13 @@ class App:
         btns = ttk.Frame(self.root, padding=(10, 0, 10, 10))
         btns.pack(fill="x")
 
-        self.btn_run = ttk.Button(btns, text="Запустить Autotest", command=self._on_run)
+        self.btn_run = ttk.Button(btns, text="Запустить автотест", command=self._on_run)
         self.btn_run.pack(side="left")
 
         self.btn_stop = ttk.Button(btns, text="Остановить", command=self._on_stop, state="disabled")
         self.btn_stop.pack(side="left", padx=(8, 0))
 
-        self.btn_open = ttk.Button(btns, text="Открыть папку autotest_runs", command=self._open_autotest_runs)
+        self.btn_open = ttk.Button(btns, text="Открыть папку автотестов", command=self._open_autotest_runs)
         self.btn_open.pack(side="left", padx=(8, 0))
 
         self.status = StringVar(value="Готов.")
@@ -131,7 +177,7 @@ class App:
 
         self.text = Text(self.root, wrap="word")
         self.text.pack(fill="both", expand=True, padx=10, pady=(0, 10))
-        self._append("Autotest GUI ready.\n")
+        self._append("Окно автотестов готово.\n")
 
     def _append(self, s: str) -> None:
         self.text.insert(END, s)
@@ -144,19 +190,19 @@ class App:
 
     def _on_run(self) -> None:
         if self.state.proc is not None:
-            messagebox.showwarning("Autotest", "Тест уже запущен.")
+            messagebox.showwarning("Автотесты", "Тест уже запущен.")
             return
 
         py = _guess_python()
         repo = _repo_root()
         script = repo / "pneumo_solver_ui" / "tools" / "run_autotest.py"
 
-        cmd = [py, "-u", str(script), "--level", self.level.get().strip()]
+        cmd = [py, "-u", str(script), "--level", _autotest_level_key(self.level.get())]
         if self.no_zip.get():
             cmd.append("--no_zip")
 
         self._append("\n" + "=" * 72 + "\n")
-        self._append("CMD: " + " ".join(cmd) + "\n")
+        self._append("Команда запуска: " + " ".join(cmd) + "\n")
         self._append("=" * 72 + "\n")
 
         try:
@@ -183,7 +229,7 @@ class App:
             self.btn_run.config(state="normal")
             self.btn_stop.config(state="disabled")
             self.status.set("Ошибка запуска.")
-            messagebox.showerror("Autotest", f"Не удалось запустить: {e}")
+            messagebox.showerror("Автотесты", f"Не удалось запустить: {e}")
 
     def _reader_thread(self) -> None:
         assert self.state.proc is not None
@@ -191,14 +237,14 @@ class App:
         try:
             if proc.stdout is not None:
                 for line in proc.stdout:
-                    self.q.put(line)
                     if line.startswith("Run dir:"):
                         self.state.last_run_dir = line.split("Run dir:", 1)[1].strip()
                     if line.startswith("Zip:"):
                         self.state.last_zip = line.split("Zip:", 1)[1].strip()
+                    self.q.put(_operator_output_line(line))
         finally:
             rc = proc.wait()
-            self.q.put(f"\n[process exit code: {rc}]\n")
+            self.q.put(f"\n[код завершения процесса: {rc}]\n")
             self.q.put("__PROC_DONE__" + str(rc))
 
     def _on_stop(self) -> None:
@@ -206,7 +252,7 @@ class App:
         if proc is None:
             return
         try:
-            self._append("\n[STOP requested]\n")
+            self._append("\n[запрошена остановка]\n")
             proc.terminate()
         except Exception:
             return
@@ -214,6 +260,7 @@ class App:
     def _tick(self) -> None:
         if self._host_closed:
             return
+        self._tick_after_id = None
         try:
             while True:
                 msg = self.q.get_nowait()
@@ -228,14 +275,34 @@ class App:
                     self._append(msg)
         except queue.Empty:
             pass
-        self.root.after(100, self._tick)
+        self._schedule_tick()
+
+    def _schedule_tick(self) -> None:
+        if self._host_closed:
+            return
+        self._tick_after_id = self.root.after(100, self._tick)
+
+    def _cancel_tick(self) -> None:
+        after_id = self._tick_after_id
+        self._tick_after_id = None
+        if after_id:
+            try:
+                self.root.after_cancel(after_id)
+            except Exception:
+                pass
 
     def on_host_close(self) -> None:
         self._host_closed = True
+        self._cancel_tick()
         self._on_stop()
 
+    def on_close(self) -> None:
+        self.on_host_close()
+        if self._owns_root:
+            self.root.destroy()
+
     def _on_finished(self, rc: int) -> None:
-        self.status.set(f"Готово. RC={rc}.")
+        self.status.set(f"Готово. Код завершения: {rc}.")
         self.btn_run.config(state="normal")
         self.btn_stop.config(state="disabled")
 
@@ -247,18 +314,18 @@ class App:
         except Exception:
             pass
 
-        msg_lines = [f"Autotest завершён (rc={rc}, {dur:.1f} s)."]
+        msg_lines = [f"Автотест завершён (код {rc}, {dur:.1f} с)."]
         if self.state.last_run_dir:
-            msg_lines.append(f"Run dir: {self.state.last_run_dir}")
+            msg_lines.append(f"Папка результата: {self.state.last_run_dir}")
         if self.state.last_zip and not self.no_zip.get():
-            msg_lines.append(f"ZIP: {self.state.last_zip}")
+            msg_lines.append(f"Архив: {self.state.last_zip}")
             out_dir = Path(self.state.last_zip).expanduser().resolve().parent
             msg_lines.extend(format_anim_dashboard_brief_lines(load_latest_send_bundle_anim_dashboard(out_dir)))
             diag_json = out_dir / ANIM_DIAG_SIDECAR_JSON
             if diag_json.exists():
-                msg_lines.append(f"Anim pointer diagnostics: {diag_json}")
+                msg_lines.append(f"Диагностика последней анимации: {diag_json}")
 
-        messagebox.showinfo("Autotest", "\n".join(msg_lines))
+        messagebox.showinfo("Автотесты", "\n".join(msg_lines))
 
         if self.auto_open_folder.get() and self.state.last_run_dir:
             _open_in_file_manager(self.state.last_run_dir)
@@ -270,7 +337,7 @@ class App:
                 script = repo / "pneumo_solver_ui" / "tools" / "send_results_gui.py"
                 subprocess.Popen([py, str(script)], cwd=str(repo))
             except Exception as e:
-                messagebox.showwarning("Send bundle", f"Не удалось открыть send_results_gui: {e}")
+                messagebox.showwarning("Подготовка отправки", f"Не удалось открыть центр подготовки отправки: {e}")
 
     def run(self) -> None:
         if self._owns_root:

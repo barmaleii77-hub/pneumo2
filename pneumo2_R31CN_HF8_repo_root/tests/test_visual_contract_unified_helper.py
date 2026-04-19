@@ -222,7 +222,8 @@ def test_desktop_animator_follow_uses_visual_dependency_token_source_check() -> 
     assert 'collect_visual_cache_dependencies(' in app_text
     assert 'visual_cache_dependencies_token(deps)' in app_text
     assert '_last_deps_token' in app_text
-    assert 'Reload (' in app_text
+    assert 'Перезагрузка (' in app_text
+    assert 'Reload (' not in app_text
 
     assert 'meta["_visual_cache_dependencies"]' in data_bundle_text
     assert 'meta["_visual_cache_token"]' in data_bundle_text

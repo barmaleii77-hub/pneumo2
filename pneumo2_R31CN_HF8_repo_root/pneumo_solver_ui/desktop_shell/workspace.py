@@ -129,7 +129,7 @@ class DesktopWorkspaceManager:
     def handle_tab_changed(self) -> HostedToolSession | None:
         session = self.current_session()
         if session is None:
-            self._set_status("Открыта стартовая страница shell.")
+            self._set_status("Открыта стартовая страница.")
             self._notify_state_changed()
             return None
         self._set_status(f"Активно окно: {session.spec.title}")
@@ -138,7 +138,7 @@ class DesktopWorkspaceManager:
 
     def select_home_tab(self) -> None:
         self.notebook.select(self.home_tab)
-        self._set_status("Открыта стартовая страница shell.")
+        self._set_status("Открыта стартовая страница.")
         self._notify_state_changed()
 
     def open_hosted_tool(self, spec: DesktopShellToolSpec) -> HostedToolSession:
@@ -218,7 +218,7 @@ class DesktopWorkspaceManager:
             step=1,
         )
         if session is None:
-            self._set_status("Разделы основного маршрута пока не открыты.")
+            self._set_status("Окна основного порядка работы пока не открыты.")
             return False
         return self.select_hosted_session(session.key)
 
@@ -232,7 +232,7 @@ class DesktopWorkspaceManager:
             step=-1,
         )
         if session is None:
-            self._set_status("Разделы основного маршрута пока не открыты.")
+            self._set_status("Окна основного порядка работы пока не открыты.")
             return False
         return self.select_hosted_session(session.key)
 
@@ -240,7 +240,12 @@ class DesktopWorkspaceManager:
         self._dispose_session(session, update_status=True, remember_closed=True)
         self._notify_state_changed()
 
-    def dispose_all_hosted_sessions(self, *, remember_closed: bool = False) -> int:
+    def dispose_all_hosted_sessions(
+        self,
+        *,
+        remember_closed: bool = False,
+        notify: bool = True,
+    ) -> int:
         sessions = list(self.hosted_sessions.values())
         for session in sessions:
             self._dispose_session(
@@ -248,12 +253,12 @@ class DesktopWorkspaceManager:
                 update_status=False,
                 remember_closed=remember_closed,
             )
-        if sessions:
+        if sessions and notify:
             self._notify_state_changed()
         return len(sessions)
 
     def shutdown(self) -> int:
-        return self.dispose_all_hosted_sessions()
+        return self.dispose_all_hosted_sessions(notify=False)
 
     def close_current_tab(self) -> bool:
         if not self.notebook.select():

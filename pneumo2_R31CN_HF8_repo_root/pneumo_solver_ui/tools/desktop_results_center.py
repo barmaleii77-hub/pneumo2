@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import tkinter as tk
+from datetime import datetime
 from pathlib import Path
 from tkinter import messagebox, ttk
 
@@ -35,12 +36,79 @@ def _open_path(path: Path) -> None:
 
 
 def _button_text(prefix: str, text: str, *, limit: int = 58) -> str:
-    raw = " ".join(str(text or "").split())
+    raw = " ".join(_operator_text(text).split())
     if not raw:
         return prefix
     if len(raw) > limit:
         raw = raw[: max(0, limit - 3)].rstrip() + "..."
     return f"{prefix}: {raw}"
+
+
+def _operator_text(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    replacements = {
+        "rc=": "код завершения ",
+        "duration=": "длительность ",
+        "ZIP": "архив",
+        "Autotest:": "Автотест:",
+        "Diagnostics:": "Диагностика:",
+        "Action completed:": "Действие выполнено:",
+        "Opened:": "Открыто:",
+        "Pinned current run.": "Текущий прогон закреплён.",
+        "Open Desktop Animator first": "Сначала откройте аниматор",
+        "Then inspect Compare Viewer": "Затем проверьте окно сравнения",
+        "Compare Viewer": "окно сравнения",
+        "Desktop Animator": "аниматор",
+        "Desktop Mnemo": "мнемосхема",
+        "Open browser perf evidence": "Открыть материалы производительности интерфейса",
+        "Browser perf artifacts are missing.": "Материалы производительности интерфейса не найдены.",
+        "browser perf artifacts are missing": "материалы производительности интерфейса не найдены",
+        "browser perf evidence": "материалы производительности интерфейса",
+        "optimizer scope artifacts are missing": "материалы области оптимизации не найдены",
+        "optimizer scope": "область оптимизации",
+        "artifacts are missing": "материалы не найдены",
+        "frozen context": "закреплёнными данными",
+        "hash=": "идентификатор ",
+        "path=": "файл ",
+        "current=": "текущее ",
+        "selected=": "выбранное ",
+        "FAIL": "ошибка",
+        "PASS": "норма",
+        "WARN": "предупреждение",
+        "MISSING": "нет данных",
+        "READY": "готово",
+        "HO-009": "",
+        "HO-010": "",
+        "handoff": "передача данных",
+        "manifest": "описание файлов",
+        "selected_run_contract.json": "файл выбранного прогона",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    return text
+
+
+def _short_value(value: object, *, limit: int = 28) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "—"
+    return text if len(text) <= limit else text[: max(0, limit - 3)].rstrip() + "..."
+
+
+def _action_label(action_key: str) -> str:
+    labels = {
+        "open_artifact": "открыт материал",
+        "open_compare_viewer": "открыто окно сравнения",
+        "open_animator": "открыт аниматор",
+        "open_animator_follow": "открыт аниматор с привязкой к результату",
+        "open_diagnostics_gui": "открыта диагностика проекта",
+        "open_send_center": "открыт центр отправки",
+        "open_send_bundles": "открыта папка архивов",
+        "export_diagnostics_evidence": "сохранены материалы диагностики",
+    }
+    return labels.get(str(action_key or "").strip(), "действие выполнено")
 
 
 def _artifact_matches_filters(
@@ -75,9 +143,9 @@ _BROWSE_CATEGORY_OPTIONS: tuple[tuple[str, str], ...] = (
     ("triage", "Разбор замечаний"),
     ("results", "Результаты"),
     ("anim_latest", "Визуализация"),
-    ("evidence", "Доказательства"),
+    ("evidence", "Материалы диагностики"),
     ("runs", "Прогоны"),
-    ("bundle", "Пакет"),
+    ("bundle", "Архив отправки"),
 )
 
 _STATUS_LABELS: dict[str, str] = {
@@ -94,6 +162,7 @@ _STATUS_LABELS: dict[str, str] = {
     "HISTORICAL": "Исторический",
     "STALE": "Устарел",
     "UNKNOWN": "Не определён",
+    "N/A": "Нет данных",
 }
 
 
@@ -137,16 +206,16 @@ class DesktopResultsCenter(ttk.Frame):
 
         self.validation_var = tk.StringVar(master=self, value="Проверка: результаты пока недоступны.")
         self.optimizer_var = tk.StringVar(master=self, value="Оптимизация: шлюз оценки пока не собран")
-        self.triage_var = tk.StringVar(master=self, value="Разбор замечаний: критично=0 | предупреждений=0 | информации=0 | красных флагов=0")
-        self.npz_var = tk.StringVar(master=self, value="Последний NPZ: пока недоступен.")
-        self.runs_var = tk.StringVar(master=self, value="Последние прогоны: автотест=— | диагностика=—")
-        self.context_var = tk.StringVar(master=self, value="Контекст результата: не определён")
-        self.context_banner_var = tk.StringVar(master=self, value="Контекст результата: выбранный результат пока не определён.")
-        self.evidence_manifest_var = tk.StringVar(master=self, value="Доказательства диагностики: пока не экспортированы.")
+        self.triage_var = tk.StringVar(master=self, value="Разбор замечаний: критичных: 0; предупреждений: 0; справочных: 0; красных флагов: 0")
+        self.npz_var = tk.StringVar(master=self, value="Последний файл анимации: пока недоступен.")
+        self.runs_var = tk.StringVar(master=self, value="Последние прогоны: автотест: —; диагностика: —")
+        self.context_var = tk.StringVar(master=self, value="Данные результата: не определены")
+        self.context_banner_var = tk.StringVar(master=self, value="Данные результата: выбранный результат пока не определён.")
+        self.evidence_manifest_var = tk.StringVar(master=self, value="Материалы диагностики: пока не сохранены.")
         self.next_step_var = tk.StringVar(master=self, value="Следующий шаг: дождитесь первого снимка проверки и результатов.")
-        self.next_detail_var = tk.StringVar(master=self, value="Пояснение: свежие артефакты проверки и результатов пока не появились.")
-        self.handoff_summary_var = tk.StringVar(master=self, value="Передача последнего прогона: локальная точка передачи пока не сформирована.")
-        self.handoff_detail_var = tk.StringVar(master=self, value="Запустите проверки с первой вкладки, чтобы закрепить текущую сессию в этом центре.")
+        self.next_detail_var = tk.StringVar(master=self, value="Пояснение: свежие материалы проверки и результатов пока не появились.")
+        self.handoff_summary_var = tk.StringVar(master=self, value="Последний прогон: материалы пока не подготовлены.")
+        self.handoff_detail_var = tk.StringVar(master=self, value="Запустите проверки на первой вкладке, чтобы закрепить текущий прогон в этом центре.")
         self.handoff_steps_var = tk.StringVar(master=self, value="")
         self.show_current_run_only = tk.BooleanVar(master=self, value=False)
         self.browse_category_var = tk.StringVar(master=self, value=_browse_category_label("all"))
@@ -176,11 +245,11 @@ class DesktopResultsCenter(ttk.Frame):
         actions = ttk.Frame(header)
         actions.pack(side="right", anchor="ne")
         ttk.Button(actions, text="Обновить", command=self.refresh).pack(side="left")
-        self.btn_open_selected = ttk.Button(actions, text="Открыть артефакт", command=self._open_selected)
+        self.btn_open_selected = ttk.Button(actions, text="Открыть материал", command=self._open_selected)
         self.btn_open_selected.pack(side="left", padx=(8, 0))
         self.btn_diagnostics = ttk.Button(actions, text="Собрать диагностику", command=self._launch_full_diagnostics_gui)
         self.btn_diagnostics.pack(side="left", padx=(8, 0))
-        self.btn_export_evidence = ttk.Button(actions, text="Экспорт доказательств", command=self._export_diagnostics_evidence)
+        self.btn_export_evidence = ttk.Button(actions, text="Сохранить материалы", command=self._export_diagnostics_evidence)
         self.btn_export_evidence.pack(side="left", padx=(8, 0))
         self.btn_compare = ttk.Button(actions, text="Сравнение", command=self._launch_compare_viewer)
         self.btn_compare.pack(side="left", padx=(8, 0))
@@ -240,7 +309,7 @@ class DesktopResultsCenter(ttk.Frame):
         )
         self.btn_run_next_step.pack(side="left")
 
-        run_handoff = ttk.LabelFrame(summary_body, text="Передача последнего прогона", padding=10)
+        run_handoff = ttk.LabelFrame(summary_body, text="Материалы последнего прогона", padding=10)
         run_handoff.pack(fill="x", pady=(10, 0))
         ttk.Label(
             run_handoff,
@@ -265,7 +334,7 @@ class DesktopResultsCenter(ttk.Frame):
         run_handoff_actions.pack(fill="x", pady=(8, 0))
         self.btn_open_handoff_zip = ttk.Button(
             run_handoff_actions,
-            text="Открыть последний ZIP",
+            text="Открыть последний архив",
             command=self._open_handoff_zip,
         )
         self.btn_open_handoff_zip.pack(side="left")
@@ -283,7 +352,7 @@ class DesktopResultsCenter(ttk.Frame):
         self.btn_open_handoff_diagnostics.pack(side="left", padx=(8, 0))
         self.btn_focus_suggested = ttk.Button(
             run_handoff_actions,
-            text="Перейти к рекомендованной ветви",
+            text="Показать рекомендованный раздел",
             command=self._focus_suggested_branch,
         )
         self.btn_focus_suggested.pack(side="left", padx=(8, 0))
@@ -316,9 +385,9 @@ class DesktopResultsCenter(ttk.Frame):
 
         tools = ttk.LabelFrame(summary_body, text="Инструменты", padding=10)
         tools.pack(fill="x", pady=(10, 0))
-        ttk.Button(tools, text="Открыть send_bundles", command=self._open_send_bundles).pack(fill="x")
+        ttk.Button(tools, text="Открыть папку архивов", command=self._open_send_bundles).pack(fill="x")
         ttk.Button(tools, text="Собрать диагностику", command=self._launch_full_diagnostics_gui).pack(fill="x", pady=(6, 0))
-        ttk.Button(tools, text="Экспорт доказательств диагностики", command=self._export_diagnostics_evidence).pack(fill="x", pady=(6, 0))
+        ttk.Button(tools, text="Сохранить материалы диагностики", command=self._export_diagnostics_evidence).pack(fill="x", pady=(6, 0))
         ttk.Button(tools, text="Открыть центр отправки", command=self._launch_send_results_gui).pack(fill="x", pady=(6, 0))
 
         overview = ttk.LabelFrame(left_pane, text="Обзор проверок", padding=8)
@@ -329,10 +398,10 @@ class DesktopResultsCenter(ttk.Frame):
             height=6,
         )
         self.overview_tree.heading("#0", text="Проверка")
-        self.overview_tree.heading("status", text="Статус")
+        self.overview_tree.heading("status", text="Состояние")
         self.overview_tree.heading("detail", text="Пояснение")
         self.overview_tree.heading("next_action", text="Следующее действие")
-        self.overview_tree.heading("evidence", text="Артефакт")
+        self.overview_tree.heading("evidence", text="Материал")
         self.overview_tree.column("#0", width=220, anchor="w")
         self.overview_tree.column("status", width=110, anchor="w")
         self.overview_tree.column("detail", width=340, anchor="w")
@@ -399,7 +468,7 @@ class DesktopResultsCenter(ttk.Frame):
             show="tree headings",
             height=16,
         )
-        self.tree.heading("#0", text="Артефакт")
+        self.tree.heading("#0", text="Материал")
         self.tree.heading("category", text="Раздел")
         self.tree.heading("path", text="Путь")
         self.tree.column("#0", width=240, anchor="w")
@@ -433,24 +502,26 @@ class DesktopResultsCenter(ttk.Frame):
         self.npz_var.set(format_npz_summary(snapshot))
         self.runs_var.set(format_recent_runs_summary(snapshot))
         self.context_var.set(format_result_context_summary(snapshot))
-        self.context_banner_var.set(snapshot.result_context_banner)
+        self.context_banner_var.set(_operator_text(snapshot.result_context_banner))
         manifest_label = (
             str(snapshot.diagnostics_evidence_manifest_path)
             if snapshot.diagnostics_evidence_manifest_path is not None
-            else "пока не экспортирован"
+            else "пока не сохранены"
         )
         self.evidence_manifest_var.set(
-            f"Доказательства диагностики: {snapshot.diagnostics_evidence_manifest_status} | {manifest_label}"
+            "Материалы диагностики: "
+            + f"{_status_label(snapshot.diagnostics_evidence_manifest_status)}; "
+            + manifest_label
         )
         if snapshot.selected_run_contract_path is not None:
             self.context_banner_var.set(
-                snapshot.result_context_banner
-                + "\nКонтекст оптимизации для анализа: "
-                + f"{snapshot.selected_run_contract_status} | "
-                + str(snapshot.selected_run_contract_path)
+                _operator_text(snapshot.result_context_banner)
+                + "\nВыбранный расчёт для анализа: "
+                + f"состояние: {_status_label(snapshot.selected_run_contract_status)}; "
+                + f"файл: {snapshot.selected_run_contract_path}"
             )
-        self.next_step_var.set("Следующий шаг: " + snapshot.suggested_next_step)
-        self.next_detail_var.set("Почему сейчас: " + snapshot.suggested_next_detail)
+        self.next_step_var.set("Следующий шаг: " + _operator_text(snapshot.suggested_next_step))
+        self.next_detail_var.set("Почему сейчас: " + _operator_text(snapshot.suggested_next_detail))
         self._render_overview(snapshot)
         self._render_artifacts(snapshot)
         self._select_initial_overview(snapshot)
@@ -683,8 +754,8 @@ class DesktopResultsCenter(ttk.Frame):
                 text=row.title,
                 values=(
                     _status_label(row.status),
-                    row.detail,
-                    row.next_action,
+                    _operator_text(row.detail),
+                    _operator_text(row.next_action),
                     str(row.evidence_path) if row.evidence_path is not None else "",
                 ),
             )
@@ -733,16 +804,19 @@ class DesktopResultsCenter(ttk.Frame):
     def _render_session_handoff(self) -> None:
         handoff = self.session_handoff_state
         if handoff is None:
-            self.handoff_summary_var.set("Передача последнего прогона: локальная точка передачи пока не создана.")
+            self.handoff_summary_var.set("Последний прогон: материалы пока не подготовлены.")
             self.handoff_detail_var.set(
                 "Запустите проверки с первой вкладки, чтобы закрепить текущую сессию в этом центре."
             )
             self.handoff_steps_var.set("")
             return
-        self.handoff_summary_var.set("Передача последнего прогона: " + str(handoff.summary or ""))
-        self.handoff_detail_var.set(str(handoff.detail or ""))
+        self.handoff_summary_var.set("Последний прогон: " + _operator_text(handoff.summary))
+        self.handoff_detail_var.set(_operator_text(handoff.detail))
         self.handoff_steps_var.set(
-            "Шаги: " + " | ".join(str(item) for item in handoff.step_lines if str(item).strip())
+            "Шаги: "
+            + " | ".join(
+                _operator_text(item) for item in handoff.step_lines if str(item).strip()
+            )
             if handoff.step_lines
             else ""
         )
@@ -778,7 +852,7 @@ class DesktopResultsCenter(ttk.Frame):
         )
         category = _browse_category_label(self.browse_category_var.get() or "all")
         query = " ".join(str(self.browse_query_var.get() or "").split()).strip()
-        return f"{scope} | раздел={category} | запрос={query or '—'}"
+        return f"{scope}; раздел: {category}; запрос: {query or '—'}"
 
     def _clear_browse_query(self) -> None:
         if not str(self.browse_query_var.get() or "").strip():
@@ -841,6 +915,12 @@ class DesktopResultsCenter(ttk.Frame):
         artifact = self._selected_artifact()
         row = self._selected_overview_row()
         handoff = self.session_handoff_state
+        selected_run_line = (
+            "Выбранный расчёт для анализа: "
+            f"состояние: {_status_label(snapshot.selected_run_contract_status)}; "
+            f"идентификатор: {_short_value(snapshot.selected_run_contract_hash)}; "
+            f"файл: {snapshot.selected_run_contract_path or '—'}"
+        )
         lines = [
             format_validation_summary(snapshot),
             format_optimizer_gate_summary(snapshot),
@@ -848,113 +928,115 @@ class DesktopResultsCenter(ttk.Frame):
             format_npz_summary(snapshot),
             format_recent_runs_summary(snapshot),
             format_result_context_summary(snapshot),
-            snapshot.result_context_banner,
-            (
-                "Контекст оптимизации для анализа: "
-                f"{snapshot.selected_run_contract_status} | "
-                f"hash={snapshot.selected_run_contract_hash or '—'} | "
-                f"path={snapshot.selected_run_contract_path or '—'}"
-            ),
-            snapshot.selected_run_contract_banner,
-            f"Доказательства диагностики: {snapshot.diagnostics_evidence_manifest_path or '—'}",
+            _operator_text(snapshot.result_context_banner),
+            selected_run_line,
+            _operator_text(snapshot.selected_run_contract_banner),
+            f"Материалы диагностики: {snapshot.diagnostics_evidence_manifest_path or '—'}",
             "Область просмотра: " + self._browse_scope_summary(),
             "",
             "Рекомендуемый следующий шаг:",
-            snapshot.suggested_next_step,
-            f"Почему сейчас: {snapshot.suggested_next_detail}",
+            _operator_text(snapshot.suggested_next_step),
+            f"Почему сейчас: {_operator_text(snapshot.suggested_next_detail)}",
         ]
         if snapshot.result_context_detail:
-            lines.append("Детали контекста: " + snapshot.result_context_detail)
+            lines.append("Детали результата: " + _operator_text(snapshot.result_context_detail))
         if snapshot.result_context_action:
-            lines.append("Действие по контексту: " + snapshot.result_context_action)
+            lines.append("Действие по результату: " + _operator_text(snapshot.result_context_action))
         if snapshot.result_context_fields:
-            lines.extend(["", "Поля контекста результата:"])
+            lines.extend(["", "Поля данных результата:"])
             for field in snapshot.result_context_fields[:12]:
                 lines.append(
                     "- "
                     + f"{field.title}: {_status_label(field.status)} | "
-                    + f"current={field.current_value or '—'} | selected={field.selected_value or '—'}"
+                    + f"текущее: {field.current_value or '—'}; выбранное: {field.selected_value or '—'}"
                 )
         if handoff is not None:
             lines.extend(
                 [
                     "",
-                    "Передача последнего прогона:",
-                    handoff.summary,
+                    "Материалы последнего прогона:",
+                    _operator_text(handoff.summary),
                 ]
             )
             if handoff.detail:
-                lines.append(handoff.detail)
+                lines.append(_operator_text(handoff.detail))
             if handoff.step_lines:
-                lines.extend(f"- {item}" for item in handoff.step_lines)
+                lines.extend(f"- {_operator_text(item)}" for item in handoff.step_lines)
         if row is not None:
             lines.extend(
                 [
                     "",
                     f"Выбранная проверка: {row.title}",
-                    f"Статус проверки: {_status_label(row.status)}",
-                    f"Пояснение проверки: {row.detail}",
+                    f"Состояние проверки: {_status_label(row.status)}",
+                    f"Пояснение проверки: {_operator_text(row.detail)}",
                 ]
             )
             if row.next_action:
-                lines.append(f"Следующее действие: {row.next_action}")
+                lines.append(f"Следующее действие: {_operator_text(row.next_action)}")
             if row.evidence_path is not None:
-                lines.append(f"Подтверждающий артефакт: {row.evidence_path}")
+                lines.append(f"Материал проверки: {row.evidence_path}")
         if snapshot.mnemo_current_mode:
             lines.append(f"Режим мнемосхемы: {snapshot.mnemo_current_mode}")
         if snapshot.mnemo_recent_titles:
-            lines.append("Последние события мнемосхемы: " + " | ".join(snapshot.mnemo_recent_titles[:3]))
+            lines.append(
+                "Последние события мнемосхемы: "
+                + " | ".join(_operator_text(item) for item in snapshot.mnemo_recent_titles[:3])
+            )
         if snapshot.optimizer_scope_gate_reason:
-            lines.append(f"Причина срабатывания шлюза оптимизации: {snapshot.optimizer_scope_gate_reason}")
+            lines.append(
+                "Причина ограничения оптимизации: "
+                + _operator_text(snapshot.optimizer_scope_gate_reason)
+            )
         if artifact is not None:
             lines.extend(
                 [
                     "",
-                    f"Выбранный артефакт: {artifact.title}",
+                    f"Выбранный материал: {artifact.title}",
                     f"Раздел: {_browse_category_label(artifact.category)}",
-                    f"Путь: {artifact.path}",
+                    f"Файл: {artifact.path}",
                 ]
             )
             try:
                 st = artifact.path.stat()
-                lines.append(f"Изменён: {st.st_mtime:.0f}")
+                changed_at = datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+                lines.append(f"Изменён: {changed_at}")
                 if artifact.path.is_file():
-                    lines.append(f"Размер, байт: {int(st.st_size)}")
+                    lines.append(f"Размер файла: {int(st.st_size)} байт")
             except Exception:
                 pass
             if artifact.detail:
-                lines.append(f"Примечание: {artifact.detail}")
+                lines.append(f"Примечание: {_operator_text(artifact.detail)}")
             compare_target = self.runtime.compare_viewer_path(snapshot, artifact=artifact)
             animator_npz, animator_pointer = self.runtime.animator_target_paths(
                 snapshot,
                 artifact=artifact,
             )
             if compare_target is not None:
-                lines.append(f"NPZ для сравнения: {compare_target}")
+                lines.append(f"Файл для сравнения: {compare_target}")
             if animator_pointer is not None:
-                lines.append(f"Контекст аниматора: {animator_pointer}")
+                lines.append(f"Данные для аниматора: {animator_pointer}")
             elif animator_npz is not None:
-                lines.append(f"NPZ аниматора: {animator_npz}")
+                lines.append(f"Файл анимации: {animator_npz}")
             preview_lines = self.runtime.artifact_preview_lines(artifact)
             if preview_lines:
                 lines.extend(["", "Предпросмотр:"])
-                lines.extend(f"- {line}" for line in preview_lines)
+                lines.extend(f"- {_operator_text(line)}" for line in preview_lines)
         if snapshot.validation_errors:
             lines.extend(["", "Ошибки проверки:"])
-            lines.extend(f"- {item}" for item in snapshot.validation_errors[:5])
+            lines.extend(f"- {_operator_text(item)}" for item in snapshot.validation_errors[:5])
         if snapshot.validation_warnings:
             lines.extend(["", "Предупреждения проверки:"])
-            lines.extend(f"- {item}" for item in snapshot.validation_warnings[:5])
+            lines.extend(f"- {_operator_text(item)}" for item in snapshot.validation_warnings[:5])
         if snapshot.triage_red_flags:
             lines.extend(["", "Красные флаги разбора замечаний:"])
-            lines.extend(f"- {item}" for item in snapshot.triage_red_flags[:5])
+            lines.extend(f"- {_operator_text(item)}" for item in snapshot.triage_red_flags[:5])
         if snapshot.anim_summary_lines:
             lines.extend(["", "Сводка по последней визуализации:"])
-            lines.extend(f"- {line}" for line in snapshot.anim_summary_lines)
+            lines.extend(f"- {_operator_text(line)}" for line in snapshot.anim_summary_lines)
         if snapshot.operator_recommendations:
             lines.extend(["", "Рекомендуемые действия по ветвям:"])
             lines.extend(
-                f"{idx}. {item}"
+                f"{idx}. {_operator_text(item)}"
                 for idx, item in enumerate(snapshot.operator_recommendations, start=1)
             )
 
@@ -994,7 +1076,7 @@ class DesktopResultsCenter(ttk.Frame):
         artifact = self._selected_artifact()
         if artifact is None:
             return
-        self._run_action("open_artifact", artifact=artifact, success_message=f"Opened: {artifact.title}")
+        self._run_action("open_artifact", artifact=artifact, success_message=f"Открыт материал: {artifact.title}")
 
     def _run_action(
         self,
@@ -1042,13 +1124,14 @@ class DesktopResultsCenter(ttk.Frame):
                     "diagnostics_evidence_manifest",
                 )
                 self._select_artifact(artifact)
-                self.status_var.set(f"Доказательства диагностики экспортированы: {manifest_path}")
+                self.status_var.set(f"Материалы диагностики сохранены: {manifest_path}")
                 return
             else:
                 return
-            self.status_var.set(success_message or f"Action completed: {action}")
+            message = success_message or f"Действие выполнено: {_action_label(action)}"
+            self.status_var.set(_operator_text(message))
         except Exception as exc:
-            messagebox.showerror("Validation & Results", f"Не удалось выполнить действие:\n{exc}")
+            messagebox.showerror("Результаты и анализ", f"Не удалось выполнить действие:\n{exc}")
 
     def _run_suggested_next_step(self) -> None:
         snapshot = self.snapshot_state
@@ -1062,7 +1145,7 @@ class DesktopResultsCenter(ttk.Frame):
         self._run_action(
             snapshot.suggested_next_action_key,
             artifact=artifact,
-            success_message="Suggested next step launched.",
+            success_message="Рекомендованное действие запущено.",
         )
 
     def _run_selected_overview_action(self) -> None:
@@ -1081,7 +1164,7 @@ class DesktopResultsCenter(ttk.Frame):
             row.action_key,
             artifact=artifact,
             path=row.evidence_path,
-            success_message=f"Overview action launched: {row.title}",
+            success_message=f"Действие по проверке запущено: {row.title}",
         )
 
     def _focus_suggested_branch(self) -> None:
@@ -1091,7 +1174,7 @@ class DesktopResultsCenter(ttk.Frame):
         self._select_initial_overview(snapshot)
         self._render_details()
         self._refresh_action_states(snapshot)
-        self.status_var.set("Suggested branch focused in Validation & Results.")
+        self.status_var.set("Показан рекомендованный раздел результатов.")
 
     def _open_handoff_zip(self) -> None:
         handoff = self.session_handoff_state
@@ -1100,7 +1183,7 @@ class DesktopResultsCenter(ttk.Frame):
         self._run_action(
             "open_artifact",
             path=handoff.zip_path,
-            success_message=f"Opened: {handoff.zip_path}",
+            success_message=f"Открыт архив: {handoff.zip_path}",
         )
 
     def _open_handoff_validation(self) -> None:
@@ -1110,7 +1193,7 @@ class DesktopResultsCenter(ttk.Frame):
         self._run_action(
             "open_artifact",
             artifact=artifact,
-            success_message="Current run validation opened.",
+            success_message="Открыта проверка текущего прогона.",
         )
 
     def _open_handoff_triage(self) -> None:
@@ -1120,7 +1203,7 @@ class DesktopResultsCenter(ttk.Frame):
         self._run_action(
             "open_artifact",
             artifact=artifact,
-            success_message="Current run triage opened.",
+            success_message="Открыт разбор замечаний текущего прогона.",
         )
 
     def _branch_handoff_compare(self) -> None:
@@ -1130,7 +1213,7 @@ class DesktopResultsCenter(ttk.Frame):
         self._run_action(
             "open_compare_viewer",
             artifact=artifact,
-            success_message="Current run compare branch launched.",
+            success_message="Открыто сравнение текущего прогона.",
         )
 
     def _branch_handoff_animator(self) -> None:
@@ -1142,7 +1225,7 @@ class DesktopResultsCenter(ttk.Frame):
         self._run_action(
             "open_animator_follow",
             artifact=artifact,
-            success_message="Current run animator branch launched.",
+            success_message="Открыта визуализация текущего прогона.",
         )
 
     def _open_handoff_autotest_run(self) -> None:
@@ -1152,7 +1235,7 @@ class DesktopResultsCenter(ttk.Frame):
         self._run_action(
             "open_artifact",
             path=handoff.autotest_run_dir,
-            success_message=f"Opened: {handoff.autotest_run_dir}",
+            success_message=f"Открыт каталог автотеста: {handoff.autotest_run_dir}",
         )
 
     def _open_handoff_diagnostics_run(self) -> None:
@@ -1162,19 +1245,19 @@ class DesktopResultsCenter(ttk.Frame):
         self._run_action(
             "open_artifact",
             path=handoff.diagnostics_run_dir,
-            success_message=f"Opened: {handoff.diagnostics_run_dir}",
+            success_message=f"Открыт каталог диагностики: {handoff.diagnostics_run_dir}",
         )
 
     def _open_send_bundles(self) -> None:
         self._run_action(
             "open_send_bundles",
-            success_message=f"Opened: {self.runtime.send_bundles_dir}",
+            success_message=f"Открыта папка архивов: {self.runtime.send_bundles_dir}",
         )
 
     def _export_diagnostics_evidence(self) -> None:
         self._run_action(
             "export_diagnostics_evidence",
-            success_message="Доказательства диагностики экспортированы.",
+            success_message="Материалы диагностики сохранены.",
         )
 
     def _launch_compare_viewer(self) -> None:
@@ -1184,7 +1267,7 @@ class DesktopResultsCenter(ttk.Frame):
         self._run_action(
             "open_compare_viewer",
             artifact=self._selected_artifact(),
-            success_message="Compare Viewer launched from Validation & Results.",
+            success_message="Открыто окно сравнения для выбранного результата.",
         )
 
     def _launch_animator(self) -> None:
@@ -1194,7 +1277,7 @@ class DesktopResultsCenter(ttk.Frame):
         self._run_action(
             "open_animator",
             artifact=self._selected_artifact(),
-            success_message="Desktop Animator launched on latest result.",
+            success_message="Открыт аниматор для последнего результата.",
         )
 
     def _launch_animator_follow(self) -> None:
@@ -1204,19 +1287,19 @@ class DesktopResultsCenter(ttk.Frame):
         self._run_action(
             "open_animator_follow",
             artifact=self._selected_artifact(),
-            success_message="Desktop Animator follow launched from analysis context.",
+            success_message="Открыт аниматор с привязкой к выбранному результату.",
         )
 
     def _launch_full_diagnostics_gui(self) -> None:
         self._run_action(
             "open_diagnostics_gui",
-            success_message="Full Diagnostics GUI launched.",
+            success_message="Открыта диагностика проекта.",
         )
 
     def _launch_send_results_gui(self) -> None:
         self._run_action(
             "open_send_center",
-            success_message="Send Center launched.",
+            success_message="Открыт центр отправки.",
         )
 
 

@@ -509,7 +509,9 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "gui_spec_imports/v38_github_kb_commit_ready/README.md" in index_text
     assert "V38_KB_IMPORT_AUDIT_2026-04-18.md" in index_text
     assert "17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md" in index_text
-    assert "current post-acceptance self-contained Plan-mode starter prompts" in index_text
+    assert "previous post-acceptance self-contained Plan-mode starter prompts" in index_text
+    assert "18_POST_CHAT_WORKTREE_CLEANUP_V38_PLAN_MODE_PROMPTS.md" in index_text
+    assert "current self-contained Plan-mode starter prompts" in index_text
     assert "gui_spec_imports/v37_github_kb_supplement/README.md" in index_text
     assert "TECHNICAL_SPECIFICATION.md" in index_text
     assert "GUI_SPEC.yaml" in index_text

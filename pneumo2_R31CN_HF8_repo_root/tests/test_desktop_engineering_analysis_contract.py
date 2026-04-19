@@ -969,9 +969,9 @@ def test_desktop_engineering_analysis_center_shell_is_materialized() -> None:
     assert hasattr(DesktopEngineeringAnalysisCenter, "_export_animator_link")
     assert hasattr(DesktopEngineeringAnalysisCenter, "_run_command_surface_action")
     command_labels = {label for _key, label in ANALYSIS_COMMAND_OPEN_TARGETS}
-    assert "Открыть HO-007 selected_run_contract.json" in command_labels
-    assert "Открыть selected run_dir" in command_labels
-    assert "Открыть selected artifact" in command_labels
-    assert "Открыть HO-009 evidence manifest" in command_labels
-    assert "Открыть HO-008 analysis_context.json" in command_labels
-    assert "Открыть HO-008 animator_link_contract.json" in command_labels
+    assert "Открыть выбранный прогон" in command_labels
+    assert "Открыть папку прогона" in command_labels
+    assert "Открыть выбранный файл" in command_labels
+    assert "Открыть материалы диагностики" in command_labels
+    assert "Открыть данные для анимации" in command_labels
+    assert "Открыть связь анализа с аниматором" in command_labels

@@ -378,6 +378,13 @@ ID: `PLAN-0051`.
 Источник: chat:2026-04-18 accept chat worktrees cleanup.
 ID: `PLAN-0052`.
 
+53. Семантический аудит всех GUI-кнопок и надписей относительно V38 и PIPELINE_OPTIMIZED.dot
+Назначение: Сформирован локальный audit-документ с нормализованным pipeline, найденными неоднозначностями V38, высоковероятными нарушениями текста и приоритетным порядком исправлений.
+Артефакт: [docs/context/release_readiness/GUI_TEXT_SEMANTIC_AUDIT_2026-04-19.md](./context/release_readiness/GUI_TEXT_SEMANTIC_AUDIT_2026-04-19.md)
+Статус: active.
+Источник: chat:2026-04-19 semantic GUI audit.
+ID: `PLAN-0053`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

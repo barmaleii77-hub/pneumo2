@@ -49,8 +49,8 @@ class DesktopRunSetupCenter:
         self.launch_plain_button: ttk.Button | None = None
         self.suite_lineage_var = tk.StringVar(
             value=(
-                "HO-003 / HO-004 / HO-005 state will appear after checking the suite. "
-                "Ring geometry refs are read-only in WS-SUITE."
+                "Состояние набора испытаний появится после проверки. "
+                "Геометрия колец используется только для чтения."
             )
         )
         self.suite_tree: ttk.Treeview | None = None
@@ -119,10 +119,10 @@ class DesktopRunSetupCenter:
         ttk.Label(
             outer,
             text=(
-                "Runtime-настройки расчёта вынесены в отдельное desktop-окно: "
-                "здесь находятся baseline/detail/full, dt, длительность, cache, export, "
-                "auto-check, запись логов и runtime policy. "
-                "Физические параметры остаются в основном editor и не смешиваются с pre-run workflow."
+                "Настройки расчёта вынесены в отдельное окно: здесь находятся краткий "
+                "предпросмотр, подробные режимы, шаг по времени, длительность, "
+                "повторное использование расчётов, выгрузка, самопроверка и запись журналов. "
+                "Физические параметры остаются в основном редакторе и не смешиваются с подготовкой запуска."
             ),
             wraplength=920,
             justify="left",
@@ -151,7 +151,7 @@ class DesktopRunSetupCenter:
             foreground="#555555",
         ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(10, 0))
 
-        preview_frame = ttk.LabelFrame(body, text="Профиль preview-дороги", padding=10)
+        preview_frame = ttk.LabelFrame(body, text="Профиль дороги для предпросмотра", padding=10)
         preview_frame.grid(row=1, column=0, sticky="ew", pady=(12, 0))
         preview_frame.columnconfigure(5, weight=1)
 
@@ -178,7 +178,7 @@ class DesktopRunSetupCenter:
 
         ttk.Label(
             preview_frame,
-            text="Шаг preview dt, с",
+            text="Шаг предпросмотра, с",
         ).grid(row=1, column=0, sticky="w", pady=(10, 0))
         ttk.Spinbox(
             preview_frame,
@@ -190,7 +190,7 @@ class DesktopRunSetupCenter:
             format="%.3f",
         ).grid(row=1, column=1, sticky="w", padx=(8, 0), pady=(10, 0))
 
-        ttk.Label(preview_frame, text="Длительность preview, с").grid(
+        ttk.Label(preview_frame, text="Длительность предпросмотра, с").grid(
             row=1, column=2, sticky="w", padx=(16, 0), pady=(10, 0)
         )
         ttk.Spinbox(
@@ -345,7 +345,7 @@ class DesktopRunSetupCenter:
 
         ttk.Checkbutton(
             detail_frame,
-            text="Сохранять расширенный лог (давления и потоки)",
+            text="Сохранять расширенный журнал давления и потоков",
             variable=self.editor.run_record_full_var,
         ).grid(row=1, column=4, columnspan=2, sticky="w", padx=(16, 0), pady=(10, 0))
 
@@ -423,12 +423,12 @@ class DesktopRunSetupCenter:
             justify="left",
         ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(8, 0))
 
-        runtime_frame = ttk.LabelFrame(body, text="Cache, export и runtime policy", padding=10)
+        runtime_frame = ttk.LabelFrame(body, text="Повторное использование, выгрузка и режим выполнения", padding=10)
         runtime_frame.grid(row=3, column=0, sticky="ew", pady=(12, 0))
         runtime_frame.columnconfigure(0, weight=1)
         runtime_frame.columnconfigure(1, weight=1)
 
-        cache_frame = ttk.LabelFrame(runtime_frame, text="Cache", padding=8)
+        cache_frame = ttk.LabelFrame(runtime_frame, text="Повторное использование расчётов", padding=8)
         cache_frame.grid(row=0, column=0, sticky="nsew")
         for idx, (policy_key, policy_label, _policy_desc) in enumerate(DESKTOP_RUN_CACHE_POLICY_OPTIONS):
             ttk.Radiobutton(
@@ -445,7 +445,7 @@ class DesktopRunSetupCenter:
             foreground="#555555",
         ).grid(row=4, column=0, sticky="w", pady=(8, 0))
 
-        runtime_policy_frame = ttk.LabelFrame(runtime_frame, text="Runtime policy", padding=8)
+        runtime_policy_frame = ttk.LabelFrame(runtime_frame, text="Режим выполнения", padding=8)
         runtime_policy_frame.grid(row=0, column=1, sticky="nsew", padx=(12, 0))
         for idx, (policy_key, policy_label, _policy_desc) in enumerate(DESKTOP_RUN_RUNTIME_POLICY_OPTIONS):
             ttk.Radiobutton(
@@ -466,29 +466,29 @@ class DesktopRunSetupCenter:
         flags_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(12, 0))
         ttk.Checkbutton(
             flags_frame,
-            text="Экспортировать CSV-таблицы для detail/full",
+            text="Сохранять таблицы результатов для подробных режимов",
             variable=self.editor.run_export_csv_var,
         ).grid(row=0, column=0, sticky="w")
         ttk.Checkbutton(
             flags_frame,
-            text="Экспортировать NPZ bundle для detail/full",
+            text="Сохранять файл анимации для подробных режимов",
             variable=self.editor.run_export_npz_var,
         ).grid(row=0, column=1, sticky="w", padx=(16, 0))
         ttk.Checkbutton(
             flags_frame,
-            text="Автоматический auto-check перед запуском",
+            text="Запускать самопроверку перед расчётом",
             variable=self.editor.run_auto_check_var,
         ).grid(row=1, column=0, sticky="w", pady=(8, 0))
         ttk.Checkbutton(
             flags_frame,
-            text="Писать subprocess-лог в файл",
+            text="Сохранять журнал процесса в файл",
             variable=self.editor.run_log_to_file_var,
         ).grid(row=1, column=1, sticky="w", padx=(16, 0), pady=(8, 0))
         ttk.Label(
             flags_frame,
             text=(
-                "Cache и export применяются к detail/full. "
-                "Baseline / preview всегда пишет краткую JSON-сводку, а авто-проверка и логирование работают для всех режимов."
+                "Повторное использование и выгрузка важны для подробных режимов. "
+                "Краткий предпросмотр всегда пишет короткую сводку, а самопроверка и журнал доступны для всех режимов."
             ),
             wraplength=860,
             justify="left",
@@ -517,7 +517,7 @@ class DesktopRunSetupCenter:
         self.launch_with_check_button.grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
         self.launch_plain_button = ttk.Button(
             summary_frame,
-            text="Запустить выбранный режим",
+            text="Запустить расчёт",
             command=self._run_selected_profile,
         )
         self.launch_plain_button.grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
@@ -534,14 +534,14 @@ class DesktopRunSetupCenter:
             foreground="#1f5d50",
         ).grid(row=2, column=0, columnspan=4, sticky="w", pady=(10, 0))
 
-        recent_frame = ttk.LabelFrame(body, text="Последние runtime-артефакты", padding=10)
+        recent_frame = ttk.LabelFrame(body, text="Последние результаты и журналы", padding=10)
         recent_frame.grid(row=5, column=0, sticky="ew", pady=(12, 0))
         recent_frame.columnconfigure(0, weight=1)
         recent_frame.columnconfigure(1, weight=1)
 
         preview_recent_frame = ttk.LabelFrame(
             recent_frame,
-            text="Последний baseline / preview",
+            text="Последний предпросмотр",
             padding=8,
         )
         preview_recent_frame.grid(row=0, column=0, sticky="nsew")
@@ -554,23 +554,23 @@ class DesktopRunSetupCenter:
         ).grid(row=0, column=0, columnspan=3, sticky="w")
         ttk.Button(
             preview_recent_frame,
-            text="Обновить preview",
+            text="Обновить сводку",
             command=self.editor._refresh_latest_preview_summary,
         ).grid(row=1, column=0, sticky="w", pady=(10, 0))
         ttk.Button(
             preview_recent_frame,
-            text="Открыть preview_report.json",
+            text="Открыть сводку",
             command=self.editor._open_latest_preview_report_json,
         ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
             preview_recent_frame,
-            text="Открыть preview-лог",
+            text="Открыть журнал",
             command=self.editor._open_latest_preview_log,
         ).grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
 
         check_recent_frame = ttk.LabelFrame(
             recent_frame,
-            text="Последний auto-check / selfcheck",
+            text="Последняя самопроверка",
             padding=8,
         )
         check_recent_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(12, 0))
@@ -583,23 +583,23 @@ class DesktopRunSetupCenter:
         ).grid(row=0, column=0, columnspan=3, sticky="w")
         ttk.Button(
             check_recent_frame,
-            text="Обновить selfcheck",
+            text="Обновить сводку",
             command=self.editor._refresh_latest_selfcheck_summary,
         ).grid(row=1, column=0, sticky="w", pady=(10, 0))
         ttk.Button(
             check_recent_frame,
-            text="Открыть selfcheck_report.json",
+            text="Открыть сводку",
             command=self.editor._open_latest_selfcheck_report_json,
         ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
             check_recent_frame,
-            text="Открыть selfcheck-лог",
+            text="Открыть журнал",
             command=self.editor._open_latest_selfcheck_log,
         ).grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
 
         run_recent_frame = ttk.LabelFrame(
             recent_frame,
-            text="Последний detail / full",
+            text="Последний подробный расчёт",
             padding=8,
         )
         run_recent_frame.grid(row=0, column=1, sticky="nsew", padx=(12, 0))
@@ -612,32 +612,32 @@ class DesktopRunSetupCenter:
         ).grid(row=0, column=0, columnspan=4, sticky="w")
         ttk.Button(
             run_recent_frame,
-            text="Обновить detail/full",
+            text="Обновить сводку",
             command=self.editor._refresh_latest_run_summary,
         ).grid(row=1, column=0, sticky="w", pady=(10, 0))
         ttk.Button(
             run_recent_frame,
-            text="Открыть run_summary.json",
+            text="Открыть сводку",
             command=self.editor._open_latest_run_summary_json,
         ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
             run_recent_frame,
-            text="Открыть run-лог",
+            text="Открыть журнал",
             command=self.editor._open_latest_run_log,
         ).grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
             run_recent_frame,
-            text="Открыть df_main.csv",
+            text="Открыть основную таблицу результатов",
             command=self.editor._open_latest_df_main_csv,
         ).grid(row=1, column=3, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
             run_recent_frame,
-            text="Открыть NPZ bundle",
+            text="Открыть файл анимации",
             command=self.editor._open_latest_npz_bundle,
         ).grid(row=2, column=0, sticky="w", pady=(10, 0))
         ttk.Button(
             run_recent_frame,
-            text="Открыть cache entry",
+            text="Открыть готовый результат",
             command=self.editor._open_latest_run_cache_dir,
         ).grid(row=2, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
@@ -646,14 +646,14 @@ class DesktopRunSetupCenter:
             command=self.editor._open_desktop_runs_dir,
         ).grid(row=2, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
 
-        support_frame = ttk.LabelFrame(body, text="Cache и логи runtime", padding=10)
+        support_frame = ttk.LabelFrame(body, text="Папки и журналы расчёта", padding=10)
         support_frame.grid(row=6, column=0, sticky="ew", pady=(12, 0))
         ttk.Label(
             support_frame,
             text=(
-                "Runtime cache и subprocess-логи лежат отдельно от физических профилей. "
-                "Если нужно проверить cache-hit, ручной export или детальный stdout/stderr, "
-                "открывайте эти папки прямо из run setup."
+                "Данные расчёта и журналы лежат отдельно от физических профилей. "
+                "Если нужно проверить повторное использование, ручную выгрузку или детальный журнал процесса, "
+                "открывайте эти папки здесь."
             ),
             wraplength=880,
             justify="left",
@@ -661,12 +661,12 @@ class DesktopRunSetupCenter:
         ).grid(row=0, column=0, columnspan=3, sticky="w")
         ttk.Button(
             support_frame,
-            text="Открыть cache runtime",
+            text="Открыть папку готовых результатов",
             command=self.editor._open_run_setup_cache_root,
         ).grid(row=1, column=0, sticky="w", pady=(10, 0))
         ttk.Button(
             support_frame,
-            text="Открыть папку логов",
+            text="Открыть папку журналов",
             command=self.editor._open_run_setup_log_root,
         ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
@@ -739,7 +739,7 @@ class DesktopRunSetupCenter:
         workspace.add(sidebar, weight=0)
         workspace.add(content, weight=1)
 
-        context_box = ttk.LabelFrame(sidebar, text="Контекст", padding=8)
+        context_box = ttk.LabelFrame(sidebar, text="Что выбрано", padding=8)
         context_box.grid(row=0, column=0, sticky="ew")
         ttk.Label(
             context_box,
@@ -763,7 +763,7 @@ class DesktopRunSetupCenter:
             foreground="#1f5d50",
         ).grid(row=2, column=0, sticky="w", pady=(8, 0))
 
-        nav_box = ttk.LabelFrame(sidebar, text="Разделы", padding=8)
+        nav_box = ttk.LabelFrame(sidebar, text="Настройки расчёта", padding=8)
         nav_box.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
         sidebar.rowconfigure(1, weight=1)
         tree_host, self.section_tree = build_scrolled_treeview(
@@ -789,12 +789,12 @@ class DesktopRunSetupCenter:
         ).grid(row=1, column=0, sticky="ew", pady=(8, 0))
         ttk.Button(
             quick_box,
-            text="Политики и выгрузка",
+            text="Поведение и выгрузка",
             command=lambda: self._select_section("policy"),
         ).grid(row=2, column=0, sticky="ew", pady=(8, 0))
         ttk.Button(
             quick_box,
-            text="Набор испытаний / HO-005",
+            text="Набор испытаний",
             command=lambda: self._select_section("suite"),
         ).grid(row=3, column=0, sticky="ew", pady=(8, 0))
         ttk.Button(
@@ -856,8 +856,8 @@ class DesktopRunSetupCenter:
             "profile": "Профиль запуска",
             "preview": "Предпросмотр дороги",
             "run": "Режим расчёта",
-            "policy": "Политики и выгрузка",
-            "suite": "Набор испытаний / HO-005",
+            "policy": "Поведение и выгрузка",
+            "suite": "Набор испытаний",
             "launch": "Запуск",
             "artifacts": "Результаты и журналы",
         }
@@ -1118,7 +1118,7 @@ class DesktopRunSetupCenter:
 
         ttk.Checkbutton(
             detail_frame,
-            text="Сохранять расширенный лог давления и потоков",
+            text="Сохранять расширенный журнал давления и потоков",
             variable=self.editor.run_record_full_var,
         ).grid(row=1, column=4, columnspan=2, sticky="w", padx=(16, 0), pady=(10, 0))
 
@@ -1197,13 +1197,13 @@ class DesktopRunSetupCenter:
         ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(8, 0))
 
     def _build_policy_tab(self) -> None:
-        body = self._create_tab("policy", "Политики и выгрузка")
+        body = self._create_tab("policy", "Поведение и выгрузка")
         runtime_frame = ttk.LabelFrame(body, text="Поведение расчёта и выгрузка", padding=10)
         runtime_frame.grid(row=0, column=0, sticky="ew")
         runtime_frame.columnconfigure(0, weight=1)
         runtime_frame.columnconfigure(1, weight=1)
 
-        cache_frame = ttk.LabelFrame(runtime_frame, text="Кэш расчёта", padding=8)
+        cache_frame = ttk.LabelFrame(runtime_frame, text="Повторное использование расчётов", padding=8)
         cache_frame.grid(row=0, column=0, sticky="nsew")
         for idx, (policy_key, policy_label, _policy_desc) in enumerate(DESKTOP_RUN_CACHE_POLICY_OPTIONS):
             ttk.Radiobutton(
@@ -1220,7 +1220,7 @@ class DesktopRunSetupCenter:
             foreground="#555555",
         ).grid(row=4, column=0, sticky="w", pady=(8, 0))
 
-        runtime_policy_frame = ttk.LabelFrame(runtime_frame, text="Политика выполнения", padding=8)
+        runtime_policy_frame = ttk.LabelFrame(runtime_frame, text="Поведение при предупреждениях", padding=8)
         runtime_policy_frame.grid(row=0, column=1, sticky="nsew", padx=(12, 0))
         for idx, (policy_key, policy_label, _policy_desc) in enumerate(DESKTOP_RUN_RUNTIME_POLICY_OPTIONS):
             ttk.Radiobutton(
@@ -1237,16 +1237,16 @@ class DesktopRunSetupCenter:
             foreground="#555555",
         ).grid(row=4, column=0, sticky="w", pady=(8, 0))
 
-        flags_frame = ttk.LabelFrame(body, text="Флаги запуска", padding=10)
+        flags_frame = ttk.LabelFrame(body, text="Что сохранять", padding=10)
         flags_frame.grid(row=1, column=0, sticky="ew", pady=(12, 0))
         ttk.Checkbutton(
             flags_frame,
-            text="Выгружать таблицы CSV для подробных режимов",
+            text="Сохранять таблицы результатов для подробных режимов",
             variable=self.editor.run_export_csv_var,
         ).grid(row=0, column=0, sticky="w")
         ttk.Checkbutton(
             flags_frame,
-            text="Выгружать набор NPZ для подробных режимов",
+            text="Сохранять файл анимации для подробных режимов",
             variable=self.editor.run_export_npz_var,
         ).grid(row=0, column=1, sticky="w", padx=(16, 0))
         ttk.Checkbutton(
@@ -1262,7 +1262,7 @@ class DesktopRunSetupCenter:
         ttk.Label(
             flags_frame,
             text=(
-                "Кэш и выгрузка важны для подробных режимов. "
+                "Повторное использование и сохранение результатов важны для подробных режимов. "
                 "Краткий предпросмотр всегда пишет короткую сводку, а самопроверка и журнал доступны для всех режимов."
             ),
             wraplength=860,
@@ -1271,10 +1271,10 @@ class DesktopRunSetupCenter:
         ).grid(row=2, column=0, columnspan=2, sticky="w", pady=(8, 0))
 
     def _build_suite_tab(self) -> None:
-        body = self._create_tab("suite", "Набор испытаний / HO-005")
+        body = self._create_tab("suite", "Набор испытаний")
         body.rowconfigure(1, weight=1)
 
-        status_frame = ttk.LabelFrame(body, text="validated_suite_snapshot / suite_snapshot_hash", padding=10)
+        status_frame = ttk.LabelFrame(body, text="Состояние набора испытаний", padding=10)
         status_frame.grid(row=0, column=0, sticky="ew")
         status_frame.columnconfigure(0, weight=1)
         ttk.Label(
@@ -1292,22 +1292,22 @@ class DesktopRunSetupCenter:
             foreground="#334455",
         ).grid(row=1, column=0, sticky="w", pady=(8, 0))
 
-        matrix_frame = ttk.LabelFrame(body, text="Preview матрицы испытаний", padding=10)
+        matrix_frame = ttk.LabelFrame(body, text="Матрица испытаний", padding=10)
         matrix_frame.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
         matrix_frame.columnconfigure(0, weight=1)
         matrix_frame.rowconfigure(0, weight=1)
         columns = ("enabled", "name", "stage", "type", "dt", "t_end", "refs", "hashes", "state")
         self.suite_tree = ttk.Treeview(matrix_frame, columns=columns, show="headings", height=10)
         headings = {
-            "enabled": "enabled",
+            "enabled": "вкл.",
             "name": "имя",
             "stage": "стадия",
             "type": "тип",
-            "dt": "dt",
-            "t_end": "t_end",
-            "refs": "read-only WS-RING refs",
-            "hashes": "source/export hashes",
-            "state": "ring_handoff_stale / reasons",
+            "dt": "шаг, с",
+            "t_end": "длительность, с",
+            "refs": "исходные файлы",
+            "hashes": "контрольные суммы",
+            "state": "актуальность",
         }
         widths = {
             "enabled": 70,
@@ -1328,7 +1328,7 @@ class DesktopRunSetupCenter:
         self.suite_tree.grid(row=0, column=0, sticky="nsew")
         yscroll.grid(row=0, column=1, sticky="ns")
 
-        command_frame = ttk.LabelFrame(body, text="Команды HO-005", padding=10)
+        command_frame = ttk.LabelFrame(body, text="Действия с набором", padding=10)
         command_frame.grid(row=2, column=0, sticky="ew", pady=(12, 0))
         ttk.Button(
             command_frame,
@@ -1337,32 +1337,30 @@ class DesktopRunSetupCenter:
         ).grid(row=0, column=0, sticky="w")
         ttk.Button(
             command_frame,
-            text="Заморозить HO-005",
+            text="Зафиксировать набор",
             command=self._freeze_suite_handoff,
         ).grid(row=0, column=1, sticky="w", padx=(12, 0))
         ttk.Button(
             command_frame,
-            text="Открыть validated_suite_snapshot.json",
+            text="Открыть снимок набора",
             command=self.editor._open_suite_handoff_snapshot,
         ).grid(row=0, column=2, sticky="w", padx=(12, 0))
         ttk.Button(
             command_frame,
-            text="Открыть папку handoff",
+            text="Открыть папку набора",
             command=self.editor._open_suite_handoff_dir,
         ).grid(row=0, column=3, sticky="w", padx=(12, 0))
         ttk.Button(
             command_frame,
-            text="Сбросить overrides",
+            text="Сбросить ручные изменения",
             command=self._reset_suite_overrides,
         ).grid(row=0, column=4, sticky="w", padx=(12, 0))
         ttk.Label(
             command_frame,
             text=(
-                "Generated/derived refs из WS-RING и frozen refs из WS-INPUTS здесь "
-                "только читаются: road_csv, axay_csv, scenario_json, segment_meta_ref, "
-                "inputs_snapshot, ring_source_hash и ring_export_set_hash не "
-                "редактируются в WS-SUITE. "
-                "Для правки геометрии откройте Ring Editor / WS-RING source."
+                "Данные, подготовленные редактором колец и вводом исходных данных, здесь "
+                "только читаются. Для правки геометрии или сценариев откройте редактор "
+                "и генератор сценариев колец."
             ),
             wraplength=880,
             justify="left",
@@ -1393,7 +1391,7 @@ class DesktopRunSetupCenter:
         ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
             summary_frame,
-            text="Запустить выбранный режим",
+            text="Запустить расчёт",
             command=self._run_selected_profile,
         ).grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
@@ -1436,7 +1434,7 @@ class DesktopRunSetupCenter:
         ).grid(row=1, column=0, sticky="w", pady=(10, 0))
         ttk.Button(
             preview_recent_frame,
-            text="Открыть сводку (JSON)",
+            text="Открыть сводку",
             command=self.editor._open_latest_preview_report_json,
         ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
@@ -1465,7 +1463,7 @@ class DesktopRunSetupCenter:
         ).grid(row=1, column=0, sticky="w", pady=(10, 0))
         ttk.Button(
             run_recent_frame,
-            text="Открыть сводку (JSON)",
+            text="Открыть сводку",
             command=self.editor._open_latest_run_summary_json,
         ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
@@ -1475,17 +1473,17 @@ class DesktopRunSetupCenter:
         ).grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
             run_recent_frame,
-            text="Открыть основную таблицу CSV",
+            text="Открыть основную таблицу результатов",
             command=self.editor._open_latest_df_main_csv,
         ).grid(row=1, column=3, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
             run_recent_frame,
-            text="Открыть набор NPZ",
+            text="Открыть файл анимации",
             command=self.editor._open_latest_npz_bundle,
         ).grid(row=2, column=0, sticky="w", pady=(10, 0))
         ttk.Button(
             run_recent_frame,
-            text="Открыть каталог кэша",
+            text="Открыть готовый результат",
             command=self.editor._open_latest_run_cache_dir,
         ).grid(row=2, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
@@ -1514,7 +1512,7 @@ class DesktopRunSetupCenter:
         ).grid(row=1, column=0, sticky="w", pady=(10, 0))
         ttk.Button(
             check_recent_frame,
-            text="Открыть сводку (JSON)",
+            text="Открыть сводку",
             command=self.editor._open_latest_selfcheck_report_json,
         ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
@@ -1523,13 +1521,13 @@ class DesktopRunSetupCenter:
             command=self.editor._open_latest_selfcheck_log,
         ).grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
 
-        support_frame = ttk.LabelFrame(body, text="Кэш и журналы", padding=10)
+        support_frame = ttk.LabelFrame(body, text="Папки и журналы расчёта", padding=10)
         support_frame.grid(row=2, column=0, sticky="ew", pady=(12, 0))
         ttk.Label(
             support_frame,
             text=(
-                "Здесь собраны только служебные каталоги расчёта. "
-                "Открывайте их, когда нужно проверить кэш, журнал запуска или ручную выгрузку."
+                "Здесь собраны папки расчёта. "
+                "Открывайте их, когда нужно проверить повторное использование, журнал запуска или ручную выгрузку."
             ),
             wraplength=860,
             justify="left",
@@ -1537,7 +1535,7 @@ class DesktopRunSetupCenter:
         ).grid(row=0, column=0, columnspan=3, sticky="w")
         ttk.Button(
             support_frame,
-            text="Открыть кэш расчёта",
+            text="Открыть папку готовых результатов",
             command=self.editor._open_run_setup_cache_root,
         ).grid(row=1, column=0, sticky="w", pady=(10, 0))
         ttk.Button(
@@ -1595,7 +1593,7 @@ class DesktopRunSetupCenter:
         plain_enabled = bool(plain_launch_state.get("enabled", True))
         plain_detail = str(plain_launch_state.get("detail") or "").strip()
         check_text = str(launch_target.get("checked_button") or "Проверить и запустить").strip()
-        plain_text = str(launch_target.get("plain_button") or "Запустить выбранный режим").strip()
+        plain_text = str(launch_target.get("plain_button") or "Запустить расчёт").strip()
         target_hint = str(launch_target.get("hint_line") or "").strip()
         if action_key == "check_then_launch":
             check_text += " (рекомендуется)"
@@ -1616,7 +1614,7 @@ class DesktopRunSetupCenter:
             plain_text += " (рекомендуется)"
             hint = (
                 f"{target_hint} "
-                "Рекомендуемая кнопка: Запустить выбранный режим. "
+                "Рекомендуемая кнопка: Запустить расчёт. "
                 f"Обычный запуск доступен: {plain_detail}."
             )
         if self.launch_with_check_button is not None:
@@ -1636,7 +1634,7 @@ class DesktopRunSetupCenter:
         self.editor._run_single_desktop_run()
 
     def _run_selected_profile_with_check(self) -> None:
-        run_label = "Запустить выбранный режим"
+        run_label = "Запустить расчёт"
         if not self.editor._soft_preflight_before_run(run_label):
             return
 
@@ -1652,11 +1650,11 @@ class DesktopRunSetupCenter:
                 _launch_selected_prechecked()
                 return
             self.editor._append_run_log(
-                f"[auto-check] {run_label}: запуск отменён после принудительного auto-check."
+                f"[самопроверка] {run_label}: запуск отменён после принудительной самопроверки."
             )
 
         self.editor._run_config_check(
-            title=f"Auto-check перед «{run_label}»",
+            title=f"Самопроверка перед «{run_label}»",
             on_success=_after_check,
         )
 
@@ -1670,9 +1668,36 @@ class DesktopRunSetupCenter:
         current = dict(context or {})
         if not current:
             return (
-                "HO-003 / HO-004 / HO-005: not checked. "
-                "Ring geometry refs are read-only in WS-SUITE; edit geometry in Ring Editor / WS-RING."
+                "Набор испытаний ещё не проверен. "
+                "Геометрия колец используется только для чтения; правьте её в редакторе сценариев колец."
             )
+        state_labels = {
+            "current": "актуально",
+            "missing": "не найдено",
+            "stale": "устарело",
+            "invalid": "ошибка",
+        }
+        reason_labels = {
+            "ring_source_hash_changed": "изменился исходный сценарий",
+            "ring_export_set_hash_changed": "изменилась выгрузка сценария",
+            "suite_snapshot_hash_changed": "изменился набор испытаний",
+            "inputs_snapshot_hash_changed": "изменились исходные данные",
+            "missing_" + "validated_" + "suite_snapshot": "нет снимка набора",
+            "unsupported_" + "validated_" + "suite_snapshot_schema": "неподдерживаемая версия снимка набора",
+            "missing_ring_or_input_refs": "не хватает ссылок на исходные данные или сценарии",
+            "missing_upstream_handoff_refs": "не хватает входных ссылок",
+            "rejected_suite_overrides": "есть отклонённые ручные изменения",
+            "suite_validation_failed": "проверка набора не пройдена",
+        }
+
+        def _state_label(value: object) -> str:
+            raw = str(value or "missing").strip()
+            return state_labels.get(raw, raw)
+
+        def _reason_label(value: object) -> str:
+            raw = str(value or "").strip()
+            return reason_labels.get(raw, raw)
+
         snapshot = dict(current.get("snapshot") or {})
         inputs_context = dict(current.get("inputs_context") or {})
         ring_context = dict(current.get("ring_context") or {})
@@ -1704,22 +1729,22 @@ class DesktopRunSetupCenter:
             stale_row_reasons.extend(str(item) for item in list(row.get("ring_stale_reasons") or []) if str(item).strip())
         lines = [
             (
-                f"HO-003 / HO-004 / HO-005: inputs={inputs_context.get('state') or 'missing'}; "
-                f"ring={ring_context.get('state') or 'missing'}; validated_suite_snapshot={suite_state}"
+                f"Исходные данные: {_state_label(inputs_context.get('state'))}; "
+                f"сценарии колец: {_state_label(ring_context.get('state'))}; снимок набора: {_state_label(suite_state)}"
             ),
             (
-                f"WS-RING source hash={DesktopRunSetupCenter._short_hash(ring_source_hash)} | "
-                f"Derived export-set hash={DesktopRunSetupCenter._short_hash(export_set_hash)} | "
-                f"suite_snapshot_hash={DesktopRunSetupCenter._short_hash(suite_hash)}"
+                f"Снимок колец: {DesktopRunSetupCenter._short_hash(ring_source_hash)} | "
+                f"Экспорт колец: {DesktopRunSetupCenter._short_hash(export_set_hash)} | "
+                f"Снимок набора: {DesktopRunSetupCenter._short_hash(suite_hash)}"
             ),
-            f"ring_handoff_stale rows={', '.join(stale_row_names) if stale_row_names else 'none'}",
+            f"Устаревшие строки: {', '.join(stale_row_names) if stale_row_names else 'нет'}",
             (
-                "Stale reasons: "
-                + ", ".join(str(item) for item in [*stale_reasons, *stale_row_reasons] if str(item).strip())
+                "Причины устаревания: "
+                + ", ".join(_reason_label(item) for item in [*stale_reasons, *stale_row_reasons] if str(item).strip())
                 if stale_reasons or stale_row_reasons
-                else "Stale reasons: none"
+                else "Причины устаревания: нет"
             ),
-            "Ring geometry refs are read-only in WS-SUITE; edit geometry in Ring Editor / WS-RING source.",
+            "Геометрия колец используется только для чтения; правьте её в редакторе сценариев колец.",
         ]
         return "\n".join(lines)
 
@@ -1728,6 +1753,13 @@ class DesktopRunSetupCenter:
         current = dict(context or {})
         snapshot = dict(current.get("snapshot") or {})
         validation = dict(snapshot.get("validation") or {})
+        reason_labels = {
+            "ring_source_hash_changed": "изменился исходный сценарий",
+            "ring_export_set_hash_changed": "изменилась выгрузка сценария",
+            "suite_snapshot_hash_changed": "изменился набор испытаний",
+            "inputs_snapshot_hash_changed": "изменились исходные данные",
+            "missing_ring_or_input_refs": "не хватает ссылок на исходные данные или сценарии",
+        }
         missing_by_row: dict[str, int] = {}
         for item in list(validation.get("missing_refs") or []):
             if isinstance(item, dict):
@@ -1753,15 +1785,19 @@ class DesktopRunSetupCenter:
             )
             source_hash = str(row.get("ring_source_hash_sha256") or row.get("ring_source_hash") or "").strip()
             export_hash = str(row.get("ring_export_set_hash_sha256") or "").strip()
-            stale_reasons = [str(item) for item in list(row.get("ring_stale_reasons") or []) if str(item).strip()]
+            stale_reasons = [
+                reason_labels.get(str(item), str(item))
+                for item in list(row.get("ring_stale_reasons") or [])
+                if str(item).strip()
+            ]
             if missing_by_row.get(name):
-                stale_reasons.append(f"missing_refs={missing_by_row[name]}")
-            stale_label = "ring_handoff_stale=yes" if bool(row.get("ring_handoff_stale", False)) else "ring_handoff_stale=no"
+                stale_reasons.append(f"не хватает ссылок: {missing_by_row[name]}")
+            stale_label = "устарело: да" if bool(row.get("ring_handoff_stale", False)) else "актуально"
             if stale_reasons:
                 stale_label += "; " + ", ".join(stale_reasons)
             rows.append(
                 (
-                    "yes" if bool(row.get("включен", row.get("enabled", True))) else "no",
+                    "да" if bool(row.get("включен", row.get("enabled", True))) else "нет",
                     name,
                     str(row.get("стадия", row.get("stage", 0)) or 0),
                     str(row.get("тип", row.get("type", "")) or ""),
@@ -1769,8 +1805,8 @@ class DesktopRunSetupCenter:
                     str(row.get("t_end", row.get("t_end_s", ""))),
                     refs or "—",
                     (
-                        f"source={DesktopRunSetupCenter._short_hash(source_hash)} | "
-                        f"export={DesktopRunSetupCenter._short_hash(export_hash)}"
+                        f"источник={DesktopRunSetupCenter._short_hash(source_hash)} | "
+                        f"экспорт={DesktopRunSetupCenter._short_hash(export_hash)}"
                     ),
                     stale_label,
                 )

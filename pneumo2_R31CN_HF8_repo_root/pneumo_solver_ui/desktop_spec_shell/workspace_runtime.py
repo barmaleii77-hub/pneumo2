@@ -60,6 +60,138 @@ def _safe_text(value: Any, *, fallback: str = "нет данных") -> str:
     return text or fallback
 
 
+def _yes_no(value: Any) -> str:
+    return "да" if bool(value) else "нет"
+
+
+def _state_text(value: Any, *, fallback: str = "нет данных") -> str:
+    raw = " ".join(str(value or "").replace("_", " ").split()).strip()
+    if not raw:
+        return fallback
+    labels = {
+        "artifacts-missing": "не хватает файлов результатов",
+        "artifact missing": "не хватает файла результата",
+        "artifacts missing": "не хватает файлов результатов",
+        "blocked": "заблокировано",
+        "coordinator": "распределённый режим",
+        "done": "завершено",
+        "enabled": "включено",
+        "failed": "ошибка",
+        "missing": "не найдено",
+        "ok": "готово",
+        "ready": "готово",
+        "running": "выполняется",
+        "stage runner": "поэтапный запуск",
+        "staged": "поэтапный режим",
+        "stale": "устарело",
+    }
+    return labels.get(raw.casefold(), raw)
+
+
+def _operator_token_text(value: Any, *, fallback: str = "нет данных") -> str:
+    text = _safe_text(value, fallback=fallback)
+    replacements = (
+        ("StageRunner", "поэтапный запуск"),
+        ("stage_runner", "поэтапный запуск"),
+        ("staged", "поэтапный режим"),
+        ("coordinator", "распределённый режим"),
+        ("metric_", ""),
+        ("метрика_", ""),
+        ("penalty_", "штраф "),
+        ("штраф_", "штраф "),
+        ("RMS", "RMS"),
+    )
+    for old, new in replacements:
+        text = text.replace(old, new)
+    text = " ".join(text.replace("_", " ").split())
+    return text or fallback
+
+
+def _operator_message_text(raw: Any) -> str:
+    text = " ".join(str(raw or "").split()).strip()
+    replacements = (
+        ("Clipboard status is stale for the current latest bundle:", "Буфер обмена устарел для текущего последнего архива:"),
+        ("Clipboard updated for latest bundle:", "Буфер обмена обновлён для последнего архива:"),
+        ("no clipboard activity", "буфер обмена не использовался"),
+        ("inspection", "проверка состава"),
+        ("health", "состояние проекта"),
+        ("validation", "проверка результата"),
+        ("triage", "разбор предупреждений"),
+    )
+    for old, new in replacements:
+        text = text.replace(old, new)
+    return text
+
+
+def _operator_result_text(raw: Any) -> str:
+    text = _operator_message_text(raw)
+    replacements = (
+        ("Optimizer scope gate", "Проверка области оптимизации"),
+        ("Optimizer scope", "Область оптимизации"),
+        ("optimizer scope artifacts are missing", "материалы области оптимизации не найдены"),
+        ("Шлюз оптимизации", "Готовность оптимизации"),
+        ("шлюз оптимизации", "готовность оптимизации"),
+        ("Open browser perf evidence artifacts and refresh the trace; current evidence status is missing (WARN), bundle_ready=False.", "Откройте материалы проверки быстродействия интерфейса и обновите трассу; текущий статус: не найдено, предупреждение; архив не готов."),
+        ("Browser perf evidence", "Проверка быстродействия интерфейса"),
+        ("Browser perf comparison", "Сравнение быстродействия интерфейса"),
+        ("browser perf evidence artifacts", "материалы проверки быстродействия интерфейса"),
+        ("Open материалы проверки быстродействия интерфейса and refresh the trace; current evidence status is не найдено (предупреждение), архив готов=нет.", "Откройте материалы проверки быстродействия интерфейса и обновите трассу; текущий статус: не найдено, предупреждение; архив не готов."),
+        ("Open материалы проверки быстродействия интерфейса", "Откройте материалы проверки быстродействия интерфейса"),
+        ("and refresh the trace", "и обновите трассу"),
+        ("current evidence status is", "текущее состояние"),
+        ("Create or refresh a browser perf reference snapshot before marking performance review complete.", "Создайте или обновите эталонный снимок быстродействия интерфейса перед завершением проверки."),
+        ("Rebuild the send-bundle after re-export so anim_latest is reproducible directly from the archive.", "Пересоберите архив отправки после повторного экспорта, чтобы последний результат анимации воспроизводился из архива."),
+        ("send-bundle", "архив отправки"),
+        ("anim_latest", "последний результат анимации"),
+        ("release_gate", "готовность"),
+        ("release_risk", "риск выдачи"),
+        ("риск выпуска=", "риск для выдачи "),
+        ("риск выпуска", "риск для выдачи"),
+        ("bundle_ready", "архив готов"),
+        ("архив готов=", "архив готов "),
+        ("no_reference", "нет эталона"),
+        ("trace_bundle_ready", "архив трассы готов"),
+        ("regression_checked", "регрессия проверена"),
+        ("MISSING", "не найдено"),
+        ("missing", "не найдено"),
+        ("WARN", "предупреждение"),
+        ("FAIL", "ошибка"),
+        ("PASS", "норма"),
+        ("READY", "готово"),
+        ("UNKNOWN", "не определено"),
+        ("True", "да"),
+        ("False", "нет"),
+        ("true", "да"),
+        ("false", "нет"),
+        ("Проверка:", "Проверка результата -"),
+        ("Разбор замечаний:", "Разбор замечаний -"),
+        ("Последние прогоны:", "Последние прогоны -"),
+        ("errors=", "ошибок "),
+        ("warnings=", "предупреждений "),
+        ("ошибок=", "ошибок "),
+        ("предупреждений=", "предупреждений "),
+        ("критичных=", "критичных "),
+        ("справочных=", "справочных "),
+        ("красных флагов=", "красных флагов "),
+        ("автотест=", "автотест "),
+        ("диагностика=", "диагностика "),
+        ("ready=", "готовность "),
+        ("ошибок:", "ошибок"),
+        ("предупреждений:", "предупреждений"),
+        ("критичных:", "критичных"),
+        ("справочных:", "справочных"),
+        ("красных флагов:", "красных флагов"),
+        ("автотест:", "автотест"),
+        ("диагностика:", "диагностика"),
+        ("готово:", "готовность"),
+    )
+    for old, new in replacements:
+        text = text.replace(old, new)
+    text = text.replace(" / ", "; ").replace(" | ", "; ")
+    text = text.replace("_", " ")
+    return " ".join(text.split()).strip()
+
+
 def _path_text(value: Any) -> str:
     text = str(value or "").strip()
     if not text:
@@ -100,12 +232,15 @@ def _stage_counts_text(counts: dict[str, int] | None) -> str:
     data = dict(counts or {})
     if not data:
         return "стадии пока не размечены"
-    ordered = [f"{key}={int(value)}" for key, value in sorted(data.items())]
-    return " | ".join(ordered)
+    ordered = [
+        f"На стадии {_operator_token_text(key)} включено {int(value)} испытаний"
+        for key, value in sorted(data.items())
+    ]
+    return "; ".join(ordered)
 
 
 def _objective_text(values: tuple[str, ...] | list[str] | None) -> str:
-    items = [str(item).strip() for item in (values or ()) if str(item).strip()]
+    items = [_operator_token_text(item) for item in (values or ()) if str(item).strip()]
     return ", ".join(items) if items else "цели пока не заданы"
 
 
@@ -183,96 +318,105 @@ def build_baseline_workspace_summary(
     history_rows = tuple(dict(row) for row in baseline_surface.get("history_rows") or ())
     action_strip = dict(baseline_surface.get("action_strip") or {})
 
-    active_state = _safe_text(active.get("state"), fallback="missing")
-    ho005_state = _safe_text(suite_handoff.get("state"), fallback="missing")
+    active_state_raw = active.get("state")
+    ho005_state_raw = suite_handoff.get("state")
+    active_state = _state_text(active_state_raw, fallback="не найдено")
+    ho005_state = _state_text(ho005_state_raw, fallback="не найдено")
     active_hash = str(active.get("active_baseline_hash") or "")
     suite_hash = str(active.get("suite_snapshot_hash") or suite_handoff.get("suite_snapshot_hash") or "")
     inputs_hash = str(active.get("inputs_snapshot_hash") or suite_handoff.get("inputs_snapshot_hash") or "")
     ring_hash = str(active.get("ring_source_hash") or suite_handoff.get("ring_source_hash") or "")
-    policy_mode = _safe_text(active.get("policy_mode"), fallback="policy n/a")
-    source_run = _path_text(active.get("source_run_dir")) or "source run не указан"
-    active_contract_path = _path_text(active.get("contract_path")) or "active_baseline_contract.json пока не найден"
-    history_path = _path_text(baseline_surface.get("history_path")) or "baseline_history.jsonl пока не найден"
+    policy_mode = _safe_text(active.get("policy_mode"), fallback="режим не выбран")
+    source_run = _path_text(active.get("source_run_dir")) or "исходный запуск не указан"
+    active_contract_path = _path_text(active.get("contract_path")) or "активный опорный прогон пока не найден"
+    history_path = _path_text(baseline_surface.get("history_path")) or "история опорных прогонов пока не найдена"
     optimizer_can_consume = bool(active.get("optimizer_baseline_can_consume", False))
     baseline_label = (
-        f"HO-006 {active_state}"
-        if active_hash or active_state != "missing"
-        else "HO-006 active baseline не найден"
+        f"Опорный прогон {active_state}"
+        if active_hash or str(active_state_raw or "").strip().casefold() != "missing"
+        else "Активный опорный прогон не найден"
     )
     baseline_path = active_contract_path
     latest_result = (
-        format_npz_summary(results_snapshot)
+        _operator_result_text(format_npz_summary(results_snapshot))
         if results_snapshot is not None
         else "Последний NPZ пока не найден."
     )
     recent_runs = (
-        format_recent_runs_summary(results_snapshot)
+        _operator_result_text(format_recent_runs_summary(results_snapshot))
         if results_snapshot is not None
         else "История последних прогонов пока не собрана."
     )
     suggested_next = (
-        _safe_text(results_snapshot.suggested_next_step, fallback="Откройте baseline launch surface и выполните базовый прогон.")
+        _operator_result_text(_safe_text(results_snapshot.suggested_next_step, fallback="Откройте центр опорного прогона и выполните расчёт."))
         if results_snapshot is not None
-        else "Откройте baseline launch surface и выполните базовый прогон."
+        else "Откройте центр опорного прогона и выполните расчёт."
     )
     suggested_detail = (
-        _safe_text(results_snapshot.suggested_next_detail, fallback="После baseline переходите в оптимизацию только из baseline-aware контекста.")
+        _operator_result_text(_safe_text(results_snapshot.suggested_next_detail, fallback="После опорного прогона переходите в оптимизацию только из согласованного контекста."))
         if results_snapshot is not None
-        else "После baseline переходите в оптимизацию только из baseline-aware контекста."
+        else "После опорного прогона переходите в оптимизацию только из согласованного контекста."
     )
     mismatch_fields = tuple(str(field) for field in mismatch_state.get("mismatch_fields") or ())
     mismatch_text = (
         ", ".join(mismatch_fields)
         if mismatch_fields
-        else _safe_text(mismatch_state.get("state"), fallback="active/history mismatch не выбран")
+        else _state_text(mismatch_state.get("state"), fallback="расхождение активного прогона и истории не выбрано")
     )
+    action_labels = {"review": "просмотр", "adopt": "принять", "restore": "восстановить"}
+    state_labels = {"enabled": "доступно", "blocked": "заблокировано", "read-only": "только просмотр"}
     allowed_actions = []
     for action_name in ("review", "adopt", "restore"):
         action = dict(action_strip.get(action_name) or {})
         state = "enabled" if bool(action.get("enabled", False)) else "blocked"
         if action_name == "review" and bool(action.get("read_only", False)):
             state = "read-only"
-        allowed_actions.append(f"{action_name}={state}")
+        allowed_actions.append(f"{action_labels.get(action_name, action_name)} - {state_labels.get(state, state)}")
 
     facts = (
         WorkspaceSummaryFact(
-            "HO-005 -> active_baseline_contract -> HO-006",
-            f"HO-005={ho005_state} | HO-006={active_state}",
-            _safe_text(banner_state.get("banner"), fallback="Baseline Center ждёт явного review/adopt/restore."),
+            "Снимок набора и активный опорный прогон",
+            f"Набор испытаний {ho005_state}. Опорный прогон {active_state}.",
+            _safe_text(banner_state.get("banner"), fallback="Центр опорного прогона ждёт просмотра, принятия или восстановления."),
         ),
         WorkspaceSummaryFact(
-            "Активный baseline",
+            "Активный опорный прогон",
             baseline_label,
-            f"active_baseline_hash={active_hash[:12] or '—'} | optimizer_can_consume={optimizer_can_consume}",
+            (
+                f"Идентификатор прогона - {active_hash[:12]}. "
+                f"Оптимизатор может использовать его: {_yes_no(optimizer_can_consume)}."
+                if active_hash
+                else f"Идентификатор прогона пока отсутствует. Оптимизатор может использовать его: {_yes_no(optimizer_can_consume)}."
+            ),
         ),
         WorkspaceSummaryFact(
-            "Frozen context",
-            f"suite={suite_hash[:12] or '—'} | inputs={inputs_hash[:12] or '—'} | ring={ring_hash[:12] or '—'}",
-            f"policy_mode={policy_mode}",
+            "Зафиксированный контекст",
+            f"Набор испытаний - {suite_hash[:12] or '—'}. Исходные данные - {inputs_hash[:12] or '—'}. Сценарий - {ring_hash[:12] or '—'}.",
+            f"Режим работы: {_operator_token_text(policy_mode)}.",
         ),
         WorkspaceSummaryFact(
-            "Baseline history",
-            f"rows={len(history_rows)} | selected={_safe_text(baseline_surface.get('selected_history_id'), fallback='нет')}",
-            f"mismatch={mismatch_text}",
+            "История опорных прогонов",
+            f"В истории {len(history_rows)} записей. Выбранная запись: {_safe_text(baseline_surface.get('selected_history_id'), fallback='нет')}.",
+            f"Сверка истории: {mismatch_text}.",
         ),
         WorkspaceSummaryFact(
-            "Действия review/adopt/restore",
-            " | ".join(allowed_actions),
-            "Adopt/restore применяются только после explicit confirmation; silent rebinding запрещён.",
+            "Действия с опорным прогоном",
+            ". ".join(allowed_actions) + ".",
+            "Принятие и восстановление применяются только после явного выбора; молчаливая подмена запрещена.",
         ),
         WorkspaceSummaryFact(
-            "Контракт задачи",
-            f"{_safe_text(contract.problem_hash_mode, fallback='mode n/a')} | {_safe_text(contract.problem_hash, fallback='hash n/a')}",
-            f"Путь модели: {contract.model_path}",
+            "Задача расчёта",
+            f"{_operator_token_text(contract.problem_hash_mode, fallback='режим не выбран')}; {_safe_text(contract.problem_hash, fallback='контроль не найден')}",
+            f"Файл модели расположен здесь - {contract.model_path}",
         ),
         WorkspaceSummaryFact(
             "Пространство параметров",
-            f"base={int(contract.base_param_count)} | search={int(contract.search_param_count)}",
-            f"widened={int(contract.widened_range_count)} | runtime knobs removed={int(contract.removed_runtime_knob_count)}",
+            f"Базовых параметров {int(contract.base_param_count)}. В переборе участвуют {int(contract.search_param_count)}.",
+            f"Расширенных диапазонов {int(contract.widened_range_count)}. Технических параметров, скрытых от запуска, {int(contract.removed_runtime_knob_count)}.",
         ),
         WorkspaceSummaryFact(
             "Набор испытаний",
-            f"rows={int(contract.suite_row_count)} | enabled={int(contract.enabled_suite_total)}",
+            f"Включено {int(contract.enabled_suite_total)} из {int(contract.suite_row_count)} испытаний.",
             _stage_counts_text(contract.enabled_stage_counts),
         ),
         WorkspaceSummaryFact("Последний результат", latest_result, recent_runs),
@@ -280,17 +424,17 @@ def build_baseline_workspace_summary(
     )
     evidence_lines = _dedupe_lines(
         (
-            f"Active contract: {active_contract_path}",
-            f"Baseline history: {history_path}",
-            f"Banner: {_safe_text(banner_state.get('banner'), fallback='нет active banner')}",
-            f"Mismatch state: {mismatch_text}",
-            f"Suite: {contract.suite_json_path}",
-            f"Ranges: {contract.ranges_json_path}",
-            f"Worker: {contract.worker_path}",
+            f"Активный опорный прогон - {active_contract_path}",
+            f"История опорных прогонов - {history_path}",
+            f"Предупреждение - {_safe_text(banner_state.get('banner'), fallback='нет предупреждений')}",
+            f"Сверка - {mismatch_text}",
+            f"Набор испытаний - {contract.suite_json_path}",
+            f"Диапазоны оптимизации - {contract.ranges_json_path}",
+            f"Исполнитель расчёта - {contract.worker_path}",
         ),
         (
-            f"Latest NPZ: {_path_text(results_snapshot.latest_npz_path) if results_snapshot is not None else ''}",
-            f"Latest validation: {_path_text(results_snapshot.latest_validation_json_path) if results_snapshot is not None else ''}",
+            f"Последний NPZ - {_path_text(results_snapshot.latest_npz_path) if results_snapshot is not None else ''}",
+            f"Последняя проверка - {_path_text(results_snapshot.latest_validation_json_path) if results_snapshot is not None else ''}",
         ),
     )
     return WorkspaceSummaryState(
@@ -326,22 +470,22 @@ def build_input_workspace_summary(
     except Exception as exc:
         return WorkspaceSummaryState(
             headline="Сводка исходных данных пока недоступна",
-            detail="Не удалось собрать hosted summary для workspace исходных данных.",
+            detail="Не удалось собрать сводку исходных данных для главного окна.",
             facts=(
                 WorkspaceSummaryFact(
                     "Состояние",
-                    "runtime summary недоступен",
+                    "сводка недоступна",
                     _safe_text(exc, fallback="Проверьте desktop_input_model и рабочую копию входных данных."),
                 ),
                 WorkspaceSummaryFact(
                     "Следующий шаг",
-                    "Откройте legacy editor исходных данных",
-                    "После восстановления runtime можно вернуться в hosted workspace и продолжить маршрут shell.",
+                    "Откройте центр исходных данных",
+                    "После восстановления можно вернуться в рабочий шаг исходных данных и продолжить работу в главном окне.",
                 ),
             ),
             evidence_lines=(
-                f"Working copy: {_path_text(default_working_copy_path())}",
-                f"Default base JSON: {_path_text(default_base_json_path())}",
+                f"Рабочая копия: {_path_text(default_working_copy_path())}",
+                f"Эталонный JSON: {_path_text(default_base_json_path())}",
             ),
         )
 
@@ -372,14 +516,14 @@ def build_input_workspace_summary(
     )
 
     headline = (
-        "Исходные данные готовы к следующему маршруту"
+        "Исходные данные готовы к следующему шагу"
         if warn_count == 0
-        else f"Требуют внимания {warn_count} разделов исходных данных"
+        else f"Требуют внимания {warn_count} кластеров исходных данных"
     )
     detail = (
-        "Рабочая копия, эталон и готовность разделов собраны прямо в hosted shell."
+        "Рабочая копия, эталон и готовность кластеров собраны прямо в главном окне."
         if warn_count == 0
-        else f"Проверьте разделы: {_preview_list(warn_titles, empty='нет предупреждений')}."
+        else f"Проверьте кластеры: {_preview_list(warn_titles, empty='нет предупреждений')}."
     )
 
     facts = (
@@ -389,15 +533,15 @@ def build_input_workspace_summary(
             _path_text(working_copy_path) or "Файл рабочей копии пока не найден.",
         ),
         WorkspaceSummaryFact(
-            "Эталон base JSON",
+            "Эталон исходных данных",
             _path_name(base_json_path, fallback="default_base.json"),
-            _path_text(base_json_path) or "Эталонный JSON пока не найден.",
+            _path_text(base_json_path) or "Эталонный файл исходных данных пока не найден.",
         ),
         WorkspaceSummaryFact(
-            "Готовность разделов",
-            f"ok={ok_count} | warn={warn_count}",
+            "Готовность кластеров",
+            f"Готовы {ok_count} кластеров. Требуют внимания {warn_count}.",
             (
-                "Все ключевые разделы выглядят готовыми к переходу в сценарии и набор испытаний."
+                "Все ключевые кластеры выглядят готовыми к переходу в сценарии и набор испытаний."
                 if warn_count == 0
                 else f"Требуют проверки: {_preview_list(warn_titles, empty='нет предупреждений')}."
             ),
@@ -411,39 +555,39 @@ def build_input_workspace_summary(
                     for card in issue_cards
                     if int(card.get("issue_count") or 0) > 0
                 ),
-                empty="Замечаний по разделам сейчас нет.",
+                empty="Замечаний по кластерам сейчас нет.",
             ),
         ),
         WorkspaceSummaryFact(
             "Изменения относительно эталона",
-            f"разделов={len(changed_sections)} | параметров={changed_total}",
+            f"изменённых кластеров: {len(changed_sections)}; параметров: {changed_total}",
             (
                 "Рабочая копия совпадает с эталоном."
                 if not changed_sections
-                else f"Изменены разделы: {_preview_list(changed_sections, empty='без изменений')}."
+                else f"Изменены кластеры: {_preview_list(changed_sections, empty='без изменений')}."
             ),
         ),
         WorkspaceSummaryFact(
-            "Профили и snapshots",
-            f"profiles={len(profile_paths)} | snapshots={len(snapshot_paths)}",
-            f"Profiles: {_path_text(profile_dir)} | Snapshots: {_path_text(snapshot_dir)}",
+            "Профили и снимки",
+            f"профилей: {len(profile_paths)}; снимков: {len(snapshot_paths)}",
+            f"Профили: {_path_text(profile_dir)} | Снимки: {_path_text(snapshot_dir)}",
         ),
         WorkspaceSummaryFact(
             "Следующий шаг",
             (
                 "Переходите к сценариям и редактору кольца"
                 if warn_count == 0
-                else "Сначала доберите предупреждения в исходных данных или откройте legacy editor"
+                else "Сначала разберите предупреждения в исходных данных или откройте центр исходных данных"
             ),
-            "После стабилизации исходных данных переходите в сценарии, затем в набор испытаний и baseline.",
+            "После стабилизации исходных данных переходите в сценарии, затем в набор испытаний и опорный прогон.",
         ),
     )
     evidence_lines = _dedupe_lines(
         (
-            f"Working copy: {_path_text(working_copy_path)}",
-            f"Default base JSON: {_path_text(base_json_path)}",
-            f"Profiles dir: {_path_text(profile_dir)}",
-            f"Snapshots dir: {_path_text(snapshot_dir)}",
+            f"Рабочая копия: {_path_text(working_copy_path)}",
+            f"Эталонный JSON: {_path_text(base_json_path)}",
+            f"Папка профилей: {_path_text(profile_dir)}",
+            f"Папка снимков: {_path_text(snapshot_dir)}",
         ),
         top_section_lines,
         issue_lines,
@@ -467,74 +611,74 @@ def build_optimization_workspace_summary(
     pointer = runtime.latest_pointer_summary()
     current_job = runtime.current_job()
 
-    active_job = "нет активного job"
-    active_job_detail = "Можно запускать только один активный route: StageRunner primary, distributed coordinator как advanced mode."
+    active_job = "нет активного задания"
+    active_job_detail = "Одновременно допускается только один активный способ выполнения: основной расчёт или расширенный распределённый расчёт."
     if current_job is not None:
-        active_job = f"{_safe_text(current_job.backend, fallback='backend')} | {_path_name(current_job.run_dir)}"
+        active_job = f"{_operator_token_text(current_job.backend, fallback='исполнитель не выбран')}; {_path_name(current_job.run_dir)}"
         active_job_detail = (
-            f"pipeline={_safe_text(current_job.pipeline_mode, fallback='n/a')} | "
-            f"budget={int(getattr(current_job, 'budget', 0) or 0)}"
+            f"Режим выполнения: {_state_text(current_job.pipeline_mode, fallback='не выбран')}. "
+            f"Бюджет запуска: {int(getattr(current_job, 'budget', 0) or 0)}."
         )
 
-    pointer_value = "указатель последнего optimization run пока не найден"
-    pointer_detail = "Сначала нужен завершённый или выбранный run в истории."
+    pointer_value = "последний запуск оптимизации пока не найден"
+    pointer_detail = "Сначала нужен завершённый или выбранный запуск в истории."
     if bool(pointer.get("exists")):
-        pointer_value = f"{_safe_text(pointer.get('status_label'), fallback='run')} | {_safe_text(pointer.get('run_name'), fallback='run')}"
+        pointer_value = f"{_state_text(pointer.get('status_label'), fallback='запуск')}; {_safe_text(pointer.get('run_name'), fallback='запуск')}"
         pointer_detail = (
-            f"backend={_safe_text(pointer.get('backend'), fallback='n/a')} | "
-            f"rows={int(pointer.get('rows') or 0)} | "
-            f"done={int(pointer.get('done_count') or 0)} | "
-            f"errors={int(pointer.get('error_count') or 0)}"
+            f"Исполнитель: {_operator_token_text(pointer.get('backend'), fallback='не выбран')}. "
+            f"В таблице {int(pointer.get('rows') or 0)} строк, готово {int(pointer.get('done_count') or 0)}, ошибок {int(pointer.get('error_count') or 0)}."
         )
 
     facts = (
         WorkspaceSummaryFact(
             "Рекомендуемый путь",
-            "StageRunner — основной маршрут",
-            "Distributed coordinator остаётся advanced mode и не должен становиться вторым параллельным основным запуском.",
+            "Основной расчёт — главный режим",
+            "Распределённый режим остаётся расширенной настройкой и не должен становиться вторым параллельным основным запуском.",
         ),
         WorkspaceSummaryFact(
-            "Objective stack",
+            "Цели оптимизации",
             _objective_text(contract.objective_keys),
-            f"Penalty: {_safe_text(contract.penalty_key, fallback='n/a')} <= {float(contract.penalty_tol):g}",
+            f"Ограничение - {_operator_token_text(contract.penalty_key, fallback='не задано')} не выше {float(contract.penalty_tol):g}",
         ),
         WorkspaceSummaryFact(
-            "Baseline provenance",
-            f"HO-006={_safe_text(contract.active_baseline_state, fallback='missing')}",
+            "Происхождение опорного прогона",
+            f"Состояние опорного прогона - {_state_text(contract.active_baseline_state, fallback='не найдено')}.",
             (
-                f"active_baseline_hash={str(contract.active_baseline_hash or '')[:12] or '—'} | "
-                f"can_consume={bool(contract.optimizer_baseline_can_consume)}"
+                f"Идентификатор прогона - {str(contract.active_baseline_hash or '')[:12]}. "
+                f"Оптимизатор может использовать его: {_yes_no(contract.optimizer_baseline_can_consume)}."
+                if str(contract.active_baseline_hash or "")
+                else f"Идентификатор прогона пока отсутствует. Оптимизатор может использовать его: {_yes_no(contract.optimizer_baseline_can_consume)}."
             ),
         ),
         WorkspaceSummaryFact(
-            "Suite / stages",
-            f"enabled={int(contract.enabled_suite_total)} | rows={int(contract.suite_row_count)}",
+            "Набор и стадии",
+            f"Включено {int(contract.enabled_suite_total)} из {int(contract.suite_row_count)} испытаний.",
             _stage_counts_text(contract.enabled_stage_counts),
         ),
         WorkspaceSummaryFact(
-            "Search space",
-            f"base={int(contract.base_param_count)} | search={int(contract.search_param_count)}",
-            f"widened={int(contract.widened_range_count)} | runtime knobs removed={int(contract.removed_runtime_knob_count)}",
+            "Пространство поиска",
+            f"Базовых параметров {int(contract.base_param_count)}. В переборе участвуют {int(contract.search_param_count)}.",
+            f"Расширенных диапазонов {int(contract.widened_range_count)}. Технических параметров, скрытых от запуска, {int(contract.removed_runtime_knob_count)}.",
         ),
-        WorkspaceSummaryFact("Активный job", active_job, active_job_detail),
-        WorkspaceSummaryFact("Последний optimization pointer", pointer_value, pointer_detail),
+        WorkspaceSummaryFact("Активное задание", active_job, active_job_detail),
+        WorkspaceSummaryFact("Последний запуск оптимизации", pointer_value, pointer_detail),
     )
     evidence_lines = _dedupe_lines(
         (
-            f"Model: {contract.model_path}",
-            f"Base JSON: {contract.base_json_path}",
-            f"Ranges JSON: {contract.ranges_json_path}",
-            f"Suite JSON: {contract.suite_json_path}",
-            f"Stage tuner: {contract.stage_tuner_json_path or 'не используется'}",
+            f"Модель - {contract.model_path}",
+            f"Исходные данные - {contract.base_json_path}",
+            f"Диапазоны оптимизации - {contract.ranges_json_path}",
+            f"Набор испытаний - {contract.suite_json_path}",
+            f"Настройка стадий - {contract.stage_tuner_json_path or 'не используется'}",
         ),
         (
-            f"Pointer run dir: {_safe_text(pointer.get('run_dir'), fallback='')}",
-            f"Pointer result: {_safe_text(pointer.get('result_path'), fallback='')}",
+            f"Папка последнего запуска - {_safe_text(pointer.get('run_dir'), fallback='')}",
+            f"Результат последнего запуска - {_safe_text(pointer.get('result_path'), fallback='')}",
         ),
     )
     return WorkspaceSummaryState(
-        headline="Optimization contract готов к управляемому запуску",
-        detail="Shell держит objective stack, hard gate и baseline provenance рядом с входом в optimization.",
+        headline="Оптимизация готова к управляемому запуску",
+        detail="Окно держит цели оптимизации, обязательные проверки и происхождение опорного прогона рядом с запуском.",
         facts=facts,
         evidence_lines=evidence_lines,
     )
@@ -549,40 +693,65 @@ def build_results_workspace_summary(
     if snapshot is None:
         return WorkspaceSummaryState(
             headline="Сводка результатов пока недоступна",
-            detail="Не удалось прочитать latest results artifacts. Откройте results center или diagnostics lane и обновите артефакты.",
+            detail="Не удалось прочитать последние файлы результатов. Откройте центр результатов или диагностику и обновите данные.",
             facts=(
                 WorkspaceSummaryFact(
                     "Состояние",
-                    "нет snapshot",
-                    "Results snapshot должен собраться из send_bundles, autotest_runs и diagnostics_runs.",
+                    "нет свежего снимка",
+            "Сводка результатов собирается из отправленных файлов, автопроверок и диагностики.",
                 ),
             ),
         )
 
     artifact_lines = tuple(
-        f"{artifact.title}: {artifact.path}"
+        f"{_operator_result_text(artifact.title)}: {artifact.path}"
         for artifact in snapshot.recent_artifacts[:6]
     )
     facts = (
-        WorkspaceSummaryFact("Валидация", format_validation_summary(snapshot), snapshot.suggested_next_detail),
-        WorkspaceSummaryFact("Optimizer gate", format_optimizer_gate_summary(snapshot), "Gate должен быть видимым прямо в analysis lane."),
-        WorkspaceSummaryFact("Triage", format_triage_summary(snapshot), _safe_text(snapshot.triage_red_flags[0] if snapshot.triage_red_flags else "", fallback="Красных флагов сейчас нет.")),
-        WorkspaceSummaryFact("Последний NPZ", format_npz_summary(snapshot), format_recent_runs_summary(snapshot)),
         WorkspaceSummaryFact(
-            "Animator / Mnemo",
-            f"mode={_safe_text(snapshot.mnemo_current_mode, fallback='нет данных')}",
-            ", ".join(snapshot.mnemo_recent_titles[:3]) if snapshot.mnemo_recent_titles else "Недавние мнемо-события пока не найдены.",
+            "Проверка результата",
+            _operator_result_text(format_validation_summary(snapshot)),
+            _operator_result_text(snapshot.suggested_next_detail),
         ),
-        WorkspaceSummaryFact("Следующий шаг", _safe_text(snapshot.suggested_next_step, fallback="Откройте results center или compare viewer."), snapshot.suggested_next_detail),
+        WorkspaceSummaryFact(
+            "Готовность оптимизации",
+            _operator_result_text(format_optimizer_gate_summary(snapshot)),
+            "Проверка должна быть видима прямо в анализе результатов.",
+        ),
+        WorkspaceSummaryFact(
+            "Разбор предупреждений",
+            _operator_result_text(format_triage_summary(snapshot)),
+            _operator_result_text(
+                _safe_text(
+                    snapshot.triage_red_flags[0] if snapshot.triage_red_flags else "",
+                    fallback="Красных флагов сейчас нет.",
+                )
+            ),
+        ),
+        WorkspaceSummaryFact(
+            "Последний NPZ",
+            _operator_result_text(format_npz_summary(snapshot)),
+            _operator_result_text(format_recent_runs_summary(snapshot)),
+        ),
+        WorkspaceSummaryFact(
+            "Анимация и мнемосхема",
+            f"Текущий режим мнемосхемы: {_operator_token_text(snapshot.mnemo_current_mode, fallback='нет данных')}.",
+            _operator_result_text(", ".join(snapshot.mnemo_recent_titles[:3])) if snapshot.mnemo_recent_titles else "Недавние события мнемосхемы пока не найдены.",
+        ),
+        WorkspaceSummaryFact(
+            "Следующий шаг",
+            _operator_result_text(_safe_text(snapshot.suggested_next_step, fallback="Откройте центр результатов или окно сравнения.")),
+            _operator_result_text(snapshot.suggested_next_detail),
+        ),
     )
     evidence_lines = _dedupe_lines(
         artifact_lines,
-        tuple(str(line) for line in snapshot.anim_summary_lines[:4]),
-        tuple(str(line) for line in snapshot.operator_recommendations[:4]),
+        tuple(_operator_result_text(line) for line in snapshot.anim_summary_lines[:4]),
+        tuple(_operator_result_text(line) for line in snapshot.operator_recommendations[:4]),
     )
     return WorkspaceSummaryState(
-        headline=_safe_text(snapshot.suggested_next_step, fallback="Последние results artifacts готовы к анализу"),
-        detail=_safe_text(snapshot.suggested_next_detail, fallback="Откройте compare, animator или diagnostics в зависимости от latest artifacts."),
+        headline=_operator_result_text(_safe_text(snapshot.suggested_next_step, fallback="Последние результаты готовы к анализу")),
+        detail=_operator_result_text(_safe_text(snapshot.suggested_next_detail, fallback="Откройте сравнение, анимацию или диагностику в зависимости от найденных файлов.")),
         facts=facts,
         evidence_lines=evidence_lines,
     )
@@ -597,12 +766,15 @@ def build_diagnostics_workspace_summary(
     bundle = load_desktop_diagnostics_bundle_record(repo_root)
     run_record = load_last_desktop_diagnostics_run_record(repo_root / "diagnostics")
 
-    headline = _safe_text(bundle.latest_zip_name, fallback="Последний diagnostics bundle пока не найден")
-    detail = _safe_text(bundle.clipboard_message, fallback="Bundle lane должен оставаться доступным из любого workspace.")
+    headline = _safe_text(bundle.latest_zip_name, fallback="Последний архив диагностики пока не найден")
+    detail = _safe_text(
+        _operator_message_text(bundle.clipboard_message),
+        fallback="Диагностика должна оставаться доступной из любого окна.",
+    )
     run_status = "запусков пока нет"
-    run_detail = "Команда запуска диагностики ещё не сохраняла state."
+    run_detail = "Команда запуска диагностики ещё не сохраняла состояние."
     if run_record is not None:
-        run_status = f"{_safe_text(run_record.status, fallback='run')} | ok={bool(run_record.ok)}"
+        run_status = f"Последний запуск: {_safe_text(run_record.status, fallback='запуск')}. Завершён успешно: {'да' if bool(run_record.ok) else 'нет'}."
         run_detail = _safe_text(run_record.last_message, fallback=_path_text(run_record.run_dir) or "Последний запуск сохранён без текстового сообщения.")
 
     validation_state = "нет свежей проверки"
@@ -610,30 +782,30 @@ def build_diagnostics_workspace_summary(
         validation_state = _path_name(bundle.latest_validation_json_path or bundle.latest_validation_md_path)
 
     facts = (
-        WorkspaceSummaryFact("Последний ZIP", headline, _path_text(bundle.latest_zip_path) or "ZIP ещё не собран."),
-        WorkspaceSummaryFact("Каталог bundle lane", _safe_text(bundle.out_dir), "Этот каталог используется как always-visible diagnostics lane."),
-        WorkspaceSummaryFact("Последняя проверка bundle", validation_state, _path_text(bundle.latest_inspection_md_path) or "inspection report пока не найден."),
+        WorkspaceSummaryFact("Последний архив", headline, _path_text(bundle.latest_zip_path) or "Архив диагностики ещё не собран."),
+        WorkspaceSummaryFact("Папка файлов диагностики", _safe_text(bundle.out_dir), "Эта папка используется для архива диагностики, отчётов и файлов проверки."),
+        WorkspaceSummaryFact("Последняя проверка архива", validation_state, _path_text(bundle.latest_inspection_md_path) or "Отчёт о составе архива пока не найден."),
         WorkspaceSummaryFact(
-            "Clipboard / handoff",
+            "Буфер обмена",
             "готово" if bundle.clipboard_ok else "не подтверждено",
             detail,
         ),
         WorkspaceSummaryFact("Последний запуск диагностики", run_status, run_detail),
         WorkspaceSummaryFact(
             "Следующий шаг",
-            "Собрать диагностику или проверить bundle",
-            "Command search должен уметь открыть collect / verify / send flow из любого места shell.",
+            "Собрать диагностику или проверить архив",
+            "Быстрый поиск должен открывать сбор, проверку и отправку из любого места основного окна.",
         ),
     )
     evidence_lines = _dedupe_lines(
-        tuple(bundle.summary_lines[:6]),
+        tuple(_operator_message_text(line) for line in bundle.summary_lines[:6]),
         (
-            f"Inspection JSON: {_path_text(bundle.latest_inspection_json_path)}",
-            f"Health JSON: {_path_text(bundle.latest_health_json_path)}",
-            f"Triage MD: {_path_text(bundle.latest_triage_md_path)}",
-            f"Validation JSON: {_path_text(bundle.latest_validation_json_path)}",
-            f"Run dir: {_path_text(run_record.run_dir) if run_record is not None else ''}",
-            f"Run log: {_path_text(run_record.log_path) if run_record is not None else ''}",
+            f"Состав архива JSON: {_path_text(bundle.latest_inspection_json_path)}",
+            f"Состояние проекта JSON: {_path_text(bundle.latest_health_json_path)}",
+            f"Разбор предупреждений MD: {_path_text(bundle.latest_triage_md_path)}",
+            f"Проверка результата JSON: {_path_text(bundle.latest_validation_json_path)}",
+            f"Папка запуска: {_path_text(run_record.run_dir) if run_record is not None else ''}",
+            f"Журнал запуска: {_path_text(run_record.log_path) if run_record is not None else ''}",
         ),
     )
     return WorkspaceSummaryState(

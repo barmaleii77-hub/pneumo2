@@ -229,7 +229,7 @@ def _auto_bundle_on_crash(where: str = "crash", exc: Exception | None = None) ->
         _emit_bundle_summary_event("autosave_bundle_on_crash", where=where, res=res)
         if res.ok and res.zip_path:
             return Path(res.zip_path)
-        raise RuntimeError(res.message or "bundle build failed")
+        raise RuntimeError(res.message or "Не удалось собрать пакет отправки")
     except Exception:
         print("[crash_guard] Failed to autosave diagnostic bundle", file=sys.stderr)
         if exc is not None:

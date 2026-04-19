@@ -365,7 +365,8 @@ def test_ui_preflight_send_bundle_step_reports_last_bundle_summary(tmp_path: Pat
     assert send_bundle_step.ok is True
     assert "Последний ZIP: latest_send_bundle.zip" in send_bundle_step.detail
     assert "Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True" in send_bundle_step.detail
-    assert "Anim pointer diagnostics:" in send_bundle_step.detail
+    assert "Диагностика указателя анимации:" in send_bundle_step.detail
+    assert "Anim pointer diagnostics:" not in send_bundle_step.detail
 
 
 def test_ui_preflight_send_bundle_step_rebuilds_ring_summary_from_anim_latest_summary(tmp_path: Path, monkeypatch) -> None:

@@ -1019,10 +1019,10 @@ def test_send_bundle_evidence_manifest_warns_for_stale_ho006_suite_snapshot_hash
     assert banner["state"] == "stale"
     assert banner["optimizer_baseline_can_consume"] is False
     assert "suite_snapshot_hash_changed" in banner["stale_reasons"]
-    assert "silent rebinding" in banner["banner"]
+    assert "молчаливая подмена запрещена" in banner["banner"]
     assert baseline["active_baseline_hash"] == active["active_baseline_hash"]
     assert baseline["silent_rebinding_allowed"] is False
-    assert any("Baseline HO-006 state is STALE" in msg for msg in warnings)
+    assert any("Опорный прогон имеет состояние stale" in msg for msg in warnings)
     assert any("suite_snapshot_hash_changed" in msg for msg in warnings)
     assert evidence["missing_warnings"] == warnings
 

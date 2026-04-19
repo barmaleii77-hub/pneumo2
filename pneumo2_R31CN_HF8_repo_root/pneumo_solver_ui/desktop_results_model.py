@@ -4,6 +4,34 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+_STATUS_LABELS: dict[str, str] = {
+    "PASS": "норма",
+    "FAIL": "ошибка",
+    "WARN": "предупреждение",
+    "READY": "готово",
+    "MISSING": "нет данных",
+    "BLOCKED": "заблокировано",
+    "CRITICAL": "критично",
+    "PARTIAL": "частично",
+    "INFO": "справка",
+    "CURRENT": "текущий",
+    "HISTORICAL": "исторический",
+    "STALE": "устарел",
+    "UNKNOWN": "не определён",
+}
+
+
+def _status_label(value: object) -> str:
+    raw = str(value or "").strip()
+    return _STATUS_LABELS.get(raw.upper(), raw.lower() if raw else "нет данных")
+
+
+def _bool_ru(value: bool | None) -> str:
+    if value is None:
+        return "нет данных"
+    return "да" if bool(value) else "нет"
+
+
 @dataclass(frozen=True)
 class DesktopResultsArtifact:
     key: str
@@ -82,7 +110,7 @@ class DesktopResultsSnapshot:
     suggested_next_action_key: str = ""
     suggested_next_artifact_key: str = ""
     result_context_state: str = "UNKNOWN"
-    result_context_banner: str = "Контекст результата: выбранный результат пока не определён."
+    result_context_banner: str = "Данные результата: выбранный результат пока не определён."
     result_context_detail: str = ""
     result_context_action: str = ""
     result_context_fields: tuple[DesktopResultsContextField, ...] = ()
@@ -98,7 +126,7 @@ class DesktopResultsSnapshot:
     selected_run_contract_path: Path | None = None
     selected_run_contract_hash: str = ""
     selected_run_contract_status: str = "MISSING"
-    selected_run_contract_banner: str = "Контекст выбранного оптимизационного прогона пока недоступен."
+    selected_run_contract_banner: str = "Данные выбранного оптимизационного прогона пока недоступны."
 
 
 def format_validation_summary(snapshot: DesktopResultsSnapshot) -> str:
@@ -106,9 +134,9 @@ def format_validation_summary(snapshot: DesktopResultsSnapshot) -> str:
         return "Проверка: свежий отчёт пока не найден."
     status = "Норма" if snapshot.validation_ok else "Ошибка"
     return (
-        f"Проверка: {status} | "
-        f"ошибок={int(snapshot.validation_error_count)} | "
-        f"предупреждений={int(snapshot.validation_warning_count)}"
+        f"Проверка: {status}; "
+        f"ошибок: {int(snapshot.validation_error_count)}; "
+        f"предупреждений: {int(snapshot.validation_warning_count)}"
     )
 
 
@@ -116,30 +144,30 @@ def format_optimizer_gate_summary(snapshot: DesktopResultsSnapshot) -> str:
     gate = str(snapshot.optimizer_scope_gate or "").strip() or "нет данных"
     risk = snapshot.optimizer_scope_release_risk
     if risk is None:
-        return f"Шлюз оптимизации: {gate}"
-    return f"Шлюз оптимизации: {gate} | риск выпуска={bool(risk)}"
+        return f"Оптимизация: {_status_label(gate)}"
+    return f"Оптимизация: {_status_label(gate)}; риск для передачи: {_bool_ru(risk)}"
 
 
 def format_triage_summary(snapshot: DesktopResultsSnapshot) -> str:
     return (
         "Разбор замечаний: "
-        f"критичных={int(snapshot.triage_critical_count)} | "
-        f"предупреждений={int(snapshot.triage_warn_count)} | "
-        f"справочных={int(snapshot.triage_info_count)} | "
-        f"красных флагов={len(snapshot.triage_red_flags)}"
+        f"критичных: {int(snapshot.triage_critical_count)}; "
+        f"предупреждений: {int(snapshot.triage_warn_count)}; "
+        f"справочных: {int(snapshot.triage_info_count)}; "
+        f"красных флагов: {len(snapshot.triage_red_flags)}"
     )
 
 
 def format_npz_summary(snapshot: DesktopResultsSnapshot) -> str:
     if snapshot.latest_npz_path is None:
-        return "Последний NPZ: пока недоступен."
-    return f"Последний NPZ: {snapshot.latest_npz_path.name}"
+        return "Последний файл анимации: пока недоступен."
+    return f"Последний файл анимации: {snapshot.latest_npz_path.name}"
 
 
 def format_recent_runs_summary(snapshot: DesktopResultsSnapshot) -> str:
     autotest = snapshot.latest_autotest_run_dir.name if snapshot.latest_autotest_run_dir else "—"
     diagnostics = snapshot.latest_diagnostics_run_dir.name if snapshot.latest_diagnostics_run_dir else "—"
-    return f"Последние прогоны: автотест={autotest} | диагностика={diagnostics}"
+    return f"Последние прогоны: автотест: {autotest}; диагностика: {diagnostics}"
 
 
 def format_result_context_summary(snapshot: DesktopResultsSnapshot) -> str:
@@ -151,7 +179,7 @@ def format_result_context_summary(snapshot: DesktopResultsSnapshot) -> str:
         "MISSING": "нет данных",
         "UNKNOWN": "не определён",
     }
-    return f"Контекст результата: {labels.get(state, state.lower())}"
+    return f"Данные результата: {labels.get(state, state.lower())}"
 
 
 __all__ = [

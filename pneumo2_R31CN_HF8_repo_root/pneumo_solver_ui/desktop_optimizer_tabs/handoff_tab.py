@@ -24,10 +24,10 @@ class DesktopOptimizerHandoffTab(ttk.Frame):
         actions = ttk.Frame(right)
         actions.grid(row=0, column=0, sticky="ew")
         ttk.Button(actions, text="Обновить передачу", command=controller.refresh_handoff).pack(side="left")
-        ttk.Button(actions, text="Открыть каталог прогона", command=controller.open_selected_run_dir).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Открыть папку прогона", command=controller.open_selected_run_dir).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="План передачи", command=controller.open_selected_handoff_plan).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Применить контракт", command=controller.apply_selected_run_contract).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Сделать текущим указателем", command=controller.make_selected_run_latest_pointer).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Применить настройки", command=controller.apply_selected_run_contract).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Передать в анализ", command=controller.make_selected_run_latest_pointer).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Начать передачу", command=controller.start_selected_handoff).pack(side="left", padx=(8, 0))
 
         filters = ttk.LabelFrame(right, text="Фильтры кандидатов на передачу", padding=8)

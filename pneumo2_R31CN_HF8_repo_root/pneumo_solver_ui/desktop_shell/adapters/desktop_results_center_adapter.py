@@ -22,7 +22,7 @@ def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="desktop_results_center",
         title="Анализ результатов",
-        description="Единый центр результатов, validation summary и переходов к сравнению, визуализации и диагностике.",
+        description="Единый центр результатов, проверки расчёта и переходов к сравнению, визуализации и диагностике.",
         group="Встроенные окна",
         mode="hosted",
         workflow_stage="results",
@@ -49,6 +49,6 @@ def build_spec() -> DesktopShellToolSpec:
             "analysis",
             "results",
             "compare",
-            "validation summary",
+            "проверка расчёта",
         ),
     )

@@ -15,6 +15,7 @@ ENTRYPOINTS = [
     ROOT / "pneumo_solver_ui" / "pneumo_ui_app.py",
 ]
 SHARED_TEXT_FILES = [
+    ROOT / "pneumo_solver_ui" / "ui_preflight.py",
     ROOT / "pneumo_solver_ui" / "ui_animation_mode_helpers.py",
     ROOT / "pneumo_solver_ui" / "ui_optimization_page_shell_helpers.py",
     ROOT / "pneumo_solver_ui" / "ui_results_section_helpers.py",
@@ -30,6 +31,23 @@ SHARED_TEXT_FILES = [
     ROOT / "pneumo_solver_ui" / "tools" / "triage_report.py",
 ]
 
+DESKTOP_OPERATOR_TEXT_FILES = [
+    ROOT / "pneumo_solver_ui" / "desktop_shell" / "launcher_catalog.py",
+    ROOT / "pneumo_solver_ui" / "desktop_shell" / "command_search.py",
+    ROOT / "pneumo_solver_ui" / "desktop_shell" / "adapters" / "desktop_engineering_analysis_center_adapter.py",
+    ROOT / "pneumo_solver_ui" / "tools" / "desktop_control_center.py",
+    ROOT / "pneumo_solver_ui" / "tools" / "desktop_engineering_analysis_center.py",
+]
+
+DESKTOP_MOJIBAKE_GUARDED_FILES = [
+    ROOT / "pneumo_solver_ui" / "ui_preflight.py",
+    ROOT / "pneumo_solver_ui" / "desktop_animator" / "app.py",
+    ROOT / "pneumo_solver_ui" / "desktop_spec_shell" / "catalogs.py",
+    ROOT / "pneumo_solver_ui" / "desktop_spec_shell" / "help_registry.py",
+    ROOT / "pneumo_solver_ui" / "desktop_spec_shell" / "registry.py",
+    *DESKTOP_OPERATOR_TEXT_FILES,
+]
+
 STRONG_MOJIBAKE_MARKERS = (
     "Р В Р’В Р РЋРЎСџР В Р’В ",
     "Р В Р’В Р РЋРІР‚в„ўР В Р’В ",
@@ -41,6 +59,46 @@ STRONG_MOJIBAKE_MARKERS = (
     "Р вЂњР вЂЎР вЂњР’В°",
 )
 
+COMMON_MOJIBAKE_MARKERS = (
+    "Рћ",
+    "Рџ",
+    "РЎ",
+    "Р‘",
+    "РЁ",
+    "СЃ",
+    "С‚",
+    "Р°",
+    "Рµ",
+    "\ufffd",
+)
+
+FORBIDDEN_OPERATOR_TEXT_SNIPPETS = (
+    "Desktop Main Shell",
+    "GUI-spec shell",
+    "Legacy/reference",
+    "Primary operator launch target",
+    "Модуль запуска:",
+    "[spawn]",
+    "[open]",
+    "[error]",
+    "Consumer HO-007",
+    "HO-009 evidence handoff",
+    "hard-gate",
+    "baseline lineage",
+    "diagnostics bundle",
+    "selected result artifact pointer",
+    "selected animation NPZ",
+    "Selected run contract:",
+    "Selected run:",
+    "Engineering Analysis Center ready",
+    "READY only",
+    "Optimization runs for HO-007",
+    "Export HO-007",
+    "Экспорт evidence",
+    "Открыть evidence",
+    "Animator link",
+)
+
 
 def test_shared_text_files_have_no_strong_mojibake_markers() -> None:
     offenders: list[str] = []
@@ -48,6 +106,30 @@ def test_shared_text_files_have_no_strong_mojibake_markers() -> None:
     for path in SHARED_TEXT_FILES:
         text = path.read_text(encoding="utf-8")
         bad = [marker for marker in STRONG_MOJIBAKE_MARKERS if marker in text]
+        if bad:
+            offenders.append(f"{path.name}: {', '.join(bad)}")
+
+    assert not offenders, "\n".join(offenders)
+
+
+def test_guarded_operator_text_files_have_no_common_mojibake_markers() -> None:
+    offenders: list[str] = []
+
+    for path in DESKTOP_MOJIBAKE_GUARDED_FILES:
+        text = path.read_text(encoding="utf-8")
+        bad = [marker for marker in COMMON_MOJIBAKE_MARKERS if marker in text]
+        if bad:
+            offenders.append(f"{path.name}: {', '.join(bad[:5])}")
+
+    assert not offenders, "\n".join(offenders)
+
+
+def test_desktop_operator_text_does_not_expose_service_labels() -> None:
+    offenders: list[str] = []
+
+    for path in DESKTOP_OPERATOR_TEXT_FILES:
+        text = path.read_text(encoding="utf-8")
+        bad = [snippet for snippet in FORBIDDEN_OPERATOR_TEXT_SNIPPETS if snippet in text]
         if bad:
             offenders.append(f"{path.name}: {', '.join(bad)}")
 

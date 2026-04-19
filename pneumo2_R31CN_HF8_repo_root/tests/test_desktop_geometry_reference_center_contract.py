@@ -1192,15 +1192,25 @@ def test_desktop_geometry_reference_center_keeps_tabbed_desktop_workspace_contra
     assert "self.artifact_path_var" in tool_src
     assert "self.artifact_freshness_var" in tool_src
     assert "self.evidence_export_summary_var" in tool_src
-    assert 'text="Artifact JSON/NPZ:"' in tool_src
-    assert 'text="Artifact freshness:"' in tool_src
-    assert 'text="Export evidence for SEND"' in tool_src
+    assert 'text="Базовый файл:"' in tool_src
+    assert 'text="Файл анимации:"' in tool_src
+    assert 'text="Выбрать файл..."' in tool_src
+    assert 'text="Актуальность файла:"' in tool_src
+    assert "Актуальность файла анимации: последний файл ещё не проверен." in tool_src
+    assert 'text="Подготовить данные для отправки"' in tool_src
+    assert "Подготовить данные справочника для диагностики и отправки." in tool_src
+    assert "не собирает архив отправки" in tool_src
     assert "def _browse_artifact_path(self) -> None:" in tool_src
     assert "def _use_latest_artifact(self) -> None:" in tool_src
     assert "def _artifact_context(self):" in tool_src
     assert "def _export_evidence_for_send(self) -> None:" in tool_src
     assert "artifact_path=self._artifact_path()" in tool_src
-    assert '("Animator artifacts", "*.json *.npz")' in tool_src
+    assert 'title="Выбрать файл анимации"' in tool_src
+    assert '("Файлы данных", "*.json")' in tool_src
+    assert '("Файлы анимации", "*.json *.npz")' in tool_src
+    assert '("Описание последней анимации", "*.json")' in tool_src
+    assert '("Данные анимации", "*.npz")' in tool_src
+    assert '("Все файлы", "*.*")' in tool_src
     assert "DesktopGeometryReferenceRuntime()" in tool_src
     assert "def _refresh_geometry_tab(self) -> None:" in tool_src
     assert "def _refresh_cylinder_tab(self) -> None:" in tool_src
@@ -1213,27 +1223,35 @@ def test_desktop_geometry_reference_center_keeps_tabbed_desktop_workspace_contra
     assert "self.artifact_summary_var" in tool_src
     assert "self.solver_points_hardpoints_summary_var" in tool_src
     assert "self.solver_points_hardpoints_tree = self._build_tree(" in tool_src
-    assert 'text="solver_points / hardpoints producer evidence"' in tool_src
+    assert 'text="Данные источника: точки расчёта и опоры"' in tool_src
     assert "solver_points_hardpoints_evidence" in tool_src
-    assert "Read-only reference/evidence surface" in tool_src
-    assert "hardpoints/solver_points remain producer-owned" in tool_src
+    assert "Справочная область только для чтения" in tool_src
+    assert "точки расчёта и опоры остаются данными источника" in tool_src
     assert "self.producer_gap_summary_var" in tool_src
+    assert '("sources", "Файлы источника", 520, "w")' in tool_src
+    assert "Файл анимации: состояние" in tool_src
+    assert "выбранный файл" in tool_src
+    assert "приёмка:" in tool_src
+    assert "контрольная отметка:" in tool_src
+    assert "Справочник строится по единому набору правил для рабочих окон" in tool_src
     assert "self.producer_gap_tree = self._build_tree(" in tool_src
-    assert 'text="producer truth gap map"' in tool_src
+    assert 'text="Карта недостающих данных источника"' in tool_src
     assert "producer_truth_gap_map" in tool_src
-    assert 'text="road_width_m reference / GAP-008"' in tool_src
-    assert 'text="Geometry acceptance evidence / GAP-006"' in tool_src
+    assert 'text="Справочная ширина дороги"' in tool_src
+    assert 'text="Подтверждение геометрии"' in tool_src
     assert "self.road_width_tree = self._build_tree(" in tool_src
     assert "self.geometry_acceptance_tree = self._build_tree(" in tool_src
     assert "self.component_passport_tree = self._build_tree(" in tool_src
     assert "self.packaging_passport_tree = self._build_tree(" in tool_src
     assert "self.packaging_artifact_tree = self._build_tree(" in tool_src
-    assert 'text="export/runtime packaging passport evidence"' in tool_src
+    assert 'text="Данные размещения цилиндров из экспорта"' in tool_src
     assert "self.catalog_source_summary_var" in tool_src
-    assert "Catalog source:" in tool_src
+    assert "Источник каталога:" in tool_src
+    assert "позиций:" in tool_src
+    assert "вариантов:" in tool_src
     assert '("unit", "Ед. изм.", 80, "w")' in tool_src
-    assert '("layer", "Layer", 120, "w")' in tool_src
-    assert '("source", "Source", 220, "w")' in tool_src
+    assert '("layer", "Слой", 120, "w")' in tool_src
+    assert '("source", "Источник", 220, "w")' in tool_src
     assert "artifact_geometry_acceptance_evidence" in tool_src
     assert "build_catalog_source_summary" in runtime_src
     assert "build_producer_truth_gap_map" in model_src
@@ -1251,47 +1269,125 @@ def test_desktop_geometry_reference_center_keeps_tabbed_desktop_workspace_contra
     assert "diagnostics_handoff_evidence" in tool_src
     assert "def _producer_readiness_reasons(" in tool_src
     assert "def _producer_readiness_text(" in tool_src
-    assert "producer_readiness_reasons=" in tool_src
+    assert "причины неготовности:" in tool_src
     assert "producer_artifact_status" in tool_src
     assert "write_diagnostics_handoff_evidence" in tool_src
     assert 'text="Сквозная совместимость компонентов по семействам"' in tool_src
     assert "self.component_fit_summary_var" in tool_src
     assert "self.component_fit_tree = self._build_tree(" in tool_src
-    assert '("cyl_od", "Cylinder OD, мм", 110, "e")' in tool_src
-    assert '("spring_id", "Spring ID, мм", 110, "e")' in tool_src
-    assert '("clearance", "ID-OD, мм", 90, "e")' in tool_src
-    assert '("od", "OD, мм", 90, "e")' in tool_src
-    assert '("body", "Body, мм", 90, "e")' in tool_src
-    assert '("body_need", "Stroke+dead, мм", 110, "e")' in tool_src
+    assert '("cyl_od", "Наруж. D цилиндра, мм", 150, "e")' in tool_src
+    assert '("spring_id", "Внутр. D пружины, мм", 150, "e")' in tool_src
+    assert '("clearance", "Зазор, мм", 90, "e")' in tool_src
+    assert '("od", "Наруж. D, мм", 90, "e")' in tool_src
+    assert '("body", "Корпус, мм", 90, "e")' in tool_src
+    assert '("body_need", "Ход+запас, мм", 110, "e")' in tool_src
     assert '("body_gap", "Δbody, мм", 90, "e")' in tool_src
-    assert '("pkg_status", "Pkg status", 100, "w")' in tool_src
-    assert '("pkg_complete", "Pkg, %", 80, "e")' in tool_src
-    assert '("truth", "Truth state", 170, "w")' in tool_src
-    assert '("dnet", "ΔFnet rec, Н", 110, "e")' in tool_src
-    assert '("bias", "Bias rec", 90, "w")' in tool_src
+    assert '("pkg_status", "Паспорт", 100, "w")' in tool_src
+    assert '("pkg_complete", "Полнота, %", 90, "e")' in tool_src
+    assert '("truth", "Достоверность", 170, "w")' in tool_src
+    assert '("dnet", "ΔF итог, Н", 110, "e")' in tool_src
+    assert '("bias", "Баланс", 90, "w")' in tool_src
     assert '("B", "B, мм", 80, "e")' in tool_src
     assert '("E", "E, мм", 80, "e")' in tool_src
     assert '("TG", "TG, мм", 80, "e")' in tool_src
-    assert 'text="Текущий precharge / force bias из base"' in tool_src
+    assert 'text="Текущие давления и баланс усилий из базы"' in tool_src
     assert "self.cylinder_precharge_summary_var" in tool_src
     assert "self.current_cylinder_precharge_tree = self._build_tree(" in tool_src
-    assert '("pcap_abs", "Pcap abs, кПа", 100, "e")' in tool_src
-    assert '("f_net", "Fnet, Н", 100, "e")' in tool_src
-    assert "text=\"Рекомендованные каталожные варианты для текущего family\"" in tool_src
-    assert '("dnet", "ΔFnet, Н", 100, "e")' in tool_src
-    assert '("bias", "Bias", 80, "w")' in tool_src
-    assert '("inner", "ID, мм", 80, "e")' in tool_src
-    assert '("outer", "OD, мм", 80, "e")' in tool_src
-    assert 'text="Текущий spring install contract из base"' in tool_src
+    assert '("pcap_abs", "P порш. abs, кПа", 120, "e")' in tool_src
+    assert '("f_net", "F итог, Н", 100, "e")' in tool_src
+    assert "text=\"Рекомендованные каталожные варианты для текущего семейства\"" in tool_src
+    assert '("dnet", "ΔF итог, Н", 100, "e")' in tool_src
+    assert '("bias", "Баланс", 80, "w")' in tool_src
+    assert '("inner", "Внутр. D, мм", 100, "e")' in tool_src
+    assert '("outer", "Наруж. D, мм", 100, "e")' in tool_src
+    assert 'text="Текущая установка пружины из базы"' in tool_src
     assert "self.spring_install_summary_var" in tool_src
     assert "self.current_spring_install_tree = self._build_tree(" in tool_src
     assert '("free_gap", "ΔLfree, мм", 90, "e")' in tool_src
-    assert '("rebound", "Rebound min, мм", 110, "e")' in tool_src
+    assert '("rebound", "Отбой min, мм", 110, "e")' in tool_src
     assert '(\"current\", \"Текущее\", 140, \"w\")' in tool_src
     assert "self.cylinder_recommendation_var" in tool_src
     assert "self.recommendation_tree = self._build_tree(" in tool_src
     assert "def on_host_close(self) -> None:" in tool_src
     assert "def main() -> int:" in tool_src
+
+    forbidden_visible_labels = [
+        'text="Artifact JSON/NPZ:"',
+        'text="Artifact freshness:"',
+        'text="Export evidence for SEND"',
+        'text="Артефакт JSON/NPZ:"',
+        'text="Актуальность артефакта:"',
+        'text="Выбрать артефакт..."',
+        "Актуальность артефакта: последний файл ещё не проверен.",
+        "Записать geometry_reference_evidence.json для Diagnostics/Send Bundle.",
+        "Reference Center только передаёт evidence summary",
+        "SEND bundle",
+        'title="Выбрать anim artifact pointer JSON или NPZ"',
+        '("JSON files", "*.json")',
+        '("Animator artifacts", "*.json *.npz")',
+        '("JSON pointer", "*.json")',
+        '("NPZ bundle", "*.npz")',
+        '("All files", "*.*")',
+        '("sources", "Артефакты источника", 520, "w")',
+        "Артефакт расчёта:",
+        "Актуальность артефакта:",
+        "npz=",
+        "gate=",
+        "artifact=",
+        " Warnings: ",
+        "desktop-полей",
+        "web-разметке",
+        "семейным контрактам",
+        "hash=",
+        "Контекст: слева источник",
+        "Catalog source:",
+        "family context",
+        "current-table",
+        "package passport",
+        "truth-state",
+        "precharge->force bias summary",
+        "shortlist",
+        "raw Camozzi dims",
+        "items=",
+        "variants=",
+        "series=",
+        "pdf=",
+        "extracted=",
+        "причины неготовности=",
+        'text="solver_points / hardpoints producer evidence"',
+        "Read-only reference/evidence surface",
+        "hardpoints/solver_points remain producer-owned",
+        'text="producer truth gap map"',
+        'text="road_width_m reference / GAP-008"',
+        'text="Geometry acceptance evidence / GAP-006"',
+        'text="export/runtime packaging passport evidence"',
+        '("layer", "Layer", 120, "w")',
+        '("source", "Source", 220, "w")',
+        "producer_readiness_reasons=",
+        '("cyl_od", "Cylinder OD, мм", 110, "e")',
+        '("spring_id", "Spring ID, мм", 110, "e")',
+        '("clearance", "ID-OD, мм", 90, "e")',
+        '("od", "OD, мм", 90, "e")',
+        '("body", "Body, мм", 90, "e")',
+        '("body_need", "Stroke+dead, мм", 110, "e")',
+        '("pkg_status", "Pkg status", 100, "w")',
+        '("pkg_complete", "Pkg, %", 80, "e")',
+        '("truth", "Truth state", 170, "w")',
+        '("dnet", "ΔFnet rec, Н", 110, "e")',
+        '("bias", "Bias rec", 90, "w")',
+        'text="Текущий precharge / force bias из base"',
+        '("pcap_abs", "Pcap abs, кПа", 100, "e")',
+        '("f_net", "Fnet, Н", 100, "e")',
+        'text="Рекомендованные каталожные варианты для текущего family"',
+        '("dnet", "ΔFnet, Н", 100, "e")',
+        '("bias", "Bias", 80, "w")',
+        '("inner", "ID, мм", 80, "e")',
+        '("outer", "OD, мм", 80, "e")',
+        'text="Текущий spring install contract из base"',
+        '("rebound", "Rebound min, мм", 110, "e")',
+    ]
+    for fragment in forbidden_visible_labels:
+        assert fragment not in tool_src
 
     assert "class GeometryReferenceSnapshot" in model_src
     assert "class CylinderCatalogRow" in model_src

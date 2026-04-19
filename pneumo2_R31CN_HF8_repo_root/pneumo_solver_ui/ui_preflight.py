@@ -305,7 +305,7 @@ def _last_send_bundle_info(st_mod: Any, app_dir: Path) -> Tuple[bool, str]:
     for line in list(meta.get("summary_lines") or []):
         lines.append(str(line))
     if meta.get("anim_pointer_diagnostics_path"):
-        lines.append(f"Anim pointer diagnostics: {meta.get('anim_pointer_diagnostics_path')}")
+        lines.append(f"Диагностика указателя анимации: {meta.get('anim_pointer_diagnostics_path')}")
     return bool(meta.get("ok")), "\n".join(lines)
 
 
@@ -458,18 +458,18 @@ def _pick_next_page(steps: Dict[str, _Step]) -> Tuple[str, str]:
 
 
 def _pick_next_page_canonical(steps: Dict[str, _Step]) -> Tuple[str, str]:
-    """Return canonical relative page targets for the recommended next step."""
+    """Вернуть канонические относительные цели для рекомендуемого шага."""
     if not steps.get("suite", _Step("", "", True, "ok", "")).ok:
-        return HOME_PAGE, "РћС‚РєСЂС‹С‚СЊ РРЅС‚РµСЂС„РµР№СЃ Рё РЅР°СЃС‚СЂРѕРёС‚СЊ С‚РµСЃС‚вЂ‘РЅР°Р±РѕСЂ"
+        return HOME_PAGE, "Открыть интерфейс и настроить набор испытаний"
     if not steps.get("baseline", _Step("", "", True, "ok", "")).ok:
-        return HOME_PAGE, "Р—Р°РїСѓСЃС‚РёС‚СЊ Baseline"
+        return HOME_PAGE, "Запустить базовый прогон"
     if not steps.get("export", _Step("", "", True, "ok", "")).ok:
-        return HOME_PAGE, "РЎРґРµР»Р°С‚СЊ РґРµС‚Р°Р»СЊРЅС‹Р№ РїСЂРѕРіРѕРЅ + СЌРєСЃРїРѕСЂС‚ anim_latest"
+        return HOME_PAGE, "Сделать детальный прогон и экспорт анимации"
     if not steps.get("mnemo", _Step("", "", True, "ok", "")).ok:
-        return DESKTOP_MNEMO_PAGE, "РЈСЃС‚Р°РЅРѕРІРёС‚СЊ/Р·Р°РїСѓСЃС‚РёС‚СЊ Desktop Mnemo"
+        return DESKTOP_MNEMO_PAGE, "Установить или запустить мнемосхему"
     if not steps.get("desktop", _Step("", "", True, "ok", "")).ok:
-        return DESKTOP_MNEMO_PAGE, "РћС‚РєСЂС‹С‚СЊ Desktop Mnemo; Desktop Animator РѕСЃС‚Р°С‘С‚СЃСЏ РґРѕРїРѕР»РЅРёС‚РµР»СЊРЅС‹Рј РёРЅСЃС‚СЂСѓРјРµРЅС‚РѕРј"
-    return VALIDATION_WEB_PAGE, "РџРµСЂРµР№С‚Рё Рє Р’Р°Р»РёРґР°С†РёРё (Web)"
+        return DESKTOP_MNEMO_PAGE, "Открыть мнемосхему и при необходимости аниматор"
+    return VALIDATION_WEB_PAGE, "Перейти к проверке результатов"
 
 
 _pick_next_page = _pick_next_page_canonical

@@ -1511,9 +1511,9 @@ def evidence_manifest_warnings(manifest: Mapping[str, Any] | None) -> List[str]:
             ]
             reason_text = ", ".join(stale_reasons) if stale_reasons else state
             warnings.append(
-                "Baseline HO-006 state is "
-                f"{state.upper()}; optimizer consumption blocked. "
-                f"Reasons: {reason_text}. Open Baseline Center for review/adopt/restore."
+                "Опорный прогон имеет состояние "
+                f"{state}; передача в оптимизацию заблокирована. "
+                f"Причины: {reason_text}. Откройте центр опорного прогона для просмотра, принятия или восстановления."
             )
     return list(dict.fromkeys(warnings))
 

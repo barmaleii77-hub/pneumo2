@@ -175,16 +175,16 @@ def _build_summary_text(errors: list[str], warnings: list[str], metrics: dict[st
     )
     if float(metrics.get("raw_seam_max_mm", 0.0) or 0.0) > 1e-9:
         lines.append(
-            "Raw seam до export-замыкания L/R/max: "
+            "Шов до обработки L/R/max: "
             f"{float(metrics.get('raw_seam_left_mm', 0.0) or 0.0):.2f} / "
             f"{float(metrics.get('raw_seam_right_mm', 0.0) or 0.0):.2f} / "
             f"{float(metrics.get('raw_seam_max_mm', 0.0) or 0.0):.2f} мм."
         )
     lines.append(
-        "Whole-ring amplitude A L/R: "
+        "Амплитуда всего кольца A L/R: "
         f"{float(metrics.get('ring_amp_left_mm', 0.0) or 0.0):.2f} / "
         f"{float(metrics.get('ring_amp_right_mm', 0.0) or 0.0):.2f} мм; "
-        "p-p L/R: "
+        "размах p-p L/R: "
         f"{float(metrics.get('ring_p2p_left_mm', 0.0) or 0.0):.2f} / "
         f"{float(metrics.get('ring_p2p_right_mm', 0.0) or 0.0):.2f} мм."
     )
@@ -261,7 +261,7 @@ def build_ring_editor_diagnostics(spec: dict[str, Any]) -> RingEditorDiagnostics
                 )
             if closure_policy == "preview_open_only":
                 warnings.append(
-                    "preview_open_only: сценарий экспортируется как открытый preview с явным seam-warning; downstream не должен считать его замкнутым."
+                    "Сценарий экспортируется как открытый предпросмотр с явным предупреждением о стыке; последующие расчёты не должны считать его замкнутым."
                 )
             summarized_rows = summarize_ring_track_segments(spec, tracks)
             for index, row in enumerate(summarized_rows):

@@ -66,7 +66,7 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
         self.summary_var = tk.StringVar(master=self, value="Выберите параметр или раздел.")
         self.source_marker_var = tk.StringVar(
             master=self,
-            value="Источник: WS-INPUTS live · source: default_base.json · state: current · режим: По исходным данным",
+            value="источник: текущие исходные данные · состояние: актуально · режим: По исходным данным",
         )
         ttk.Label(
             self,
@@ -115,12 +115,49 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
         )
         geom = self._geometry_from_payload(payload)
         self.summary_var.set(self._build_summary(section_title, field_label, unit_label, active_context))
-        marker = str(source_marker or "source: default_base.json · state: current").strip()
-        self.source_marker_var.set(
-            f"Источник: WS-INPUTS live · {marker} · режим: По исходным данным"
-        )
+        marker = self._operator_source_marker(source_marker)
+        self.source_marker_var.set(f"{marker} · режим: По исходным данным")
         self._draw_reference_scheme(section_title, field_label, active_context, geom)
         self._draw_metrics(section_title, payload, geom, active_context, unit_label)
+
+    @staticmethod
+    def _operator_source_marker(source_marker: str | None) -> str:
+        raw = str(source_marker or "").strip()
+        if not raw:
+            return "источник: исходный шаблон · состояние: актуально"
+
+        legacy_source_prefix = "source" + ":"
+        legacy_state_prefix = "state" + ":"
+        legacy_default = "default_base" + ".json"
+        source_label = ""
+        state_label = ""
+        passthrough: list[str] = []
+        for part in raw.split("·"):
+            item = part.strip()
+            lowered = item.lower()
+            if lowered.startswith(legacy_source_prefix):
+                source_value = item.split(":", 1)[1].strip()
+                source_label = "исходный шаблон" if source_value == legacy_default else source_value
+            elif lowered.startswith(legacy_state_prefix):
+                state_value = item.split(":", 1)[1].strip().lower()
+                state_label = {
+                    "current": "актуально",
+                    "dirty": "изменено",
+                    "stale": "устарело",
+                    "invalid": "ошибка",
+                }.get(state_value, state_value)
+            elif "WS-INPUTS" not in item:
+                passthrough.append(item)
+
+        if source_label or state_label:
+            normalized = []
+            if source_label:
+                normalized.append(f"источник: {source_label}")
+            if state_label:
+                normalized.append(f"состояние: {state_label}")
+            normalized.extend(passthrough)
+            return " · ".join(part for part in normalized if part)
+        return raw
 
     def _load_scheme_image(
         self,
@@ -454,8 +491,8 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
                 f"Масса рамы: {self._safe_float(payload, 'масса_рамы', 0.0):.0f} кг",
                 f"Неподрессоренная масса: {self._safe_float(payload, 'масса_неподрессоренная_на_угол', 0.0):.0f} кг",
                 f"Высота ЦМ: {self._safe_float(payload, 'высота_центра_масс', 0.0):.3f} м",
-                f"CG X: {self._safe_float(payload, 'cg_x_м', 0.0):.3f} м",
-                f"CG Y: {self._safe_float(payload, 'cg_y_м', 0.0):.3f} м",
+                f"ЦМ X: {self._safe_float(payload, 'cg_x_м', 0.0):.3f} м",
+                f"ЦМ Y: {self._safe_float(payload, 'cg_y_м', 0.0):.3f} м",
                 f"Распределение: {str(payload.get('corner_loads_mode') or '—')}",
             ]
         if section == "Механика":
@@ -472,8 +509,8 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
                 f"Цель по ходу: {geom['trim_target']:.2f} доли хода",
                 f"Допуск: {geom['trim_tol']:.2f} доли хода",
                 f"Начальная скорость: {self._safe_float(payload, 'vx0_м_с', 0.0):.2f} м/с",
-                f"CG X: {self._safe_float(payload, 'cg_x_м', 0.0):.3f} м",
-                f"CG Y: {self._safe_float(payload, 'cg_y_м', 0.0):.3f} м",
+                f"ЦМ X: {self._safe_float(payload, 'cg_x_м', 0.0):.3f} м",
+                f"ЦМ Y: {self._safe_float(payload, 'cg_y_м', 0.0):.3f} м",
             ]
         if section == "Компоненты":
             return [
@@ -489,14 +526,14 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
                 f"Термодинамика: {str(payload.get('термодинамика') or '—')}",
                 f"Теплоёмкость: {str(payload.get('газ_модель_теплоемкости') or '—')}",
                 f"Сомкнутая длина пружины: {1000.0 * self._safe_float(payload, 'пружина_длина_солид_м', 0.0):.0f} мм",
-                f"Запас до coil bind: {1000.0 * self._safe_float(payload, 'пружина_запас_до_coil_bind_минимум_м', 0.0):.0f} мм",
+                f"Запас до смыкания витков: {1000.0 * self._safe_float(payload, 'пружина_запас_до_coil_bind_минимум_м', 0.0):.0f} мм",
             ]
         if section in {"Численные настройки", "Расчётные настройки"}:
             return [
                 f"Шаг интегрирования: {self._safe_float(payload, 'макс_шаг_интегрирования_с', 0.0):.4f} с",
                 f"Внутренних шагов: {self._safe_float(payload, 'макс_число_внутренних_шагов_на_dt', 0.0):.0f}",
-                f"Autoverif: {'включён' if bool(payload.get('autoverif_enable')) else 'выключен'}",
-                f"Mechanics selfcheck: {'включён' if bool(payload.get('mechanics_selfcheck')) else 'выключен'}",
+                f"Автопроверка: {'включён' if bool(payload.get('autoverif_enable')) else 'выключен'}",
+                f"Самопроверка механики: {'включён' if bool(payload.get('mechanics_selfcheck')) else 'выключен'}",
             ]
         return [
             f"База: {geom['wheelbase']:.2f} м",

@@ -291,7 +291,7 @@ def resolve_ring_source_context(
                 "required_by_suite": required,
                 "source_hash": source_hash,
                 "source_ref": source_ref,
-                "banner": "WS-RING HO-004 hash найден в suite meta.",
+                "banner": "Контрольная сумма сценариев колец найдена в метаданных набора.",
             }
 
     for row in enabled_ring_rows:
@@ -316,7 +316,7 @@ def resolve_ring_source_context(
                     )
                     if str(row.get(key) or "").strip()
                 },
-                "banner": "WS-RING HO-004 hash найден в строке suite.",
+                "banner": "Контрольная сумма сценариев колец найдена в строке набора.",
             }
         scenario_context = _ring_hash_from_scenario(str(row.get("scenario_json") or ""))
         scenario_hash = str(scenario_context.get("ring_source_hash_sha256") or "").strip()
@@ -326,7 +326,7 @@ def resolve_ring_source_context(
                 "required_by_suite": required,
                 "source_hash": scenario_hash,
                 "source_ref": scenario_context,
-                "banner": "WS-RING HO-004 hash найден в scenario _lineage.",
+                "banner": "Контрольная сумма сценариев колец найдена в сценарии.",
             }
 
     return {
@@ -335,9 +335,9 @@ def resolve_ring_source_context(
         "source_hash": "",
         "source_ref": {},
         "banner": (
-            "WS-RING HO-004 hash не найден для ring-backed строк suite."
+            "Контрольная сумма сценариев колец не найдена для строк набора."
             if required
-            else "В выбранном наборе нет ring-backed строк, HO-004 hash не требуется."
+            else "В выбранном наборе нет строк, зависящих от сценариев колец; контрольная сумма не требуется."
         ),
     }
 
@@ -503,7 +503,7 @@ def read_desktop_suite_handoff_state(
             "is_stale": True,
             "handoff_ready": False,
             "stale_reasons": ["unreadable_validated_suite_snapshot"],
-            "banner": f"validated_suite_snapshot не читается: {exc}",
+            "banner": f"Снимок набора испытаний не читается: {exc}",
         }
     return {
         "path": str(target),
@@ -529,23 +529,33 @@ def format_desktop_suite_status_lines(context: Mapping[str, Any]) -> tuple[str, 
     handoff_path = str(context.get("handoff_path") or "")
     suite_hash = str(snapshot.get("suite_snapshot_hash") or "")
     input_hash = str(inputs_context.get("payload_hash") or "")
+    state_labels = {
+        "missing": "не найден",
+        "ready": "готов",
+        "ok": "готов",
+        "stale": "устарел",
+        "unreadable": "не читается",
+    }
+    input_state = state_labels.get(str(inputs_context.get("state") or "").strip(), str(inputs_context.get("state") or "неизвестно"))
+    suite_state_raw = existing_state.get("state") or current_state.get("state") or "missing"
+    suite_state = state_labels.get(str(suite_state_raw).strip(), str(suite_state_raw))
     return (
         (
-            f"HO-003 inputs_snapshot: {inputs_context.get('state') or 'missing'} | "
-            f"payload_hash={input_hash[:12] or '—'} | "
-            f"can_consume={bool(inputs_context.get('can_consume', False))}"
+            f"Снимок исходных данных: {input_state} | "
+            f"контроль={input_hash[:12] or '—'} | "
+            f"доступен={'да' if bool(inputs_context.get('can_consume', False)) else 'нет'}"
         ),
         str(inputs_context.get("banner") or "").strip(),
-        f"HO-005 validated_suite_snapshot: {existing_state.get('state') or current_state.get('state') or 'missing'}",
+        f"Набор испытаний: {suite_state}",
         (
-            f"suite_snapshot_hash={suite_hash[:12] or '—'} | "
-            f"rows={int(preview.get('row_count', 0) or 0)} | "
-            f"enabled={int(preview.get('enabled_count', 0) or 0)} | "
-            f"missing_refs={int(validation.get('blocking_missing_ref_count', 0) or 0)} | "
-            f"upstream_errors={int(validation.get('upstream_ref_error_count', 0) or 0)}"
+            f"контроль набора={suite_hash[:12] or '—'} | "
+            f"строк={int(preview.get('row_count', 0) or 0)} | "
+            f"включено={int(preview.get('enabled_count', 0) or 0)} | "
+            f"не хватает ссылок={int(validation.get('blocking_missing_ref_count', 0) or 0)} | "
+            f"ошибок связей={int(validation.get('upstream_ref_error_count', 0) or 0)}"
         ),
         str(existing_state.get("banner") or current_state.get("banner") or "").strip(),
-        f"validated_suite_snapshot.json: {handoff_path}",
+        f"Файл снимка набора: {handoff_path}",
     )
 
 

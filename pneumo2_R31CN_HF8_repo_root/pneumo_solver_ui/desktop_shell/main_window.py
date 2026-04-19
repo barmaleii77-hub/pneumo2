@@ -18,7 +18,12 @@ from .menu_builder import (
     build_shell_menubar,
     build_shell_workspace_context_menu,
 )
-from .navigation import describe_workflow_status, next_workflow_spec, ordered_workflow_specs
+from .navigation import (
+    describe_workflow_status,
+    next_workflow_spec,
+    ordered_navigation_sections,
+    ordered_workflow_specs,
+)
 from .registry import build_desktop_shell_specs
 from .toolbar import ShellToolbarController, build_shell_toolbar
 from .workspace import DesktopWorkspaceManager
@@ -38,30 +43,32 @@ class DesktopMainShell:
         self.spec_by_key = {spec.key: spec for spec in self.specs}
         self.command_search_entries = build_shell_command_search_entries(self.specs)
         self.status_var = tk.StringVar(
-            value="Готово. Выберите раздел слева, верхнее меню или обзорную страницу."
+            value="Готово. Выберите окно слева, верхнее меню или обзорную страницу."
         )
         self.runtime_var = tk.StringVar(
-            value="Runtime: нет активной инженерной операции."
+            value="Ход выполнения: нет активной инженерной операции."
         )
-        self.workflow_var = tk.StringVar(value="Маршрут: недоступен")
+        self.workflow_var = tk.StringVar(value="Порядок работы: недоступен")
         self.workspace_var = tk.StringVar(value="Обзор | Открытых окон: 0")
         self.command_search_var = tk.StringVar(value="")
         self.command_search_hint_var = tk.StringVar(
-            value="Поиск команд: начните вводить название экрана, команды или артефакта."
+            value="Быстрый поиск: начните вводить название окна, действия или файла."
         )
         self.details_title_var = tk.StringVar(value="Обзор")
         self.details_meta_var = tk.StringVar(value="Основное рабочее место")
         self.details_body_var = tk.StringVar(
-            value="Слева доступны разделы проекта: данные, сценарии, расчёт, оптимизация, результаты, анализ и визуализация."
+            value="Слева доступны рабочие окна проекта: данные, сценарии, расчёт, оптимизация, результаты, анализ и визуализация."
         )
         self.details_hint_var = tk.StringVar(
-            value="Подсказка: основные пользовательские разделы помечены как часть рабочего маршрута."
+            value="Подсказка: основные пользовательские окна идут в порядке инженерной работы."
         )
         self.home_view: ShellHomeViewController | None = None
         self.toolbar: ShellToolbarController | None = None
         self.workspace_context_menu: ShellWorkspaceContextMenuController | None = None
         self._startup_tool_keys = startup_tool_keys
         self._startup_route_applied = False
+        self._startup_after_id: str | None = None
+        self._is_closing = False
         self._nav_item_to_key: dict[str, str] = {}
         self._syncing_navigation_selection = False
         self._runtime_trace_var: tk.Variable | None = None
@@ -203,7 +210,7 @@ class DesktopMainShell:
         self._bind_runtime_trace()
         self._configure_region_navigation()
         self._bind_shell_shortcuts()
-        self.root.after_idle(self._open_startup_route)
+        self._startup_after_id = self.root.after_idle(self._open_startup_route)
 
         status = ttk.Frame(self.root, padding=(10, 6))
         status.pack(fill="x")
@@ -230,11 +237,11 @@ class DesktopMainShell:
         )
 
     def _build_navigation_panel(self, parent: ttk.Frame) -> None:
-        panel = ttk.LabelFrame(parent, text="Разделы", padding=8)
+        panel = ttk.LabelFrame(parent, text="Рабочие окна", padding=8)
         panel.pack(fill="both", expand=True)
         ttk.Label(
             panel,
-            text="Основные пользовательские разделы проекта",
+            text="Выберите окно в списке: оно откроется сразу.",
             wraplength=220,
             justify="left",
         ).pack(anchor="w")
@@ -246,7 +253,7 @@ class DesktopMainShell:
         nav_scroll.pack(side="right", fill="y")
         self.nav_tree.configure(yscrollcommand=nav_scroll.set)
         self.nav_tree.bind("<<TreeviewSelect>>", self._on_navigation_selected)
-        ttk.Button(panel, text="Перейти к выбранному разделу", command=self._open_selected_navigation_item).pack(
+        ttk.Button(panel, text="Открыть окно", command=self._open_selected_navigation_item).pack(
             fill="x",
             pady=(8, 0),
         )
@@ -287,20 +294,20 @@ class DesktopMainShell:
         ).pack(anchor="w", pady=(8, 0))
         self.details_open_button = ttk.Button(
             body,
-            text="Перейти к текущему разделу",
+            text="Открыть окно",
             command=self._open_current_detail_target,
         )
         self.details_open_button.pack(
             fill="x",
             pady=(12, 0),
         )
-        ttk.Button(body, text="Продолжить маршрут", command=self.continue_workflow_route).pack(
+        ttk.Button(body, text="Продолжить работу", command=self.continue_workflow_route).pack(
             fill="x",
             pady=(6, 0),
         )
 
     def _build_command_strip(self, parent: ttk.Frame, *, before: tk.Widget) -> None:
-        command_strip = ttk.LabelFrame(parent, text="Командная зона", padding=8)
+        command_strip = ttk.LabelFrame(parent, text="Быстрые действия", padding=8)
         command_strip.pack(fill="x", before=before, pady=(0, 8))
         command_strip.columnconfigure(1, weight=1)
 
@@ -330,7 +337,7 @@ class DesktopMainShell:
         search = ttk.Frame(command_strip)
         search.grid(row=0, column=1, sticky="ew", padx=(16, 0))
         search.columnconfigure(1, weight=1)
-        ttk.Label(search, text="Поиск команд").grid(row=0, column=0, sticky="w")
+        ttk.Label(search, text="Быстрый поиск").grid(row=0, column=0, sticky="w")
         self.command_search_combo = ttk.Combobox(
             search,
             textvariable=self.command_search_var,
@@ -369,21 +376,9 @@ class DesktopMainShell:
         self._nav_item_to_key = {}
         overview_id = self.nav_tree.insert("", "end", text="Обзор", open=True)
         self._nav_item_to_key[overview_id] = "__home__"
-        sections: dict[str, list[DesktopShellToolSpec]] = {}
-        for spec in self._main_nav_specs():
-            sections.setdefault(spec.nav_section, []).append(spec)
-        for section_label in (
-            "Исходные данные",
-            "Сценарии",
-            "Расчёт",
-            "Оптимизация",
-            "Результаты",
-        ):
-            specs = sections.get(section_label, [])
-            if not specs:
-                continue
+        for section_label, specs in ordered_navigation_sections(self._navigation_specs()):
             section_id = self.nav_tree.insert("", "end", text=section_label, open=True)
-            for spec in sorted(specs, key=lambda item: (item.nav_order, item.title.lower())):
+            for spec in specs:
                 item_id = self.nav_tree.insert(section_id, "end", text=spec.title)
                 self._nav_item_to_key[item_id] = spec.key
 
@@ -417,6 +412,8 @@ class DesktopMainShell:
         self.root.config(menu=menubar)
 
     def _refresh_shell_state(self) -> None:
+        if self._is_closing:
+            return
         open_keys = {session.key for session in self.workspace.list_open_sessions()}
         if self.home_view is not None:
             self.home_view.refresh()
@@ -434,13 +431,18 @@ class DesktopMainShell:
         target_key = current_key or "__home__"
         for item_id, item_key in self._nav_item_to_key.items():
             if item_key == target_key:
-                self._syncing_navigation_selection = True
-                try:
-                    self.nav_tree.selection_set(item_id)
+                current_selection = tuple(self.nav_tree.selection())
+                if current_selection == (item_id,):
                     self.nav_tree.focus(item_id)
-                finally:
-                    self._syncing_navigation_selection = False
+                    break
+                self._syncing_navigation_selection = True
+                self.nav_tree.selection_set(item_id)
+                self.nav_tree.focus(item_id)
+                self.root.after_idle(self._clear_navigation_selection_sync)
                 break
+
+    def _clear_navigation_selection_sync(self) -> None:
+        self._syncing_navigation_selection = False
 
     def _refresh_details_panel(self) -> None:
         current_key = self.workspace.selected_workspace_key() or "__home__"
@@ -448,17 +450,17 @@ class DesktopMainShell:
             self.details_title_var.set("Обзор")
             self.details_meta_var.set(self.workflow_var.get())
             self.details_body_var.set(
-                "Используйте разделы слева для перехода к данным, сценариям, расчёту, оптимизации и результатам."
+                "Используйте список слева для перехода к исходным данным, сценариям, расчёту, оптимизации, результатам, анализу, визуализации и диагностике."
             )
             self.details_hint_var.set(
-                "Подсказка: сначала заполните исходные данные, затем проверьте сценарии и только после этого переходите к расчёту и оптимизации."
+                "Подсказка: выбор в списке сразу открывает окно; отдельная кнопка нужна только для повторного перехода."
             )
             return
         spec = self.spec_by_key.get(current_key)
         if spec is None:
-            self.details_title_var.set("Неизвестный раздел")
+            self.details_title_var.set("Неизвестное окно")
             self.details_meta_var.set("")
-            self.details_body_var.set("Текущее окно больше не связано с зарегистрированным разделом.")
+            self.details_body_var.set("Текущее окно больше не связано с зарегистрированным рабочим окном.")
             self.details_hint_var.set("")
             return
         self.details_title_var.set(spec.title)
@@ -474,17 +476,20 @@ class DesktopMainShell:
     def _main_nav_specs(self) -> tuple[DesktopShellToolSpec, ...]:
         return tuple(spec for spec in self.specs if spec.entry_kind == "main")
 
+    def _navigation_specs(self) -> tuple[DesktopShellToolSpec, ...]:
+        return self.specs
+
     def _workflow_specs(self) -> tuple[DesktopShellToolSpec, ...]:
         return ordered_workflow_specs(self._main_nav_specs())
 
     def _entry_kind_label(self, spec: DesktopShellToolSpec) -> str:
         if spec.entry_kind == "main":
-            return "основной раздел"
+            return "основное окно"
         if spec.entry_kind == "contextual":
-            return "контекстный переход"
+            return "переход по выбранному результату"
         if spec.entry_kind == "external":
             return "внешнее специализированное окно"
-        return "служебный инструмент"
+        return "дополнительное окно"
 
     def _on_navigation_selected(self, _event: object | None = None) -> None:
         if self._syncing_navigation_selection:
@@ -499,9 +504,9 @@ class DesktopMainShell:
             self.details_title_var.set("Обзор")
             self.details_meta_var.set("Главная страница")
             self.details_body_var.set(
-                "Обзор собирает рабочий маршрут, открытые окна и быстрые переходы по основным разделам."
+                "Обзор собирает порядок работы, открытые окна и быстрые переходы по пользовательским окнам."
             )
-            self.details_hint_var.set("Выбор в дереве сразу синхронизирует рабочую область и пояснение.")
+            self.details_hint_var.set("Выбор в списке сразу синхронизирует рабочую область и пояснение.")
             return
         spec = self.spec_by_key.get(key)
         if spec is None:
@@ -533,7 +538,7 @@ class DesktopMainShell:
         open_keys = {session.key for session in self.workspace.list_open_sessions()}
         spec = next_workflow_spec(self._workflow_specs(), open_keys)
         if spec is None:
-            self.status_var.set("Основной маршрут пока недоступен в shell.")
+            self.status_var.set("Основной порядок работы пока недоступен в главном окне.")
             return
         self.open_tool(spec.key)
 
@@ -551,11 +556,13 @@ class DesktopMainShell:
             "PneumoApp",
             "PneumoApp\n\n"
             "Нативное Windows desktop-рабочее место инженера.\n"
-            "Основной маршрут: исходные данные, сценарии, baseline и optimization, анализ, аниматор и диагностика.\n"
-            "Главное shell-окно держит command surface, contextual browser, inspector и быстрые переходы к специализированным окнам.",
+            "Основной порядок работы: исходные данные, сценарии, опорный прогон и оптимизация, анализ, аниматор и диагностика.\n"
+            "Главное окно держит панель команд, быстрый поиск, инспектор и переходы к специализированным окнам.",
         )
 
     def _on_tab_changed(self, _event: object | None = None) -> None:
+        if self._is_closing:
+            return
         self.workspace.handle_tab_changed()
 
     def open_tool(self, key: str) -> None:
@@ -588,7 +595,7 @@ class DesktopMainShell:
             if capability in spec.capability_ids:
                 self.open_tool(spec.key)
                 return True
-        self.status_var.set(f"Не найден маршрут для возможности: {capability}")
+        self.status_var.set(f"Не найдено подходящее окно для возможности: {capability}")
         return False
 
     def _open_global_diagnostics(self) -> None:
@@ -624,23 +631,23 @@ class DesktopMainShell:
         if not ranked:
             if query:
                 self.command_search_hint_var.set(
-                    f"Совпадений по запросу «{query}» нет. Попробуйте название раздела, bundle, animator или diagnostics."
+                    f"Совпадений по запросу «{query}» нет. Попробуйте название окна, диагностику, аниматор или сравнение."
                 )
             else:
                 self.command_search_hint_var.set(
-                    "Поиск команд: начните вводить название экрана, команды или артефакта."
+                    "Быстрый поиск: начните вводить название окна, действия или файла."
                 )
             return
         best = ranked[0]
         self.command_search_hint_var.set(
-            f"{best.label} -> {best.location}. {best.summary}"
+            f"{best.label} - {best.location}. {best.summary}"
         )
 
     def _execute_command_search(self) -> None:
         query = str(self.command_search_var.get() or "").strip()
         ranked = rank_shell_command_search_entries(query, self.command_search_entries)
         if not ranked:
-            self.status_var.set(f"Команда по запросу «{query or '—'}» не найдена.")
+            self.status_var.set(f"Действие по запросу «{query or '—'}» не найдено.")
             self._refresh_command_search_hint()
             return
         best = ranked[0]
@@ -650,21 +657,21 @@ class DesktopMainShell:
             self._select_home_tab()
         elif best.action_kind == "focus" and best.action_value == "project_tree":
             self.nav_tree.focus_set()
-            self.status_var.set("Фокус переведён в дерево разделов проекта.")
+            self.status_var.set("Фокус переведён в список рабочих окон проекта.")
         else:
-            self.status_var.set(f"Команда «{best.label}» пока не поддерживается.")
+            self.status_var.set(f"Действие «{best.label}» пока недоступно.")
             return
-        self.status_var.set(f"Выполнена команда: {best.label}")
+        self.status_var.set(f"Выполнено: {best.label}")
         self.command_search_var.set(best.label)
         self._refresh_command_search_hint()
 
     def _compact_runtime_text(self, raw_text: str) -> str:
         text = " | ".join(part.strip() for part in str(raw_text or "").splitlines() if part.strip())
         if not text:
-            return "Runtime: нет активной инженерной операции."
+            return "Ход выполнения: нет активной инженерной операции."
         if len(text) > 220:
             text = text[:217].rstrip() + "..."
-        return f"Runtime: {text}"
+        return f"Ход выполнения: {text}"
 
     def _runtime_source_var(self, controller: object | None) -> tk.Variable | None:
         if controller is None:
@@ -695,6 +702,8 @@ class DesktopMainShell:
         self._runtime_trace_id = None
 
     def _bind_runtime_trace(self) -> None:
+        if self._is_closing:
+            return
         self._unbind_runtime_trace()
         session = self.workspace.current_session()
         controller = getattr(session, "controller", None) if session is not None else None
@@ -708,9 +717,11 @@ class DesktopMainShell:
         )
 
     def _refresh_runtime_from_active_tool(self) -> None:
+        if self._is_closing:
+            return
         session = self.workspace.current_session()
         if session is None:
-            self.runtime_var.set("Runtime: shell ждёт открытия рабочего раздела.")
+            self.runtime_var.set("Ход выполнения: откройте рабочее окно.")
             return
         controller = getattr(session, "controller", None)
         runtime_source = self._runtime_source_var(controller)
@@ -761,6 +772,9 @@ class DesktopMainShell:
         return "break"
 
     def _open_startup_route(self) -> None:
+        if self._is_closing:
+            return
+        self._startup_after_id = None
         if self._startup_route_applied:
             return
         self._startup_route_applied = True
@@ -774,18 +788,15 @@ class DesktopMainShell:
             tb = traceback.format_exc()
             messagebox.showerror(
                 "PneumoApp",
-                f"Не удалось открыть раздел «{spec.title}»:\n\n{tb}",
+                f"Не удалось открыть окно «{spec.title}»:\n\n{tb}",
             )
             self.status_var.set(f"Ошибка открытия: {spec.title}")
 
     def _launch_external_tool(self, spec: DesktopShellToolSpec) -> None:
         try:
-            launched = spec.launch_external() if spec.launch_external else None
-            pid = getattr(launched, "pid", None)
-            if pid:
-                self.status_var.set(f"Запущено внешнее окно: {spec.title} (pid={pid})")
-            else:
-                self.status_var.set(f"Запущено внешнее окно: {spec.title}")
+            if spec.launch_external:
+                spec.launch_external()
+            self.status_var.set(f"Запущено внешнее окно: {spec.title}")
         except Exception:
             tb = traceback.format_exc()
             messagebox.showerror(
@@ -830,10 +841,29 @@ class DesktopMainShell:
             self.status_var.set("Ошибка повторного открытия окна.")
 
     def quit_app(self) -> None:
+        if self._is_closing:
+            return
+        self._is_closing = True
+        self._unbind_runtime_trace()
+        startup_after_id = self._startup_after_id
+        self._startup_after_id = None
+        if startup_after_id:
+            try:
+                self.root.after_cancel(startup_after_id)
+            except Exception:
+                pass
         try:
             self.workspace.shutdown()
         finally:
-            self.root.destroy()
+            try:
+                self.root.quit()
+            except Exception:
+                pass
+            try:
+                if int(self.root.winfo_exists()):
+                    self.root.destroy()
+            except tk.TclError:
+                pass
 
     def run(self) -> None:
         self.root.mainloop()

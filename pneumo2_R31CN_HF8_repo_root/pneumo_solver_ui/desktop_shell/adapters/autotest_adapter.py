@@ -15,7 +15,7 @@ def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="autotest_gui",
         title="Автотесты",
-        description="Отдельный запуск автотестов и пакетной проверки без отвлечения от основного рабочего маршрута.",
+        description="Отдельный запуск автотестов и групповой проверки без отвлечения от основного порядка работы.",
         group="Встроенные окна",
         mode="hosted",
         workflow_stage="tools",

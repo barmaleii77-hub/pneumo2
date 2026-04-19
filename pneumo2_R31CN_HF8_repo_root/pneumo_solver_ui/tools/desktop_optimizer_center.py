@@ -50,15 +50,148 @@ BOOLEAN_KEYS = {
 
 
 DRIFT_LABELS = {
-    "objective stack": "objective stack",
-    "penalty key": "penalty key",
-    "penalty tol": "penalty tol",
+    "objective stack": "состав целей",
+    "penalty key": "ключ ограничения",
+    "penalty tol": "допуск ограничения",
+}
+
+
+OPERATOR_TOKEN_LABELS = {
+    "staged": "поэтапный запуск",
+    "distributed": "распределённая координация",
+    "coordinator": "координатор",
+    "StageRunner": "поэтапный исполнитель",
+    "Dask": "Dask-исполнитель",
+    "Ray": "Ray-исполнитель",
+    "dask": "Dask-исполнитель",
+    "ray": "Ray-исполнитель",
+    "default_base.json only": "базовый файл по умолчанию",
+    "active_baseline_contract.json": "активный опорный прогон",
+    "active_contract": "активный опорный прогон",
+    "ui_opt_minutes": "бюджет поэтапного запуска",
+    "ui_jobs": "число задач",
+    "ui_seed_candidates": "стартовые кандидаты",
+    "ui_seed_conditions": "стартовые условия",
+    "opt_budget": "бюджет координатора",
+    "opt_max_inflight": "одновременные задачи",
+    "settings_opt_problem_hash_mode": "режим контроля задачи",
+    "stage0_relevance": "предварительный отбор",
+    "stage1_long": "длинная проверка",
+    "stage2_final": "финальная проверка",
+    "0": "предварительный отбор",
+    "1": "длинная проверка",
+    "2": "финальная проверка",
+    "pareto": "Парето",
+    "full_ring": "полное кольцо",
+    "true": "да",
+    "false": "нет",
+    "True": "да",
+    "False": "нет",
+    "yes": "да",
+    "no": "нет",
+    "LIVE": "выполняется",
 }
 
 
 def _short_hash(value: Any, *, width: int = 12) -> str:
     text = str(value or "").strip()
     return text[:width] if text else "—"
+
+
+def _operator_state(value: Any, *, fallback: str = "нет данных") -> str:
+    text = str(value or "").strip()
+    if not text:
+        return fallback
+    labels = {
+        "MISSING": "не найден",
+        "READY": "готов",
+        "WARN": "требует внимания",
+        "BLOCKED": "заблокирован",
+        "INVALID": "ошибка",
+        "DONE": "завершён",
+        "done": "завершён",
+        "ready": "готов",
+        "missing": "не найден",
+        "current": "актуален",
+        "stale": "устарел",
+        "ok": "готов",
+        "warn": "требует внимания",
+        "error": "ошибка",
+        "failed": "ошибка",
+        "running": "выполняется",
+        "LIVE": "выполняется",
+    }
+    return labels.get(text, labels.get(text.upper(), labels.get(text.lower(), text)))
+
+
+def _problem_hash_mode_text(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    labels = {
+        "stable": "обычный контроль",
+        "legacy": "совместимый контроль",
+    }
+    return labels.get(text, text or "режим не выбран")
+
+
+def _operator_compat_text(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "нет данных"
+    labels = {
+        "same": "совпадает",
+        "different": "отличается",
+        "unknown": "нет данных",
+    }
+    return labels.get(text, text)
+
+
+def _operator_token_text(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "—"
+    if text in OPERATOR_TOKEN_LABELS:
+        return OPERATOR_TOKEN_LABELS[text]
+    lower = text.lower()
+    if lower in OPERATOR_TOKEN_LABELS:
+        return OPERATOR_TOKEN_LABELS[lower]
+    if text.startswith("метрика_"):
+        return text.removeprefix("метрика_").replace("_", " ")
+    return text
+
+
+def _operator_issue_text(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if text == "run incomplete":
+        return "запуск ещё не завершён"
+    if text == "missing results " + "artifact":
+        return "нет файла результатов"
+    if text.startswith("run status is "):
+        return "состояние запуска: " + _operator_state(text.removeprefix("run status is "), fallback="нет данных")
+    if text.startswith("run "):
+        return "состояние запуска: " + _operator_state(text.removeprefix("run "), fallback="нет данных")
+    return text
+
+
+def _operator_list_text(values: Any) -> str:
+    if isinstance(values, str):
+        items = (values,)
+    else:
+        items = tuple(values or ())
+    return ", ".join(_operator_token_text(item) for item in items) or "—"
+
+
+def _operator_preset_text(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "—"
+    return (
+        text.replace("ray", "Ray")
+        .replace("dask", "Dask")
+        .replace("botorch", "BoTorch")
+        .replace("/q", "/группа ")
+    )
 
 
 class DesktopOptimizerCenter:
@@ -81,16 +214,16 @@ class DesktopOptimizerCenter:
             value="Готово. Автоматизированная оптимизация доступна в отдельном инженерном центре."
         )
         self.mode_summary_var = tk.StringVar(
-            value="Маршрут: Базовый прогон -> Оптимизация -> Анализ; режим и baseline будут показаны после первого обновления."
+            value="Порядок работы: опорный прогон, оптимизация, анализ. Режим и опорный прогон будут показаны после первого обновления."
         )
         self.workspace_summary_var = tk.StringVar(
-            value="Контекст: контракт, история прогонов и готовые выпуски будут показаны после первого обновления."
+            value="Сводка запуска, история прогонов и готовые выпуски будут показаны после первого обновления."
         )
         self.baseline_summary_var = tk.StringVar(
-            value="Базовый прогон: источник и политика автообновления будут показаны после первого обновления."
+            value="Опорный прогон. Источник и политика автообновления будут показаны после первого обновления."
         )
         self.contract_summary_var = tk.StringVar(
-            value="Контракт запуска: objective stack и hard gate будут показаны после первого обновления."
+            value="Настройки запуска. Цели и жёсткое ограничение будут показаны после первого обновления."
         )
         self.launch_button_text_var = tk.StringVar(value="Запустить оптимизацию")
         self._poll_after_id: str | None = None
@@ -126,7 +259,7 @@ class DesktopOptimizerCenter:
         title_box.pack(side="left", fill="x", expand=True)
         ttk.Label(
             title_box,
-            text="Baseline и optimization",
+            text="Опорный прогон и оптимизация",
             font=("Segoe UI", 16, "bold"),
         ).pack(anchor="w")
         ttk.Label(
@@ -164,7 +297,7 @@ class DesktopOptimizerCenter:
 
         sidebar = ttk.Frame(workspace, padding=(0, 0, 8, 0))
         sidebar.columnconfigure(0, weight=1)
-        context_frame = ttk.LabelFrame(sidebar, text="Контекст", padding=8)
+        context_frame = ttk.LabelFrame(sidebar, text="Сводка", padding=8)
         context_frame.pack(fill="x")
         ttk.Label(
             context_frame,
@@ -173,7 +306,7 @@ class DesktopOptimizerCenter:
             wraplength=300,
         ).pack(anchor="w")
 
-        baseline_frame = ttk.LabelFrame(sidebar, text="Baseline", padding=8)
+        baseline_frame = ttk.LabelFrame(sidebar, text="Опорный прогон", padding=8)
         baseline_frame.pack(fill="x", pady=(8, 0))
         ttk.Label(
             baseline_frame,
@@ -182,7 +315,7 @@ class DesktopOptimizerCenter:
             wraplength=300,
         ).pack(anchor="w")
 
-        contract_frame = ttk.LabelFrame(sidebar, text="Контракт запуска", padding=8)
+        contract_frame = ttk.LabelFrame(sidebar, text="Настройки запуска", padding=8)
         contract_frame.pack(fill="x", pady=(8, 0))
         ttk.Label(
             contract_frame,
@@ -193,8 +326,8 @@ class DesktopOptimizerCenter:
 
         nav_frame = ttk.LabelFrame(sidebar, text="Переходы", padding=8)
         nav_frame.pack(fill="x", pady=(8, 0))
-        ttk.Button(nav_frame, text="Открыть Baseline Center", command=self.open_baseline_center).pack(fill="x")
-        ttk.Button(nav_frame, text="Baseline и контракт", command=self.show_contract_tab).pack(fill="x", pady=(6, 0))
+        ttk.Button(nav_frame, text="Открыть центр опорного прогона", command=self.open_baseline_center).pack(fill="x")
+        ttk.Button(nav_frame, text="Опорный прогон и настройки", command=self.show_contract_tab).pack(fill="x", pady=(6, 0))
         ttk.Button(nav_frame, text="Выполнение оптимизации", command=self.show_runtime_tab).pack(fill="x", pady=(6, 0))
         ttk.Button(nav_frame, text="История", command=self.show_history_tab).pack(fill="x", pady=(6, 0))
         ttk.Button(nav_frame, text="Готовые прогоны", command=self.show_finished_tab).pack(fill="x", pady=(6, 0))
@@ -210,8 +343,8 @@ class DesktopOptimizerCenter:
         self.finished_tab = DesktopOptimizerFinishedTab(self.notebook, self)
         self.handoff_tab = DesktopOptimizerHandoffTab(self.notebook, self)
         self.packaging_tab = DesktopOptimizerPackagingTab(self.notebook, self)
-        self.notebook.add(self.dashboard_tab, text="Baseline и запуск")
-        self.notebook.add(self.contract_tab, text="Baseline и контракт")
+        self.notebook.add(self.dashboard_tab, text="Опорный прогон и запуск")
+        self.notebook.add(self.contract_tab, text="Опорный прогон и настройки")
         self.notebook.add(self.runtime_tab, text="Выполнение")
         self.notebook.add(self.history_tab, text="История")
         self.notebook.add(self.finished_tab, text="Готовые прогоны")
@@ -278,11 +411,11 @@ class DesktopOptimizerCenter:
             )
         except Exception as exc:
             messagebox.showerror(
-                "Baseline Center",
-                f"Не удалось открыть Baseline Center:\n{exc}",
+                "Центр опорного прогона",
+                f"Не удалось открыть центр опорного прогона:\n{exc}",
             )
             return
-        self.status_var.set("Открыт Baseline Center (WS-BASELINE / HO-006).")
+        self.status_var.set("Открыт центр опорного прогона.")
 
     def open_current_artifact(self, attr_name: str) -> None:
         snapshot = self._contract_snapshot
@@ -295,7 +428,7 @@ class DesktopOptimizerCenter:
             self._open_path(getattr(snapshot, attr_name, None))
         except Exception as exc:
             messagebox.showerror(
-                "Desktop Optimizer Center",
+                "Центр оптимизации",
                 f"Не удалось открыть путь:\n{exc}",
             )
 
@@ -304,15 +437,15 @@ class DesktopOptimizerCenter:
         for row in rows:
             explore_pct = int(round(float(row.get("explore_frac", 0.0) or 0.0) * 100.0))
             line = (
-                f"{row.get('stage_name')}: {row.get('role')}\n"
-                f"  policy={row.get('policy_name')} | requested={row.get('requested_mode')} | "
-                f"effective={row.get('effective_mode')} | top_k={int(row.get('top_k', 0) or 0)} | "
-                f"explore={explore_pct}% | explore_budget={int(row.get('explore_budget', 0) or 0)} | "
-                f"focus_budget={int(row.get('focus_budget', 0) or 0)}"
+                f"{row.get('stage_name')} - {row.get('role')}\n"
+                f"  политика {row.get('policy_name')}; запрошено {row.get('requested_mode')}; "
+                f"применено {row.get('effective_mode')}; лучших {int(row.get('top_k', 0) or 0)}; "
+                f"разведка {explore_pct}%; бюджет разведки {int(row.get('explore_budget', 0) or 0)}; "
+                f"бюджет уточнения {int(row.get('focus_budget', 0) or 0)}"
             )
             fallback_reason = str(row.get("fallback_reason") or "")
             if fallback_reason:
-                line += f"\n  fallback: {fallback_reason}"
+                line += f"\n  причина замены - {fallback_reason}"
             lines.append(line)
         return "\n\n".join(lines)
 
@@ -342,19 +475,19 @@ class DesktopOptimizerCenter:
 
     def _format_runtime_status_text(self, surface: dict[str, Any]) -> str:
         if not surface:
-            return "Активного optimization job сейчас нет."
+            return "Активная задача оптимизации сейчас не выполняется."
         job = surface.get("job")
         rc = surface.get("returncode")
         runtime_summary = dict(surface.get("runtime_summary") or {})
         lines = [
-            f"run_dir: {getattr(job, 'run_dir', '')}",
-            f"pipeline: {getattr(job, 'pipeline_mode', '')}",
-            f"backend: {getattr(job, 'backend', '')}",
-            f"budget: {int(getattr(job, 'budget', 0) or 0)}",
+            f"Папка запуска - {getattr(job, 'run_dir', '')}",
+            f"Контур запуска - {_operator_token_text(getattr(job, 'pipeline_mode', ''))}",
+            f"Исполнитель - {_operator_token_text(getattr(job, 'backend', ''))}",
+            f"Бюджет - {int(getattr(job, 'budget', 0) or 0)}",
         ]
-        lines.append("состояние: выполняется" if rc is None else f"состояние: завершено rc={int(rc)}")
+        lines.append("Состояние - выполняется" if rc is None else f"Состояние - завершено, код {int(rc)}")
         if surface.get("soft_stop_requested"):
-            lines.append("soft-stop: requested")
+            lines.append("Мягкая остановка запрошена.")
         if runtime_summary:
             lines.append("")
             lines.extend(str(line) for line in surface.get("captions") or [])
@@ -362,35 +495,35 @@ class DesktopOptimizerCenter:
 
     def _format_run_identity_text(self, identity: dict[str, Any] | None = None) -> str:
         payload = dict(identity or self.runtime.selected_run_identity_summary())
-        state = str(payload.get("state") or "MISSING").upper()
+        state = _operator_state(payload.get("state"), fallback="не найден")
         lines = [
-            f"state: {state}",
-            str(payload.get("banner") or "Run identity summary is not available."),
+            f"Состояние - {state}",
+            str(payload.get("banner") or "Сводка выбранного запуска недоступна."),
             (
-                "resume: "
-                f"requested={'yes' if bool(payload.get('resume_requested')) else 'no'} | "
-                f"launch={payload.get('launch_pipeline') or '—'} | "
-                f"selected={payload.get('selected_pipeline') or '—'}"
+                "Продолжение - "
+                f"{'запрошено' if bool(payload.get('resume_requested')) else 'не запрошено'}. "
+                f"Текущий контур - {_operator_token_text(payload.get('launch_pipeline'))}. "
+                f"Выбранный контур - {_operator_token_text(payload.get('selected_pipeline'))}."
             ),
         ]
         if payload.get("selected_run_dir"):
             lines.extend(
                 [
-                    f"run: {payload.get('selected_run_name') or '—'}",
-                    f"run_id: {payload.get('run_id') or '—'}",
-                    f"run_dir: {payload.get('selected_run_dir')}",
+                    f"Запуск - {payload.get('selected_run_name') or '—'}",
+                    f"Идентификатор запуска - {payload.get('run_id') or '—'}",
+                    f"Папка запуска - {payload.get('selected_run_dir')}",
                     (
-                        "hashes: "
-                        f"objective={_short_hash(payload.get('objective_contract_hash'))} | "
-                        f"problem={_short_hash(payload.get('problem_hash'))} | "
-                        f"baseline={_short_hash(payload.get('active_baseline_hash'))} | "
-                        f"suite={_short_hash(payload.get('suite_snapshot_hash'))}"
+                        "Контрольные метки - "
+                        f"цели {_short_hash(payload.get('objective_contract_hash'))}; "
+                        f"задача {_short_hash(payload.get('problem_hash'))}; "
+                        f"опорный прогон {_short_hash(payload.get('active_baseline_hash'))}; "
+                        f"набор {_short_hash(payload.get('suite_snapshot_hash'))}."
                     ),
                     (
-                        "selected_run_contract: "
-                        f"{_short_hash(payload.get('selected_run_contract_hash'))} | "
-                        f"exists={'yes' if bool(payload.get('selected_run_contract_exists')) else 'no'} | "
-                        f"analysis={payload.get('analysis_handoff_ready_state') or '—'}"
+                        "Паспорт выбранного запуска - "
+                        f"{_short_hash(payload.get('selected_run_contract_hash'))}. "
+                        f"Файл {'есть' if bool(payload.get('selected_run_contract_exists')) else 'не найден'}. "
+                        f"Передача в анализ - {_operator_state(payload.get('analysis_handoff_ready_state'), fallback='нет данных')}."
                     ),
                 ]
             )
@@ -401,9 +534,15 @@ class DesktopOptimizerCenter:
             str(item) for item in tuple(payload.get("warnings") or ()) if str(item).strip()
         )
         if blockers:
-            lines.append("blockers: " + "; ".join(blockers))
+            lines.append(
+                "Блокирующие причины - "
+                + "; ".join(_operator_issue_text(item) for item in blockers)
+            )
         if warnings:
-            lines.append("notes: " + "; ".join(warnings))
+            lines.append(
+                "Примечания - "
+                + "; ".join(_operator_issue_text(item) for item in warnings)
+            )
         return "\n".join(lines)
 
     def _format_resume_target_text(self) -> str:
@@ -412,59 +551,62 @@ class DesktopOptimizerCenter:
         selected_run_dir = str(payload.get("selected_run_dir") or "")
         if not selected_run_dir:
             return (
-                "History target не выбран.\n"
-                "Выберите staged/coordinator run во вкладке History, чтобы использовать его как resume target.\n\n"
+                "Запуск из истории не выбран.\n"
+                "Выберите поэтапный или координационный запуск во вкладке «История», чтобы продолжить его.\n\n"
                 + identity_text
             )
         lines = [
-            f"выбранный прогон: {payload.get('selected_run_name') or '—'}",
-            f"контур выбранного прогона: {payload.get('selected_pipeline') or '—'}",
-            f"путь к выбранному прогону: {selected_run_dir}",
-            f"контур текущего запуска: {payload.get('launch_pipeline') or '—'}",
+            f"Выбранный прогон - {payload.get('selected_run_name') or '—'}",
+            f"Контур выбранного прогона - {_operator_token_text(payload.get('selected_pipeline'))}",
+            f"Путь к выбранному прогону - {selected_run_dir}",
+            f"Контур текущего запуска - {_operator_token_text(payload.get('launch_pipeline'))}",
         ]
         if payload.get("selected_run_id"):
-            lines.append(f"идентификатор координатора: {payload.get('selected_run_id')}")
+            lines.append(f"Идентификатор координатора - {payload.get('selected_run_id')}")
         if bool(payload.get("stage_resume_enabled")):
-            lines.append("продолжение стадий: включено")
+            lines.append("Продолжение стадий включено.")
         else:
-            lines.append("продолжение стадий: выключено")
+            lines.append("Продолжение стадий выключено.")
         if bool(payload.get("coord_resume_enabled")):
             lines.append(
-                f"продолжение координатора: включено (run_id={payload.get('coord_run_id') or 'auto/problem-hash'})"
+                f"Продолжение координатора включено. Идентификатор - {payload.get('coord_run_id') or 'автоматически'}."
             )
         else:
-            lines.append("продолжение координатора: выключено")
-        lines.extend(["", "Run identity / resume safety:", identity_text])
+            lines.append("Продолжение координатора выключено.")
+        lines.extend(["", "Идентичность запуска и безопасное продолжение:", identity_text])
         return "\n".join(lines)
 
     def _format_dashboard_workspace_text(self) -> str:
         snapshot = self._contract_snapshot
         if snapshot is None:
             snapshot = self.runtime.contract_snapshot()
-        objective_keys = ", ".join(tuple(getattr(snapshot, "objective_keys", ()) or ())) or "—"
+        objective_keys = _operator_list_text(getattr(snapshot, "objective_keys", ()))
         stage_counts = ", ".join(
-            f"{key}={value}"
+            f"{_operator_token_text(key)} - {value}"
             for key, value in dict(getattr(snapshot, "enabled_stage_counts", {}) or {}).items()
         ) or "—"
         return "\n".join(
             [
-                f"рабочая область: {getattr(snapshot, 'workspace_dir', '')}",
-                f"хэш задачи: {getattr(snapshot, 'problem_hash', '') or '—'}",
-                f"режим хэша: {getattr(snapshot, 'problem_hash_mode', '') or '—'}",
-                f"цели оптимизации: {objective_keys}",
+                f"Рабочая папка - {getattr(snapshot, 'workspace_dir', '')}",
+                f"Контроль задачи - {getattr(snapshot, 'problem_hash', '') or '—'}",
+                f"Режим контроля - {_problem_hash_mode_text(getattr(snapshot, 'problem_hash_mode', ''))}",
+                f"Цели оптимизации - {objective_keys}",
                 (
-                    "пространство поиска: "
-                    f"базовых={int(getattr(snapshot, 'base_param_count', 0) or 0)}, "
-                    f"проектных={int(getattr(snapshot, 'search_param_count', 0) or 0)}, "
-                    f"расширенных={int(getattr(snapshot, 'widened_range_count', 0) or 0)}"
+                    "Пространство поиска - "
+                    f"базовых параметров {int(getattr(snapshot, 'base_param_count', 0) or 0)}, "
+                    f"проектных параметров {int(getattr(snapshot, 'search_param_count', 0) or 0)}, "
+                    f"расширенных диапазонов {int(getattr(snapshot, 'widened_range_count', 0) or 0)}."
                 ),
                 (
-                    "покрытие сценариев: "
-                    f"строк={int(getattr(snapshot, 'suite_row_count', 0) or 0)}, "
-                    f"включено={int(getattr(snapshot, 'enabled_suite_total', 0) or 0)}, "
-                    f"стадии={stage_counts}"
+                    "Покрытие сценариев - "
+                    f"строк {int(getattr(snapshot, 'suite_row_count', 0) or 0)}, "
+                    f"включено {int(getattr(snapshot, 'enabled_suite_total', 0) or 0)}, "
+                    f"стадии {stage_counts}."
                 ),
-                f"источник базового решения: {getattr(snapshot, 'baseline_source_label', '') or getattr(snapshot, 'baseline_source_kind', '') or '—'}",
+                (
+                    "Источник опорного прогона - "
+                    f"{_operator_token_text(getattr(snapshot, 'baseline_source_label', '') or getattr(snapshot, 'baseline_source_kind', ''))}"
+                ),
             ]
         )
 
@@ -474,33 +616,33 @@ class DesktopOptimizerCenter:
         identity = dict(dashboard.get("selected_run_identity") or {})
         active_surface = dict(dashboard.get("active_surface") or {})
         lines = [
-            f"профиль запуска: {launch_profile.get('profile_label') or '—'}",
+            f"Профиль запуска - {launch_profile.get('profile_label') or '—'}",
             (
-                "режим запуска: "
-                f"{launch_profile.get('launch_pipeline') or '—'} / "
-                f"{launch_profile.get('backend') or '—'}"
+                "Режим запуска - "
+                f"{_operator_token_text(launch_profile.get('launch_pipeline'))} / "
+                f"{_operator_token_text(launch_profile.get('backend'))}"
             ),
             (
-                "resume target: "
-                f"{resume_target.get('selected_run_name') or 'not selected'} / "
-                f"{resume_target.get('selected_pipeline') or '—'}"
+                "Запуск для продолжения - "
+                f"{resume_target.get('selected_run_name') or 'не выбран'} / "
+                f"{_operator_token_text(resume_target.get('selected_pipeline'))}"
             ),
             (
-                "identity: "
-                f"{identity.get('state') or 'MISSING'} | "
-                f"objective={_short_hash(identity.get('objective_contract_hash'))} | "
-                f"problem={_short_hash(identity.get('problem_hash'))} | "
-                f"baseline={_short_hash(identity.get('active_baseline_hash'))}"
+                "Идентичность запуска - "
+                f"{_operator_state(identity.get('state'), fallback='не найден')}. "
+                f"Цели {_short_hash(identity.get('objective_contract_hash'))}; "
+                f"задача {_short_hash(identity.get('problem_hash'))}; "
+                f"опорный прогон {_short_hash(identity.get('active_baseline_hash'))}."
             ),
         ]
         if not active_surface:
-            lines.append("active job: none")
+            lines.append("Активная задача не выполняется.")
             return "\n".join(lines)
         job = active_surface.get("job")
         lines.append(
-            "active job: "
-            f"{getattr(job, 'pipeline_mode', '') or '—'} / "
-            f"{getattr(job, 'backend', '') or '—'} @ {getattr(job, 'run_dir', '') or '—'}"
+            "Активная задача - "
+            f"{_operator_token_text(getattr(job, 'pipeline_mode', ''))} / "
+            f"{_operator_token_text(getattr(job, 'backend', ''))} @ {getattr(job, 'run_dir', '') or '—'}"
         )
         lines.extend(str(line) for line in active_surface.get("captions") or [])
         return "\n".join(lines)
@@ -509,29 +651,29 @@ class DesktopOptimizerCenter:
         overview = dict(dashboard.get("finished_overview") or {})
         best = dict(dashboard.get("best_finished_row") or {})
         if int(overview.get("total_jobs", 0) or 0) <= 0:
-            return "Finished jobs readiness: historical finished runs пока не найдены."
+            return "Завершённые прогоны пока не найдены."
         lines = [
             (
-                "jobs: "
-                f"total={int(overview.get('total_jobs', 0) or 0)}, "
-                f"truth_ready={int(overview.get('truth_ready_jobs', 0) or 0)}, "
-                f"verification={int(overview.get('verification_pass_jobs', 0) or 0)}, "
-                f"interference={int(overview.get('interference_jobs', 0) or 0)}"
+                "Прогоны - "
+                f"всего {int(overview.get('total_jobs', 0) or 0)}, "
+                f"готовы к проверке {int(overview.get('truth_ready_jobs', 0) or 0)}, "
+                f"прошли проверку {int(overview.get('verification_pass_jobs', 0) or 0)}, "
+                f"с рисками {int(overview.get('interference_jobs', 0) or 0)}."
             ),
             (
-                "rows: "
-                f"packaging={int(overview.get('rows_with_packaging_total', 0) or 0)}, "
-                f"truth_ready={int(overview.get('truth_ready_rows_total', 0) or 0)}, "
-                f"verification={int(overview.get('verification_rows_total', 0) or 0)}"
+                "Строки результатов - "
+                f"для выпуска {int(overview.get('rows_with_packaging_total', 0) or 0)}, "
+                f"готовы к проверке {int(overview.get('truth_ready_rows_total', 0) or 0)}, "
+                f"прошли проверку {int(overview.get('verification_rows_total', 0) or 0)}."
             ),
         ]
         if best:
             lines.append(
-                "best finished run: "
-                f"{best.get('name') or '—'} | ready={best.get('ready_state') or '—'} | "
-                f"truth={int(best.get('truth_ready_rows', 0) or 0)} | "
-                f"verify={int(best.get('verification_pass_rows', 0) or 0)} | "
-                f"risk={int(best.get('interference_rows', 0) or 0)}"
+                "Лучший завершённый прогон - "
+                f"{best.get('name') or '—'}. Готовность {_operator_state(best.get('ready_state'), fallback='нет данных')}. "
+                f"Готовых строк {int(best.get('truth_ready_rows', 0) or 0)}. "
+                f"Проверенных строк {int(best.get('verification_pass_rows', 0) or 0)}. "
+                f"Строк с рисками {int(best.get('interference_rows', 0) or 0)}."
             )
         return "\n".join(lines)
 
@@ -539,23 +681,24 @@ class DesktopOptimizerCenter:
         overview = dict(dashboard.get("handoff_overview") or {})
         best = dict(dashboard.get("best_handoff_row") or {})
         if int(overview.get("total_candidates", 0) or 0) <= 0:
-            return "Handoff: staged continuation candidates пока не найдены."
+            return "Кандидаты для передачи пока не найдены."
         lines = [
             (
-                "candidates: "
-                f"total={int(overview.get('total_candidates', 0) or 0)}, "
-                f"done={int(overview.get('done_candidates', 0) or 0)}, "
-                f"full_ring={int(overview.get('full_ring_candidates', 0) or 0)}, "
-                f"live={int(overview.get('live_candidates', 0) or 0)}"
+                "Кандидаты - "
+                f"всего {int(overview.get('total_candidates', 0) or 0)}, "
+                f"завершены {int(overview.get('done_candidates', 0) or 0)}, "
+                f"полное кольцо {int(overview.get('full_ring_candidates', 0) or 0)}, "
+                f"в работе {int(overview.get('live_candidates', 0) or 0)}."
             ),
-            f"seed inventory: {int(overview.get('seed_total', 0) or 0)}",
+            f"Стартовых вариантов - {int(overview.get('seed_total', 0) or 0)}.",
         ]
         if best:
             lines.append(
-                "best handoff: "
-                f"{best.get('run') or '—'} | preset={best.get('preset') or '—'} | "
-                f"score={float(best.get('quality_score', 0.0) or 0.0):.1f} | "
-                f"budget={int(best.get('budget', 0) or 0)} | seeds={int(best.get('seeds', 0) or 0)}"
+                "Лучший кандидат на передачу - "
+                f"{best.get('run') or '—'}. Профиль {_operator_preset_text(best.get('preset'))}. "
+                f"Оценка {float(best.get('quality_score', 0.0) or 0.0):.1f}. "
+                f"Бюджет {int(best.get('budget', 0) or 0)}. "
+                f"Стартовых вариантов {int(best.get('seeds', 0) or 0)}."
             )
         return "\n".join(lines)
 
@@ -563,44 +706,44 @@ class DesktopOptimizerCenter:
         overview = dict(dashboard.get("packaging_overview") or {})
         best = dict(dashboard.get("best_packaging_row") or {})
         if int(overview.get("total_runs", 0) or 0) <= 0:
-            return "Packaging: packaging evidence по finished runs пока недоступен."
+            return "Данные для выпуска по завершённым прогонам пока недоступны."
         lines = [
             (
-                "runs: "
-                f"total={int(overview.get('total_runs', 0) or 0)}, "
-                f"truth_ready={int(overview.get('truth_ready_runs', 0) or 0)}, "
-                f"verification={int(overview.get('verification_runs', 0) or 0)}, "
-                f"zero_interference={int(overview.get('zero_interference_runs', 0) or 0)}"
+                "Прогоны для выпуска - "
+                f"всего {int(overview.get('total_runs', 0) or 0)}, "
+                f"готовы к проверке {int(overview.get('truth_ready_runs', 0) or 0)}, "
+                f"прошли проверку {int(overview.get('verification_runs', 0) or 0)}, "
+                f"без рисков {int(overview.get('zero_interference_runs', 0) or 0)}."
             ),
             (
-                "row totals: "
-                f"packaging={int(overview.get('packaging_rows_total', 0) or 0)}, "
-                f"truth_ready={int(overview.get('truth_ready_rows_total', 0) or 0)}, "
-                f"verification={int(overview.get('verification_rows_total', 0) or 0)}"
+                "Строки для выпуска - "
+                f"всего {int(overview.get('packaging_rows_total', 0) or 0)}, "
+                f"готовы к проверке {int(overview.get('truth_ready_rows_total', 0) or 0)}, "
+                f"прошли проверку {int(overview.get('verification_rows_total', 0) or 0)}."
             ),
         ]
         if best:
             lines.append(
-                "best packaging run: "
-                f"{best.get('name') or '—'} | ready={best.get('ready_state') or '—'} | "
-                f"truth={int(best.get('truth_ready_rows', 0) or 0)} | "
-                f"verify={int(best.get('verification_pass_rows', 0) or 0)} | "
-                f"risk={int(best.get('interference_rows', 0) or 0)}"
+                "Лучший прогон для выпуска - "
+                f"{best.get('name') or '—'}. Готовность {_operator_state(best.get('ready_state'), fallback='нет данных')}. "
+                f"Готовых строк {int(best.get('truth_ready_rows', 0) or 0)}. "
+                f"Проверенных строк {int(best.get('verification_pass_rows', 0) or 0)}. "
+                f"Строк с рисками {int(best.get('interference_rows', 0) or 0)}."
             )
         return "\n".join(lines)
 
     def _format_compact_mode_summary(self) -> str:
         payload = self.runtime.launch_profile_summary()
         profile = str(payload.get("profile_label") or "Автоматический маршрут")
-        pipeline = str(payload.get("launch_pipeline") or "—")
-        backend = str(payload.get("backend") or "—")
+        pipeline = _operator_token_text(payload.get("launch_pipeline"))
+        backend = _operator_token_text(payload.get("backend"))
         drift_keys = tuple(str(key) for key in payload.get("drift_keys") or ())
         summary = (
-            "Маршрут: Базовый прогон -> Оптимизация -> Анализ | "
-            f"Режим: {profile} | Контур: {pipeline} | Исполнитель: {backend}"
+            "Порядок работы: опорный прогон, оптимизация, анализ. "
+            f"Режим - {profile}. Контур - {pipeline}. Исполнитель - {backend}."
         )
         if drift_keys:
-            summary += " | Изменено вручную: " + ", ".join(drift_keys[:3])
+            summary += " Изменено вручную - " + _operator_list_text(drift_keys[:3])
             if len(drift_keys) > 3:
                 summary += "..."
         return summary
@@ -611,17 +754,17 @@ class DesktopOptimizerCenter:
             snapshot = self.runtime.contract_snapshot()
         return "\n".join(
             [
-                f"Хэш задачи: {getattr(snapshot, 'problem_hash', '') or '—'}",
+                f"Контроль задачи - {getattr(snapshot, 'problem_hash', '') or '—'}",
                 (
-                    "Сценарии: "
+                    "Сценарии - "
                     f"всего {int(getattr(snapshot, 'suite_row_count', 0) or 0)}, "
                     f"активно {int(getattr(snapshot, 'enabled_suite_total', 0) or 0)}"
                 ),
                 (
-                    "Параметры поиска: "
+                    "Параметры поиска - "
                     f"{int(getattr(snapshot, 'search_param_count', 0) or 0)}"
                 ),
-                "Рабочая зона: базовый прогон, выполнение оптимизации, история, передача в анализ и выпуск открываются справа во вкладках.",
+                "Рабочая зона: опорный прогон, выполнение оптимизации, история, передача в анализ и выпуск открываются справа во вкладках.",
             ]
         )
 
@@ -663,18 +806,21 @@ class DesktopOptimizerCenter:
         if snapshot is None:
             snapshot = self.runtime.contract_snapshot()
         auto_update = bool(self.runtime.session_state.get("opt_autoupdate_baseline", False))
-        source_label = str(getattr(snapshot, "baseline_source_label", "") or getattr(snapshot, "baseline_source_kind", "") or "—")
+        source_label = _operator_token_text(
+            getattr(snapshot, "baseline_source_label", "")
+            or getattr(snapshot, "baseline_source_kind", "")
+        )
         baseline_path = str(getattr(snapshot, "baseline_path", "") or "не найден")
         ho006_state = str(getattr(snapshot, "active_baseline_state", "") or "missing")
         ho006_hash = str(getattr(snapshot, "active_baseline_hash", "") or "")
         ho006_can_consume = bool(getattr(snapshot, "optimizer_baseline_can_consume", False))
         return "\n".join(
             [
-                f"Базовый прогон: {source_label}",
-                f"HO-006: {ho006_state} ({'current' if ho006_can_consume else 'blocked'})",
-                f"active_baseline_hash: {ho006_hash[:12] if ho006_hash else '—'}",
-                f"Путь: {baseline_path}",
-                f"Автообновление baseline: {'включено' if auto_update else 'выключено'}",
+                f"Опорный прогон - {source_label}",
+                f"Состояние активного прогона - {_operator_state(ho006_state)} ({'актуален' if ho006_can_consume else 'заблокирован'})",
+                f"Контроль активного прогона - {ho006_hash[:12] if ho006_hash else '—'}",
+                f"Путь - {baseline_path}",
+                f"Автообновление опорного прогона {'включено' if auto_update else 'выключено'}.",
             ]
         )
 
@@ -683,7 +829,7 @@ class DesktopOptimizerCenter:
         if snapshot is None:
             snapshot = self.runtime.contract_snapshot()
         identity = self.runtime.selected_run_identity_summary()
-        objective_stack = ", ".join(tuple(getattr(snapshot, "objective_keys", ()) or ())) or "—"
+        objective_stack = _operator_list_text(getattr(snapshot, "objective_keys", ()))
         hard_gate = format_hard_gate(
             getattr(snapshot, "penalty_key", ""),
             getattr(snapshot, "penalty_tol", None),
@@ -694,15 +840,15 @@ class DesktopOptimizerCenter:
             mode_label = "Расширенный: Распределённая координация"
         return "\n".join(
             [
-                f"Контракт запуска: {mode_label}",
-                f"Objective stack: {objective_stack}",
-                f"Hard gate: {hard_gate}",
+                f"Настройки запуска - {mode_label}",
+                f"Цели оптимизации - {objective_stack}",
+                f"Жёсткий критерий - {hard_gate}",
                 (
-                    "Run identity: "
-                    f"{identity.get('state') or 'MISSING'} | "
-                    f"objective={_short_hash(identity.get('objective_contract_hash'))} | "
-                    f"problem={_short_hash(identity.get('problem_hash'))} | "
-                    f"resume={'requested' if bool(identity.get('resume_requested')) else 'off'}"
+                    "Идентичность запуска - "
+                    f"{_operator_state(identity.get('state'), fallback='не найден')}. "
+                    f"Цели {_short_hash(identity.get('objective_contract_hash'))}; "
+                    f"задача {_short_hash(identity.get('problem_hash'))}; "
+                    f"продолжение {'запрошено' if bool(identity.get('resume_requested')) else 'выключено'}."
                 ),
             ]
         )
@@ -711,53 +857,53 @@ class DesktopOptimizerCenter:
         pointer = dict(dashboard.get("latest_pointer") or {})
         if not bool(pointer.get("exists")):
             return (
-                "Контекст анализа ещё не закреплён.\n"
-                "Выберите прогон в History / Finished Jobs / Packaging / Handoff: "
-                "selected_run_contract.json будет создан автоматически."
+                "Прогон для анализа ещё не выбран.\n"
+                "Выберите прогон в истории, готовых прогонах, выпуске или передаче. "
+                "Паспорт выбранного запуска будет создан автоматически."
             )
         lines = [
-            f"контекст анализа: {pointer.get('pointer_path') or '—'}",
+            f"Текущий прогон для анализа - {pointer.get('pointer_path') or '—'}",
             (
-                "выбранный прогон: "
-                f"{pointer.get('run_name') or '—'} | "
-                f"{pointer.get('pipeline_mode') or '—'} / {pointer.get('backend') or '—'} | "
-                f"{pointer.get('status_label') or pointer.get('status') or '—'}"
+                "Выбранный прогон - "
+                f"{pointer.get('run_name') or '—'}. "
+                f"Контур {_operator_token_text(pointer.get('pipeline_mode'))} / {_operator_token_text(pointer.get('backend'))}. "
+                f"Состояние {_operator_state(pointer.get('status_label') or pointer.get('status'), fallback='нет данных')}."
             ),
             (
-                "meta: "
-                f"selected_from={pointer.get('selected_from') or '—'} | "
-                f"updated_at={pointer.get('updated_at') or '—'}"
+                "Сведения о выборе - "
+                f"источник {pointer.get('selected_from') or '—'}, "
+                f"обновлён {pointer.get('updated_at') or '—'}."
             ),
             (
-                "rows: "
-                f"total={int(pointer.get('rows', 0) or 0)}, "
-                f"done={int(pointer.get('done_count', 0) or 0)}, "
-                f"errors={int(pointer.get('error_count', 0) or 0)}"
+                "Строки результата - "
+                f"всего {int(pointer.get('rows', 0) or 0)}, "
+                f"завершено {int(pointer.get('done_count', 0) or 0)}, "
+                f"ошибок {int(pointer.get('error_count', 0) or 0)}."
             ),
         ]
         if bool(pointer.get("selected_matches_pointer")):
-            lines.append("передача в анализ: выбранный прогон уже закреплён.")
+            lines.append("Передача в анализ - выбранный прогон уже используется.")
         elif self._selected_run_dir:
-            lines.append("передача в анализ: закреплён другой прогон.")
+            lines.append("Передача в анализ - сейчас используется другой прогон.")
         if not bool(pointer.get("pointer_in_history")):
-            lines.append("история: закреплённый прогон вне текущего снимка workspace history.")
+            lines.append("История - текущий прогон анализа не найден в списке.")
         elif pointer.get("result_path"):
-            lines.append(f"результаты: {pointer.get('result_path')}")
+            lines.append(f"Результаты - {pointer.get('result_path')}")
         return "\n".join(lines)
 
     def _format_selected_run_next_step_text(self, payload: dict[str, Any]) -> str:
         rows = tuple(payload.get("rows") or ())
         if not rows:
-            return "Selected run next step summary пока недоступен."
+            return "Следующий шаг по выбранному прогону пока недоступен."
         lines = [
-            f"headline: {payload.get('headline') or '—'}",
-            f"next action: {payload.get('next_action') or '—'}",
+            f"Сводка - {payload.get('headline') or '—'}",
+            f"Следующее действие - {payload.get('next_action') or '—'}",
             "",
         ]
         for row in rows:
-            status = str(row.get("status") or "info").strip().upper() or "INFO"
+            status = _operator_state(row.get("status"), fallback="сведения")
             lines.append(
-                f"[{status}] {row.get('title') or 'step'} -> {row.get('action') or '—'}"
+                f"{status}. {row.get('title') or 'шаг'} -> {row.get('action') or '—'}"
             )
             lines.append(str(row.get("summary") or ""))
             lines.append("")
@@ -765,10 +911,10 @@ class DesktopOptimizerCenter:
 
     def _format_dashboard_selection_text(self) -> str:
         if not self._selected_run_dir:
-            return "Selected run context: run пока не выбран. Используйте History, Finished Jobs, Handoff или Packaging."
+            return "Прогон пока не выбран. Используйте историю, готовые прогоны, передачу или выпуск."
         details = self.runtime.selected_run_details(self._selected_run_dir)
         if details is None:
-            return f"Selected run context: {self._selected_run_dir}\nRun уже недоступен в workspace history."
+            return f"Контекст выбранного запуска: {self._selected_run_dir}\nЗапуск уже недоступен в истории рабочей области."
         summary = getattr(details, "summary")
         drift = self.runtime.contract_drift_summary(summary)
         identity = self.runtime.selected_run_identity_summary(self._selected_run_dir)
@@ -776,70 +922,70 @@ class DesktopOptimizerCenter:
         handoff_row = self.runtime.selected_handoff_row(self._selected_run_dir)
         latest_pointer = self.runtime.latest_pointer_summary()
         lines = [
-            f"selected run: {summary.run_dir}",
-            f"status: {summary.status_label} ({summary.status})",
-            f"pipeline/backend: {summary.pipeline_mode} / {summary.backend}",
-            f"run identity: {identity.get('state') or 'MISSING'} | {identity.get('banner') or '—'}",
+            f"Выбранный запуск - {summary.run_dir}",
+            f"Состояние - {_operator_state(summary.status_label or summary.status, fallback='нет данных')}",
+            f"Контур и исполнитель - {_operator_token_text(summary.pipeline_mode)} / {_operator_token_text(summary.backend)}",
+            f"Идентичность запуска - {_operator_state(identity.get('state'), fallback='не найден')}. {identity.get('banner') or '—'}",
             (
-                "identity hashes: "
-                f"run_id={identity.get('run_id') or '—'} | "
-                f"objective={_short_hash(identity.get('objective_contract_hash'))} | "
-                f"problem={_short_hash(identity.get('problem_hash'))} | "
-                f"baseline={_short_hash(identity.get('active_baseline_hash'))}"
+                "Контрольные метки - "
+                f"идентификатор {identity.get('run_id') or '—'}; "
+                f"цели {_short_hash(identity.get('objective_contract_hash'))}; "
+                f"задача {_short_hash(identity.get('problem_hash'))}; "
+                f"опорный прогон {_short_hash(identity.get('active_baseline_hash'))}."
             ),
-            f"objective keys: {', '.join(summary.objective_keys) or '—'}",
-            f"results: {summary.result_path or 'not found'}",
+            f"Цели - {_operator_list_text(summary.objective_keys)}",
+            f"Результаты - {summary.result_path or 'не найдены'}",
         ]
         if bool(latest_pointer.get("selected_matches_pointer")):
-            lines.append("передача в анализ: выбранный прогон уже закреплён")
+            lines.append("Передача в анализ - выбранный прогон уже закреплён.")
         elif bool(latest_pointer.get("exists")):
             lines.append(
-                "передача в анализ: закреплён "
+                "Передача в анализ - закреплён "
                 f"{latest_pointer.get('run_name') or '—'}"
             )
         diff_bits = tuple(drift.get("diff_bits") or ())
         scope_payload = dict(drift.get("scope_payload") or {})
         if diff_bits:
             lines.append(
-                "contract drift: " + ", ".join(
+                "Расхождение настроек - " + ", ".join(
                     DRIFT_LABELS.get(str(bit), str(bit)) for bit in diff_bits
                 )
             )
         else:
-            lines.append("contract drift: none")
+            lines.append("Расхождений настроек нет.")
         if str(scope_payload.get("compatibility") or ""):
             lines.append(
-                "problem scope compatibility: "
-                + str(scope_payload.get("compatibility") or "")
+                "Совместимость области задачи - "
+                + _operator_compat_text(scope_payload.get("compatibility"))
             )
         if packaging_row is not None:
             lines.append(
-                "packaging state: "
-                f"{packaging_row.get('ready_state') or '—'} | "
-                f"truth={int(packaging_row.get('truth_ready_rows', 0) or 0)} | "
-                f"verify={int(packaging_row.get('verification_pass_rows', 0) or 0)} | "
-                f"risk={int(packaging_row.get('interference_rows', 0) or 0)}"
+                "Состояние выпуска - "
+                f"{_operator_state(packaging_row.get('ready_state'), fallback='нет данных')}. "
+                f"Готовых строк {int(packaging_row.get('truth_ready_rows', 0) or 0)}. "
+                f"Проверенных строк {int(packaging_row.get('verification_pass_rows', 0) or 0)}. "
+                f"Строк с рисками {int(packaging_row.get('interference_rows', 0) or 0)}."
             )
         if handoff_row is not None:
             lines.append(
-                "handoff state: "
-                f"preset={handoff_row.get('preset') or '—'} | "
-                f"score={float(handoff_row.get('quality_score', 0.0) or 0.0):.1f} | "
-                f"budget={int(handoff_row.get('budget', 0) or 0)} | "
-                f"seeds={int(handoff_row.get('seeds', 0) or 0)}"
+                "Состояние передачи - "
+                f"профиль {_operator_preset_text(handoff_row.get('preset'))}. "
+                f"Оценка {float(handoff_row.get('quality_score', 0.0) or 0.0):.1f}. "
+                f"Бюджет {int(handoff_row.get('budget', 0) or 0)}. "
+                f"Стартовых вариантов {int(handoff_row.get('seeds', 0) or 0)}."
             )
         return "\n".join(lines)
 
     def _format_selected_contract_drift_text(self) -> str:
         if not self._selected_run_dir:
             return (
-                "Исторический run не выбран.\n"
-                "Выберите run во вкладке History, Finished Jobs, Handoff или Packaging, "
-                "чтобы сравнить его objective contract и problem scope с текущим launch context."
+                "Исторический прогон не выбран.\n"
+                "Выберите прогон во вкладке истории, готовых прогонов, передачи или выпуска, "
+                "чтобы сравнить его настройки с текущим запуском."
             )
         details = self.runtime.selected_run_details(self._selected_run_dir)
         if details is None:
-            return "Выбранный run больше не найден в workspace history."
+            return "Выбранный прогон больше не найден в истории рабочей папки."
         summary = getattr(details, "summary")
         drift = self.runtime.contract_drift_summary(summary)
         identity = self.runtime.selected_run_identity_summary(self._selected_run_dir)
@@ -848,151 +994,152 @@ class DesktopOptimizerCenter:
         baseline_compatibility = str(drift.get("baseline_compatibility") or "")
 
         def _compat_text(value: str) -> str:
-            normalized = str(value or "").strip()
-            if not normalized:
-                return "n/a"
-            return normalized
+            return _operator_compat_text(value)
 
         lines = [
-            f"identity state: {identity.get('state') or 'MISSING'}",
-            f"identity banner: {identity.get('banner') or '—'}",
+            f"Состояние идентичности - {_operator_state(identity.get('state'), fallback='не найден')}",
+            f"Пояснение - {identity.get('banner') or '—'}",
             (
-                "identity hashes: "
-                f"run_id={identity.get('run_id') or '—'} | "
-                f"objective={_short_hash(identity.get('objective_contract_hash'))} | "
-                f"problem={_short_hash(identity.get('problem_hash'))} | "
-                f"baseline={_short_hash(identity.get('active_baseline_hash'))} | "
-                f"selected_contract={_short_hash(identity.get('selected_run_contract_hash'))}"
+                "Контрольные метки - "
+                f"идентификатор {identity.get('run_id') or '—'}; "
+                f"цели {_short_hash(identity.get('objective_contract_hash'))}; "
+                f"задача {_short_hash(identity.get('problem_hash'))}; "
+                f"опорный прогон {_short_hash(identity.get('active_baseline_hash'))}; "
+                f"паспорт выбранного запуска {_short_hash(identity.get('selected_run_contract_hash'))}."
             ),
             "",
-            f"selected run: {summary.run_dir}",
-            f"pipeline/status: {summary.pipeline_mode} / {summary.status_label}",
+            f"Выбранный запуск - {summary.run_dir}",
+            f"Контур и состояние - {_operator_token_text(summary.pipeline_mode)} / {_operator_state(summary.status_label, fallback='нет данных')}",
             (
-                "selected contract: "
-                f"objectives={', '.join(tuple(drift.get('selected_objective_keys') or ())) or '—'} | "
-                f"penalty={drift.get('selected_penalty_key') or '—'} | "
-                f"tol={drift.get('selected_penalty_tol') if drift.get('selected_penalty_tol') is not None else '—'}"
+                "Выбранный запуск - "
+                f"цели {_operator_list_text(drift.get('selected_objective_keys'))}; "
+                f"ограничение {drift.get('selected_penalty_key') or '—'}; "
+                f"допуск {drift.get('selected_penalty_tol') if drift.get('selected_penalty_tol') is not None else '—'}."
             ),
             (
-                "current launch contract: "
-                f"objectives={', '.join(tuple(drift.get('current_objective_keys') or ())) or '—'} | "
-                f"penalty={drift.get('current_penalty_key') or '—'} | "
-                f"tol={drift.get('current_penalty_tol') if drift.get('current_penalty_tol') is not None else '—'}"
+                "Текущий запуск - "
+                f"цели {_operator_list_text(drift.get('current_objective_keys'))}; "
+                f"ограничение {drift.get('current_penalty_key') or '—'}; "
+                f"допуск {drift.get('current_penalty_tol') if drift.get('current_penalty_tol') is not None else '—'}."
             ),
         ]
         if diff_bits:
             lines.append(
-                "objective-contract drift: "
+                "Расхождение целей и ограничения - "
                 + ", ".join(DRIFT_LABELS.get(bit, bit) for bit in diff_bits)
             )
         else:
-            lines.append("objective-contract drift: none")
+            lines.append("Расхождений целей и ограничения нет.")
         lines.append(
-            "problem scope: "
-            f"run={drift.get('selected_problem_hash') or '—'} | "
-            f"current={drift.get('current_problem_hash') or '—'} | "
-            f"compatibility={_compat_text(scope_payload.get('compatibility', ''))}"
+            "Область задачи - "
+            f"выбранный прогон {drift.get('selected_problem_hash') or '—'}; "
+            f"текущий запуск {drift.get('current_problem_hash') or '—'}; "
+            f"совместимость {_compat_text(scope_payload.get('compatibility', ''))}."
         )
         lines.append(
-            "hash mode: "
-            f"run={drift.get('selected_problem_hash_mode') or '—'} | "
-            f"current={drift.get('current_problem_hash_mode') or '—'} | "
-            f"compatibility={_compat_text(scope_payload.get('mode_compatibility', ''))}"
+            "Режим контроля - "
+            f"выбранный прогон {_problem_hash_mode_text(drift.get('selected_problem_hash_mode'))}; "
+            f"текущий запуск {_problem_hash_mode_text(drift.get('current_problem_hash_mode'))}; "
+            f"совместимость {_compat_text(scope_payload.get('mode_compatibility', ''))}."
         )
         lines.append(
-            "baseline source: "
-            f"run={drift.get('selected_baseline_label') or drift.get('selected_baseline_path') or '—'} | "
-            f"current={drift.get('current_baseline_label') or drift.get('current_baseline_path') or '—'} | "
-            f"compatibility={_compat_text(baseline_compatibility)}"
+            "Источник опорного прогона - "
+            f"выбранный прогон {_operator_token_text(drift.get('selected_baseline_label') or drift.get('selected_baseline_path'))}; "
+            f"текущий запуск {_operator_token_text(drift.get('current_baseline_label') or drift.get('current_baseline_path'))}; "
+            f"совместимость {_compat_text(baseline_compatibility)}."
         )
         lines.append("")
         if str(scope_payload.get("compatibility") or "") == "different" or str(
             scope_payload.get("mode_compatibility") or ""
         ) == "different":
             lines.append(
-                "Operator note: scope differs from the current launch contract. "
-                "Resume/cache/baseline guards will treat this as another optimization problem."
+                "Область отличается от текущего запуска. "
+                "Продолжение и опорный прогон будут рассматриваться как другая задача оптимизации."
             )
         elif diff_bits:
             lines.append(
-                "Operator note: scope matches, but objective contract differs. "
-                "Use `Apply selected contract`, если хотите честный apples-to-apples relaunch."
+                "Область совпадает, но цели или ограничение отличаются. "
+                "Примените настройки выбранного запуска, если нужен честный повтор."
             )
         else:
             lines.append(
-                "Operator note: selected run is aligned with the current launch contract and scope."
+                "Выбранный прогон согласован с текущими настройками и областью задачи."
             )
         return "\n".join(lines)
 
     def _format_launch_profile_text(self) -> str:
         summary = self.runtime.launch_profile_summary()
         lines = [
-            f"profile: {summary.get('profile_label') or '—'}",
-            f"pipeline/backend: {summary.get('launch_pipeline') or '—'} / {summary.get('backend') or '—'}",
-            str(summary.get("description") or "Профиль задаёт стартовый runtime preset для operator workflow."),
+            f"Профиль - {summary.get('profile_label') or '—'}",
+            (
+                "Контур и исполнитель - "
+                f"{_operator_token_text(summary.get('launch_pipeline'))} / "
+                f"{_operator_token_text(summary.get('backend'))}"
+            ),
+            str(summary.get("description") or "Профиль задаёт стартовые настройки выполнения."),
         ]
         if str(summary.get("launch_pipeline") or "") == "staged":
             lines.append(
-                "stage knobs: "
-                f"minutes={float(summary.get('stage_minutes', 0.0) or 0.0):.1f}, "
-                f"jobs={int(summary.get('stage_jobs', 0) or 0)}, "
-                f"seed_candidates={int(summary.get('seed_candidates', 0) or 0)}, "
-                f"seed_conditions={int(summary.get('seed_conditions', 0) or 0)}, "
-                f"warmstart={summary.get('warmstart_mode') or '—'}"
+                "Поэтапный запуск - "
+                f"минут {float(summary.get('stage_minutes', 0.0) or 0.0):.1f}, "
+                f"задач {int(summary.get('stage_jobs', 0) or 0)}, "
+                f"кандидатов {int(summary.get('seed_candidates', 0) or 0)}, "
+                f"условий {int(summary.get('seed_conditions', 0) or 0)}, "
+                f"тёплый старт {summary.get('warmstart_mode') or '—'}."
             )
             lines.append(
-                "runtime flags: "
-                f"adaptive_eps={'on' if bool(summary.get('adaptive_influence_eps')) else 'off'}, "
-                f"stage_resume={'on' if bool(summary.get('resume_stage')) else 'off'}"
+                "Дополнительные флаги - "
+                f"автопорог {'включён' if bool(summary.get('adaptive_influence_eps')) else 'выключен'}, "
+                f"продолжение стадий {'включено' if bool(summary.get('resume_stage')) else 'выключено'}."
             )
         else:
             lines.append(
-                "coordinator knobs: "
-                f"budget={int(summary.get('budget', 0) or 0)}, "
-                f"max_inflight={int(summary.get('max_inflight', 0) or 0)}, "
-                f"q={int(summary.get('q', 0) or 0)}, "
-                f"export_every={int(summary.get('export_every', 0) or 0)}"
+                "Координатор - "
+                f"бюджет {int(summary.get('budget', 0) or 0)}, "
+                f"одновременно задач {int(summary.get('max_inflight', 0) or 0)}, "
+                f"группа кандидатов {int(summary.get('q', 0) or 0)}, "
+                f"выгрузка каждые {int(summary.get('export_every', 0) or 0)}."
             )
             lines.append(
-                "cluster knobs: "
-                f"dask_workers={int(summary.get('dask_workers', 0) or 0)} x "
-                f"{int(summary.get('dask_threads_per_worker', 0) or 0)} threads, "
-                f"ray_eval={int(summary.get('ray_num_evaluators', 0) or 0)}, "
-                f"ray_prop={int(summary.get('ray_num_proposers', 0) or 0)}"
+                "Параметры кластера - "
+                f"Dask {int(summary.get('dask_workers', 0) or 0)} x "
+                f"{int(summary.get('dask_threads_per_worker', 0) or 0)} потоков, "
+                f"Ray исполнителей {int(summary.get('ray_num_evaluators', 0) or 0)}, "
+                f"генераторов Ray {int(summary.get('ray_num_proposers', 0) or 0)}."
             )
             lines.append(
-                "resume flags: "
-                f"coord_resume={'on' if bool(summary.get('resume_coord')) else 'off'}"
+                "Продолжение координатора "
+                f"{'включено' if bool(summary.get('resume_coord')) else 'выключено'}."
             )
         drift_keys = tuple(summary.get("drift_keys") or ())
         if drift_keys:
             lines.append("")
-            lines.append("manual overrides since preset:")
-            lines.append(", ".join(str(key) for key in drift_keys))
+            lines.append("Изменено вручную после применения профиля:")
+            lines.append(_operator_list_text(drift_keys))
         else:
             lines.append("")
-            lines.append("Preset currently matches the live launch knobs.")
+            lines.append("Текущие настройки совпадают с выбранным профилем.")
         return "\n".join(lines)
 
     def _format_launch_readiness_text(self, readiness: dict[str, Any]) -> str:
         rows = tuple(readiness.get("rows") or ())
         if not rows:
-            return "Launch readiness snapshot пока недоступен."
+            return "Сводка готовности к запуску пока недоступна."
         lines = [
-            f"headline: {readiness.get('headline') or '—'}",
+            f"Сводка - {readiness.get('headline') or '—'}",
             (
-                "status counts: "
-                f"warn={int(readiness.get('warn_count', 0) or 0)}, "
-                f"info={int(readiness.get('info_count', 0) or 0)}, "
-                f"ok={int(readiness.get('ok_count', 0) or 0)}"
+                "Итоги проверки - "
+                f"требуют внимания {int(readiness.get('warn_count', 0) or 0)}, "
+                f"информационных {int(readiness.get('info_count', 0) or 0)}, "
+                f"готовых {int(readiness.get('ok_count', 0) or 0)}."
             ),
-            f"next recommended surface: {readiness.get('next_action') or 'Runtime'}",
+            f"Следующий рекомендуемый шаг - {readiness.get('next_action') or 'Выполнение'}",
             "",
         ]
         for row in rows:
-            status = str(row.get("status") or "info").strip().upper() or "INFO"
+            status = _operator_state(row.get("status"), fallback="сведения")
             lines.append(
-                f"[{status}] {row.get('title') or 'check'} -> {row.get('action') or 'Runtime'}"
+                f"{status}. {row.get('title') or 'проверка'} -> {row.get('action') or 'Выполнение'}"
             )
             lines.append(str(row.get("summary") or ""))
             lines.append("")
@@ -1000,18 +1147,18 @@ class DesktopOptimizerCenter:
 
     def _format_stage_runtime_text(self, rows: tuple[dict[str, Any], ...]) -> str:
         if not rows:
-            return "StageRunner runtime policy пока недоступен."
+            return "Политика стадий пока недоступна."
         lines: list[str] = []
         for row in rows:
             if not bool(row.get("available")):
-                lines.append(f"{row.get('stage_name')}: нет live audit/artifacts.")
+                lines.append(f"{row.get('stage_name')}: нет данных о выполнении.")
                 continue
             seed_count = int(row.get("seed_count", 0) or 0)
             target = int(row.get("target_seed_count", 0) or 0)
             lines.append(
                 f"{row.get('stage_name')}: {row.get('summary_line') or row.get('policy_name')}\n"
-                f"  seeds={seed_count}/{target} | mode={row.get('effective_mode')} | "
-                f"underfill={row.get('underfill_message') or 'ok'}"
+                f"  стартовые варианты {seed_count}/{target}; режим {_operator_token_text(row.get('effective_mode'))}; "
+                f"заполнение {row.get('underfill_message') or 'готово'}"
             )
         return "\n\n".join(lines)
 
@@ -1022,9 +1169,9 @@ class DesktopOptimizerCenter:
                 {
                     "run_dir": str(summary.run_dir),
                     "name": str(summary.run_dir.name),
-                    "status": str(summary.status_label),
-                    "pipeline": str(summary.pipeline_mode),
-                    "backend": str(summary.backend),
+                    "status": _operator_state(summary.status_label, fallback=str(summary.status_label)),
+                    "pipeline": _operator_token_text(summary.pipeline_mode),
+                    "backend": _operator_token_text(summary.backend),
                     "run_id": str(summary.run_id or summary.run_dir.name),
                     "objective": _short_hash(summary.objective_contract_hash),
                     "scope": _short_hash(summary.problem_hash),
@@ -1036,20 +1183,20 @@ class DesktopOptimizerCenter:
     def _format_handoff_overview_text(self) -> str:
         rows = self.runtime.handoff_overview_rows()
         if not rows:
-            return "Сейчас в workspace нет staged runs с готовым coordinator handoff."
+            return "Сейчас нет поэтапных прогонов, готовых к передаче координатору."
         lines: list[str] = []
         for idx, row in enumerate(rows[:8], start=1):
             lines.append(
-                f"{idx}. {row.get('run')} | live={row.get('live_now')} | preset={row.get('preset')} | "
-                f"score={float(row.get('quality_score', 0.0) or 0.0):.1f} | budget={int(row.get('budget', 0) or 0)} | "
-                f"seeds={int(row.get('seeds', 0) or 0)} | pool={row.get('pool')} | full_ring={row.get('full_ring')}"
+                f"{idx}. {row.get('run')} - профиль {_operator_preset_text(row.get('preset'))}; "
+                f"оценка {float(row.get('quality_score', 0.0) or 0.0):.1f}; бюджет {int(row.get('budget', 0) or 0)}; "
+                f"стартовых вариантов {int(row.get('seeds', 0) or 0)}; полное кольцо {_operator_token_text(row.get('full_ring'))}"
             )
             lines.append(
-                f"   valid={int(row.get('valid_rows', 0) or 0)} | promotable={int(row.get('promotable', 0) or 0)} | "
-                f"unique={int(row.get('unique', 0) or 0)} | fragments={int(row.get('fragments', 0) or 0)} | suite={row.get('suite')}"
+                f"   допустимых строк {int(row.get('valid_rows', 0) or 0)}; пригодных {int(row.get('promotable', 0) or 0)}; "
+                f"уникальных {int(row.get('unique', 0) or 0)}; фрагментов {int(row.get('fragments', 0) or 0)}; набор {_operator_token_text(row.get('suite'))}"
             )
         if len(rows) > 8:
-            lines.append(f"... и ещё {len(rows) - 8} handoff rows в workspace history.")
+            lines.append(f"... и ещё {len(rows) - 8} кандидатов в истории.")
         return "\n".join(lines)
 
     def _handoff_rows(self) -> list[dict[str, str]]:
@@ -1059,8 +1206,8 @@ class DesktopOptimizerCenter:
                 {
                     "run_dir": str(row.get("__run_dir") or ""),
                     "name": str(row.get("run") or ""),
-                    "live": str(row.get("live_now") or ""),
-                    "preset": str(row.get("preset") or ""),
+                    "live": _operator_state(row.get("live_now"), fallback="нет"),
+                    "preset": _operator_preset_text(row.get("preset")),
                     "score": f"{float(row.get('quality_score', 0.0) or 0.0):.1f}",
                     "budget": str(int(row.get("budget", 0) or 0)),
                     "seeds": str(int(row.get("seeds", 0) or 0)),
@@ -1074,109 +1221,110 @@ class DesktopOptimizerCenter:
     def _format_handoff_summary_text(self) -> str:
         summary = self.runtime.handoff_overview_summary()
         if int(summary.get("total_candidates", 0) or 0) <= 0:
-            return "Сейчас в workspace нет staged runs с handoff-plan для seeded continuation."
+            return "Сейчас нет поэтапных прогонов с планом передачи для продолжения."
         filters = dict(summary.get("filters") or {})
         return "\n".join(
             [
-                f"candidates in view: {int(summary.get('total_candidates', 0) or 0)}",
+                f"Кандидатов в списке - {int(summary.get('total_candidates', 0) or 0)}",
                 (
-                    "readiness: "
-                    f"done={int(summary.get('done_candidates', 0) or 0)}, "
-                    f"full_ring={int(summary.get('full_ring_candidates', 0) or 0)}, "
-                    f"live={int(summary.get('live_candidates', 0) or 0)}"
+                    "Готовность - "
+                    f"завершены {int(summary.get('done_candidates', 0) or 0)}, "
+                    f"полное кольцо {int(summary.get('full_ring_candidates', 0) or 0)}, "
+                    f"в работе {int(summary.get('live_candidates', 0) or 0)}."
                 ),
-                f"seed inventory: total={int(summary.get('seed_total', 0) or 0)}",
+                f"Стартовых вариантов всего - {int(summary.get('seed_total', 0) or 0)}",
                 (
-                    "best ranked candidate: "
-                    f"{summary.get('best_run') or '—'} | preset={summary.get('best_preset') or '—'} | "
-                    f"score={float(summary.get('best_score', 0.0) or 0.0):.1f}"
+                    "Лучший кандидат - "
+                    f"{summary.get('best_run') or '—'}. Профиль {_operator_preset_text(summary.get('best_preset'))}. "
+                    f"Оценка {float(summary.get('best_score', 0.0) or 0.0):.1f}."
                 ),
                 (
-                    "filters: "
-                    f"sort={summary.get('sort_mode') or '—'}, "
-                    f"full_ring_only={'on' if bool(filters.get('full_ring_only')) else 'off'}, "
-                    f"done_only={'on' if bool(filters.get('done_only')) else 'off'}, "
-                    f"min_seeds={int(filters.get('min_seeds', 0) or 0)}"
+                    "Фильтры - "
+                    f"сортировка {summary.get('sort_mode') or '—'}, "
+                    f"только полное кольцо {'да' if bool(filters.get('full_ring_only')) else 'нет'}, "
+                    f"только завершённые {'да' if bool(filters.get('done_only')) else 'нет'}, "
+                    f"минимум вариантов {int(filters.get('min_seeds', 0) or 0)}."
                 ),
             ]
         )
 
     def _format_handoff_ranking_text(self, rows: list[dict[str, Any]]) -> str:
         if not rows:
-            return "После текущих handoff-фильтров подходящих staged continuation-кандидатов не осталось."
+            return "После текущих фильтров подходящих кандидатов для продолжения не осталось."
         lines: list[str] = []
         for idx, row in enumerate(rows[:8], start=1):
             lines.append(
-                f"{idx}. {row.get('run')} | live={row.get('live_now')} | preset={row.get('preset')} | "
-                f"score={float(row.get('quality_score', 0.0) or 0.0):.1f} | budget={int(row.get('budget', 0) or 0)} | "
-                f"seeds={int(row.get('seeds', 0) or 0)}"
+                f"{idx}. {row.get('run')} - профиль {_operator_preset_text(row.get('preset'))}; "
+                f"оценка {float(row.get('quality_score', 0.0) or 0.0):.1f}; бюджет {int(row.get('budget', 0) or 0)}; "
+                f"стартовых вариантов {int(row.get('seeds', 0) or 0)}."
             )
             lines.append(
-                f"   valid={int(row.get('valid_rows', 0) or 0)} | promotable={int(row.get('promotable', 0) or 0)} | "
-                f"unique={int(row.get('unique', 0) or 0)} | pool={row.get('pool')} | "
-                f"fragments={int(row.get('fragments', 0) or 0)} | full_ring={row.get('full_ring')}"
+                f"   допустимых строк {int(row.get('valid_rows', 0) or 0)}; пригодных {int(row.get('promotable', 0) or 0)}; "
+                f"уникальных {int(row.get('unique', 0) or 0)}; фрагментов {int(row.get('fragments', 0) or 0)}; "
+                f"полное кольцо {_operator_token_text(row.get('full_ring'))}"
             )
         if len(rows) > 8:
-            lines.append(f"... и ещё {len(rows) - 8} handoff candidates в текущем ranked view.")
+            lines.append(f"... и ещё {len(rows) - 8} кандидатов в текущем списке.")
         return "\n".join(lines)
 
     def _format_selected_handoff_text(self, details: object | None, row: dict[str, Any] | None) -> str:
         if details is None or row is None:
-            return "Выберите staged run слева, чтобы увидеть handoff recommendation и continuation contract."
+            return "Выберите поэтапный прогон слева, чтобы увидеть рекомендацию по передаче и продолжению."
         summary = getattr(details, "summary")
         identity = self.runtime.selected_run_identity_summary(summary.run_dir)
         lines = [
-            f"source staged run: {summary.run_dir}",
-            f"status: {summary.status_label} ({summary.status})",
-            f"identity: {identity.get('state') or 'MISSING'} | run_id={identity.get('run_id') or '—'} | objective={_short_hash(identity.get('objective_contract_hash'))}",
+            f"Исходный поэтапный прогон - {summary.run_dir}",
+            f"Состояние - {_operator_state(summary.status_label or summary.status, fallback='нет данных')}",
+            f"Идентичность - {_operator_state(identity.get('state'), fallback='не найден')}; запуск {identity.get('run_id') or '—'}; цели {_short_hash(identity.get('objective_contract_hash'))}",
             (
-                "handoff preset: "
-                f"{summary.handoff_preset_tag or row.get('preset') or '—'} | "
-                f"backend={summary.handoff_backend or '—'} | proposer={summary.handoff_proposer or '—'} | "
-                f"q={int(summary.handoff_q or 0)}"
+                "Профиль передачи - "
+                f"{_operator_preset_text(summary.handoff_preset_tag or row.get('preset'))}. "
+                f"Исполнитель {_operator_token_text(summary.handoff_backend)}. "
+                f"Генератор {_operator_token_text(summary.handoff_proposer)}. "
+                f"Группа кандидатов {int(summary.handoff_q or 0)}."
             ),
             (
-                "continuation budget: "
-                f"{int(summary.handoff_budget or 0)} | seed_count={int(summary.handoff_seed_count or 0)} | "
-                f"suite={summary.handoff_suite_family or '—'}"
+                "Бюджет продолжения - "
+                f"{int(summary.handoff_budget or 0)}. Стартовых вариантов {int(summary.handoff_seed_count or 0)}. "
+                f"Набор {_operator_token_text(summary.handoff_suite_family)}."
             ),
             (
-                "seed bridge: "
-                f"valid={int(summary.handoff_staged_rows_ok or 0)} | "
-                f"promotable={int(summary.handoff_promotable_rows or 0)} | "
-                f"unique={int(summary.handoff_unique_param_candidates or 0)} | "
-                f"pool={summary.handoff_selection_pool or '—'}"
+                "Мост стартовых вариантов - "
+                f"допустимых {int(summary.handoff_staged_rows_ok or 0)}. "
+                f"пригодных {int(summary.handoff_promotable_rows or 0)}. "
+                f"уникальных {int(summary.handoff_unique_param_candidates or 0)}. "
+                f"пул {_operator_token_text(summary.handoff_selection_pool)}."
             ),
             (
-                "full ring validation: "
-                f"{'required' if bool(summary.handoff_requires_full_ring_validation) else 'optional'} | "
-                f"has_full_ring={'yes' if bool(summary.handoff_has_full_ring) else 'no'} | "
-                f"fragments={int(summary.handoff_fragment_count or 0)}"
+                "Проверка полного кольца - "
+                f"{'обязательна' if bool(summary.handoff_requires_full_ring_validation) else 'не обязательна'}. "
+                f"Полное кольцо {'есть' if bool(summary.handoff_has_full_ring) else 'не найдено'}. "
+                f"Фрагментов {int(summary.handoff_fragment_count or 0)}."
             ),
         ]
         if summary.handoff_target_run_dir is not None:
-            lines.append(f"target run dir: {summary.handoff_target_run_dir}")
+            lines.append(f"Целевая папка запуска - {summary.handoff_target_run_dir}")
         if summary.handoff_reason_lines:
             lines.append("")
-            lines.append("handoff reasoning:")
+            lines.append("Пояснение передачи:")
             lines.extend(str(line) for line in summary.handoff_reason_lines)
         return "\n".join(lines)
 
     def _format_handoff_runtime_text(self, row: dict[str, Any] | None) -> str:
         if row is None:
-            return "Live continuation state появится здесь для выбранного handoff-кандидата."
+            return "Состояние продолжения появится здесь для выбранного кандидата."
         lines = [
-            f"selected candidate: {row.get('run') or '—'}",
-            f"live now: {row.get('live_now') or '—'}",
+            f"Выбранный кандидат - {row.get('run') or '—'}",
+            f"Сейчас выполняется - {_operator_state(row.get('live_now'), fallback='нет')}",
         ]
         active_context = self.runtime.active_launch_context()
         if str(row.get("live_now") or "") == "LIVE":
-            lines.append("handoff status: active seeded coordinator continuation")
+            lines.append("Передача выполняется как продолжение координатора.")
             source_run_dir = str(active_context.get("source_run_dir") or "")
             if source_run_dir:
-                lines.append(f"active source run dir: {source_run_dir}")
+                lines.append(f"Исходная папка активного запуска - {source_run_dir}")
         else:
-            lines.append("handoff status: not running right now")
+            lines.append("Передача сейчас не выполняется.")
         surface = self.runtime.active_job_surface()
         runtime_summary = dict(surface.get("runtime_summary") or {})
         if runtime_summary and str(row.get("live_now") or "") == "LIVE":
@@ -1184,7 +1332,7 @@ class DesktopOptimizerCenter:
             lines.extend(str(item) for item in surface.get("captions") or ())
         else:
             lines.append("")
-            lines.append("Use `Start handoff`, чтобы перевести selected staged run в coordinator continuation.")
+            lines.append("Нажмите «Начать передачу», чтобы продолжить выбранный поэтапный прогон через координатор.")
         return "\n".join(lines)
 
     def _finished_rows(self) -> list[dict[str, str]]:
@@ -1194,8 +1342,8 @@ class DesktopOptimizerCenter:
                 {
                     "run_dir": str(row.get("run_dir") or ""),
                     "name": str(row.get("name") or ""),
-                    "status": str(row.get("status_label") or row.get("status") or ""),
-                    "pipeline": str(row.get("pipeline") or ""),
+                    "status": _operator_state(row.get("status_label") or row.get("status"), fallback="нет данных"),
+                    "pipeline": _operator_token_text(row.get("pipeline")),
                     "truth": str(row.get("truth_ready_rows") or 0),
                     "verify": str(row.get("verification_pass_rows") or 0),
                     "risk": str(row.get("interference_rows") or 0),
@@ -1212,118 +1360,122 @@ class DesktopOptimizerCenter:
     def _format_finished_overview_text(self) -> str:
         overview = self.runtime.finished_job_overview()
         if int(overview.get("total_jobs", 0) or 0) <= 0:
-            return "В workspace пока нет finished optimization jobs с доступной historical сводкой."
+            return "В рабочей папке пока нет завершённых прогонов с доступной сводкой."
         status_counts = ", ".join(
-            f"{name}={count}" for name, count in tuple(overview.get("status_counts") or ())
+            f"{_operator_state(name, fallback=str(name))} - {count}"
+            for name, count in tuple(overview.get("status_counts") or ())
         ) or "—"
         pipeline_counts = ", ".join(
-            f"{name}={count}" for name, count in tuple(overview.get("pipeline_counts") or ())
+            f"{_operator_token_text(name)} - {count}"
+            for name, count in tuple(overview.get("pipeline_counts") or ())
         ) or "—"
         filters = dict(overview.get("filters") or {})
         return "\n".join(
             [
-                f"jobs in view: {int(overview.get('total_jobs', 0) or 0)}",
-                f"jobs with results: {int(overview.get('jobs_with_results', 0) or 0)}",
+                f"Прогонов в списке - {int(overview.get('total_jobs', 0) or 0)}",
+                f"Прогонов с результатами - {int(overview.get('jobs_with_results', 0) or 0)}",
                 (
-                    "packaging rows: "
-                    f"with_packaging={int(overview.get('rows_with_packaging_total', 0) or 0)}, "
-                    f"truth_ready={int(overview.get('truth_ready_rows_total', 0) or 0)}, "
-                    f"verification_pass={int(overview.get('verification_rows_total', 0) or 0)}"
+                    "Строки для выпуска - "
+                    f"с данными {int(overview.get('rows_with_packaging_total', 0) or 0)}, "
+                    f"готовы к проверке {int(overview.get('truth_ready_rows_total', 0) or 0)}, "
+                    f"прошли проверку {int(overview.get('verification_rows_total', 0) or 0)}."
                 ),
                 (
-                    "job readiness: "
-                    f"truth_ready_jobs={int(overview.get('truth_ready_jobs', 0) or 0)}, "
-                    f"verification_jobs={int(overview.get('verification_pass_jobs', 0) or 0)}, "
-                    f"interference_jobs={int(overview.get('interference_jobs', 0) or 0)}, "
-                    f"fallback_jobs={int(overview.get('runtime_fallback_jobs', 0) or 0)}"
+                    "Готовность прогонов - "
+                    f"готовы к проверке {int(overview.get('truth_ready_jobs', 0) or 0)}, "
+                    f"прошли проверку {int(overview.get('verification_pass_jobs', 0) or 0)}, "
+                    f"с рисками {int(overview.get('interference_jobs', 0) or 0)}, "
+                    f"с резервными данными {int(overview.get('runtime_fallback_jobs', 0) or 0)}."
                 ),
-                f"status counts: {status_counts}",
-                f"pipeline counts: {pipeline_counts}",
+                f"Состояния - {status_counts}",
+                f"Режимы запуска - {pipeline_counts}",
                 (
-                    "filters: "
-                    f"sort={overview.get('sort_mode') or '—'}, "
-                    f"done_only={'on' if bool(filters.get('done_only')) else 'off'}, "
-                    f"truth_only={'on' if bool(filters.get('truth_ready_only')) else 'off'}, "
-                    f"verification_only={'on' if bool(filters.get('verification_only')) else 'off'}"
+                    "Фильтры - "
+                    f"сортировка {overview.get('sort_mode') or '—'}, "
+                    f"только завершённые {'да' if bool(filters.get('done_only')) else 'нет'}, "
+                    f"только готовые к проверке {'да' if bool(filters.get('truth_ready_only')) else 'нет'}, "
+                    f"только прошедшие проверку {'да' if bool(filters.get('verification_only')) else 'нет'}."
                 ),
             ]
         )
 
     def _format_finished_ranking_text(self, rows: list[dict[str, Any]]) -> str:
         if not rows:
-            return "После текущих finished-job фильтров подходящих run не осталось."
+            return "После текущих фильтров подходящих завершённых прогонов не осталось."
         lines: list[str] = []
         for idx, row in enumerate(rows[:8], start=1):
             lines.append(
-                f"{idx}. {row.get('name')} | {row.get('status_label')} | {row.get('pipeline')} | "
-                f"ready={row.get('ready_state')} | truth={int(row.get('truth_ready_rows', 0) or 0)} | "
-                f"verify={int(row.get('verification_pass_rows', 0) or 0)} | "
-                f"risk={int(row.get('interference_rows', 0) or 0)}"
+                f"{idx}. {row.get('name')} - {_operator_state(row.get('status_label'), fallback='нет данных')}; "
+                f"контур {_operator_token_text(row.get('pipeline'))}; готовность {_operator_state(row.get('ready_state'), fallback='нет данных')}; "
+                f"готовых строк {int(row.get('truth_ready_rows', 0) or 0)}; "
+                f"проверенных {int(row.get('verification_pass_rows', 0) or 0)}; "
+                f"с рисками {int(row.get('interference_rows', 0) or 0)}."
             )
             lines.append(
-                f"   packaging={int(row.get('rows_with_packaging', 0) or 0)}/{int(row.get('rows_considered', 0) or 0)} | "
-                f"complete={int(row.get('packaging_complete_rows', 0) or 0)} | "
-                f"fallback={int(row.get('runtime_fallback_rows', 0) or 0)} | "
-                f"status_counts={row.get('status_counts_text') or 'n/a'}"
+                f"   строк для выпуска {int(row.get('rows_with_packaging', 0) or 0)}/{int(row.get('rows_considered', 0) or 0)}; "
+                f"полных {int(row.get('packaging_complete_rows', 0) or 0)}; "
+                f"резервных {int(row.get('runtime_fallback_rows', 0) or 0)}; "
+                f"состояния {row.get('status_counts_text') or 'нет данных'}"
             )
         if len(rows) > 8:
-            lines.append(f"... и ещё {len(rows) - 8} finished jobs в текущем filtered view.")
+            lines.append(f"... и ещё {len(rows) - 8} завершённых прогонов в текущем списке.")
         return "\n".join(lines)
 
     def _format_finished_packaging_text(self, details: object | None, row: dict[str, Any] | None) -> str:
         if details is None or row is None:
-            return "Выберите finished run слева, чтобы увидеть packaging snapshot и readiness signals."
+            return "Выберите завершённый прогон слева, чтобы увидеть готовность данных для выпуска."
         packaging = getattr(details, "packaging_snapshot")
         status_counts = ", ".join(
-            f"{name}={count}" for name, count in tuple(getattr(packaging, "status_counts", ()) or ())
+            f"{_operator_state(name, fallback=str(name))} - {count}"
+            for name, count in tuple(getattr(packaging, "status_counts", ()) or ())
         ) or "—"
         return "\n".join(
             [
-                f"selected ready-state: {row.get('ready_state') or '—'}",
+                f"Готовность выбранного прогона - {_operator_state(row.get('ready_state'), fallback='нет данных')}",
                 (
-                    "packaging rows: "
+                    "Строки для выпуска - "
                     f"{int(getattr(packaging, 'rows_with_packaging', 0) or 0)} / "
-                    f"{int(getattr(packaging, 'rows_considered', 0) or 0)} done-rows"
+                    f"{int(getattr(packaging, 'rows_considered', 0) or 0)} завершённых строк"
                 ),
-                f"truth-ready rows: {int(getattr(packaging, 'packaging_truth_ready_rows', 0) or 0)}",
-                f"verification-pass rows: {int(getattr(packaging, 'packaging_verification_pass_rows', 0) or 0)}",
-                f"complete rows: {int(getattr(packaging, 'packaging_complete_rows', 0) or 0)}",
-                f"runtime fallback rows: {int(getattr(packaging, 'runtime_fallback_rows', 0) or 0)}",
+                f"Готовых к проверке строк - {int(getattr(packaging, 'packaging_truth_ready_rows', 0) or 0)}",
+                f"Проверенных строк - {int(getattr(packaging, 'packaging_verification_pass_rows', 0) or 0)}",
+                f"Полных строк - {int(getattr(packaging, 'packaging_complete_rows', 0) or 0)}",
+                f"Резервных строк - {int(getattr(packaging, 'runtime_fallback_rows', 0) or 0)}",
                 (
-                    "interference rows: "
-                    f"spring-host={int(getattr(packaging, 'spring_host_interference_rows', 0) or 0)}, "
-                    f"spring-pair={int(getattr(packaging, 'spring_pair_interference_rows', 0) or 0)}"
+                    "Строки с риском пересечения - "
+                    f"крепление пружины {int(getattr(packaging, 'spring_host_interference_rows', 0) or 0)}, "
+                    f"пара пружин {int(getattr(packaging, 'spring_pair_interference_rows', 0) or 0)}."
                 ),
-                f"packaging statuses: {status_counts}",
+                f"Состояния выпуска - {status_counts}",
             ]
         )
 
     def _format_finished_summary_text(self, details: object | None, row: dict[str, Any] | None) -> str:
         if details is None or row is None:
-            return "Selected finished-job summary пока недоступен."
+            return "Сводка завершённого прогона пока недоступна."
         summary = getattr(details, "summary")
         identity = self.runtime.selected_run_identity_summary(summary.run_dir)
         result_path = summary.result_path if summary.result_path is not None else None
-        contract_text = ", ".join(summary.objective_keys) or "—"
+        contract_text = _operator_list_text(summary.objective_keys)
         return "\n".join(
             [
-                f"run_dir: {summary.run_dir}",
-                f"pipeline/backend: {summary.pipeline_mode} / {summary.backend}",
-                f"status: {summary.status_label} ({summary.status})",
-                f"run identity: {identity.get('state') or 'MISSING'} | run_id={identity.get('run_id') or '—'}",
+                f"Папка запуска - {summary.run_dir}",
+                f"Контур и исполнитель - {_operator_token_text(summary.pipeline_mode)} / {_operator_token_text(summary.backend)}",
+                f"Состояние - {_operator_state(summary.status_label or summary.status, fallback='нет данных')}",
+                f"Идентичность запуска - {_operator_state(identity.get('state'), fallback='не найден')}; идентификатор {identity.get('run_id') or '—'}",
                 (
-                    "hashes: "
-                    f"objective={_short_hash(identity.get('objective_contract_hash'))} | "
-                    f"problem={_short_hash(identity.get('problem_hash'))} | "
-                    f"baseline={_short_hash(identity.get('active_baseline_hash'))} | "
-                    f"suite={_short_hash(identity.get('suite_snapshot_hash'))}"
+                    "Контрольные метки - "
+                    f"цели {_short_hash(identity.get('objective_contract_hash'))}; "
+                    f"задача {_short_hash(identity.get('problem_hash'))}; "
+                    f"опорный прогон {_short_hash(identity.get('active_baseline_hash'))}; "
+                    f"набор {_short_hash(identity.get('suite_snapshot_hash'))}."
                 ),
-                f"results: {result_path or 'not found'}",
-                f"objective keys: {contract_text}",
-                f"penalty: {summary.penalty_key or '—'} tol={summary.penalty_tol if summary.penalty_tol is not None else '—'}",
-                f"problem hash mode: {summary.problem_hash_mode or '—'}",
-                f"baseline source: {summary.baseline_source_label or summary.baseline_source_kind or '—'}",
-                f"note: {summary.note or '—'}",
+                f"Результаты - {result_path or 'не найдены'}",
+                f"Цели - {contract_text}",
+                f"Ограничение - {summary.penalty_key or '—'}, допуск {summary.penalty_tol if summary.penalty_tol is not None else '—'}",
+                f"Режим контроля - {_problem_hash_mode_text(summary.problem_hash_mode)}",
+                f"Источник опорного прогона - {_operator_token_text(summary.baseline_source_label or summary.baseline_source_kind)}",
+                f"Примечание - {summary.note or '—'}",
             ]
         )
 
@@ -1349,160 +1501,165 @@ class DesktopOptimizerCenter:
     def _format_packaging_overview_text(self) -> str:
         overview = self.runtime.packaging_overview()
         if int(overview.get("total_runs", 0) or 0) <= 0:
-            return "Packaging snapshot пока не нашёл finished runs с доступными packaging metrics."
+            return "Сводка выпуска пока не нашла завершённых прогонов с доступными показателями."
         filters = dict(overview.get("filters") or {})
         return "\n".join(
             [
-                f"packaging runs in view: {int(overview.get('total_runs', 0) or 0)}",
+                f"Прогонов для выпуска в списке - {int(overview.get('total_runs', 0) or 0)}",
                 (
-                    "readiness counts: "
-                    f"truth_ready={int(overview.get('truth_ready_runs', 0) or 0)}, "
-                    f"verification={int(overview.get('verification_runs', 0) or 0)}, "
-                    f"zero_interference={int(overview.get('zero_interference_runs', 0) or 0)}, "
-                    f"fallback={int(overview.get('fallback_runs', 0) or 0)}"
+                    "Готовность - "
+                    f"готовы к проверке {int(overview.get('truth_ready_runs', 0) or 0)}, "
+                    f"прошли проверку {int(overview.get('verification_runs', 0) or 0)}, "
+                    f"без рисков {int(overview.get('zero_interference_runs', 0) or 0)}, "
+                    f"с резервными данными {int(overview.get('fallback_runs', 0) or 0)}."
                 ),
                 (
-                    "row totals: "
-                    f"packaging={int(overview.get('packaging_rows_total', 0) or 0)}, "
-                    f"truth_ready={int(overview.get('truth_ready_rows_total', 0) or 0)}, "
-                    f"verification={int(overview.get('verification_rows_total', 0) or 0)}"
+                    "Строки - "
+                    f"для выпуска {int(overview.get('packaging_rows_total', 0) or 0)}, "
+                    f"готовы к проверке {int(overview.get('truth_ready_rows_total', 0) or 0)}, "
+                    f"прошли проверку {int(overview.get('verification_rows_total', 0) or 0)}."
                 ),
                 (
-                    "best ranked packaging run: "
-                    f"{overview.get('best_run') or '—'} | ready_state={overview.get('best_ready_state') or '—'}"
+                    "Лучший прогон для выпуска - "
+                    f"{overview.get('best_run') or '—'}. Готовность {_operator_state(overview.get('best_ready_state'), fallback='нет данных')}."
                 ),
                 (
-                    "filters: "
-                    f"sort={overview.get('sort_mode') or '—'}, "
-                    f"done_only={'on' if bool(filters.get('done_only')) else 'off'}, "
-                    f"truth_only={'on' if bool(filters.get('truth_ready_only')) else 'off'}, "
-                    f"verification_only={'on' if bool(filters.get('verification_only')) else 'off'}, "
-                    f"zero_interference_only={'on' if bool(filters.get('zero_interference_only')) else 'off'}"
+                    "Фильтры - "
+                    f"сортировка {overview.get('sort_mode') or '—'}, "
+                    f"только завершённые {'да' if bool(filters.get('done_only')) else 'нет'}, "
+                    f"только готовые к проверке {'да' if bool(filters.get('truth_ready_only')) else 'нет'}, "
+                    f"только прошедшие проверку {'да' if bool(filters.get('verification_only')) else 'нет'}, "
+                    f"только без рисков {'да' if bool(filters.get('zero_interference_only')) else 'нет'}."
                 ),
             ]
         )
 
     def _format_packaging_ranking_text(self, rows: list[dict[str, Any]]) -> str:
         if not rows:
-            return "После текущих packaging-фильтров подходящих run не осталось."
+            return "После текущих фильтров подходящих прогонов для выпуска не осталось."
         lines: list[str] = []
         for idx, row in enumerate(rows[:8], start=1):
             lines.append(
-                f"{idx}. {row.get('name')} | {row.get('status_label')} | ready={row.get('ready_state')} | "
-                f"truth={int(row.get('truth_ready_rows', 0) or 0)} | verify={int(row.get('verification_pass_rows', 0) or 0)} | "
-                f"risk={int(row.get('interference_rows', 0) or 0)} | fallback={int(row.get('runtime_fallback_rows', 0) or 0)}"
+                f"{idx}. {row.get('name')} - {_operator_state(row.get('status_label'), fallback='нет данных')}; "
+                f"готовность {_operator_state(row.get('ready_state'), fallback='нет данных')}; "
+                f"готовых строк {int(row.get('truth_ready_rows', 0) or 0)}; "
+                f"проверенных {int(row.get('verification_pass_rows', 0) or 0)}; "
+                f"с рисками {int(row.get('interference_rows', 0) or 0)}; "
+                f"резервных {int(row.get('runtime_fallback_rows', 0) or 0)}."
             )
             lines.append(
-                f"   packaging={int(row.get('rows_with_packaging', 0) or 0)}/{int(row.get('rows_considered', 0) or 0)} | "
-                f"complete={int(row.get('packaging_complete_rows', 0) or 0)} | pipeline={row.get('pipeline') or '—'}"
+                f"   строк для выпуска {int(row.get('rows_with_packaging', 0) or 0)}/{int(row.get('rows_considered', 0) or 0)}; "
+                f"полных {int(row.get('packaging_complete_rows', 0) or 0)}; контур {_operator_token_text(row.get('pipeline'))}"
             )
         if len(rows) > 8:
-            lines.append(f"... и ещё {len(rows) - 8} packaging runs в текущем ranked view.")
+            lines.append(f"... и ещё {len(rows) - 8} прогонов для выпуска в текущем списке.")
         return "\n".join(lines)
 
     def _format_selected_packaging_text(self, details: object | None, row: dict[str, Any] | None) -> str:
         if details is None or row is None:
-            return "Выберите packaging run слева, чтобы увидеть snapshot достаточности данных и geometry risk."
+            return "Выберите прогон для выпуска слева, чтобы увидеть достаточность данных и геометрические риски."
         packaging = getattr(details, "packaging_snapshot")
         status_counts = ", ".join(
-            f"{name}={count}" for name, count in tuple(getattr(packaging, "status_counts", ()) or ())
+            f"{_operator_state(name, fallback=str(name))} - {count}"
+            for name, count in tuple(getattr(packaging, "status_counts", ()) or ())
         ) or "—"
         return "\n".join(
             [
-                f"ready state: {row.get('ready_state') or '—'}",
-                f"rows with packaging: {int(getattr(packaging, 'rows_with_packaging', 0) or 0)} / {int(getattr(packaging, 'rows_considered', 0) or 0)}",
-                f"packaging complete rows: {int(getattr(packaging, 'packaging_complete_rows', 0) or 0)}",
-                f"truth-ready rows: {int(getattr(packaging, 'packaging_truth_ready_rows', 0) or 0)}",
-                f"verification-pass rows: {int(getattr(packaging, 'packaging_verification_pass_rows', 0) or 0)}",
-                f"runtime fallback rows: {int(getattr(packaging, 'runtime_fallback_rows', 0) or 0)}",
+                f"Готовность - {_operator_state(row.get('ready_state'), fallback='нет данных')}",
+                f"Строки для выпуска - {int(getattr(packaging, 'rows_with_packaging', 0) or 0)} / {int(getattr(packaging, 'rows_considered', 0) or 0)}",
+                f"Полных строк - {int(getattr(packaging, 'packaging_complete_rows', 0) or 0)}",
+                f"Готовых к проверке строк - {int(getattr(packaging, 'packaging_truth_ready_rows', 0) or 0)}",
+                f"Проверенных строк - {int(getattr(packaging, 'packaging_verification_pass_rows', 0) or 0)}",
+                f"Резервных строк - {int(getattr(packaging, 'runtime_fallback_rows', 0) or 0)}",
                 (
-                    "interference rows: "
-                    f"spring-host={int(getattr(packaging, 'spring_host_interference_rows', 0) or 0)}, "
-                    f"spring-pair={int(getattr(packaging, 'spring_pair_interference_rows', 0) or 0)}"
+                    "Строки с риском пересечения - "
+                    f"крепление пружины {int(getattr(packaging, 'spring_host_interference_rows', 0) or 0)}, "
+                    f"пара пружин {int(getattr(packaging, 'spring_pair_interference_rows', 0) or 0)}."
                 ),
-                f"packaging status counts: {status_counts}",
+                f"Состояния выпуска - {status_counts}",
             ]
         )
 
     def _format_packaging_contract_text(self, details: object | None, row: dict[str, Any] | None) -> str:
         if details is None or row is None:
-            return "Packaging contract context появится здесь для выбранного run."
+            return "Сведения о выбранном прогоне для выпуска появятся здесь."
         summary = getattr(details, "summary")
         identity = self.runtime.selected_run_identity_summary(summary.run_dir)
         return "\n".join(
             [
-                f"run_dir: {summary.run_dir}",
-                f"pipeline/backend: {summary.pipeline_mode} / {summary.backend}",
-                f"run identity: {identity.get('state') or 'MISSING'} | run_id={identity.get('run_id') or '—'}",
-                f"objective keys: {', '.join(summary.objective_keys) or '—'}",
-                f"penalty: {summary.penalty_key or '—'} tol={summary.penalty_tol if summary.penalty_tol is not None else '—'}",
-                f"problem hash: {summary.problem_hash or '—'}",
-                f"problem hash mode: {summary.problem_hash_mode or '—'}",
-                f"baseline source: {summary.baseline_source_label or summary.baseline_source_kind or '—'}",
-                f"results artifact: {summary.result_path or 'not found'}",
-                f"note: {summary.note or '—'}",
+                f"Папка запуска - {summary.run_dir}",
+                f"Контур и исполнитель - {_operator_token_text(summary.pipeline_mode)} / {_operator_token_text(summary.backend)}",
+                f"Идентичность запуска - {_operator_state(identity.get('state'), fallback='не найден')}; идентификатор {identity.get('run_id') or '—'}",
+                f"Цели - {_operator_list_text(summary.objective_keys)}",
+                f"Ограничение - {summary.penalty_key or '—'}, допуск {summary.penalty_tol if summary.penalty_tol is not None else '—'}",
+                f"Контроль задачи - {summary.problem_hash or '—'}",
+                f"Режим контроля - {_problem_hash_mode_text(summary.problem_hash_mode)}",
+                f"Источник опорного прогона - {_operator_token_text(summary.baseline_source_label or summary.baseline_source_kind)}",
+                f"Результаты - {summary.result_path or 'не найдены'}",
+                f"Примечание - {summary.note or '—'}",
             ]
         )
 
     def _history_details_tuple(self, details: object | None) -> tuple[str, str, str, str, str]:
         if details is None:
-            empty = "Выберите run в списке слева."
+            empty = "Выберите прогон в списке слева."
             return empty, empty, empty, empty, ""
         summary = getattr(details, "summary")
         packaging = getattr(details, "packaging_snapshot")
         stage_rows = tuple(getattr(details, "stage_policy_rows") or ())
         identity = self.runtime.selected_run_identity_summary(summary.run_dir)
         summary_lines = [
-            f"run_dir: {summary.run_dir}",
-            f"status: {summary.status_label} ({summary.status})",
-            f"pipeline/backend: {summary.pipeline_mode} / {summary.backend}",
-            f"run_id: {identity.get('run_id') or '—'}",
-            f"identity state: {identity.get('state') or 'MISSING'}",
-            f"rows: {summary.row_count} | done={summary.done_count} | running={summary.running_count} | errors={summary.error_count}",
-            f"note: {summary.note or '—'}",
+            f"Папка запуска - {summary.run_dir}",
+            f"Состояние - {_operator_state(summary.status_label or summary.status, fallback='нет данных')}",
+            f"Контур и исполнитель - {_operator_token_text(summary.pipeline_mode)} / {_operator_token_text(summary.backend)}",
+            f"Идентификатор запуска - {identity.get('run_id') or '—'}",
+            f"Состояние идентичности - {_operator_state(identity.get('state'), fallback='не найден')}",
+            f"Строки - всего {summary.row_count}, завершено {summary.done_count}, выполняется {summary.running_count}, ошибок {summary.error_count}",
+            f"Примечание - {summary.note or '—'}",
         ]
         contract_lines = [
             (
-                "identity hashes: "
-                f"objective={_short_hash(identity.get('objective_contract_hash'))} | "
-                f"problem={_short_hash(identity.get('problem_hash'))} | "
-                f"baseline={_short_hash(identity.get('active_baseline_hash'))} | "
-                f"suite={_short_hash(identity.get('suite_snapshot_hash'))}"
+                "Контрольные метки - "
+                f"цели {_short_hash(identity.get('objective_contract_hash'))}; "
+                f"задача {_short_hash(identity.get('problem_hash'))}; "
+                f"опорный прогон {_short_hash(identity.get('active_baseline_hash'))}; "
+                f"набор {_short_hash(identity.get('suite_snapshot_hash'))}."
             ),
-            f"selected_run_contract_hash: {_short_hash(identity.get('selected_run_contract_hash'))}",
-            f"objective keys: {', '.join(summary.objective_keys) or '—'}",
-            f"penalty: {summary.penalty_key or '—'} tol={summary.penalty_tol if summary.penalty_tol is not None else '—'}",
-            f"problem hash: {summary.problem_hash or '—'}",
-            f"problem hash mode: {summary.problem_hash_mode or '—'}",
-            f"baseline source: {summary.baseline_source_label or summary.baseline_source_kind or '—'}",
+            f"Паспорт выбранного запуска - {_short_hash(identity.get('selected_run_contract_hash'))}",
+            f"Цели - {_operator_list_text(summary.objective_keys)}",
+            f"Ограничение - {summary.penalty_key or '—'}, допуск {summary.penalty_tol if summary.penalty_tol is not None else '—'}",
+            f"Контроль задачи - {summary.problem_hash or '—'}",
+            f"Режим контроля - {_problem_hash_mode_text(summary.problem_hash_mode)}",
+            f"Источник опорного прогона - {_operator_token_text(summary.baseline_source_label or summary.baseline_source_kind)}",
         ]
         packaging_lines = [
-            f"rows with packaging: {int(packaging.rows_with_packaging)} / {int(packaging.rows_considered)}",
-            f"truth-ready: {int(packaging.packaging_truth_ready_rows)}",
-            f"verification pass: {int(packaging.packaging_verification_pass_rows)}",
-            f"runtime fallback: {int(packaging.runtime_fallback_rows)}",
-            f"host interference: {int(packaging.spring_host_interference_rows)}",
-            f"pair interference: {int(packaging.spring_pair_interference_rows)}",
+            f"Строки для выпуска - {int(packaging.rows_with_packaging)} / {int(packaging.rows_considered)}",
+            f"Готовы к проверке - {int(packaging.packaging_truth_ready_rows)}",
+            f"Прошли проверку - {int(packaging.packaging_verification_pass_rows)}",
+            f"Резервные данные - {int(packaging.runtime_fallback_rows)}",
+            f"Риск крепления пружины - {int(packaging.spring_host_interference_rows)}",
+            f"Риск пары пружин - {int(packaging.spring_pair_interference_rows)}",
         ]
         stage_lines: list[str] = []
         if str(summary.pipeline_mode) == "staged":
             stage_lines.append(
-                f"handoff: {'available' if bool(summary.handoff_available) else 'not available'} | "
-                f"preset={summary.handoff_preset_tag or '—'} | budget={int(summary.handoff_budget or 0)} | seeds={int(summary.handoff_seed_count or 0)}"
+                f"Передача - {'доступна' if bool(summary.handoff_available) else 'недоступна'}. "
+                f"Профиль {_operator_preset_text(summary.handoff_preset_tag)}. Бюджет {int(summary.handoff_budget or 0)}. "
+                f"Стартовых вариантов {int(summary.handoff_seed_count or 0)}."
             )
             if summary.handoff_reason_lines:
-                stage_lines.append("handoff reason:")
+                stage_lines.append("Пояснение передачи:")
                 stage_lines.extend(f"  - {line}" for line in summary.handoff_reason_lines)
             for row in stage_rows:
                 if not bool(row.get("available")):
                     continue
                 stage_lines.append(
                     f"{row.get('stage_name')}: {row.get('summary_line') or row.get('policy_name')} | "
-                    f"seeds={int(row.get('seed_count', 0) or 0)} | "
-                    f"underfill={row.get('underfill_message') or 'ok'}"
+                    f"стартовых вариантов {int(row.get('seed_count', 0) or 0)} | "
+                    f"заполнение {row.get('underfill_message') or 'готово'}"
                 )
         else:
-            stage_lines.append("Для coordinator run handoff/stage policy не применяется напрямую.")
+            stage_lines.append("Для координационного прогона политика стадий напрямую не применяется.")
         return (
             "\n".join(summary_lines),
             "\n".join(contract_lines),
@@ -1549,7 +1706,7 @@ class DesktopOptimizerCenter:
         self.refresh_handoff()
         self.refresh_packaging()
         self.refresh_dashboard()
-        self.status_var.set("Snapshot desktop optimizer center обновлён.")
+        self.status_var.set("Сводка центра оптимизации обновлена.")
 
     def refresh_history(self) -> None:
         self._sync_widget_state()
@@ -1601,7 +1758,7 @@ class DesktopOptimizerCenter:
         return (
             "Передача в анализ обновлена: "
             f"{pointer.get('run_name') or summary.run_dir.name} | "
-            f"selected_run_contract.json={contract_state}{path_suffix}"
+            f"паспорт выбранного запуска - {_operator_state(contract_state, fallback='нет данных')}{path_suffix}"
         )
 
     def _refresh_after_run_selection(self, status_text: str = "") -> None:
@@ -1709,27 +1866,37 @@ class DesktopOptimizerCenter:
         self._sync_widget_state()
         readiness = self.runtime.launch_readiness_summary()
         action = str(readiness.get("next_action") or "Runtime").strip()
-        if action in {"Contract", "Contract drift"}:
+        if action in {"Contract", "Contract drift", "Контракт", "Настройки запуска"}:
             self.show_contract_tab()
-        elif action == "History":
+        elif action in {"History", "История"}:
             self.show_history_tab()
-        elif action == "Finished Jobs":
+        elif action in {"Finished Jobs", "Готовые запуски"}:
             self.show_finished_tab()
-        elif action == "Handoff":
+        elif action in {"Handoff", "Передача данных"}:
             self.show_handoff_tab()
-        elif action == "Packaging":
+        elif action in {"Packaging", "Упаковка"}:
             self.show_packaging_tab()
         else:
             self.show_runtime_tab()
+        action_labels = {
+            "Contract": "настройкам запуска",
+            "Contract drift": "сверке настроек",
+            "Настройки запуска": "настройкам запуска",
+            "History": "истории",
+            "Finished Jobs": "готовым прогонам",
+            "Handoff": "передаче",
+            "Packaging": "выпуску",
+            "Runtime": "выполнению",
+        }
         self.status_var.set(
-            f"Launch readiness рекомендует перейти к поверхности: {action or 'Runtime'}."
+            f"Готовность запуска рекомендует перейти к разделу {action_labels.get(action, action or 'выполнение')}."
         )
 
     def follow_selected_run_next_step(self) -> None:
         self._sync_widget_state()
         payload = self.runtime.selected_run_next_step_summary(self._selected_run_dir)
         action_kind = str(payload.get("next_action_kind") or "show_history_tab").strip()
-        action_label = str(payload.get("next_action") or "History").strip() or "History"
+        action_label = str(payload.get("next_action") or "История").strip() or "История"
         if action_kind == "make_latest_pointer":
             self.make_selected_run_latest_pointer()
             return
@@ -1746,7 +1913,7 @@ class DesktopOptimizerCenter:
         else:
             self.show_history_tab()
         self.status_var.set(
-            f"Selected run next step рекомендует перейти к поверхности: {action_label}."
+            f"Следующий шаг выбранного запуска рекомендует перейти к разделу: {action_label}."
         )
 
     def open_selected_run_dir(self) -> None:
@@ -1756,8 +1923,8 @@ class DesktopOptimizerCenter:
             self._open_path(Path(self._selected_run_dir))
         except Exception as exc:
             messagebox.showerror(
-                "Desktop Optimizer Center",
-                f"Не удалось открыть run dir:\n{exc}",
+                "Центр оптимизации",
+                f"Не удалось открыть папку запуска:\n{exc}",
             )
 
     def open_selected_log(self) -> None:
@@ -1776,8 +1943,8 @@ class DesktopOptimizerCenter:
             self._open_path(path)
         except Exception as exc:
             messagebox.showerror(
-                "Desktop Optimizer Center",
-                f"Не удалось открыть лог:\n{exc}",
+                "Центр оптимизации",
+            f"Не удалось открыть журнал:\n{exc}",
             )
 
     def open_selected_results(self) -> None:
@@ -1792,16 +1959,16 @@ class DesktopOptimizerCenter:
         path = summary.result_path if summary.result_path is not None else None
         if path is None:
             messagebox.showinfo(
-                "Desktop Optimizer Center",
-                "У выбранного run пока нет results artifact.",
+                "Центр оптимизации",
+                "У выбранного прогона пока нет файла результатов.",
             )
             return
         try:
             self._open_path(path)
         except Exception as exc:
             messagebox.showerror(
-                "Desktop Optimizer Center",
-                f"Не удалось открыть results artifact:\n{exc}",
+                "Центр оптимизации",
+                f"Не удалось открыть файл результатов:\n{exc}",
             )
 
     def open_selected_objective_contract(self) -> None:
@@ -1816,16 +1983,16 @@ class DesktopOptimizerCenter:
         path = summary.objective_contract_path if summary.objective_contract_path is not None else None
         if path is None:
             messagebox.showinfo(
-                "Desktop Optimizer Center",
-                "У выбранного run нет objective contract artifact.",
+                "Центр оптимизации",
+                "У выбранного запуска нет файла с паспортом целей.",
             )
             return
         try:
             self._open_path(path)
         except Exception as exc:
             messagebox.showerror(
-                "Desktop Optimizer Center",
-                f"Не удалось открыть objective contract:\n{exc}",
+                "Центр оптимизации",
+                f"Не удалось открыть паспорт целей:\n{exc}",
             )
 
     def open_selected_handoff_plan(self) -> None:
@@ -1840,32 +2007,32 @@ class DesktopOptimizerCenter:
         path = summary.handoff_plan_path if summary.handoff_plan_path is not None else None
         if path is None:
             messagebox.showinfo(
-                "Desktop Optimizer Center",
-                "У выбранного run нет handoff plan artifact.",
+                "Центр оптимизации",
+                "У выбранного запуска нет плана передачи данных.",
             )
             return
         try:
             self._open_path(path)
         except Exception as exc:
             messagebox.showerror(
-                "Desktop Optimizer Center",
-                f"Не удалось открыть handoff plan:\n{exc}",
+                "Центр оптимизации",
+                f"Не удалось открыть план передачи данных:\n{exc}",
             )
 
     def open_latest_optimization_pointer(self) -> None:
         pointer = self.runtime.latest_pointer_summary()
         if not bool(pointer.get("exists")):
             messagebox.showinfo(
-                "Desktop Optimizer Center",
-                "Контекст анализа пока не закреплён.",
+                "Центр оптимизации",
+                "Прогон для анализа пока не выбран.",
             )
             return
         try:
             self._open_path(Path(str(pointer.get("pointer_path") or "")))
         except Exception as exc:
             messagebox.showerror(
-                "Desktop Optimizer Center",
-                f"Не удалось открыть контекст анализа:\n{exc}",
+                "Центр оптимизации",
+                f"Не удалось открыть прогон для анализа:\n{exc}",
             )
 
     def make_selected_run_latest_pointer(self) -> None:
@@ -1876,8 +2043,8 @@ class DesktopOptimizerCenter:
         )
         if details is None:
             messagebox.showinfo(
-                "Desktop Optimizer Center",
-                "Сначала выберите прогон, который нужно закрепить для анализа.",
+                "Центр оптимизации",
+                "Сначала выберите прогон, который нужно передать в анализ.",
             )
             return
         summary = getattr(details, "summary")
@@ -1886,7 +2053,7 @@ class DesktopOptimizerCenter:
             selected_from="desktop_optimizer_center_manual_retry",
         )
         status_text = (
-            "Контекст анализа перепривязан: "
+            "Прогон передан в анализ: "
             f"{pointer.get('run_name') or summary.run_dir.name}"
         )
         self.refresh_all()
@@ -1904,15 +2071,15 @@ class DesktopOptimizerCenter:
         updates = self.runtime.apply_run_contract(summary)
         if not updates:
             messagebox.showinfo(
-                "Desktop Optimizer Center",
-                "У выбранного run нет contract-полей для подстановки в launch context.",
+                "Центр оптимизации",
+                "У выбранного запуска нет настроек, которые можно подставить в текущий запуск.",
             )
             return
         self._load_state_into_widgets()
         self.status_var.set(
-            "Contract выбранного run подставлен в launch context: "
+            "Настройки выбранного запуска подставлены в текущий запуск: "
             + ", ".join(sorted(str(key) for key in updates))
-            + ". Baseline/source provenance не подменялись автоматически."
+            + ". Происхождение опорного прогона не подменялось автоматически."
         )
         self.refresh_all()
         self.notebook.select(self.contract_tab)
@@ -1923,15 +2090,15 @@ class DesktopOptimizerCenter:
         updates = self.runtime.apply_launch_profile(profile_key)
         if not updates:
             self.status_var.set(
-                f"Launch profile уже активен без drift: {label or profile_key}"
+                f"Профиль запуска уже активен без ручных отличий - {label or profile_key}"
             )
             self.refresh_all()
             self.notebook.select(self.runtime_tab)
             return
         self._load_state_into_widgets()
         self.status_var.set(
-            "Launch profile применён: "
-            f"{label or profile_key} ({len(updates)} knobs updated)"
+            "Профиль запуска применён - "
+            f"{label or profile_key}. Обновлено настроек {len(updates)}."
         )
         self.refresh_all()
         self.notebook.select(self.runtime_tab)
@@ -1946,10 +2113,10 @@ class DesktopOptimizerCenter:
                 if str(item).strip()
             )
             messagebox.showwarning(
-                "Desktop Optimizer Center",
-                "Запуск заблокирован preflight-проверкой:\n" + (reasons or "- unknown"),
+                "Центр оптимизации",
+                "Запуск заблокирован предварительной проверкой:\n" + (reasons or "- причина не указана"),
             )
-            self.status_var.set("Launch preflight blocked: review Runtime / Contract banners.")
+            self.status_var.set("Запуск заблокирован: проверьте разделы выполнения и настроек запуска.")
             self.refresh_all()
             self.notebook.select(self.runtime_tab)
             return
@@ -1957,31 +2124,31 @@ class DesktopOptimizerCenter:
             job = self.runtime.start_job()
         except Exception as exc:
             messagebox.showerror(
-                "Desktop Optimizer Center",
+                "Центр оптимизации",
                 f"Не удалось запустить оптимизацию:\n{exc}",
             )
             return
-        self.status_var.set(f"Запуск создан: {getattr(job, 'run_dir', '')}")
+        self.status_var.set(f"Запуск создан - {getattr(job, 'run_dir', '')}")
         self.refresh_all()
         self.notebook.select(self.runtime_tab)
 
     def soft_stop_job(self) -> None:
         if self.runtime.request_soft_stop():
-            self.status_var.set("Запрошена мягкая остановка текущего optimization job.")
+            self.status_var.set("Запрошена мягкая остановка текущей задачи оптимизации.")
             self.refresh_all()
 
     def hard_stop_job(self) -> None:
         if self.runtime.request_hard_stop():
-            self.status_var.set("Отправлена остановка optimization job (STOP + terminate).")
+            self.status_var.set("Отправлена команда остановки задачи оптимизации.")
         else:
             self.status_var.set("Процесс остановлен принудительно.")
         self.refresh_all()
 
     def clear_job_status(self) -> None:
         if self.runtime.clear_finished_job():
-            self.status_var.set("Статус текущего optimization job очищен.")
+            self.status_var.set("Сообщение о текущей задаче оптимизации очищено.")
         else:
-            self.status_var.set("Optimization job ещё активен; сначала остановите или дождитесь завершения.")
+            self.status_var.set("Задача оптимизации ещё активна; сначала остановите её или дождитесь завершения.")
         self.refresh_all()
 
     def start_selected_handoff(self) -> None:
@@ -1993,25 +2160,25 @@ class DesktopOptimizerCenter:
         summary = getattr(details, "summary")
         if str(summary.pipeline_mode) != "staged":
             messagebox.showinfo(
-                "Desktop Optimizer Center",
-                "Handoff доступен только для staged run.",
+                "Центр оптимизации",
+                "Передача доступна только для поэтапного прогона.",
             )
             return
         if not bool(summary.handoff_available):
             messagebox.showinfo(
-                "Desktop Optimizer Center",
-                "Для этого staged run coordinator handoff пока не собран.",
+                "Центр оптимизации",
+                "Для этого поэтапного прогона передача координатору пока не подготовлена.",
             )
             return
         try:
             job = self.runtime.start_handoff(summary.run_dir)
         except Exception as exc:
             messagebox.showerror(
-                "Desktop Optimizer Center",
-                f"Не удалось запустить handoff:\n{exc}",
+                "Центр оптимизации",
+                f"Не удалось запустить передачу:\n{exc}",
             )
             return
-        self.status_var.set(f"Handoff запущен: {getattr(job, 'run_dir', '')}")
+        self.status_var.set(f"Передача запущена - {getattr(job, 'run_dir', '')}")
         self.refresh_all()
         self.notebook.select(self.runtime_tab)
 

@@ -119,11 +119,11 @@ class DesktopShellToolSpec:
     @property
     def effective_search_aliases(self) -> tuple[str, ...]:
         base_aliases: dict[str, tuple[str, ...]] = {
-            "desktop_input_editor": ("исходные данные", "setup", "параметры"),
-            "desktop_ring_editor": ("test suite", "сценарии", "редактор кольца"),
-            "test_center": ("набор испытаний", "tests", "validation"),
-            "desktop_optimizer_center": ("baseline", "optimization", "stagerunner", "distributed"),
-            "desktop_results_center": ("analysis", "results", "compare", "validation"),
+            "desktop_input_editor": ("исходные данные", "настройка", "параметры"),
+            "desktop_ring_editor": ("сценарии", "редактор кольца", "дорога"),
+            "test_center": ("набор испытаний", "проверки", "опорный прогон"),
+            "desktop_optimizer_center": ("оптимизация", "опорный прогон", "распределённый расчёт"),
+            "desktop_results_center": ("анализ", "результаты", "сравнение", "проверка расчёта"),
             "desktop_engineering_analysis_center": (
                 "engineering analysis",
                 "calibration",
@@ -134,7 +134,7 @@ class DesktopShellToolSpec:
                 "влияние",
                 "чувствительность",
             ),
-            "desktop_diagnostics_center": ("diagnostics", "bundle", "send bundle", "self-check"),
+            "desktop_diagnostics_center": ("диагностика", "архив диагностики", "отправка", "самопроверка"),
             "compare_viewer": ("compare viewer", "сравнение прогонов", "npz"),
             "desktop_animator": ("animator", "3d", "viewcube"),
             "desktop_mnemo": ("mnemo", "мнемосхема", "пневмосхема"),

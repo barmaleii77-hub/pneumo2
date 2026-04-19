@@ -89,6 +89,8 @@ def search_command_palette(
             score += 35
         if haystack.startswith(normalized):
             score += 20
+        if entry.command_id.startswith("workspace."):
+            score += 10
         score += max(0, 15 - len(entry.title))
         scored.append((score, entry))
 

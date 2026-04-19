@@ -58,7 +58,7 @@ class DesktopGeometryReferenceCenter:
         )
         self.context_summary_var = tk.StringVar(
             master=self.root,
-            value="Контекст: слева источник и переходы, справа рабочие вкладки по подвеске, цилиндрам, пружинам и параметрам.",
+            value="Слева источник и быстрые переходы, справа рабочие вкладки по подвеске, цилиндрам, пружинам и параметрам.",
         )
         self.geometry_summary_var = tk.StringVar(master=self.root)
         self.component_fit_summary_var = tk.StringVar(master=self.root)
@@ -69,11 +69,11 @@ class DesktopGeometryReferenceCenter:
         self.producer_gap_summary_var = tk.StringVar(master=self.root)
         self.artifact_freshness_var = tk.StringVar(
             master=self.root,
-            value="Artifact freshness: latest not checked yet.",
+            value="Актуальность файла анимации: последний файл ещё не проверен.",
         )
         self.evidence_export_summary_var = tk.StringVar(
             master=self.root,
-            value="Diagnostics evidence export: not written yet.",
+            value="Данные для диагностики: ещё не подготовлены.",
         )
         self.dw_min_var = tk.DoubleVar(master=self.root, value=-100.0)
         self.dw_max_var = tk.DoubleVar(master=self.root, value=100.0)
@@ -154,23 +154,23 @@ class DesktopGeometryReferenceCenter:
 
         source = ttk.LabelFrame(sidebar, text="Источник", padding=10)
         source.columnconfigure(1, weight=1)
-        ttk.Label(source, text="Базовый JSON:").grid(row=0, column=0, sticky="w")
+        ttk.Label(source, text="Базовый файл:").grid(row=0, column=0, sticky="w")
         ttk.Entry(source, textvariable=self.base_path_var).grid(row=0, column=1, sticky="ew", padx=8)
         ttk.Button(source, text="Выбрать...", command=self._browse_base_path).grid(row=0, column=2, padx=(0, 6))
         ttk.Button(source, text="По умолчанию", command=self._use_default_base).grid(row=0, column=3, padx=(0, 6))
         ttk.Button(source, text="Обновить всё", command=self.refresh_all).grid(row=0, column=4)
-        ttk.Label(source, text="Artifact JSON/NPZ:").grid(row=1, column=0, sticky="w", pady=(8, 0))
+        ttk.Label(source, text="Файл анимации:").grid(row=1, column=0, sticky="w", pady=(8, 0))
         ttk.Entry(source, textvariable=self.artifact_path_var).grid(row=1, column=1, sticky="ew", padx=8, pady=(8, 0))
-        ttk.Button(source, text="Выбрать artifact...", command=self._browse_artifact_path).grid(row=1, column=2, padx=(0, 6), pady=(8, 0))
-        ttk.Button(source, text="Latest", command=self._use_latest_artifact).grid(row=1, column=3, padx=(0, 6), pady=(8, 0))
-        ttk.Label(source, text="Artifact freshness:").grid(row=2, column=0, sticky="w", pady=(8, 0))
+        ttk.Button(source, text="Выбрать файл...", command=self._browse_artifact_path).grid(row=1, column=2, padx=(0, 6), pady=(8, 0))
+        ttk.Button(source, text="Последний", command=self._use_latest_artifact).grid(row=1, column=3, padx=(0, 6), pady=(8, 0))
+        ttk.Label(source, text="Актуальность файла:").grid(row=2, column=0, sticky="w", pady=(8, 0))
         ttk.Label(
             source,
             textvariable=self.artifact_freshness_var,
             wraplength=980,
             justify="left",
         ).grid(row=2, column=1, columnspan=4, sticky="ew", padx=8, pady=(8, 0))
-        export_btn = ttk.Button(source, text="Export evidence for SEND", command=self._export_evidence_for_send)
+        export_btn = ttk.Button(source, text="Подготовить данные для отправки", command=self._export_evidence_for_send)
         export_btn.grid(row=3, column=0, sticky="w", pady=(8, 0))
         ttk.Label(
             source,
@@ -181,16 +181,16 @@ class DesktopGeometryReferenceCenter:
         ttk.Label(
             source,
             text=(
-                "Read-only reference/evidence surface: canonical parameter edits stay in Input lane; "
-                "hardpoints/solver_points remain producer-owned until export evidence closes OG-001."
+                "Справочная область только для чтения: основные параметры редактируются во вводе исходных данных; "
+                "точки расчёта и опоры остаются данными источника до подтверждения экспорта."
             ),
             wraplength=980,
             justify="left",
         ).grid(row=4, column=0, columnspan=5, sticky="ew", pady=(8, 0))
         self._attach_tooltip(
             export_btn,
-            "Записать geometry_reference_evidence.json для Diagnostics/Send Bundle. "
-            "Reference Center только передаёт evidence summary и не собирает SEND bundle.",
+            "Подготовить данные справочника для диагностики и отправки. "
+            "Справочный центр передаёт краткую сводку по данным и не собирает архив отправки.",
         )
         source.pack(fill="x", expand=False)
 
@@ -255,18 +255,16 @@ class DesktopGeometryReferenceCenter:
         refresh_btn.pack(side="left")
         self._attach_tooltip(
             refresh_btn,
-            "Пересчитать reference geometry, road_width_m и geometry acceptance evidence для текущего base.",
+            "Пересчитать справочную геометрию, ширину дороги и подтверждение геометрии для текущей базы.",
         )
         self._help_button(
             controls,
-            title="Geometry reference",
-            headline="Подвеска, road_width_m и acceptance evidence",
+            title="Справочник геометрии",
+            headline="Подвеска, ширина дороги и подтверждение геометрии",
             body=(
-                "Эта вкладка показывает source-data reference по подвеске и компонентам. "
-                "road_width_m вынесен явно из-за GAP-008: если он не задан напрямую, "
-                "Reference Center показывает declared derivation из колеи и ширины колеса. "
-                "Geometry acceptance здесь является evidence surface: без solver-point runtime frame "
-                "она честно остаётся MISSING."
+                "Эта вкладка показывает справочные данные по подвеске и компонентам. "
+                "Ширина дороги вынесена явно: если она не задана напрямую, центр показывает расчёт из колеи и ширины колеса. "
+                "Подтверждение геометрии показывает состояние входных данных; без расчётного кадра оно честно остаётся неготовым."
             ),
         ).pack(side="left", padx=(6, 0))
 
@@ -285,7 +283,7 @@ class DesktopGeometryReferenceCenter:
 
         solver_frame = ttk.LabelFrame(
             self.geometry_tab,
-            text="solver_points / hardpoints producer evidence",
+            text="Данные источника: точки расчёта и опоры",
             padding=8,
         )
         solver_frame.pack(fill="both", expand=False, pady=(0, 10))
@@ -298,16 +296,16 @@ class DesktopGeometryReferenceCenter:
         self.solver_points_hardpoints_tree = self._build_tree(
             solver_frame,
             columns=(
-                ("layer", "Layer", 170, "w"),
-                ("status", "Status", 90, "w"),
-                ("blockers", "Blocking reasons", 360, "w"),
-                ("coverage", "Visible family coverage", 300, "w"),
-                ("source", "Source / path", 520, "w"),
+                ("layer", "Слой", 170, "w"),
+                ("status", "Состояние", 90, "w"),
+                ("blockers", "Причины блокировки", 360, "w"),
+                ("coverage", "Охват семейств", 300, "w"),
+                ("source", "Источник / путь", 520, "w"),
             ),
             height=4,
         )
 
-        gap_frame = ttk.LabelFrame(self.geometry_tab, text="producer truth gap map", padding=8)
+        gap_frame = ttk.LabelFrame(self.geometry_tab, text="Карта недостающих данных источника", padding=8)
         gap_frame.pack(fill="both", expand=False, pady=(0, 10))
         ttk.Label(
             gap_frame,
@@ -318,16 +316,16 @@ class DesktopGeometryReferenceCenter:
         self.producer_gap_tree = self._build_tree(
             gap_frame,
             columns=(
-                ("gap", "Gap", 90, "w"),
-                ("status", "Status", 90, "w"),
-                ("blockers", "Blocking reasons", 330, "w"),
-                ("freshness", "Freshness", 220, "w"),
-                ("sources", "Source artifacts", 520, "w"),
+                ("gap", "Проверка", 90, "w"),
+                ("status", "Состояние", 90, "w"),
+                ("blockers", "Причины блокировки", 330, "w"),
+                ("freshness", "Актуальность", 220, "w"),
+                ("sources", "Файлы источника", 520, "w"),
             ),
             height=5,
         )
 
-        road_frame = ttk.LabelFrame(self.geometry_tab, text="road_width_m reference / GAP-008", padding=8)
+        road_frame = ttk.LabelFrame(self.geometry_tab, text="Справочная ширина дороги", padding=8)
         road_frame.pack(fill="both", expand=False, pady=(0, 10))
         ttk.Label(
             road_frame,
@@ -338,12 +336,12 @@ class DesktopGeometryReferenceCenter:
         self.road_width_tree = self._build_tree(
             road_frame,
             columns=(
-                ("layer", "Layer", 120, "w"),
+                ("layer", "Слой", 120, "w"),
                 ("parameter", "Параметр", 150, "w"),
                 ("unit", "Ед. изм.", 80, "w"),
                 ("status", "Статус", 210, "w"),
-                ("explicit", "Explicit, м", 110, "e"),
-                ("effective", "Effective, м", 110, "e"),
+                ("explicit", "Явно, м", 110, "e"),
+                ("effective", "Итог, м", 110, "e"),
                 ("track", "Колея, м", 100, "e"),
                 ("wheel", "Ширина колеса, м", 130, "e"),
                 ("source", "Источник", 260, "w"),
@@ -360,8 +358,8 @@ class DesktopGeometryReferenceCenter:
                 ("rebound", "Δшток rebound, мм", 120, "e"),
                 ("static", "Δшток static, мм", 110, "e"),
                 ("bump", "Δшток bump, мм", 110, "e"),
-                ("mr_mid", "MR @ 0", 90, "e"),
-                ("mr_peak", "MR peak", 90, "e"),
+                ("mr_mid", "MR при 0", 90, "e"),
+                ("mr_peak", "MR пик", 90, "e"),
                 ("usage", "Исп. хода, %", 100, "e"),
                 ("notes", "Замечания", 220, "w"),
             ),
@@ -386,17 +384,17 @@ class DesktopGeometryReferenceCenter:
                 ("family", "Семейство", 150, "w"),
                 ("status", "Статус", 80, "w"),
                 ("usage", "Исп. хода, %", 100, "e"),
-                ("mr", "MR peak", 90, "e"),
-                ("stroke", "Текущий stroke, мм", 120, "e"),
-                ("cyl_od", "Cylinder OD, мм", 110, "e"),
-                ("spring_id", "Spring ID, мм", 110, "e"),
-                ("clearance", "ID-OD, мм", 90, "e"),
-                ("catalog", "Top Camozzi", 210, "w"),
-                ("catalog_stroke", "Stroke rec., мм", 110, "e"),
-                ("dnet", "ΔFnet rec, Н", 110, "e"),
-                ("bias", "Bias rec", 90, "w"),
+                ("mr", "MR пик", 90, "e"),
+                ("stroke", "Текущий ход, мм", 120, "e"),
+                ("cyl_od", "Наруж. D цилиндра, мм", 150, "e"),
+                ("spring_id", "Внутр. D пружины, мм", 150, "e"),
+                ("clearance", "Зазор, мм", 90, "e"),
+                ("catalog", "Лучший Camozzi", 210, "w"),
+                ("catalog_stroke", "Рек. ход, мм", 110, "e"),
+                ("dnet", "ΔF итог, Н", 110, "e"),
+                ("bias", "Баланс", 90, "w"),
                 ("bind", "Δbind, мм", 90, "e"),
-                ("bind_target", "Target, мм", 90, "e"),
+                ("bind_target", "Цель, мм", 90, "e"),
                 ("action", "Следующее действие", 320, "w"),
             ),
             height=5,
@@ -404,7 +402,7 @@ class DesktopGeometryReferenceCenter:
 
         acceptance_frame = ttk.LabelFrame(
             self.geometry_tab,
-            text="Geometry acceptance evidence / GAP-006",
+            text="Подтверждение геометрии",
             padding=8,
         )
         acceptance_frame.pack(fill="both", expand=False, pady=(10, 0))
@@ -417,17 +415,17 @@ class DesktopGeometryReferenceCenter:
         self.geometry_acceptance_tree = self._build_tree(
             acceptance_frame,
             columns=(
-                ("source", "Source", 220, "w"),
-                ("updated", "Updated", 150, "w"),
+                ("source", "Источник", 220, "w"),
+                ("updated", "Обновлено", 150, "w"),
                 ("corner", "Угол", 70, "w"),
-                ("gate", "Gate", 90, "w"),
+                ("gate", "Результат", 90, "w"),
                 ("reason", "Причина", 300, "w"),
                 ("sigma", "Σ err, мм", 100, "e"),
                 ("xywr", "XYwr, мм", 100, "e"),
                 ("wf", "WF, мм", 90, "e"),
                 ("wr", "WR, мм", 90, "e"),
                 ("fr", "FR, мм", 90, "e"),
-                ("missing", "Missing", 260, "w"),
+                ("missing", "Нет данных", 260, "w"),
             ),
             height=5,
         )
@@ -455,7 +453,7 @@ class DesktopGeometryReferenceCenter:
         )
         self.cylinder_variant_picker.pack(side="left", padx=(6, 12))
 
-        ttk.Label(filters, text="Pressure, bar(g)").pack(side="left")
+        ttk.Label(filters, text="Давление, бар(изб.)").pack(side="left")
         ttk.Spinbox(
             filters,
             textvariable=self.cylinder_pressure_var,
@@ -471,16 +469,16 @@ class DesktopGeometryReferenceCenter:
         refresh_btn.pack(side="left")
         self._attach_tooltip(
             refresh_btn,
-            "Обновить Camozzi catalog shortlist, current cylinder family и packaging passport completeness.",
+            "Обновить список Camozzi, текущее семейство цилиндров и полноту паспорта размещения.",
         )
         self._help_button(
             filters,
-            title="Cylinder passport",
-            headline="Каталог цилиндров и packaging passport",
+            title="Паспорт цилиндров",
+            headline="Каталог цилиндров и паспорт размещения",
             body=(
-                "Каталог помогает выбрать реальные bore/rod/stroke варианты. "
-                "Packaging passport показывает, можно ли доверять body/rod/piston/gland geometry. "
-                "Если паспорт неполный, downstream graphics must stay in axis-only honesty mode."
+                "Каталог помогает выбрать реальные варианты диаметра поршня, штока и хода. "
+                "Паспорт размещения показывает, можно ли доверять геометрии корпуса, штока, поршня и гланда. "
+                "Если паспорт неполный, визуализация должна оставаться в честном осевом режиме."
             ),
         ).pack(side="left", padx=(6, 0))
 
@@ -497,18 +495,18 @@ class DesktopGeometryReferenceCenter:
             current_frame,
             columns=(
                 ("family", "Семейство", 150, "w"),
-                ("bore", "Bore, мм", 90, "e"),
-                ("rod", "Rod, мм", 90, "e"),
-                ("stroke", "Stroke, мм", 90, "e"),
-                ("od", "OD, мм", 90, "e"),
-                ("body", "Body, мм", 90, "e"),
-                ("body_need", "Stroke+dead, мм", 110, "e"),
+                ("bore", "Поршень, мм", 90, "e"),
+                ("rod", "Шток, мм", 90, "e"),
+                ("stroke", "Ход, мм", 90, "e"),
+                ("od", "Наруж. D, мм", 90, "e"),
+                ("body", "Корпус, мм", 90, "e"),
+                ("body_need", "Ход+запас, мм", 110, "e"),
                 ("body_gap", "Δbody, мм", 90, "e"),
-                ("pkg_status", "Pkg status", 100, "w"),
-                ("pkg_complete", "Pkg, %", 80, "e"),
-                ("truth", "Truth state", 170, "w"),
-                ("cap", "Acap, см²", 90, "e"),
-                ("ann", "Arod-side, см²", 110, "e"),
+                ("pkg_status", "Паспорт", 100, "w"),
+                ("pkg_complete", "Полнота, %", 90, "e"),
+                ("truth", "Достоверность", 170, "w"),
+                ("cap", "Площадь порш., см²", 130, "e"),
+                ("ann", "Площадь штока, см²", 130, "e"),
             ),
             height=5,
         )
@@ -516,7 +514,7 @@ class DesktopGeometryReferenceCenter:
 
         precharge_frame = ttk.LabelFrame(
             self.cylinder_tab,
-            text="Текущий precharge / force bias из base",
+            text="Текущие давления и баланс усилий из базы",
             padding=8,
         )
         precharge_frame.pack(fill="both", expand=False, pady=(10, 0))
@@ -530,14 +528,14 @@ class DesktopGeometryReferenceCenter:
             precharge_frame,
             columns=(
                 ("family", "Семейство", 150, "w"),
-                ("pcap_abs", "Pcap abs, кПа", 100, "e"),
-                ("prod_abs", "Prod abs, кПа", 100, "e"),
-                ("pcap_g", "Pcap, bar(g)", 100, "e"),
-                ("prod_g", "Prod, bar(g)", 100, "e"),
-                ("f_cap", "Fcap, Н", 100, "e"),
-                ("f_rod", "Frod, Н", 100, "e"),
-                ("f_net", "Fnet, Н", 100, "e"),
-                ("bias", "Bias", 90, "w"),
+                ("pcap_abs", "P порш. abs, кПа", 120, "e"),
+                ("prod_abs", "P шток abs, кПа", 120, "e"),
+                ("pcap_g", "P порш., бар(изб.)", 130, "e"),
+                ("prod_g", "P шток, бар(изб.)", 130, "e"),
+                ("f_cap", "F порш., Н", 100, "e"),
+                ("f_rod", "F штока, Н", 100, "e"),
+                ("f_net", "F итог, Н", 100, "e"),
+                ("bias", "Баланс", 90, "w"),
                 ("notes", "Замечания", 220, "w"),
             ),
             height=5,
@@ -545,7 +543,7 @@ class DesktopGeometryReferenceCenter:
 
         recommendation_frame = ttk.LabelFrame(
             self.cylinder_tab,
-            text="Рекомендованные каталожные варианты для текущего family",
+            text="Рекомендованные каталожные варианты для текущего семейства",
             padding=8,
         )
         recommendation_frame.pack(fill="both", expand=False, pady=(10, 0))
@@ -553,15 +551,15 @@ class DesktopGeometryReferenceCenter:
             recommendation_frame,
             columns=(
                 ("variant", "Вариант", 160, "w"),
-                ("bore", "Bore, мм", 90, "e"),
-                ("rod", "Rod, мм", 90, "e"),
-                ("stroke", "Stroke rec., мм", 110, "e"),
-                ("db", "Δbore, мм", 90, "e"),
-                ("dr", "Δrod, мм", 90, "e"),
-                ("ds", "Δstroke, мм", 100, "e"),
-                ("dnet", "ΔFnet, Н", 100, "e"),
-                ("bias", "Bias", 80, "w"),
-                ("score", "Score", 90, "e"),
+                ("bore", "Поршень, мм", 90, "e"),
+                ("rod", "Шток, мм", 90, "e"),
+                ("stroke", "Рек. ход, мм", 110, "e"),
+                ("db", "Δпоршень, мм", 110, "e"),
+                ("dr", "Δшток, мм", 90, "e"),
+                ("ds", "Δход, мм", 90, "e"),
+                ("dnet", "ΔF итог, Н", 100, "e"),
+                ("bias", "Баланс", 80, "w"),
+                ("score", "Оценка", 90, "e"),
                 ("notes", "Причина", 260, "w"),
             ),
             height=6,
@@ -575,7 +573,7 @@ class DesktopGeometryReferenceCenter:
             justify="left",
         ).pack(anchor="w", pady=(10, 0))
 
-        catalog_frame = ttk.LabelFrame(self.cylinder_tab, text="Camozzi catalog + force estimate", padding=8)
+        catalog_frame = ttk.LabelFrame(self.cylinder_tab, text="Каталог Camozzi и оценка усилия", padding=8)
         catalog_frame.pack(fill="both", expand=True, pady=(10, 0))
         ttk.Label(
             catalog_frame,
@@ -587,17 +585,17 @@ class DesktopGeometryReferenceCenter:
             catalog_frame,
             columns=(
                 ("variant", "Вариант", 160, "w"),
-                ("bore", "Bore, мм", 90, "e"),
-                ("rod", "Rod, мм", 90, "e"),
-                ("port", "Port", 90, "w"),
-                ("rod_thread", "Rod thread", 110, "w"),
+                ("bore", "Поршень, мм", 90, "e"),
+                ("rod", "Шток, мм", 90, "e"),
+                ("port", "Порт", 90, "w"),
+                ("rod_thread", "Резьба штока", 120, "w"),
                 ("B", "B, мм", 80, "e"),
                 ("E", "E, мм", 80, "e"),
                 ("TG", "TG, мм", 80, "e"),
-                ("cap", "Acap, см²", 90, "e"),
-                ("ann", "Arod-side, см²", 110, "e"),
-                ("f_cap", "Fcap, Н", 100, "e"),
-                ("f_rod", "Frod, Н", 100, "e"),
+                ("cap", "Площадь порш., см²", 130, "e"),
+                ("ann", "Площадь штока, см²", 130, "e"),
+                ("f_cap", "F порш., Н", 100, "e"),
+                ("f_rod", "F штока, Н", 100, "e"),
             ),
             height=12,
         )
@@ -611,27 +609,27 @@ class DesktopGeometryReferenceCenter:
         ).pack(anchor="w", pady=(10, 0))
 
     def _build_spring_tab(self, *, family_names: tuple[str, ...]) -> None:
-        current_frame = ttk.LabelFrame(self.spring_tab, text="Текущая spring geometry из base", padding=8)
+        current_frame = ttk.LabelFrame(self.spring_tab, text="Текущая геометрия пружины из базы", padding=8)
         current_frame.pack(fill="both", expand=False)
         self.current_spring_tree = self._build_tree(
             current_frame,
             columns=(
                 ("family", "Семейство", 150, "w"),
-                ("wire", "d, мм", 80, "e"),
-                ("mean", "Dmean, мм", 100, "e"),
-                ("inner", "ID, мм", 80, "e"),
-                ("outer", "OD, мм", 80, "e"),
+                ("wire", "Проволока d, мм", 130, "e"),
+                ("mean", "Средний D, мм", 110, "e"),
+                ("inner", "Внутр. D, мм", 100, "e"),
+                ("outer", "Наруж. D, мм", 100, "e"),
                 ("g", "G, ГПа", 80, "e"),
                 ("k", "k, Н/мм", 90, "e"),
-                ("solid", "Lsolid, мм", 90, "e"),
+                ("solid", "L сомкн., мм", 100, "e"),
                 ("reserve", "Δbind, мм", 90, "e"),
-                ("target", "Reserve min, мм", 110, "e"),
+                ("target", "Запас min, мм", 110, "e"),
             ),
             height=5,
         )
         self.current_spring_tree.bind("<<TreeviewSelect>>", self._on_current_spring_selected)
 
-        install_frame = ttk.LabelFrame(self.spring_tab, text="Текущий spring install contract из base", padding=8)
+        install_frame = ttk.LabelFrame(self.spring_tab, text="Текущая установка пружины из базы", padding=8)
         install_frame.pack(fill="both", expand=False, pady=(10, 0))
         ttk.Label(
             install_frame,
@@ -643,17 +641,17 @@ class DesktopGeometryReferenceCenter:
             install_frame,
             columns=(
                 ("family", "Семейство", 150, "w"),
-                ("free", "Lfree, мм", 90, "e"),
-                ("free_pitch", "Lfree(pitch), мм", 110, "e"),
+                ("free", "Свободная L, мм", 120, "e"),
+                ("free_pitch", "L по шагу, мм", 110, "e"),
                 ("free_gap", "ΔLfree, мм", 90, "e"),
-                ("top_gap", "Top gap, мм", 90, "e"),
-                ("rebound", "Rebound min, мм", 110, "e"),
+                ("top_gap", "Зазор сверху, мм", 120, "e"),
+                ("rebound", "Отбой min, мм", 110, "e"),
                 ("bind_target", "Δbind min, мм", 100, "e"),
             ),
             height=5,
         )
 
-        calculator = ttk.LabelFrame(self.spring_tab, text="Spring geometry / coil-bind calculator", padding=10)
+        calculator = ttk.LabelFrame(self.spring_tab, text="Расчёт геометрии пружины и смыкания витков", padding=10)
         calculator.pack(fill="x", expand=False, pady=(10, 0))
         for idx in range(4):
             calculator.columnconfigure(idx, weight=1 if idx % 2 == 1 else 0)
@@ -668,7 +666,7 @@ class DesktopGeometryReferenceCenter:
         )
         family_picker.grid(row=0, column=1, sticky="ew", padx=(6, 16))
         family_picker.bind("<<ComboboxSelected>>", lambda _event: self._refresh_spring_reference())
-        ttk.Button(calculator, text="Загрузить из base", command=self._load_selected_spring_family_from_base).grid(
+        ttk.Button(calculator, text="Загрузить из базы", command=self._load_selected_spring_family_from_base).grid(
             row=0,
             column=2,
             sticky="w",
@@ -688,11 +686,11 @@ class DesktopGeometryReferenceCenter:
         )
 
         fields = (
-            ("d wire, мм", self.spring_wire_var, 2, 0, 1.0, 30.0, 0.5),
-            ("D mean, мм", self.spring_mean_diameter_var, 2, 2, 10.0, 240.0, 1.0),
-            ("N active", self.spring_active_turns_var, 3, 0, 1.0, 30.0, 1.0),
-            ("N total", self.spring_total_turns_var, 3, 2, 1.0, 40.0, 1.0),
-            ("Pitch, мм", self.spring_pitch_var, 4, 0, 0.0, 60.0, 0.5),
+            ("Проволока d, мм", self.spring_wire_var, 2, 0, 1.0, 30.0, 0.5),
+            ("Средний D, мм", self.spring_mean_diameter_var, 2, 2, 10.0, 240.0, 1.0),
+            ("Активных витков", self.spring_active_turns_var, 3, 0, 1.0, 30.0, 1.0),
+            ("Всего витков", self.spring_total_turns_var, 3, 2, 1.0, 40.0, 1.0),
+            ("Шаг, мм", self.spring_pitch_var, 4, 0, 0.0, 60.0, 0.5),
             ("G, ГПа", self.spring_g_var, 4, 2, 1.0, 120.0, 1.0),
             ("Fmax, Н", self.spring_force_var, 5, 0, 0.0, 200000.0, 500.0),
         )
@@ -717,19 +715,19 @@ class DesktopGeometryReferenceCenter:
     def _build_guide_tab(self) -> None:
         filters = ttk.Frame(self.guide_tab)
         filters.pack(fill="x", expand=False)
-        ttk.Label(filters, text="Search").pack(side="left")
+        ttk.Label(filters, text="Поиск").pack(side="left")
         ttk.Entry(filters, textvariable=self.guide_query_var, width=40).pack(side="left", padx=(6, 12))
         find_btn = ttk.Button(filters, text="Найти", command=self._refresh_parameter_guide)
         find_btn.pack(side="left", padx=(0, 6))
-        self._attach_tooltip(find_btn, "Найти параметр по названию, ключу, единице измерения или help text.")
-        ttk.Button(filters, text="Показать reference set", command=self._clear_guide_query).pack(side="left")
+        self._attach_tooltip(find_btn, "Найти параметр по названию, ключу, единице измерения или подсказке.")
+        ttk.Button(filters, text="Показать справочный набор", command=self._clear_guide_query).pack(side="left")
         self._help_button(
             filters,
-            title="Parameter reference",
-            headline="Единицы и help labels",
+            title="Справочник параметров",
+            headline="Единицы и подсказки",
             body=(
                 "Каждая строка показывает пользовательское имя, единицу измерения, текущую величину, "
-                "канонический ключ и развёрнутое объяснение. road_width_m включён явно как GAP-008 reference."
+                "канонический ключ и развёрнутое объяснение. Ширина дороги включена явно как отдельный справочный параметр."
             ),
         ).pack(side="left", padx=(6, 0))
 
@@ -760,16 +758,16 @@ class DesktopGeometryReferenceCenter:
         refresh_btn.pack(side="left")
         self._attach_tooltip(
             refresh_btn,
-            "Обновить component_passport.json и сводку cylinder packaging passport completeness.",
+            "Обновить паспорт компонентов и сводку полноты размещения цилиндров.",
         )
         self._help_button(
             header,
-            title="Component passports",
-            headline="component_passport.json и packaging passport",
+            title="Паспорта компонентов",
+            headline="Паспорт компонентов и размещение цилиндров",
             body=(
-                "component_passport.json описывает пневматические компоненты и ISO 6358 estimates. "
-                "Cylinder packaging passport описывает геометрию корпуса/штока/гланда и управляет "
-                "truth-state: complete или axis-only honesty mode."
+                "Паспорт компонентов описывает пневматические компоненты и оценку ISO 6358. "
+                "Паспорт размещения цилиндров описывает геометрию корпуса, штока и гланда, а также показывает, "
+                "полная ли геометрия доступна или есть только осевая схема."
             ),
         ).pack(side="left", padx=(6, 0))
 
@@ -780,59 +778,59 @@ class DesktopGeometryReferenceCenter:
             justify="left",
         ).pack(anchor="w", pady=(10, 10))
 
-        component_frame = ttk.LabelFrame(self.passport_tab, text="component_passport.json catalog", padding=8)
+        component_frame = ttk.LabelFrame(self.passport_tab, text="Каталог паспортов компонентов", padding=8)
         component_frame.pack(fill="both", expand=True)
         self.component_passport_tree = self._build_tree(
             component_frame,
             columns=(
-                ("id", "Component", 260, "w"),
-                ("manufacturer", "Manufacturer", 110, "w"),
-                ("family", "Family", 90, "w"),
-                ("category", "Category", 150, "w"),
-                ("ports", "Ports", 140, "w"),
-                ("status", "Status", 130, "w"),
-                ("missing", "Missing data", 100, "e"),
-                ("iso", "ISO 6358 status", 460, "w"),
+                ("id", "Компонент", 260, "w"),
+                ("manufacturer", "Производитель", 130, "w"),
+                ("family", "Семейство", 100, "w"),
+                ("category", "Категория", 150, "w"),
+                ("ports", "Порты", 140, "w"),
+                ("status", "Состояние", 130, "w"),
+                ("missing", "Нет данных", 110, "e"),
+                ("iso", "Состояние ISO 6358", 460, "w"),
             ),
             height=10,
         )
 
-        packaging_frame = ttk.LabelFrame(self.passport_tab, text="cylinder packaging passport completeness", padding=8)
+        packaging_frame = ttk.LabelFrame(self.passport_tab, text="Полнота паспортов размещения цилиндров", padding=8)
         packaging_frame.pack(fill="both", expand=True, pady=(10, 0))
         self.packaging_passport_tree = self._build_tree(
             packaging_frame,
             columns=(
-                ("family", "Family", 120, "w"),
-                ("passport", "Passport id", 210, "w"),
-                ("status", "Status", 110, "w"),
-                ("truth", "Truth state", 190, "w"),
-                ("complete", "Complete, %", 100, "e"),
-                ("missing", "Missing fields", 420, "w"),
-                ("hidden", "Hidden geometry", 220, "w"),
+                ("family", "Семейство", 120, "w"),
+                ("passport", "Паспорт", 210, "w"),
+                ("status", "Состояние", 110, "w"),
+                ("truth", "Достоверность", 190, "w"),
+                ("complete", "Полнота, %", 100, "e"),
+                ("missing", "Нет полей", 420, "w"),
+                ("hidden", "Скрытая геометрия", 220, "w"),
             ),
             height=6,
         )
 
         artifact_packaging_frame = ttk.LabelFrame(
             self.passport_tab,
-            text="export/runtime packaging passport evidence",
+            text="Данные размещения цилиндров из экспорта",
             padding=8,
         )
         artifact_packaging_frame.pack(fill="both", expand=True, pady=(10, 0))
         self.packaging_artifact_tree = self._build_tree(
             artifact_packaging_frame,
             columns=(
-                ("cylinder", "Cylinder", 90, "w"),
-                ("base", "Base status", 110, "w"),
-                ("export", "Export status", 120, "w"),
-                ("truth", "Truth mode", 190, "w"),
-                ("base_complete", "Base, %", 90, "e"),
-                ("mesh", "Full mesh", 90, "w"),
-                ("fabrication", "Fabrication", 100, "w"),
-                ("mismatch", "Mismatch", 130, "w"),
-                ("missing_adv", "Missing advanced", 300, "w"),
-                ("missing_geom", "Missing geometry", 260, "w"),
-                ("lengths", "Length evidence", 220, "w"),
+                ("cylinder", "Цилиндр", 90, "w"),
+                ("base", "Состояние базы", 130, "w"),
+                ("export", "Состояние экспорта", 150, "w"),
+                ("truth", "Достоверность", 190, "w"),
+                ("base_complete", "База, %", 90, "e"),
+                ("mesh", "Полная геометрия", 130, "w"),
+                ("fabrication", "Создание геометрии", 150, "w"),
+                ("mismatch", "Расхождение", 130, "w"),
+                ("missing_adv", "Нет расширенных данных", 300, "w"),
+                ("missing_geom", "Нет геометрии", 260, "w"),
+                ("lengths", "Данные длин", 220, "w"),
             ),
             height=5,
         )
@@ -896,9 +894,9 @@ class DesktopGeometryReferenceCenter:
         current_path = self.runtime.resolve_base_path(self.base_path_var.get())
         initial_dir = current_path.parent if current_path.parent.exists() else current_path
         path = filedialog.askopenfilename(
-            title="Выбрать базовый JSON для справочного центра",
+            title="Выбрать базовый файл для справочного центра",
             initialdir=str(initial_dir),
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+            filetypes=[("Файлы данных", "*.json"), ("Все файлы", "*.*")],
         )
         if not path:
             return
@@ -912,13 +910,13 @@ class DesktopGeometryReferenceCenter:
         if not initial_dir.exists():
             initial_dir = Path.cwd()
         path = filedialog.askopenfilename(
-            title="Выбрать anim artifact pointer JSON или NPZ",
+            title="Выбрать файл анимации",
             initialdir=str(initial_dir),
             filetypes=[
-                ("Animator artifacts", "*.json *.npz"),
-                ("JSON pointer", "*.json"),
-                ("NPZ bundle", "*.npz"),
-                ("All files", "*.*"),
+                ("Файлы анимации", "*.json *.npz"),
+                ("Описание последней анимации", "*.json"),
+                ("Данные анимации", "*.npz"),
+                ("Все файлы", "*.*"),
             ],
         )
         if not path:
@@ -958,18 +956,52 @@ class DesktopGeometryReferenceCenter:
             if str(item).strip()
         )
 
+    @staticmethod
+    def _status_label(value: object) -> str:
+        text = str(value or "").strip()
+        if not text:
+            return "—"
+        labels = {
+            "ok": "в норме",
+            "ready": "готово",
+            "warn": "предупреждение",
+            "warning": "предупреждение",
+            "blocked": "заблокировано",
+            "missing": "нет данных",
+            "present": "есть",
+            "partial": "частично",
+            "complete": "полно",
+            "current": "актуально",
+            "stale": "устарело",
+            "match": "совпадает",
+            "mismatch": "расхождение",
+            "pass": "пройдено",
+            "fail": "ошибка",
+            "explicit": "задано явно",
+            "derived_from_track_and_wheel_width": "расчёт из колеи и колеса",
+            "base_missing": "нет в базе",
+            "export_missing": "нет в экспорте",
+            "axis_only": "только осевая схема",
+            "axis-only": "только осевая схема",
+        }
+        return labels.get(text.lower(), text)
+
+    @staticmethod
+    def _bool_label(value: object) -> str:
+        return "да" if bool(value) else "нет"
+
     def _producer_readiness_text(self, payload: dict[str, object]) -> str:
         reasons = self._producer_readiness_reasons(payload)
-        reasons_text = ", ".join(reasons) if reasons else "none"
+        reasons_text = ", ".join(reasons) if reasons else "нет"
         return (
-            f"producer_artifact_status={payload.get('producer_artifact_status') or 'missing'}; "
-            f"producer_readiness_reasons={reasons_text}"
+            f"состояние источника: {self._status_label(payload.get('producer_artifact_status') or 'missing')}; "
+            f"причины неготовности: {reasons_text}"
         )
 
     @staticmethod
     def _gap_map_status_text(gap_map: object) -> str:
         if not isinstance(gap_map, dict) or not gap_map:
-            return "producer_truth_gap_map: missing"
+            return "Карта недостающих данных: нет данных"
         counts: dict[str, int] = {}
         for entry in gap_map.values():
             if isinstance(entry, dict):
@@ -977,8 +1009,8 @@ class DesktopGeometryReferenceCenter:
             else:
                 status = "missing"
             counts[status] = counts.get(status, 0) + 1
-        return "producer_truth_gap_map: " + ", ".join(
-            f"{status}={count}" for status, count in sorted(counts.items())
+        return "Карта недостающих данных: " + ", ".join(
+            f"{DesktopGeometryReferenceCenter._status_label(status)}={count}" for status, count in sorted(counts.items())
         )
 
     @staticmethod
@@ -1001,9 +1033,9 @@ class DesktopGeometryReferenceCenter:
         missing = tuple(str(item) for item in (layer.get("visible_missing_families") or ()))
         required = tuple(str(item) for item in (layer.get("visible_required_families") or ()))
         return (
-            f"present={len(present)}/{len(required) or '—'}"
-            + (f"; partial={', '.join(partial[:4])}" if partial else "")
-            + (f"; missing={', '.join(missing[:4])}" if missing else "")
+            f"есть={len(present)}/{len(required) or '—'}"
+            + (f"; частично={', '.join(partial[:4])}" if partial else "")
+            + (f"; нет={', '.join(missing[:4])}" if missing else "")
         )
 
     @staticmethod
@@ -1032,23 +1064,23 @@ class DesktopGeometryReferenceCenter:
             status = "READY" if not missing and producer_status == "ready" and not producer_reasons else "WARN"
             workspace_path = Path(result["workspace_path"])
             sidecar_path = Path(result["sidecar_path"])
-            missing_text = ", ".join(missing) if missing else "none"
+            missing_text = ", ".join(missing) if missing else "нет"
             producer_text = self._producer_readiness_text(payload)
             self.evidence_export_summary_var.set(
-                "Diagnostics evidence export: "
-                f"{status}; gate={payload.get('geometry_acceptance_gate') or '—'}; "
-                f"freshness={freshness.get('status')}/{freshness.get('relation')}; "
-                f"road_width={payload.get('road_width_status') or '—'}; "
-                f"packaging={payload.get('packaging_status') or '—'}; "
-                f"{producer_text}; workspace={workspace_path}; sidecar={sidecar_path}; missing={missing_text}."
+                "Данные для диагностики: "
+                f"{self._status_label(status)}; подтверждение={self._status_label(payload.get('geometry_acceptance_gate'))}; "
+                f"актуальность={self._status_label(freshness.get('status'))}/{self._status_label(freshness.get('relation'))}; "
+                f"ширина дороги={self._status_label(payload.get('road_width_status'))}; "
+                f"размещение={self._status_label(payload.get('packaging_status'))}; "
+                f"{producer_text}; рабочая копия: {workspace_path}; файл отправки: {sidecar_path}; не хватает: {missing_text}."
             )
             self.status_var.set(
-                "Geometry Reference evidence exported for Diagnostics/SEND: "
-                f"{workspace_path.name} and {sidecar_path.name}."
+                "Данные справочника геометрии подготовлены для диагностики и отправки: "
+                f"{workspace_path.name} и {sidecar_path.name}."
             )
         except Exception as exc:
-            self.evidence_export_summary_var.set(f"Diagnostics evidence export: failed: {exc}")
-            self.status_var.set(f"Не удалось выгрузить Geometry Reference evidence: {exc}")
+            self.evidence_export_summary_var.set(f"Данные для диагностики: ошибка: {exc}")
+            self.status_var.set(f"Не удалось подготовить данные справочника геометрии: {exc}")
 
     def refresh_all(self) -> None:
         self._refresh_geometry_tab()
@@ -1059,8 +1091,8 @@ class DesktopGeometryReferenceCenter:
         self.status_var.set(
             "Справочный центр обновлён. Источник: "
             + self.runtime.describe_base_source(self._base_path())
-            + "; artifact="
-            + (self._artifact_path() or "latest")
+            + "; файл анимации: "
+            + (self._artifact_path() or "последний")
         )
 
     def _refresh_active_tab(self) -> None:
@@ -1104,20 +1136,20 @@ class DesktopGeometryReferenceCenter:
             artifact_context=artifact,
         )
         self.artifact_summary_var.set(
-            f"Runtime artifact: status={artifact.status}; updated={artifact.updated_utc or '—'}; "
-            f"npz={artifact.npz_path or '—'}; packaging_passport="
-            f"{'yes' if artifact.packaging_passport_exists else 'missing'}; "
-            f"geometry_acceptance_report={'yes' if artifact.geometry_acceptance_exists else 'missing'}; "
+            f"Файл анимации: состояние {self._status_label(artifact.status)}; обновлено {artifact.updated_utc or '—'}; "
+            f"файл {artifact.npz_path or '—'}; паспорт размещения: "
+            f"{'да' if artifact.packaging_passport_exists else 'нет'}; "
+            f"подтверждение геометрии: {'да' if artifact.geometry_acceptance_exists else 'нет'}; "
             f"{self._producer_readiness_text(diagnostics_handoff)}."
         )
         freshness_issues = tuple(str(item) for item in freshness.get("issues") or ())
         self.artifact_freshness_var.set(
-            "Artifact freshness: "
-            f"status={freshness.get('status')}; relation={freshness.get('relation')}; "
-            f"selected={freshness.get('selected_npz_path') or freshness.get('selected_pointer_path') or '—'}; "
-            f"latest={freshness.get('latest_npz_path') or freshness.get('latest_pointer_path') or '—'}; "
+            "Актуальность файла анимации: "
+            f"состояние {self._status_label(freshness.get('status'))}; связь {self._status_label(freshness.get('relation'))}; "
+            f"выбранный файл {freshness.get('selected_npz_path') or freshness.get('selected_pointer_path') or '—'}; "
+            f"последний файл {freshness.get('latest_npz_path') or freshness.get('latest_pointer_path') or '—'}; "
             f"{freshness.get('reason') or ''}"
-            + (f" Issues: {'; '.join(freshness_issues[:2])}" if freshness_issues else "")
+            + (f" Замечания: {'; '.join(freshness_issues[:2])}" if freshness_issues else "")
         )
         solver_hardpoints = diagnostics_handoff.get("solver_points_hardpoints_evidence")
         self._clear_tree(self.solver_points_hardpoints_tree)
@@ -1129,21 +1161,21 @@ class DesktopGeometryReferenceCenter:
             solver_status = str(solver_hardpoints.get("status") or "missing")
             solver_freshness = dict(solver_hardpoints.get("freshness_relation") or {})
             self.solver_points_hardpoints_summary_var.set(
-                "solver_points_hardpoints_evidence: "
-                f"status={solver_status}; blockers={solver_blockers}; "
-                f"acceptance={solver_hardpoints.get('geometry_acceptance_gate') or 'MISSING'}; "
-                f"freshness={solver_freshness.get('status') or 'missing'}/"
-                f"{solver_freshness.get('relation') or 'missing'}; read-only producer evidence, no closure claim."
+                "Данные точек расчёта и опор: "
+                f"состояние={self._status_label(solver_status)}; блокировки={solver_blockers}; "
+                f"подтверждение={self._status_label(solver_hardpoints.get('geometry_acceptance_gate') or 'MISSING')}; "
+                f"актуальность={self._status_label(solver_freshness.get('status') or 'missing')}/"
+                f"{self._status_label(solver_freshness.get('relation') or 'missing')}; только чтение, без закрытия источника."
             )
             self.solver_points_hardpoints_tree.insert(
                 "",
                 "end",
                 iid="solver_points_hardpoints_overall",
                 values=(
-                    "overall / OG-001",
-                    solver_status,
+                    "общая проверка",
+                    self._status_label(solver_status),
                     solver_blockers,
-                    f"acceptance={solver_hardpoints.get('geometry_acceptance_gate') or 'MISSING'}",
+                    f"подтверждение={self._status_label(solver_hardpoints.get('geometry_acceptance_gate') or 'MISSING')}",
                     self._source_paths_text(solver_hardpoints.get("source_artifact_paths")),
                 ),
             )
@@ -1152,11 +1184,11 @@ class DesktopGeometryReferenceCenter:
                 "end",
                 iid="solver_points_hardpoints_solver_points",
                 values=(
-                    "meta.solver_points",
-                    "present" if solver_meta.get("present") else "missing",
-                    f"consumer_geometry_fabrication_allowed={bool(solver_meta.get('consumer_geometry_fabrication_allowed'))}",
+                    "точки расчёта",
+                    "есть" if solver_meta.get("present") else "нет данных",
+                    f"можно создавать геометрию={self._bool_label(solver_meta.get('consumer_geometry_fabrication_allowed'))}",
                     self._coverage_text(solver_meta),
-                    "meta.solver_points",
+                    "точки расчёта",
                 ),
             )
             self.solver_points_hardpoints_tree.insert(
@@ -1164,11 +1196,11 @@ class DesktopGeometryReferenceCenter:
                 "end",
                 iid="solver_points_hardpoints_hardpoints",
                 values=(
-                    "meta.hardpoints",
-                    "present" if hardpoints_meta.get("present") else "missing",
-                    f"consumer_geometry_fabrication_allowed={bool(hardpoints_meta.get('consumer_geometry_fabrication_allowed'))}",
+                    "опоры",
+                    "есть" if hardpoints_meta.get("present") else "нет данных",
+                    f"можно создавать геометрию={self._bool_label(hardpoints_meta.get('consumer_geometry_fabrication_allowed'))}",
                     self._coverage_text(hardpoints_meta),
-                    "meta.hardpoints",
+                    "опоры",
                 ),
             )
             sot_status = (
@@ -1181,19 +1213,19 @@ class DesktopGeometryReferenceCenter:
                 "end",
                 iid="solver_points_hardpoints_sot",
                 values=(
-                    "HARDPOINTS_SOURCE_OF_TRUTH.json",
-                    sot_status,
-                    f"exists={bool(hardpoints_sot.get('exists'))}; complete={bool(hardpoints_sot.get('complete'))}",
+                    "файл опор",
+                    self._status_label(sot_status),
+                    f"существует={self._bool_label(hardpoints_sot.get('exists'))}; полный={self._bool_label(hardpoints_sot.get('complete'))}",
                     self._coverage_text(hardpoints_sot),
                     str(hardpoints_sot.get("path") or "—"),
                 ),
             )
         else:
-            self.solver_points_hardpoints_summary_var.set("solver_points_hardpoints_evidence: missing")
+            self.solver_points_hardpoints_summary_var.set("Данные точек расчёта и опор: нет данных")
         gap_map = diagnostics_handoff.get("producer_truth_gap_map")
         self.producer_gap_summary_var.set(
             self._gap_map_status_text(gap_map)
-            + "; consumer_may_fabricate_geometry=false; Reference Center is evidence/provenance only."
+            + "; создание геометрии в этом окне запрещено; центр только показывает справочные данные."
         )
         self._clear_tree(self.producer_gap_tree)
         if isinstance(gap_map, dict):
@@ -1207,11 +1239,11 @@ class DesktopGeometryReferenceCenter:
                     iid=f"producer_gap_{gap_id}",
                     values=(
                         gap_id,
-                        str(entry.get("status") or "missing"),
-                        ", ".join(blockers) if blockers else "none",
+                        self._status_label(entry.get("status") or "missing"),
+                        ", ".join(blockers) if blockers else "нет",
                         (
-                            f"{freshness_entry.get('status') or 'missing'}"
-                            f"/{freshness_entry.get('relation') or 'missing'}"
+                            f"{self._status_label(freshness_entry.get('status') or 'missing')}"
+                            f"/{self._status_label(freshness_entry.get('relation') or 'missing')}"
                         ),
                         self._source_paths_text(entry.get("source_artifact_paths")),
                     ),
@@ -1219,9 +1251,9 @@ class DesktopGeometryReferenceCenter:
         road_width = self.runtime.road_width_reference(self._base_path())
         road_evidence = self.runtime.road_width_evidence(self._base_path(), artifact_context=artifact)
         self.road_width_summary_var.set(
-            f"{road_width.label}: base={road_width.status}; export/runtime={road_evidence.status}; "
-            f"preferred={road_evidence.preferred_source}; "
-            f"effective={self._fmt(road_evidence.effective_road_width_m, 3)} {road_evidence.unit_label}. "
+            f"{road_width.label}: база={self._status_label(road_width.status)}; экспорт={self._status_label(road_evidence.status)}; "
+            f"предпочтительный источник={road_evidence.preferred_source}; "
+            f"итог={self._fmt(road_evidence.effective_road_width_m, 3)} {road_evidence.unit_label}. "
             f"{road_evidence.explanation}"
         )
         self._clear_tree(self.road_width_tree)
@@ -1230,10 +1262,10 @@ class DesktopGeometryReferenceCenter:
             "end",
             iid="road_width_m_base",
             values=(
-                "base/reference",
+                "база",
                 road_width.parameter_key,
                 road_width.unit_label,
-                road_width.status,
+                self._status_label(road_width.status),
                 self._fmt(road_width.explicit_road_width_m, 3),
                 self._fmt(road_width.effective_road_width_m, 3),
                 self._fmt(road_width.track_m, 3),
@@ -1247,10 +1279,10 @@ class DesktopGeometryReferenceCenter:
             "end",
             iid="road_width_m_export",
             values=(
-                "export/runtime",
+                "экспорт",
                 road_evidence.parameter_key,
                 road_evidence.unit_label,
-                road_evidence.status,
+                self._status_label(road_evidence.status),
                 self._fmt(road_evidence.meta_road_width_m, 3),
                 self._fmt(road_evidence.effective_road_width_m, 3),
                 "—",
@@ -1280,11 +1312,11 @@ class DesktopGeometryReferenceCenter:
 
         acceptance = self.runtime.artifact_geometry_acceptance_evidence(artifact)
         self.geometry_acceptance_summary_var.set(
-            f"gate={acceptance.gate}; artifact={acceptance.artifact_status}; source={acceptance.source_label}; "
-            f"updated={acceptance.updated_utc or '—'}; "
+            f"приёмка: {acceptance.gate}; данные: {acceptance.artifact_status}; источник: {acceptance.source_label}; "
+            f"обновлено: {acceptance.updated_utc or '—'}; "
             f"{acceptance.reason or acceptance.evidence_required} "
             + " ".join(acceptance.summary_lines[:2])
-            + ((" Warnings: " + "; ".join(acceptance.warnings)) if acceptance.warnings else "")
+            + ((" Предупреждения: " + "; ".join(acceptance.warnings)) if acceptance.warnings else "")
         )
         self._clear_tree(self.geometry_acceptance_tree)
         for idx, row in enumerate(acceptance.rows):
@@ -1315,8 +1347,8 @@ class DesktopGeometryReferenceCenter:
         self._component_fit_rows_by_family = {row.family: row for row in component_fit_rows}
         warn_count = sum(1 for row in component_fit_rows if row.status == "warn")
         self.component_fit_summary_var.set(
-            f"Сводка помогает связать geometry, текущий cylinder family, посадку cylinder OD -> spring ID, "
-            f"ближайший Camozzi match, его precharge-bias shift и coil-bind reserve. "
+            f"Сводка помогает связать геометрию, текущее семейство цилиндров, посадку цилиндра в пружину, "
+            f"ближайший вариант Camozzi, баланс предзаряда и запас до смыкания витков. "
             f"Семейств с предупреждениями: {warn_count} из {len(component_fit_rows)}."
         )
         self._clear_tree(self.component_fit_tree)
@@ -1417,23 +1449,24 @@ class DesktopGeometryReferenceCenter:
             self.cylinder_variant_var.set("Все варианты")
 
         self.cylinder_context_var.set(
-            "Текущий family context берётся из base и показан сверху. "
-            "В current-table теперь виден package passport: OD, body length, completeness, truth-state и согласованность body со stroke+dead lengths. "
-            "Сначала показывается precharge->force bias summary для live base, "
-            "Ниже показывается shortlist ближайших Camozzi-вариантов по bore/rod/stroke и по смещению current precharge bias, "
-            "а полный каталог справа фильтруется по варианту и поиску, показывает raw Camozzi dims B/E/TG "
-            "и считает усилия как p*A."
+            "Текущие данные семейства берутся из базового файла и показаны сверху. "
+            "В таблице текущей установки видны паспорт размещения: наружный диаметр, длина корпуса, полнота данных, "
+            "достоверность и согласованность корпуса с ходом и запасом. "
+            "Сначала показывается связь предварительного давления с балансом усилий для текущей базы. "
+            "Ниже показывается короткий список ближайших вариантов Camozzi по поршню, штоку, ходу и смещению усилия, "
+            "а полный каталог справа фильтруется по варианту и поиску, показывает размеры Camozzi B/E/TG "
+            "и считает усилия как давление * площадь."
         )
         catalog_source = self.runtime.catalog_source_summary()
         self.catalog_source_summary_var.set(
-            "Catalog source: "
-            f"items={catalog_source.get('item_count') or 0}; "
-            f"variants={catalog_source.get('variant_count') or 0}; "
-            f"series={catalog_source.get('series') or '—'}; "
-            f"source={catalog_source.get('source') or '—'}; "
-            f"pdf={catalog_source.get('source_pdf') or '—'}; "
-            f"extracted={catalog_source.get('extracted_at_utc') or '—'}; "
-            f"path={catalog_source.get('path') or '—'}."
+            "Источник каталога: "
+            f"позиций: {catalog_source.get('item_count') or 0}; "
+            f"вариантов: {catalog_source.get('variant_count') or 0}; "
+            f"серии: {catalog_source.get('series') or '—'}; "
+            f"источник: {catalog_source.get('source') or '—'}; "
+            f"PDF: {catalog_source.get('source_pdf') or '—'}; "
+            f"извлечено: {catalog_source.get('extracted_at_utc') or '—'}; "
+            f"путь: {catalog_source.get('path') or '—'}."
         )
 
         recommendations = self.runtime.cylinder_match_recommendations(
@@ -1516,7 +1549,7 @@ class DesktopGeometryReferenceCenter:
         current_package = self._current_cylinder_package_rows_by_family.get(self.cylinder_family_var.get())
         current_precharge = self._current_cylinder_precharge_rows_by_family.get(self.cylinder_family_var.get())
         if row is None:
-            self.cylinder_choice_var.set("Каталог пуст по текущему фильтру. Ослабьте variant/search.")
+            self.cylinder_choice_var.set("Каталог пуст по текущему фильтру. Ослабьте вариант или поиск.")
             self.cylinder_recommendation_var.set("Рекомендации недоступны, пока каталог пуст по текущим фильтрам.")
             return
 
@@ -1528,32 +1561,32 @@ class DesktopGeometryReferenceCenter:
         )
         if recommendation is not None:
             recommendation_line = (
-                f"Top shortlist для {recommendation.family}: {recommendation.variant_label} "
+                f"Лучший вариант для {recommendation.family}: {recommendation.variant_label} "
                 f"{recommendation.bore_mm}/{recommendation.rod_mm} мм, "
-                f"рекомендованный stroke={self._fmt(recommendation.recommended_stroke_mm, 0)} мм, "
-                f"Δbore={self._fmt(recommendation.bore_delta_mm, 1)} мм, "
-                f"Δrod={self._fmt(recommendation.rod_delta_mm, 1)} мм, "
-                f"Δstroke={self._fmt(recommendation.stroke_delta_mm, 1)} мм, "
-                f"score={self._fmt(recommendation.score, 1)}."
+                f"рекомендованный ход={self._fmt(recommendation.recommended_stroke_mm, 0)} мм, "
+                f"Δпоршень={self._fmt(recommendation.bore_delta_mm, 1)} мм, "
+                f"Δшток={self._fmt(recommendation.rod_delta_mm, 1)} мм, "
+                f"Δход={self._fmt(recommendation.stroke_delta_mm, 1)} мм, "
+                f"оценка={self._fmt(recommendation.score, 1)}."
             )
             if math.isfinite(recommendation.net_force_N):
                 recommendation_line += (
-                    f" Fnet@current-precharge≈{self._fmt(recommendation.net_force_N, 0)} Н, "
+                    f" F итог при текущем предзаряде≈{self._fmt(recommendation.net_force_N, 0)} Н, "
                     f"ΔFnet≈{self._fmt(recommendation.net_force_delta_N, 0)} Н, "
-                    f"bias={recommendation.bias_direction}."
+                    f"баланс={recommendation.bias_direction}."
                 )
             recommendation_line += f" {', '.join(recommendation.notes)}."
             self.cylinder_recommendation_var.set(recommendation_line)
         else:
             self.cylinder_recommendation_var.set(
-                "Рекомендации не найдены под текущий family/filter; проверьте variant/search."
+                "Рекомендации не найдены под текущее семейство и фильтр; проверьте вариант или поиск."
             )
 
         estimate = self.runtime.cylinder_pressure_summary(row, float(self.cylinder_pressure_var.get()))
         lines = [
-            f"Выбран каталог: {row.variant_label} | bore={row.bore_mm} мм | rod={row.rod_mm} мм | "
-            f"port={row.port_thread or '—'} | rod-thread={row.rod_thread or '—'}.",
-            f"Camozzi ref dims: B≈{self._fmt(row.B_mm, 1)} мм, E≈{self._fmt(row.E_mm, 1)} мм, TG≈{self._fmt(row.TG_mm, 1)} мм.",
+            f"Выбран каталог: {row.variant_label} | поршень={row.bore_mm} мм | шток={row.rod_mm} мм | "
+            f"порт={row.port_thread or '—'} | резьба штока={row.rod_thread or '—'}.",
+            f"Размеры Camozzi: B≈{self._fmt(row.B_mm, 1)} мм, E≈{self._fmt(row.E_mm, 1)} мм, TG≈{self._fmt(row.TG_mm, 1)} мм.",
             f"При {self._fmt(float(self.cylinder_pressure_var.get()), 1)} bar(g): "
             f"Fcap≈{self._fmt(estimate.cap_force_N, 0)} Н ({self._fmt(estimate.cap_force_kgf, 1)} кгс), "
             f"Frod≈{self._fmt(estimate.rod_force_N, 0)} Н ({self._fmt(estimate.rod_force_kgf, 1)} кгс).",
@@ -1566,31 +1599,31 @@ class DesktopGeometryReferenceCenter:
                 else float("nan")
             )
             lines.append(
-                f"Текущее family {current.family}: bore={self._fmt(current.bore_mm, 1)} мм, "
-                f"rod={self._fmt(current.rod_mm, 1)} мм, stroke={self._fmt(current.stroke_mm, 1)} мм. "
-                f"Относительно base: Acap x{self._fmt(cap_ratio, 2)}, Arod-side x{self._fmt(ann_ratio, 2)}."
+                f"Текущее семейство {current.family}: поршень={self._fmt(current.bore_mm, 1)} мм, "
+                f"шток={self._fmt(current.rod_mm, 1)} мм, ход={self._fmt(current.stroke_mm, 1)} мм. "
+                f"Относительно базы: площадь поршня x{self._fmt(cap_ratio, 2)}, площадь штока x{self._fmt(ann_ratio, 2)}."
             )
             lines.append(
-                "Каталог помогает выбрать реальный bore/rod; stroke и интеграция в current geometry остаются "
-                "отдельным инженерным решением и берутся из base/kinematics."
+                "Каталог помогает выбрать реальный поршень и шток; ход и интеграция в текущую геометрию остаются "
+                "отдельным инженерным решением и берутся из базы и кинематики."
             )
         else:
             lines.append(
-                "Текущий family-context в base нечитабелен, поэтому сравнение с live setup пропущено."
+                "Текущие данные семейства в базе нечитабельны, поэтому сравнение с рабочими настройками пропущено."
             )
         if current_package is not None:
             lines.append(
-                f"Package contract: OD≈{self._fmt(current_package.outer_diameter_mm, 1)} мм, "
-                f"body≈{self._fmt(current_package.body_length_mm, 1)} мм, "
-                f"stroke+dead≈{self._fmt(current_package.expected_body_length_mm, 1)} мм, "
+                f"Паспорт размещения: наружный D≈{self._fmt(current_package.outer_diameter_mm, 1)} мм, "
+                f"корпус≈{self._fmt(current_package.body_length_mm, 1)} мм, "
+                f"ход+запас≈{self._fmt(current_package.expected_body_length_mm, 1)} мм, "
                 f"Δbody≈{self._fmt(current_package.body_length_gap_mm, 1)} мм, "
-                f"status={current_package.status}, "
-                f"truth={current_package.truth_state}, "
-                f"complete≈{self._fmt(current_package.completeness_pct, 0)}%, "
+                f"состояние={self._status_label(current_package.status)}, "
+                f"достоверность={self._status_label(current_package.truth_state)}, "
+                f"полнота≈{self._fmt(current_package.completeness_pct, 0)}%, "
                 f"dead cap≈{self._fmt(current_package.dead_cap_length_mm, 1)} мм, "
                 f"dead rod≈{self._fmt(current_package.dead_rod_length_mm, 1)} мм, "
                 f"dead height≈{self._fmt(current_package.dead_height_mm, 1)} мм. "
-                f"{', '.join(current_package.notes) if current_package.notes else 'package ок'}. "
+                f"{', '.join(current_package.notes) if current_package.notes else 'паспорт в норме'}. "
                 f"{current_package.explanation}"
             )
         if current_precharge is not None:
@@ -1805,11 +1838,11 @@ class DesktopGeometryReferenceCenter:
         if str(self.guide_query_var.get() or "").strip():
             self.guide_summary_var.set(
                 f"Найдено {len(rows)} параметров по запросу «{self.guide_query_var.get().strip()}». "
-                "Справочник строится по каноническим спецификациям desktop-полей и семейным контрактам, а не по web-разметке."
+                "Справочник строится по единому набору правил для рабочих окон, а не по разметке старого интерфейса."
             )
         else:
             self.guide_summary_var.set(
-                f"Показано {len(rows)} справочных параметров из общих разделов desktop-интерфейса и семейных контрактов с текущими значениями из базового файла."
+                f"Показано {len(rows)} справочных параметров из общих разделов рабочих окон с текущими значениями из базового файла."
             )
 
     def _refresh_passport_tab(self) -> None:
@@ -1827,14 +1860,14 @@ class DesktopGeometryReferenceCenter:
         needs_data = sum(1 for row in component_rows if row.status != "ok")
         axis_only = sum(1 for row in package_rows if row.status != "complete")
         self.passport_summary_var.set(
-            f"component_passport: {len(component_rows)} components, {needs_data} need explicit datasheet/fit work. "
-            f"cylinder packaging passport: {axis_only} of {len(package_rows)} families remain axis-only or inconsistent. "
-            f"export/runtime={packaging_evidence.packaging_status or 'missing'} "
-            f"({packaging_evidence.mismatch_status}), hash={packaging_evidence.packaging_contract_hash or '—'}. "
-            f"Diagnostics handoff {self._producer_readiness_text(diagnostics_handoff)}; "
-            f"evidence_missing={diagnostics_handoff.get('evidence_missing') or []}. "
-            "These passports are reference/evidence contracts; this workspace does not render animator meshes."
-            + ((" Warnings: " + "; ".join(packaging_evidence.warnings)) if packaging_evidence.warnings else "")
+            f"Паспорт компонентов: всего {len(component_rows)}, требуют явных данных или подбора: {needs_data}. "
+            f"Паспорт размещения цилиндров: {axis_only} из {len(package_rows)} семейств остаются осевыми или несогласованными. "
+            f"данные экспорта: {packaging_evidence.packaging_status or 'missing'} "
+            f"({packaging_evidence.mismatch_status}), контрольная отметка: {packaging_evidence.packaging_contract_hash or '—'}. "
+            f"Данные для диагностики: {self._producer_readiness_text(diagnostics_handoff)}; "
+            f"не хватает: {diagnostics_handoff.get('evidence_missing') or []}. "
+            "Эти паспорта являются справочными данными; это окно не строит сетки аниматора."
+            + ((" Предупреждения: " + "; ".join(packaging_evidence.warnings)) if packaging_evidence.warnings else "")
         )
 
         self._component_passport_rows_by_iid.clear()
@@ -1851,9 +1884,9 @@ class DesktopGeometryReferenceCenter:
                     row.family,
                     row.category,
                     row.ports or "—",
-                    row.status,
+                    self._status_label(row.status),
                     row.missing_data_count,
-                    row.iso6358_status,
+                    self._status_label(row.iso6358_status),
                 ),
             )
             self._component_passport_rows_by_iid[iid] = row
@@ -1867,8 +1900,8 @@ class DesktopGeometryReferenceCenter:
                 values=(
                     row.family,
                     row.passport_id,
-                    row.status,
-                    row.truth_state,
+                    self._status_label(row.status),
+                    self._status_label(row.truth_state),
                     self._fmt(row.completeness_pct, 0),
                     ", ".join(row.missing_fields) if row.missing_fields else "—",
                     ", ".join(row.hidden_elements) if row.hidden_elements else "—",
@@ -1883,13 +1916,13 @@ class DesktopGeometryReferenceCenter:
                 iid=f"passport_artifact_{idx}",
                 values=(
                     row.cylinder,
-                    row.base_status,
-                    row.export_status,
-                    row.export_truth_mode,
+                    self._status_label(row.base_status),
+                    self._status_label(row.export_status),
+                    self._status_label(row.export_truth_mode),
                     self._fmt(row.base_completeness_pct, 0),
-                    "yes" if row.full_mesh_allowed else "no",
-                    "yes" if row.consumer_geometry_fabrication_allowed else "no",
-                    row.mismatch_status,
+                    self._bool_label(row.full_mesh_allowed),
+                    self._bool_label(row.consumer_geometry_fabrication_allowed),
+                    self._status_label(row.mismatch_status),
                     ", ".join(row.missing_advanced_fields) if row.missing_advanced_fields else "—",
                     ", ".join(row.missing_geometry_fields) if row.missing_geometry_fields else "—",
                     row.length_status_summary,

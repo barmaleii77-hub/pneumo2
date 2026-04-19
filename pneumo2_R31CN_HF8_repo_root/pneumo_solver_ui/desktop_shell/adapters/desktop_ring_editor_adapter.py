@@ -16,8 +16,8 @@ def build_spec() -> DesktopShellToolSpec:
         key="desktop_ring_editor",
         title="Сценарии и редактор кольца",
         description=(
-            "WS-RING источник сценариев: редактирование канонического кольца, "
-            "проверки, HO-004 export set и handoff в набор испытаний."
+            "Редактирование канонического кольца, проверка покрытия сценариев "
+            "и передача готового набора в расчёт."
         ),
         group="Встроенные окна",
         mode="hosted",
@@ -34,10 +34,9 @@ def build_spec() -> DesktopShellToolSpec:
         menu_section="Сценарии",
         nav_section="Сценарии",
         details=(
-            "Прямой hosted entry для WS-RING: выбор в дереве/поиске сразу открывает "
-            "редактор сценария без дополнительной навигации. ring_source_of_truth_json "
-            "остаётся editable source, а scenario_json, road_csv, axay_csv, meta_json, "
-            "HO-004 export set и HO-005 suite link являются derived/consumer handoff."
+            "Выбор в списке или быстром поиске сразу открывает редактор сценариев без промежуточного "
+            "шага. Здесь пользователь правит исходное кольцо, проверяет покрытие, дорожные "
+            "профили и манёвры, затем передает согласованный набор в раздел испытаний."
         ),
         menu_order=20,
         nav_order=20,
@@ -47,16 +46,12 @@ def build_spec() -> DesktopShellToolSpec:
         workspace_role="workspace",
         source_of_truth_role="master",
         search_aliases=(
-            "WS-RING",
-            "HO-004",
-            "HO-005",
-            "ring source",
-            "ring export",
-            "source-of-truth",
-            "validated suite",
-            "test suite и сценарии",
-            "ring editor",
-            "road scenario",
+            "исходный сценарий",
+            "выгрузка сценария",
+            "снимок набора",
+            "набор испытаний и сценарии",
+            "редактор кольца",
+            "профиль дороги",
             "сценарии",
             "редактор кольца",
         ),

@@ -9,18 +9,18 @@ from pneumo_solver_ui.desktop_input_model import describe_desktop_run_mode
 DESKTOP_RUN_PROFILE_OPTIONS: tuple[tuple[str, str, str], ...] = (
     (
         "baseline",
-        "Baseline / preview",
-        "Короткий pre-run режим для sanity-check и быстрой оценки текущей конфигурации.",
+        "Краткий предпросмотр",
+        "Быстрый расчёт для первичной оценки текущей конфигурации.",
     ),
     (
         "detail",
-        "Detail",
-        "Рабочий одиночный прогон с CSV-артефактами без лишней тяжести.",
+        "Подробный расчёт",
+        "Рабочий одиночный прогон с сохранением таблиц результатов без лишней тяжести.",
     ),
     (
         "full",
-        "Full",
-        "Подробный прогон с полным логом и готовностью к NPZ-экспорту.",
+        "Полный расчёт",
+        "Подробный прогон с полным журналом и готовностью к сохранению файла анимации.",
     ),
 )
 
@@ -28,17 +28,17 @@ DESKTOP_RUN_CACHE_POLICY_OPTIONS: tuple[tuple[str, str, str], ...] = (
     (
         "reuse",
         "Переиспользовать",
-        "Если совпали параметры, сценарий и режим, взять готовый detail/full результат из cache.",
+        "Если совпали параметры, сценарий и режим, взять уже готовый результат.",
     ),
     (
         "refresh",
         "Пересчитать заново",
-        "Не брать старый cache-hit, но обновить кэш новым результатом после запуска.",
+        "Не брать готовый результат, а сохранить новый результат после запуска.",
     ),
     (
         "off",
-        "Без cache",
-        "Не читать и не обновлять runtime-cache для detail/full запуска.",
+        "Не искать готовые результаты",
+        "Не читать и не обновлять сохранённые результаты подробного расчёта.",
     ),
 )
 
@@ -51,7 +51,7 @@ DESKTOP_RUN_RUNTIME_POLICY_OPTIONS: tuple[tuple[str, str, str], ...] = (
     (
         "strict",
         "Строго",
-        "Блокировать запуск при проблемах preflight или auto-check.",
+        "Блокировать запуск при проблемах предварительной проверки или самопроверки.",
     ),
     (
         "force",
@@ -121,6 +121,21 @@ def runtime_policy_label(policy_key: str) -> str:
 def runtime_policy_description(policy_key: str) -> str:
     key = str(policy_key or "").strip()
     return _descriptions_map(DESKTOP_RUN_RUNTIME_POLICY_OPTIONS).get(key, "")
+
+
+def _ok_status_label(value: bool) -> str:
+    return "норма" if bool(value) else "ошибка"
+
+
+def _selfcheck_mode_label(value: object) -> str:
+    raw = str(value or "fast").strip().lower() or "fast"
+    labels = {
+        "fast": "быстрый",
+        "quick": "быстрый",
+        "standard": "стандартный",
+        "full": "полный",
+    }
+    return labels.get(raw, raw)
 
 
 def _scenario_duration(profile_key: str, scenario_key: str) -> float:
@@ -231,29 +246,29 @@ def describe_run_setup_snapshot(
         else "автоснимок выключен"
     )
     preview_line = (
-        f"Baseline / preview: профиль дороги «{preview_surface_label}», "
-        f"dt={float(current.get('preview_dt', 0.01) or 0.01):.3f} с, "
-        f"длительность={float(current.get('preview_t_end', 3.0) or 3.0):.1f} с, "
-        f"длина участка={float(current.get('preview_road_len_m', 60.0) or 60.0):.1f} м."
+        f"Предпросмотр: профиль дороги «{preview_surface_label}», "
+        f"шаг: {float(current.get('preview_dt', 0.01) or 0.01):.3f} с, "
+        f"длительность: {float(current.get('preview_t_end', 3.0) or 3.0):.1f} с, "
+        f"длина участка: {float(current.get('preview_road_len_m', 60.0) or 60.0):.1f} м."
     )
     detail_line = (
-        f"Detail / full: {scenario_label}, dt={float(current.get('run_dt', 0.003) or 0.003):.4f} с, "
-        f"длительность={float(current.get('run_t_end', 1.6) or 1.6):.1f} с, "
-        f"расширенный лог {'включён' if record_full else 'выключен'}."
+        f"Подробный расчёт: {scenario_label}, шаг: {float(current.get('run_dt', 0.003) or 0.003):.4f} с, "
+        f"длительность: {float(current.get('run_t_end', 1.6) or 1.6):.1f} с, "
+        f"расширенный журнал {'включён' if record_full else 'выключен'}."
     )
     runtime_line = (
         f"Профиль запуска: {profile_label}. "
-        f"Cache: {cache_policy_label(cache_key)}. "
-        f"Export CSV: {'да' if export_csv else 'нет'}. "
-        f"Export NPZ: {'да' if export_npz else 'нет'}. "
-        f"Auto-check: {'да' if auto_check else 'нет'}. "
-        f"Лог в файл: {'да' if write_log_file else 'нет'}. "
-        f"Runtime policy: {runtime_policy_label(runtime_policy_key)}. "
+        f"Повторное использование: {cache_policy_label(cache_key)}. "
+        f"Таблицы результатов: {'да' if export_csv else 'нет'}. "
+        f"Файл анимации: {'да' if export_npz else 'нет'}. "
+        f"Самопроверка: {'да' if auto_check else 'нет'}. "
+        f"Журнал в файл: {'да' if write_log_file else 'нет'}. "
+        f"Режим выполнения: {runtime_policy_label(runtime_policy_key)}. "
         f"{autosnapshot_text}."
     )
     headline = (
         f"Профиль запуска «{profile_label}»: {profile_description} "
-        f"Фактическая оценка detail-режима: {str(run_mode.get('mode_label') or '').strip()}."
+        f"Фактическая оценка подробного режима: {str(run_mode.get('mode_label') or '').strip()}."
     )
     return {
         "headline": headline.strip(),
@@ -297,16 +312,16 @@ def describe_latest_run_summary(
     else:
         mech_label = "в норме" if bool(mech_ok) else "требует внимания"
     if cache_policy_key == "off":
-        cache_state = "cache отключён"
-        cache_line = "Cache entry: не используется."
+        cache_state = "не используется"
+        cache_line = "Повторное использование результата: выключено."
     else:
-        cache_state = "cache-hit" if cache_hit else "свежий прогон"
+        cache_state = "использован готовый результат" if cache_hit else "новый расчёт"
         if cache_dir:
-            cache_line = f"Cache entry: {cache_dir}"
+            cache_line = f"Папка повторного использования: {cache_dir}"
         elif cache_entry_key:
-            cache_line = f"Cache entry: ключ {cache_entry_key}"
+            cache_line = f"Повторное использование результата: запись {cache_entry_key}"
         else:
-            cache_line = "Cache entry: пока не зафиксирован."
+            cache_line = "Повторное использование результата: пока не зафиксировано."
     log_path = str(current.get("ui_subprocess_log") or "").strip()
     return {
         "headline": f"Последний запуск: {latest_run_name}",
@@ -316,9 +331,9 @@ def describe_latest_run_summary(
         ),
         "runtime_line": (
             f"Профиль запуска: {run_profile_label(run_profile_key)}; "
-            f"cache: {cache_policy_label(cache_policy_key)} ({cache_state}); "
-            f"CSV: {'да' if export_csv else 'нет'}; "
-            f"NPZ: {'да' if export_npz else 'нет'}."
+            f"повторное использование: {cache_policy_label(cache_policy_key)} ({cache_state}); "
+            f"таблицы результатов: {'да' if export_csv else 'нет'}; "
+            f"файл анимации: {'да' if export_npz else 'нет'}."
         ),
         "mode_line": (
             f"Режим: {run_mode.get('mode_label') or '—'}; "
@@ -329,13 +344,13 @@ def describe_latest_run_summary(
             f"самопроверка механики: {mech_label}"
         ),
         "artifact_state_line": (
-            f"Экспорт: CSV таблиц={csv_artifacts}; "
-            f"NPZ bundle: {'есть' if npz_path else 'нет'}; "
-            f"UI лог: {'есть' if log_path else 'нет'}."
+            f"Сохранено: таблиц результатов: {csv_artifacts}; "
+            f"файл анимации: {'есть' if npz_path else 'нет'}; "
+            f"журнал запуска: {'есть' if log_path else 'нет'}."
         ),
         "cache_line": cache_line,
-        "log_line": f"Лог запуска: {log_path}" if log_path else "Лог запуска: не записан.",
-        "artifact_line": f"Папка артефактов: {current.get('outdir') or latest_run_dir}",
+        "log_line": f"Журнал запуска: {log_path}" if log_path else "Журнал запуска: не записан.",
+        "artifact_line": f"Папка результатов: {current.get('outdir') or latest_run_dir}",
     }
 
 
@@ -358,21 +373,21 @@ def describe_latest_preview_summary(
     log_path = str(current.get("ui_subprocess_log") or "").strip()
     note = str(current.get("note") or "").strip()
     return {
-        "headline": "Последний preview: baseline / worldroad sanity-check.",
+        "headline": "Последний предпросмотр дороги.",
         "surface_line": (
             f"Профиль дороги: {surface_label}; "
-            f"dt={dt_s:.3f} с; длительность={t_end_s:.1f} с; "
-            f"длина участка={road_len_m:.1f} м; шагов={n_steps}."
+            f"шаг: {dt_s:.3f} с; длительность: {t_end_s:.1f} с; "
+            f"длина участка: {road_len_m:.1f} м; шагов: {n_steps}."
         ),
         "metrics_line": (
-            f"roll_max={roll_deg:.2f} deg; "
-            f"pitch_max={pitch_deg:.2f} deg; "
-            f"min_tire_Fz={min_tire_fz:.1f} N; "
-            f"max_tire_pen={max_tire_pen:.4f} м."
+            f"макс. крен={roll_deg:.2f} град; "
+            f"макс. тангаж={pitch_deg:.2f} град; "
+            f"мин. реакция шины={min_tire_fz:.1f} Н; "
+            f"макс. сжатие шины={max_tire_pen:.4f} м."
         ),
-        "pressure_line": f"max_pR3={max_pr3:.1f} Па.",
-        "log_line": f"Лог preview: {log_path}" if log_path else "Лог preview: не записан.",
-        "report_line": f"JSON отчёт preview: {report_path}",
+        "pressure_line": f"Макс. давление R3: {max_pr3:.1f} Па.",
+        "log_line": f"Журнал предпросмотра: {log_path}" if log_path else "Журнал предпросмотра: не записан.",
+        "report_line": f"Сводка предпросмотра: {report_path}",
         "note_line": f"Примечание: {note}" if note else "",
     }
 
@@ -397,27 +412,27 @@ def describe_latest_selfcheck_summary(
     if errors:
         note_line = f"Первое замечание: ошибка — {errors[0]}"
     elif warnings:
-        note_line = f"Первое замечание: warning — {warnings[0]}"
+        note_line = f"Первое замечание: предупреждение — {warnings[0]}"
     else:
         note_line = "Первое замечание: критичных проблем и предупреждений нет."
 
     return {
-        "headline": "Последний auto-check / selfcheck.",
+        "headline": "Последняя самопроверка.",
         "status_line": (
-            f"Статус: {'OK' if ok else 'FAIL'}; "
-            f"mode={mode}; errors={len(errors)}; warnings={len(warnings)}; "
-            f"checks={check_count}; dt={dt_sec:.2f} с."
+            f"Статус: {_ok_status_label(ok)}; "
+            f"режим: {_selfcheck_mode_label(mode)}; ошибок: {len(errors)}; предупреждений: {len(warnings)}; "
+            f"проверок: {check_count}; время: {dt_sec:.2f} с."
         ),
         "freshness_line": f"Актуальность: {describe_selfcheck_freshness(has_signature, is_stale)}.",
         "checks_line": (
-            f"Покрытие: files={'files' in checks}; "
-            f"ranges={'ranges' in checks}; "
-            f"suite={'suite' in checks}; "
-            f"scenario_expansion={'scenario_expansion' in checks}; "
-            f"model_import={'model_import' in checks}."
+            f"Покрытие: файлы: {'да' if 'files' in checks else 'нет'}; "
+            f"диапазоны: {'да' if 'ranges' in checks else 'нет'}; "
+            f"набор испытаний: {'да' if 'suite' in checks else 'нет'}; "
+            f"сценарии: {'да' if 'scenario_expansion' in checks else 'нет'}; "
+            f"модель: {'да' if 'model_import' in checks else 'нет'}."
         ),
-        "log_line": f"Лог auto-check: {log_path}" if log_path else "Лог auto-check: не записан.",
-        "report_line": f"JSON отчёт selfcheck: {report_path}",
+        "log_line": f"Журнал самопроверки: {log_path}" if log_path else "Журнал самопроверки: не записан.",
+        "report_line": f"Сводка самопроверки: {report_path}",
         "note_line": note_line,
     }
 
@@ -437,9 +452,9 @@ def describe_selfcheck_gate_status(
     is_stale: bool = False,
 ) -> str:
     if not report_exists:
-        return "Последний auto-check: ещё не запускался."
+        return "Последняя самопроверка: ещё не запускалась."
     if not isinstance(summary, dict):
-        return "Последний auto-check: отчёт найден, но не читается."
+        return "Последняя самопроверка: отчёт найден, но не читается."
     errors = [str(item).strip() for item in list(summary.get("errors") or []) if str(item).strip()]
     warnings = [str(item).strip() for item in list(summary.get("warnings") or []) if str(item).strip()]
     ok = bool(summary.get("ok", False))
@@ -447,8 +462,8 @@ def describe_selfcheck_gate_status(
     updated_suffix = f"; обновлён {modified_at}" if modified_at else ""
     freshness = describe_selfcheck_freshness(has_signature, is_stale)
     return (
-        f"Последний auto-check: {'OK' if ok else 'FAIL'}; "
-        f"mode={mode}; errors={len(errors)}; warnings={len(warnings)}"
+        f"Последняя самопроверка: {_ok_status_label(ok)}; "
+        f"режим: {_selfcheck_mode_label(mode)}; ошибок: {len(errors)}; предупреждений: {len(warnings)}"
         f"; {freshness}{updated_suffix}."
     )
 
@@ -464,22 +479,22 @@ def describe_run_launch_route(
 ) -> str:
     if auto_check_enabled:
         return (
-            "Маршрут запуска: «Запустить выбранный режим» сначала делает свежий auto-check; "
+            "Маршрут запуска: «Запустить расчёт» сначала делает свежую самопроверку; "
             "«Проверить и запустить» выполняет тот же маршрут одним явным действием."
         )
 
     policy_key = str(runtime_policy_key or "balanced").strip().lower() or "balanced"
     if not report_exists:
-        stored_state = "последний сохранённый auto-check не найден"
+        stored_state = "последняя сохранённая самопроверка не найдена"
     elif not isinstance(summary, dict):
-        stored_state = "последний сохранённый auto-check не читается"
+        stored_state = "последняя сохранённая самопроверка не читается"
     else:
         errors = [str(item).strip() for item in list(summary.get("errors") or []) if str(item).strip()]
         warnings = [str(item).strip() for item in list(summary.get("warnings") or []) if str(item).strip()]
         freshness = describe_selfcheck_freshness(has_signature, is_stale)
         stored_state = (
-            f"использует сохранённый auto-check ({'OK' if bool(summary.get('ok', False)) else 'FAIL'}, "
-            f"errors={len(errors)}, warnings={len(warnings)}, {freshness})"
+            f"использует сохранённую самопроверку ({_ok_status_label(bool(summary.get('ok', False)))}; "
+            f"ошибок: {len(errors)}; предупреждений: {len(warnings)}; {freshness})"
         )
 
     stored_is_fresh_ok = (
@@ -492,15 +507,15 @@ def describe_run_launch_route(
     if stored_is_fresh_ok:
         action = "обычный запуск опирается на него без повторной проверки"
     elif policy_key == "force":
-        action = "при проблеме policy=force всё равно разрешит запуск"
+        action = "при проблеме форсированный режим всё равно разрешит запуск"
     elif policy_key == "strict":
-        action = "при проблеме policy=strict остановит запуск"
+        action = "при проблеме строгий режим остановит запуск"
     else:
-        action = "при проблеме policy=balanced запросит подтверждение"
+        action = "при проблеме режим с подтверждением запросит решение оператора"
 
     return (
-        f"Маршрут запуска: «Запустить выбранный режим» {stored_state}; {action}. "
-        "«Проверить и запустить» сначала обновит auto-check."
+        f"Маршрут запуска: «Запустить расчёт» {stored_state}; {action}. "
+        "«Проверить и запустить» сначала обновит самопроверку."
     )
 
 
@@ -516,39 +531,39 @@ def describe_run_launch_outlook(
     policy_key = str(runtime_policy_key or "balanced").strip().lower() or "balanced"
     if auto_check_enabled:
         if policy_key == "force":
-            action = "даже при ошибках policy=force разрешит продолжение"
+            action = "даже при ошибках форсированный режим разрешит продолжение"
         elif policy_key == "strict":
-            action = "если свежий auto-check вернёт ошибки, policy=strict остановит запуск"
+            action = "если свежая самопроверка вернёт ошибки, строгий режим остановит запуск"
         else:
-            action = "если свежий auto-check вернёт ошибки, policy=balanced запросит подтверждение"
-        return f"Прогноз обычного запуска: сначала выполнит свежий auto-check; {action}."
+            action = "если свежая самопроверка вернёт ошибки, режим с подтверждением запросит решение оператора"
+        return f"Прогноз обычного запуска: сначала выполнит свежую самопроверку; {action}."
 
     if not report_exists:
-        reason = "сохранённый auto-check не найден"
+        reason = "сохранённая самопроверка не найдена"
     elif not isinstance(summary, dict):
-        reason = "сохранённый auto-check не читается"
+        reason = "сохранённая самопроверка не читается"
     else:
         errors = [str(item).strip() for item in list(summary.get("errors") or []) if str(item).strip()]
         warnings = [str(item).strip() for item in list(summary.get("warnings") or []) if str(item).strip()]
         ok = bool(summary.get("ok", False))
         if not has_signature or is_stale:
             reason = (
-                "сохранённый auto-check устарел для текущих настроек"
+                "сохранённая самопроверка устарела для текущих настроек"
                 if is_stale
-                else "сохранённый auto-check не привязан к текущей конфигурации"
+                else "сохранённая самопроверка не привязана к текущей конфигурации"
             )
         elif ok:
             return (
-                "Прогноз обычного запуска: пойдёт сразу по актуальному сохранённому auto-check; "
-                f"warnings={len(warnings)} не блокируют старт."
+                "Прогноз обычного запуска: пойдёт сразу по актуальной сохранённой самопроверке; "
+                f"предупреждений: {len(warnings)} не блокируют старт."
             )
         else:
-            reason = f"актуальный сохранённый selfcheck содержит ошибки (errors={len(errors)})"
+            reason = f"актуальная сохранённая самопроверка содержит ошибки (ошибок: {len(errors)})"
 
     if policy_key == "force":
-        return f"Прогноз обычного запуска: продолжит запуск, хотя {reason}; policy=force разрешает это."
+        return f"Прогноз обычного запуска: продолжит запуск, хотя {reason}; форсированный режим разрешает это."
     if policy_key == "strict":
-        return f"Прогноз обычного запуска: будет остановлен, потому что {reason}; policy=strict требует новую проверку."
+        return f"Прогноз обычного запуска: будет остановлен, потому что {reason}; строгий режим требует новую проверку."
     return f"Прогноз обычного запуска: запросит подтверждение, потому что {reason}."
 
 
@@ -564,10 +579,10 @@ def describe_run_launch_target(
     profile_title = run_profile_label(profile_key)
     if profile_key == "baseline" and scenario_name == "worldroad":
         return {
-            "target_label": "baseline / preview",
-            "plain_button": "Запустить preview",
-            "checked_button": "Проверить и запустить preview",
-            "hint_line": "Целевой запуск: baseline / preview для worldroad sanity-check.",
+            "target_label": "краткий предпросмотр",
+            "plain_button": "Запустить предпросмотр",
+            "checked_button": "Проверить и запустить предпросмотр",
+            "hint_line": "Целевой запуск: краткий предпросмотр дороги.",
         }
     return {
         "target_label": profile_title,
@@ -609,31 +624,31 @@ def describe_plain_launch_availability(
     if auto_check_enabled:
         return {
             "enabled": True,
-            "detail": "перед стартом выполнится свежий auto-check",
+            "detail": "перед стартом выполнится свежая самопроверка",
         }
 
     if not report_exists or not isinstance(summary, dict):
         if policy_key == "strict":
             return {
                 "enabled": False,
-                "detail": "strict требует новый selfcheck перед запуском",
+                "detail": "строгий режим требует новую самопроверку перед запуском",
             }
         if policy_key == "force":
             return {
                 "enabled": True,
-                "detail": "при проблеме policy=force всё равно разрешит старт без новой проверки",
+                "detail": "форсированный режим всё равно разрешит старт без новой проверки",
             }
         return {
             "enabled": True,
-            "detail": "при проблеме policy=balanced запросит подтверждение",
+            "detail": "режим с подтверждением запросит решение оператора при проблеме",
         }
 
     errors = [str(item).strip() for item in list(summary.get("errors") or []) if str(item).strip()]
     if not has_signature or is_stale:
         detail = (
-            "strict требует свежий selfcheck для текущих настроек"
+            "строгий режим требует свежую самопроверку для текущих настроек"
             if policy_key == "strict"
-            else "сохранённый selfcheck уже не подходит текущей конфигурации"
+            else "сохранённая самопроверка уже не подходит текущей конфигурации"
         )
         return {
             "enabled": policy_key != "strict",
@@ -644,22 +659,22 @@ def describe_plain_launch_availability(
         warnings = [str(item).strip() for item in list(summary.get("warnings") or []) if str(item).strip()]
         return {
             "enabled": True,
-            "detail": f"есть актуальный selfcheck; warnings={len(warnings)} не блокируют старт",
+            "detail": f"есть актуальная самопроверка; предупреждений: {len(warnings)} не блокируют старт",
         }
 
     if policy_key == "strict":
         return {
             "enabled": False,
-            "detail": f"strict блокирует старт, пока selfcheck содержит ошибки (errors={len(errors)})",
+            "detail": f"строгий режим блокирует старт, пока самопроверка содержит ошибки (ошибок: {len(errors)})",
         }
     if policy_key == "force":
         return {
             "enabled": True,
-            "detail": f"policy=force разрешит старт, несмотря на ошибки selfcheck (errors={len(errors)})",
+            "detail": f"форсированный режим разрешит старт, несмотря на ошибки самопроверки (ошибок: {len(errors)})",
         }
     return {
         "enabled": True,
-        "detail": f"policy=balanced спросит подтверждение из-за ошибок selfcheck (errors={len(errors)})",
+        "detail": f"режим с подтверждением спросит решение оператора из-за ошибок самопроверки (ошибок: {len(errors)})",
     }
 
 
@@ -675,19 +690,19 @@ def describe_run_launch_recommendation(
     policy_key = str(runtime_policy_key or "balanced").strip().lower() or "balanced"
     if auto_check_enabled:
         return (
-            "Рекомендация: можно нажимать «Запустить выбранный режим»; свежий auto-check всё равно выполнится. "
+            "Рекомендация: можно нажимать «Запустить расчёт»; свежая самопроверка всё равно выполнится. "
             "«Проверить и запустить» полезно, если хотите видеть этап проверки как отдельное действие."
         )
 
     if not report_exists or not isinstance(summary, dict):
         if policy_key == "strict":
             return (
-                "Рекомендация: используйте «Проверить и запустить»; без нового selfcheck "
-                "обычный запуск упрётся в strict-gate."
+                "Рекомендация: используйте «Проверить и запустить»; без новой самопроверки "
+                "обычный запуск остановит строгий режим."
             )
         return (
             "Рекомендация: лучше использовать «Проверить и запустить», "
-            "чтобы не стартовать без свежего selfcheck."
+            "чтобы не стартовать без свежей самопроверки."
         )
 
     errors = [str(item).strip() for item in list(summary.get("errors") or []) if str(item).strip()]
@@ -695,33 +710,33 @@ def describe_run_launch_recommendation(
     if not has_signature or is_stale:
         if policy_key == "strict":
             return (
-                "Рекомендация: используйте «Проверить и запустить»; сохранённый selfcheck "
-                "уже не подходит текущей конфигурации, и strict его не пропустит."
+                "Рекомендация: используйте «Проверить и запустить»; сохранённая самопроверка "
+                "уже не подходит текущей конфигурации, и строгий режим её не пропустит."
             )
         return (
             "Рекомендация: лучше использовать «Проверить и запустить», "
-            "потому что сохранённый selfcheck уже не подходит текущим настройкам."
+            "потому что сохранённая самопроверка уже не подходит текущим настройкам."
         )
 
     if ok:
         return (
-            "Рекомендация: можно запускать обычной кнопкой; актуальный selfcheck "
+            "Рекомендация: можно запускать обычной кнопкой; актуальная самопроверка "
             "уже подходит текущим настройкам."
         )
 
     if policy_key == "strict":
         return (
             "Рекомендация: используйте «Проверить и запустить»; обычный запуск будет остановлен, "
-            f"пока selfcheck содержит ошибки (errors={len(errors)})."
+            f"пока самопроверка содержит ошибки (ошибок: {len(errors)})."
         )
     if policy_key == "force":
         return (
-            "Рекомендация: лучше использовать «Проверить и запустить»; обычный запуск разрешён по force, "
-            f"но selfcheck уже содержит ошибки (errors={len(errors)})."
+            "Рекомендация: лучше использовать «Проверить и запустить»; обычный запуск разрешён в форсированном режиме, "
+            f"но самопроверка уже содержит ошибки (ошибок: {len(errors)})."
         )
     return (
         "Рекомендация: лучше использовать «Проверить и запустить»; обычный запуск лишь спросит "
-        f"подтверждение поверх уже известных ошибок (errors={len(errors)})."
+        f"подтверждение поверх уже известных ошибок (ошибок: {len(errors)})."
     )
 
 

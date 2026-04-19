@@ -78,10 +78,12 @@ def test_describe_run_setup_snapshot_includes_operator_friendly_runtime_summary(
     )
 
     assert "Профиль запуска" in summary["headline"]
-    assert "Baseline / preview" in summary["preview_line"]
-    assert "Detail / full" in summary["detail_line"]
-    assert "Cache: Пересчитать заново." in summary["runtime_line"]
-    assert "Export NPZ: да." in summary["runtime_line"]
+    assert "Предпросмотр" in summary["preview_line"]
+    assert "Подробный расчёт" in summary["detail_line"]
+    assert "Повторное использование: Пересчитать заново." in summary["runtime_line"]
+    assert "Таблицы результатов: да." in summary["runtime_line"]
+    assert "Файл анимации: да." in summary["runtime_line"]
+    assert "Выгрузка NPZ" not in summary["runtime_line"]
     assert "автоснимок включён (before_full_run)" in summary["runtime_line"]
 
 
@@ -116,14 +118,16 @@ def test_describe_latest_run_summary_exposes_cache_export_and_log_state() -> Non
 
     assert "Последний запуск" in summary["headline"]
     assert "desktop_run_worldroad" in summary["scenario_line"]
-    assert "Профиль запуска: Full" in summary["runtime_line"]
-    assert "cache-hit" in summary["runtime_line"]
-    assert "CSV: да" in summary["runtime_line"]
-    assert "NPZ: да" in summary["runtime_line"]
+    assert "Профиль запуска: Полный расчёт" in summary["runtime_line"]
+    assert "использован готовый результат" in summary["runtime_line"]
+    assert "таблицы результатов: да" in summary["runtime_line"]
+    assert "файл анимации: да" in summary["runtime_line"]
+    assert "CSV: да" not in summary["runtime_line"]
+    assert "NPZ: да" not in summary["runtime_line"]
     assert "самопроверка механики: в норме" in summary["health_line"]
-    assert "CSV таблиц=2" in summary["artifact_state_line"]
-    assert "NPZ bundle: есть" in summary["artifact_state_line"]
-    assert "UI лог: есть" in summary["artifact_state_line"]
+    assert "таблиц результатов: 2" in summary["artifact_state_line"]
+    assert "файл анимации: есть" in summary["artifact_state_line"]
+    assert "журнал запуска: есть" in summary["artifact_state_line"]
     assert "C:/cache/desktop_run_setup/single_run/abc123" in summary["cache_line"]
     assert "C:/tmp/run_001.log" in summary["log_line"]
     assert "C:/tmp/run_001" in summary["artifact_line"]
@@ -148,11 +152,11 @@ def test_describe_latest_preview_summary_exposes_metrics_and_log_state() -> None
         report_path="C:/tmp/desktop_input_preview_report.json",
     )
 
-    assert "Последний preview" in summary["headline"]
+    assert "Последний предпросмотр" in summary["headline"]
     assert "Косинусный бугор" in summary["surface_line"]
-    assert "шагов=134" in summary["surface_line"]
-    assert "roll_max=2.40 deg" in summary["metrics_line"]
-    assert "max_pR3=615000.0 Па." in summary["pressure_line"]
+    assert "шагов: 134" in summary["surface_line"]
+    assert "макс. крен=2.40 град" in summary["metrics_line"]
+    assert "Макс. давление R3: 615000.0 Па." in summary["pressure_line"]
     assert "C:/tmp/preview.log" in summary["log_line"]
     assert "desktop_input_preview_report.json" in summary["report_line"]
     assert "compile_only demo" in summary["note_line"]
@@ -179,14 +183,14 @@ def test_describe_latest_selfcheck_summary_exposes_status_and_log_state() -> Non
         is_stale=True,
     )
 
-    assert "Последний auto-check / selfcheck" in summary["headline"]
-    assert "Статус: FAIL" in summary["status_line"]
+    assert "Последняя самопроверка" in summary["headline"]
+    assert "Статус: ошибка" in summary["status_line"]
     assert "устарел для текущих настроек" in summary["freshness_line"]
-    assert "mode=fast" in summary["status_line"]
-    assert "errors=1" in summary["status_line"]
-    assert "warnings=1" in summary["status_line"]
-    assert "files=True" in summary["checks_line"]
-    assert "scenario_expansion=True" in summary["checks_line"]
+    assert "режим: быстрый" in summary["status_line"]
+    assert "ошибок: 1" in summary["status_line"]
+    assert "предупреждений: 1" in summary["status_line"]
+    assert "файлы: да" in summary["checks_line"]
+    assert "сценарии: да" in summary["checks_line"]
     assert "C:/tmp/selfcheck.log" in summary["log_line"]
     assert "desktop_input_selfcheck_report.json" in summary["report_line"]
     assert "Missing file: demo.py" in summary["note_line"]
@@ -229,13 +233,13 @@ def test_describe_selfcheck_gate_status_produces_launch_friendly_line() -> None:
         is_stale=True,
     )
 
-    assert "ещё не запускался" in missing
+    assert "ещё не запускалась" in missing
     assert "отчёт найден, но не читается" in broken
     assert "без привязки к текущей конфигурации" in legacy
-    assert "Последний auto-check: OK" in ok
+    assert "Последняя самопроверка: норма" in ok
     assert "актуален для текущих настроек" in ok
     assert "устарел для текущих настроек" in stale
-    assert "warnings=1" in ok
+    assert "предупреждений: 1" in ok
     assert "2026-04-13 10:45" in ok
 
 
@@ -271,13 +275,13 @@ def test_describe_run_launch_route_explains_default_and_prechecked_paths() -> No
         is_stale=True,
     )
 
-    assert "сначала делает свежий auto-check" in auto
+    assert "сначала делает свежую самопроверку" in auto
     assert "Проверить и запустить" in auto
-    assert "использует сохранённый auto-check (OK" in stored_ok
+    assert "использует сохранённую самопроверку (норма" in stored_ok
     assert "без повторной проверки" in stored_ok
     assert "устарел для текущих настроек" in strict_stale
-    assert "policy=strict остановит запуск" in strict_stale
-    assert "сначала обновит auto-check" in strict_stale
+    assert "строгий режим остановит запуск" in strict_stale
+    assert "сначала обновит самопроверку" in strict_stale
 
 
 def test_describe_run_launch_outlook_predicts_operator_visible_gate() -> None:
@@ -324,16 +328,16 @@ def test_describe_run_launch_outlook_predicts_operator_visible_gate() -> None:
         is_stale=False,
     )
 
-    assert "сначала выполнит свежий auto-check" in auto
-    assert "policy=balanced запросит подтверждение" in auto
-    assert "пойдёт сразу по актуальному сохранённому auto-check" in stored_ok
-    assert "warnings=1" in stored_ok
+    assert "сначала выполнит свежую самопроверку" in auto
+    assert "режим с подтверждением запросит решение оператора" in auto
+    assert "пойдёт сразу по актуальной сохранённой самопроверке" in stored_ok
+    assert "предупреждений: 1" in stored_ok
     assert "будет остановлен" in strict_stale
-    assert "устарел для текущих настроек" in strict_stale
-    assert "policy=strict требует новую проверку" in strict_stale
+    assert "устарела для текущих настроек" in strict_stale
+    assert "строгий режим требует новую проверку" in strict_stale
     assert "продолжит запуск" in force_failed
-    assert "errors=2" in force_failed
-    assert "policy=force" in force_failed
+    assert "ошибок: 2" in force_failed
+    assert "форсированный режим" in force_failed
 
 
 def test_describe_run_launch_recommendation_guides_button_choice() -> None:
@@ -374,15 +378,15 @@ def test_describe_run_launch_recommendation_guides_button_choice() -> None:
         is_stale=False,
     )
 
-    assert "можно нажимать «Запустить выбранный режим»" in auto
+    assert "можно нажимать «Запустить расчёт»" in auto
     assert "Проверить и запустить" in auto
     assert "можно запускать обычной кнопкой" in stored_ok
-    assert "актуальный selfcheck" in stored_ok
+    assert "актуальная самопроверка" in stored_ok
     assert "используйте «Проверить и запустить»" in strict_missing
-    assert "strict-gate" in strict_missing
+    assert "строгий режим" in strict_missing
     assert "лучше использовать «Проверить и запустить»" in force_failed
-    assert "errors=2" in force_failed
-    assert "force" in force_failed
+    assert "ошибок: 2" in force_failed
+    assert "форсированном режиме" in force_failed
 
 
 def test_describe_run_launch_target_names_preview_and_profile_routes() -> None:
@@ -397,13 +401,13 @@ def test_describe_run_launch_target_names_preview_and_profile_routes() -> None:
         scenario_label="Крен на ступени",
     )
 
-    assert preview_target["target_label"] == "baseline / preview"
-    assert preview_target["plain_button"] == "Запустить preview"
-    assert preview_target["checked_button"] == "Проверить и запустить preview"
-    assert "worldroad sanity-check" in preview_target["hint_line"]
-    assert full_target["target_label"] == "Full"
-    assert full_target["plain_button"] == "Запустить Full"
-    assert full_target["checked_button"] == "Проверить и запустить Full"
+    assert preview_target["target_label"] == "краткий предпросмотр"
+    assert preview_target["plain_button"] == "Запустить предпросмотр"
+    assert preview_target["checked_button"] == "Проверить и запустить предпросмотр"
+    assert "краткий предпросмотр дороги" in preview_target["hint_line"]
+    assert full_target["target_label"] == "Полный расчёт"
+    assert full_target["plain_button"] == "Запустить Полный расчёт"
+    assert full_target["checked_button"] == "Проверить и запустить Полный расчёт"
     assert "Крен на ступени" in full_target["hint_line"]
 
 
@@ -492,14 +496,14 @@ def test_describe_plain_launch_availability_marks_strict_blockers() -> None:
     )
 
     assert auto["enabled"] is True
-    assert "свежий auto-check" in str(auto["detail"])
+    assert "свежая самопроверка" in str(auto["detail"])
     assert strict_missing["enabled"] is False
-    assert "strict требует новый selfcheck" in str(strict_missing["detail"])
+    assert "строгий режим требует новую самопроверку" in str(strict_missing["detail"])
     assert balanced_stale["enabled"] is True
     assert "не подходит текущей конфигурации" in str(balanced_stale["detail"])
     assert force_failed["enabled"] is True
-    assert "policy=force" in str(force_failed["detail"])
-    assert "errors=2" in str(force_failed["detail"])
+    assert "форсированный режим" in str(force_failed["detail"])
+    assert "ошибок: 2" in str(force_failed["detail"])
 
 
 def test_describe_selfcheck_freshness_and_signature_are_stable() -> None:

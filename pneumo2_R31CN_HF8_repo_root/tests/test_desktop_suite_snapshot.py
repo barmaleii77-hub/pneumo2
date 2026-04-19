@@ -198,8 +198,8 @@ def test_suite_runtime_status_lines_surface_ho003_inputs_handoff(tmp_path: Path)
     assert context["path"] == str(inputs_path)
     assert context["payload_hash"] == desktop_input_payload_hash(inputs_payload)
     assert context["can_consume"] is True
-    assert status_lines[0].startswith("HO-003 inputs_snapshot: current")
-    assert "can_consume=True" in status_lines[0]
+    assert status_lines[0].startswith("Снимок исходных данных:")
+    assert "доступен=да" in status_lines[0]
 
 
 def test_desktop_suite_runtime_facade_writes_validated_ho005_with_upstream_hashes(tmp_path: Path) -> None:
@@ -244,8 +244,8 @@ def test_desktop_suite_runtime_facade_writes_validated_ho005_with_upstream_hashe
     assert snapshot["validated"] is True
     assert state["state"] == "current"
     assert state["handoff_ready"] is True
-    assert any("validated_suite_snapshot" in line for line in lines)
-    assert any("suite_snapshot_hash" in line for line in lines)
+    assert any("Снимок набора" in line for line in lines)
+    assert any("контроль набора" in line for line in lines)
 
 
 def test_desktop_suite_runtime_blocks_missing_inputs_snapshot_as_upstream_ref(tmp_path: Path) -> None:
@@ -308,7 +308,7 @@ def test_suite_inputs_handoff_reports_missing_and_stale_without_live_editor_stat
 
     assert missing["state"] == "missing"
     assert missing["can_consume"] is False
-    assert "surrogate inputs" in missing["banner"]
+    assert "не должен подставлять исходные данные самостоятельно" in missing["banner"]
     assert stale["state"] == "stale"
     assert stale["can_consume"] is False
     assert "inputs_snapshot_hash_changed" in stale["stale_reasons"]
@@ -449,7 +449,7 @@ def test_suite_matrix_preview_counts_stages_types_and_refs(tmp_path: Path) -> No
     assert preview["type_counts"]["maneuver_csv"] == 1
     assert preview["type_counts"]["инерция_крен"] == 1
     assert preview["ref_row_count"] == 1
-    assert "rows=2" in preview["summary_text"]
+    assert "строк=2" in preview["summary_text"]
 
 
 def test_stale_suite_banner_detects_inputs_ring_and_suite_hash_drift(tmp_path: Path) -> None:
@@ -473,7 +473,7 @@ def test_stale_suite_banner_detects_inputs_ring_and_suite_hash_drift(tmp_path: P
     stale_suite = describe_suite_snapshot_state(snapshot, current_suite_snapshot_hash="other-suite-hash")
 
     assert current["state"] == "current"
-    assert "HO-005" in current["banner"]
+    assert "Снимок набора испытаний актуален" in current["banner"]
     assert stale_inputs["state"] == "stale"
     assert "inputs_snapshot_hash_changed" in stale_inputs["stale_reasons"]
     assert stale_ring["state"] == "stale"
@@ -529,18 +529,18 @@ def test_baseline_consumes_ho005_validated_suite_snapshot_without_rebinding(tmp_
 
 def test_command_search_discovers_validated_suite_and_ho005_routes() -> None:
     entries = build_shell_command_search_entries(build_desktop_shell_specs())
-    hits = rank_shell_command_search_entries("validated_suite_snapshot HO-005", entries)
-    freeze_hits = rank_shell_command_search_entries("заморозить HO-005", entries)
+    hits = rank_shell_command_search_entries("снимок набора испытаний", entries)
+    freeze_hits = rank_shell_command_search_entries("зафиксировать набор", entries)
 
     assert hits
     assert hits[0].action_value == "test_center"
-    assert "suite_snapshot_hash" in " ".join(hits[0].keywords)
+    assert "снимок набора" in " ".join(hits[0].keywords)
     assert freeze_hits
     assert freeze_hits[0].action_value == "test_center"
 
     spec_entries = build_search_entries(build_shell_workspaces(), tuple(build_command_map().values()))
-    spec_hits = search_command_palette(spec_entries, "suite_snapshot_hash")
-    spec_freeze_hits = search_command_palette(spec_entries, "заморозить HO-005")
+    spec_hits = search_command_palette(spec_entries, "снимок набора")
+    spec_freeze_hits = search_command_palette(spec_entries, "зафиксировать набор")
     assert spec_hits
     assert spec_hits[0].workspace_id == "test_matrix"
     assert spec_freeze_hits

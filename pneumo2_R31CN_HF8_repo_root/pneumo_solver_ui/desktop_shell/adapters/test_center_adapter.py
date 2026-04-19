@@ -14,8 +14,8 @@ def create_hosted_test_center(parent: tk.Misc) -> App:
 def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="test_center",
-        title="Набор испытаний и базовый прогон",
-        description="Baseline-прогоны, контрольные тесты и первичная проверка результатов из одного понятного места.",
+        title="Набор испытаний и опорный прогон",
+        description="Опорные прогоны, контрольные тесты и первичная проверка результатов из одного понятного места.",
         group="Встроенные окна",
         mode="hosted",
         workflow_stage="calculation",
@@ -31,8 +31,8 @@ def build_spec() -> DesktopShellToolSpec:
         menu_section="Расчёт",
         nav_section="Расчёт",
         details=(
-            "Раздел держит матрицу испытаний, runtime overrides, validated_suite_snapshot, "
-            "suite_snapshot_hash и HO-005 handoff в baseline без скрытых маршрутов."
+            "Окно показывает матрицу испытаний, настройки запуска, проверку набора "
+            "и переход к опорному прогону без скрытых промежуточных маршрутов."
         ),
         menu_order=30,
         nav_order=30,
@@ -40,19 +40,16 @@ def build_spec() -> DesktopShellToolSpec:
         standalone_module="pneumo_solver_ui.tools.test_center_gui",
         create_hosted=create_hosted_test_center,
         search_aliases=(
-            "baseline и проверки",
+            "опорный прогон и проверки",
             "набор испытаний",
             "базовый прогон",
-            "baseline",
-            "test matrix",
-            "validated suite",
-            "validated_suite_snapshot",
-            "suite snapshot",
-            "suite_snapshot_hash",
-            "HO-005",
-            "заморозить HO-005",
+            "опорный прогон",
+            "матрица испытаний",
+            "снимок набора",
+            "контроль набора",
+            "зафиксировать набор",
             "расчетная настройка",
-            "run setup",
+            "настройка расчёта",
         ),
         context_handoff_keys=(
             "validated_suite_snapshot",

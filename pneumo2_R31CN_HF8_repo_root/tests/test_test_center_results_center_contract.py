@@ -85,13 +85,22 @@ def test_test_center_gui_uses_left_controls_and_right_log_workspace() -> None:
     )
 
     assert 'run_split = ttk.Panedwindow(run_tab, orient="horizontal")' in tool_src
-    assert 'summary_box = ttk.LabelFrame(config_body, text="Контекст", padding=pad)' in tool_src
+    assert 'summary_box = ttk.LabelFrame(config_body, text="Сводка работы", padding=pad)' in tool_src
     assert 'btns = ttk.LabelFrame(config_body, text="Команды", padding=pad)' in tool_src
     assert 'ttk.Button(header_actions, text="Результаты", command=lambda: self.notebook.select(self.results_center)).pack(side="left", padx=(8, 0))' in tool_src
-    assert 'ttk.LabelFrame(config_body, text="Набор испытаний / HO-005", padding=pad)' in tool_src
-    assert "validated_suite_snapshot" in tool_src
-    assert "suite_snapshot_hash" in tool_src
-    assert 'text="Открыть validated_suite_snapshot.json"' in tool_src
+    assert 'ttk.LabelFrame(config_body, text="Набор испытаний", padding=pad)' in tool_src
+    assert "Снимок набора испытаний" in tool_src
+    assert "Включено испытаний:" in tool_src
+    assert "Ссылки на исходные данные:" in tool_src
+    assert "контроль=" not in tool_src
+    assert "включено=" not in tool_src
+    assert "Подготовить пакет" not in tool_src
+    assert "Пакеты отправки" not in tool_src
+    assert "Открыть папку пакетов" not in tool_src
+    assert "Команда запуска:" not in tool_src
+    assert "▶" not in tool_src
+    assert "■" not in tool_src
+    assert 'text="Открыть снимок набора"' in tool_src
     assert "read_desktop_suite_handoff_state" in tool_src
 
 
@@ -239,12 +248,12 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert snapshot.optimizer_scope_release_risk is True
     overview = {row.key: row for row in snapshot.validation_overview_rows}
     assert overview["send_bundle_validation"].status == "WARN"
-    assert "warnings=2" in overview["send_bundle_validation"].detail
+    assert "предупреждений: 2" in overview["send_bundle_validation"].detail
     assert overview["send_bundle_validation"].action_key == "open_artifact"
     assert overview["selected_result_context"].status == "CURRENT"
     assert overview["selected_result_context"].action_key == "export_diagnostics_evidence"
     assert overview["triage_report"].status == "CRITICAL"
-    assert "critical=1" in overview["triage_report"].detail
+    assert "критично: 1" in overview["triage_report"].detail
     assert overview["triage_report"].action_key == "open_artifact"
     assert overview["anim_latest_results"].status == "READY"
     assert overview["anim_latest_results"].action_key == "open_compare_viewer"
@@ -285,10 +294,10 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert snapshot.suggested_next_artifact_key == "latest_pointer"
 
     titles = {item.title for item in snapshot.recent_artifacts}
-    assert "Последний ZIP пакета отправки" in titles
-    assert "Проверка в Markdown" in titles
-    assert "Последний NPZ анимации" in titles
-    assert "HO-010 capture/export manifest" in titles
+    assert "Последний архив отправки" in titles
+    assert "Отчёт проверки" in titles
+    assert "Последний файл анимации" in titles
+    assert "Запись экспорта анимации" in titles
     assert "Журнал событий мнемосхемы" in titles
 
     validation_artifact = next(
@@ -305,9 +314,10 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert capture_artifact is not None
     assert capture_artifact.key == "capture_export_manifest"
     capture_preview = runtime.artifact_preview_lines(capture_artifact)
-    assert "handoff_id=HO-010" in capture_preview
-    assert "capture_hash=capture-hash-010" in capture_preview
-    assert "analysis_context_status=READY" in capture_preview
+    assert "Тип: экспорт анимации" in capture_preview
+    assert "Идентификатор захвата: capture-hash-010" in capture_preview
+    assert "Данные анализа: готово" in capture_preview
+    assert not any("handoff_id=" in line or "schema=" in line for line in capture_preview)
     session_artifacts = runtime.session_artifacts(
         snapshot,
         DesktopResultsSessionHandoff(
@@ -322,11 +332,11 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     session_titles = {item.title for item in session_artifacts}
     session_keys = {item.key for item in session_artifacts}
     session_categories = {item.key: item.category for item in session_artifacts}
-    assert "ZIP текущего прогона" in session_titles
-    assert "Проверка текущего прогона в JSON" in session_titles
-    assert "Разбор замечаний текущего прогона в JSON" in session_titles
-    assert "Контекст аниматора текущего прогона" in session_titles
-    assert "HO-010 manifest текущего прогона" in session_titles
+    assert "Архив текущего прогона" in session_titles
+    assert "Данные проверки текущего прогона" in session_titles
+    assert "Данные разбора замечаний текущего прогона" in session_titles
+    assert "Данные аниматора текущего прогона" in session_titles
+    assert "Запись экспорта текущего прогона" in session_titles
     assert "session_send_bundle_zip" in session_keys
     assert "session_validation_json" in session_keys
     assert "session_capture_export_manifest" in session_keys
@@ -391,18 +401,20 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert preferred_overview_artifact is not None
     assert preferred_overview_artifact.key == "session_latest_pointer"
     assert preview[:4] == (
-        "ok=True",
-        "errors=0",
-        "warnings=2",
-        "optimizer_gate=FAIL",
+        "Проверка: пройдена",
+        "Ошибок: 0",
+        "Предупреждений: 2",
+        "Оптимизация: ошибка",
     )
-    assert "warning: warn-a" in preview
+    assert "Предупреждение: warn-a" in preview
+    assert not any("ok=" in line or "errors=" in line or "warnings=" in line for line in preview)
 
     assert format_validation_summary(snapshot).startswith("Проверка: Норма")
-    assert "FAIL" in format_optimizer_gate_summary(snapshot)
-    assert "критичных=1" in format_triage_summary(snapshot)
+    assert "Оптимизация: ошибка" in format_optimizer_gate_summary(snapshot)
+    assert "FAIL" not in format_optimizer_gate_summary(snapshot)
+    assert "критичных: 1" in format_triage_summary(snapshot)
     assert "anim_latest.npz" in format_npz_summary(snapshot)
-    assert format_result_context_summary(snapshot).startswith("Контекст результата:")
+    assert format_result_context_summary(snapshot).startswith("Данные результата:")
 
     manifest_payload = runtime.build_diagnostics_evidence_manifest(snapshot)
     assert manifest_payload["result_context"]["state"] == "CURRENT"
@@ -482,7 +494,7 @@ def test_desktop_results_runtime_surfaces_stale_selected_result_context(tmp_path
     assert context_fields["run_contract_hash"].status == "STALE"
     assert context_fields["run_contract_hash"].selected_value == "run-hash-historical"
     assert context_fields["scenario_lineage_hash"].current_value == "ring-current"
-    assert format_result_context_summary(snapshot) == "Контекст результата: устарел"
+    assert format_result_context_summary(snapshot) == "Данные результата: устарел"
 
 
 def test_desktop_results_runtime_surfaces_latest_optimizer_selected_run_contract(
@@ -693,7 +705,7 @@ def test_desktop_results_runtime_warns_when_selected_contract_exists_without_poi
     assert snapshot.selected_run_contract_path == selected_contract_path.resolve()
     assert snapshot.selected_run_contract_hash == "selected-contract-no-pointer"
     assert snapshot.selected_run_contract_status == "WARN"
-    assert "закреплённый контекст анализа отсутствует" in snapshot.selected_run_contract_banner
+    assert "закреплённые данные анализа отсутствуют" in snapshot.selected_run_contract_banner
     assert overview["selected_optimizer_run_contract"].status == "WARN"
     assert overview["selected_optimizer_run_contract"].artifact_key == "selected_optimizer_run_contract"
     assert artifacts["selected_optimizer_run_contract"].path == selected_contract_path.resolve()
@@ -749,7 +761,7 @@ def test_desktop_results_runtime_keeps_validation_report_visible_without_json(tm
     assert overview["send_bundle_validation"].artifact_key == "validation_md"
     assert validation_artifact is not None
     assert validation_artifact.key == "validation_md"
-    assert "Проверка в Markdown" in {item.title for item in snapshot.recent_artifacts}
+    assert "Отчёт проверки" in {item.title for item in snapshot.recent_artifacts}
 
 
 def test_desktop_results_runtime_exports_diagnostics_evidence_manifest_input(tmp_path: Path, monkeypatch) -> None:
@@ -860,8 +872,8 @@ def test_desktop_results_runtime_exports_diagnostics_evidence_manifest_input(tmp
     assert payload["result_context"]["selected"]["capture_export_manifest_handoff_id"] == "HO-010"
     assert payload["result_context"]["selected"]["capture_hash"] == "capture-777"
     assert payload["result_context"]["selected"]["truth_mode_hash"] == "truth-777"
-    assert fields["analysis_context_status"].title == "Статус контекста анализа"
-    assert fields["animator_link_contract_hash"].title == "Хэш связи с аниматором"
+    assert fields["analysis_context_status"].title == "Состояние данных анализа"
+    assert fields["animator_link_contract_hash"].title == "Идентификатор связи с аниматором"
     assert fields["selected_npz_path"].selected_value == str(latest_npz)
     assert payload["result_context"]["state"] == "CURRENT"
     assert payload["mismatch_summary"]["state"] == "CURRENT"
@@ -892,12 +904,12 @@ def test_desktop_results_runtime_exports_diagnostics_evidence_manifest_input(tmp
     assert compare_artifact is not None
     assert compare_artifact.path == compare_sidecar_path
     assert compare_artifact.category == "evidence"
-    assert compare_artifact.detail == "HO-009 WS-ANALYSIS -> CompareViewer current_context_ref"
+    assert compare_artifact.detail == "Материалы для передачи выбранного результата в окно сравнения."
     compare_preview = runtime.artifact_preview_lines(compare_artifact)
-    assert "schema=desktop_results_compare_current_context" in compare_preview
-    assert "handoff_id=HO-009" in compare_preview
-    assert "context_state=CURRENT" in compare_preview
-    assert "mismatch=BANNER-HIST-001" in compare_preview
+    assert "Тип: данные сравнения" in compare_preview
+    assert "Состояние данных: текущий" in compare_preview
+    assert "Согласование: BANNER-HIST-001" in compare_preview
+    assert not any("schema=" in line or "handoff_id=" in line or "context_state=" in line for line in compare_preview)
 
 
 def test_desktop_results_runtime_builds_branch_args() -> None:
@@ -1023,11 +1035,11 @@ def test_desktop_results_runtime_launch_compare_viewer_writes_current_context_si
         result_context_state="STALE",
         result_context_banner="Текущая постановка отличается от выбранного результата.",
         result_context_detail="objective_contract_hash",
-        result_context_action="Открыть Compare Viewer",
+        result_context_action="Открыть окно сравнения",
         result_context_fields=(
             DesktopResultsContextField(
                 key="run_id",
-                title="ID прогона",
+                title="Номер прогона",
                 current_value="run-current",
                 selected_value="run-history",
                 status="STALE",
@@ -1035,7 +1047,7 @@ def test_desktop_results_runtime_launch_compare_viewer_writes_current_context_si
             ),
             DesktopResultsContextField(
                 key="objective_contract_hash",
-                title="Хэш objective-контракта",
+                title="Идентификатор целевого профиля",
                 current_value="obj-current",
                 selected_value="obj-history",
                 status="STALE",
@@ -1124,10 +1136,10 @@ def test_desktop_results_runtime_previews_selected_result_artifacts(tmp_path: Pa
     pointer_preview = runtime.artifact_preview_lines(pointer_artifact)
     mnemo_preview = runtime.artifact_preview_lines(mnemo_artifact)
 
-    assert "token=tok-preview" in pointer_preview
-    assert "reload_inputs=['npz', 'road_csv']" in pointer_preview
-    assert "mode=Регуляторный коридор" in mnemo_preview
-    assert "recent: Большой перепад давлений" in mnemo_preview
+    assert "Метка визуального кэша: tok-preview" in pointer_preview
+    assert "Входные данные перезагрузки: ['npz', 'road_csv']" in pointer_preview
+    assert "Режим: Регуляторный коридор" in mnemo_preview
+    assert "Недавнее событие: Большой перепад давлений" in mnemo_preview
 
     triage_path = repo_root / "send_bundles" / "latest_triage_report.json"
     triage_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1150,9 +1162,10 @@ def test_desktop_results_runtime_previews_selected_result_artifacts(tmp_path: Pa
     )()
     triage_preview = runtime.artifact_preview_lines(triage_artifact)
 
-    assert "severity_counts={'critical': 0, 'warn': 1, 'info': 0}" in triage_preview
-    assert "red_flag: Pointer drift" in triage_preview
-    assert "next: Открыть Compare Viewer следующим шагом" in triage_preview
+    assert "Замечания: критичных: 0; предупреждений: 1; справочных: 0" in triage_preview
+    assert "Красный флаг: Pointer drift" in triage_preview
+    assert "Следующий шаг: Открыть окно сравнения следующим шагом" in triage_preview
+    assert not any("severity_counts=" in line or "red_flag:" in line or "next:" in line for line in triage_preview)
 
 
 def test_test_center_gui_embeds_validation_results_center_modules() -> None:
@@ -1188,14 +1201,20 @@ def test_test_center_gui_embeds_validation_results_center_modules() -> None:
     assert "def refresh(self) -> None:" in center_src
     assert "Обзор проверок" in center_src
     assert "Следующий шаг:" in center_src
-    assert "Передача последнего прогона" in center_src
+    assert "Материалы последнего прогона" in center_src
     assert "def set_session_handoff(" in center_src
-    assert "Перейти к рекомендованной ветви" in center_src
-    assert "Открыть последний ZIP" in center_src
+    assert "Показать рекомендованный раздел" in center_src
+    assert "Открыть последний архив" in center_src
     assert "Открыть текущую проверку" in center_src
     assert "Открыть текущий разбор замечаний" in center_src
     assert "Открыть текущее сравнение" in center_src
     assert "Открыть текущую визуализацию" in center_src
+    assert "Открыть последний ZIP" not in center_src
+    assert "Validation & Results" not in center_src
+    assert "Suggested next step launched." not in center_src
+    assert "Контекст аниматора:" not in center_src
+    assert "Проверка в JSON" not in center_src
+    assert "Проверка в Markdown" not in center_src
     assert "def _preferred_handoff_artifact(" in center_src
     assert "Только текущий прогон" in center_src
     assert "Раздел:" in center_src
@@ -1225,7 +1244,7 @@ def test_test_center_gui_embeds_validation_results_center_modules() -> None:
     assert "launch_compare_viewer" in center_src
     assert "launch_animator" in center_src
     assert "Предупреждения проверки:" in center_src
-    assert "NPZ для сравнения:" in center_src
+    assert "Файл для сравнения:" in center_src
     assert "artifact=self._selected_artifact()" in center_src
 
     assert "class DesktopResultsSnapshot" in model_src
@@ -1256,7 +1275,12 @@ def test_test_center_gui_embeds_validation_results_center_modules() -> None:
     assert "def session_artifacts(" in runtime_src
     assert "def preferred_artifact_by_key(" in runtime_src
     assert "def preferred_overview_evidence_artifact(" in runtime_src
-    assert "Проверка текущего прогона в JSON" in runtime_src
+    assert "Данные проверки текущего прогона" in runtime_src
+    assert "Проверка текущего прогона в JSON" not in runtime_src
+    assert "Разбор замечаний текущего прогона в JSON" not in runtime_src
+    assert "Сводная HTML-страница" not in runtime_src
+    assert "JSON-файл:" not in runtime_src
+    assert "Предпросмотр JSON" not in runtime_src
     assert "def compare_viewer_path(" in runtime_src
     assert "def animator_target_paths(" in runtime_src
     assert "def compare_viewer_args(" in runtime_src

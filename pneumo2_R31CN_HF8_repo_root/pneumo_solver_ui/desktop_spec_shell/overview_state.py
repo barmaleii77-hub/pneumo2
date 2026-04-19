@@ -99,6 +99,7 @@ class OverviewCardState:
     value: str
     detail: str
     command_id: str
+    action_text: str = "Открыть"
 
 
 @dataclass(frozen=True)
@@ -154,44 +155,50 @@ def build_overview_snapshot(repo_root: Path | None = None) -> OverviewSnapshot:
             value=root.name,
             detail=str(root),
             command_id="workspace.input_data.open",
+            action_text="Открыть исходные данные",
         ),
         OverviewCardState(
-            title="Активный baseline",
+            title="Активный опорный прогон",
             value=_safe_relative(baseline_path, root) if baseline_path else "Не выбран",
-            detail="Источник истины по baseline должен жить в отдельном workspace.",
+            detail="Источник данных по опорному прогону должен быть виден в отдельном рабочем шаге.",
             command_id="workspace.baseline_run.open",
+            action_text="Открыть базовый прогон",
         ),
         OverviewCardState(
-            title="Optimization contract",
-            value="StageRunner - primary path",
-            detail="Distributed coordinator остаётся advanced path и не должен конкурировать с основным запуском.",
+            title="Настройки оптимизации",
+            value="Поэтапный запуск - основной режим",
+            detail="Распределённая координация остаётся расширенным режимом и не должна конкурировать с основным запуском.",
             command_id="workspace.optimization.open",
+            action_text="Открыть оптимизацию",
         ),
         OverviewCardState(
             title="Последние результаты",
-            value=_safe_relative(result_path, root) if result_path else "Пока нет артефактов",
-            detail="Results and compare открываются из центра анализа результатов.",
+            value=_safe_relative(result_path, root) if result_path else "Пока нет файлов результатов",
+            detail="Результаты и сравнение открываются из центра анализа результатов.",
             command_id="results.center.open",
+            action_text="Открыть анализ результатов",
         ),
         OverviewCardState(
-            title="Последний diagnostics bundle",
-            value=str(bundle_path.name) if bundle_path else "Пока нет ZIP",
-            detail=str(bundle_path.parent) if bundle_path else "Глобальная диагностика должна оставаться доступной из любого workspace.",
+            title="Последний архив диагностики",
+            value=str(bundle_path.name) if bundle_path else "Архив пока не найден",
+            detail=str(bundle_path.parent) if bundle_path else "Диагностика должна оставаться доступной из любого рабочего шага приложения.",
             command_id="diagnostics.collect_bundle",
+            action_text="Собрать диагностику",
         ),
         OverviewCardState(
-            title="Health / self-check",
+            title="Проверка готовности",
             value=(
-                f"PySide6={'OK' if pyside6_ready else 'missing'} | "
-                f"Animator={'OK' if animator_ready else 'missing'} | "
-                f"Diagnostics={'OK' if diagnostics_ready else 'missing'}"
+                f"Основные окна: {'готовы' if pyside6_ready else 'не найдены'} | "
+                f"Аниматор: {'найден' if animator_ready else 'не найден'} | "
+                f"Диагностика: {'найдена' if diagnostics_ready else 'не найдена'}"
             ),
             detail=(
-                "Workflow graphs "
-                + ("готовы" if workflow_graphs_ready else "не найдены")
-                + "; shell должен сохранять честный bridge к существующим инженерным центрам."
+                "Схема последовательности "
+                + ("готова" if workflow_graphs_ready else "не найдена")
+                + "; главное окно должно открывать существующие инженерные центры без скрытой подмены."
             ),
             command_id="workspace.diagnostics.open",
+            action_text="Открыть диагностику",
         ),
     )
     return OverviewSnapshot(cards=cards)

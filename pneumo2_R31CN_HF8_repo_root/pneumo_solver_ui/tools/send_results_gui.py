@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Shared desktop send-results entrypoint.
+"""Точка входа desktop-отправки результатов.
 
-Legacy contract kept on purpose:
-- hosted shell still imports `SendResultsGUI`;
-- send flow still surfaces the single primary action to copy the ZIP;
-- clipboard status continues to persist in `latest_send_bundle_clipboard_status.json`.
+Совместимость оставлена намеренно:
+- hosted shell по-прежнему импортирует `SendResultsGUI`;
+- сценарий отправки по-прежнему держит одно главное действие копирования архива;
+- состояние буфера обмена сохраняется в `latest_send_bundle_clipboard_status.json`.
 
-The actual UI now lives in the unified desktop diagnostics/send center so the
-operator can collect bundle, read summary, inspect, health and send from one
-desktop flow.
+Реальное окно живёт в едином desktop-центре диагностики и отправки, чтобы
+оператор собирал архив, читал сводку, проверял архив, смотрел состояние проекта
+и отправлял результаты из одного последовательного сценария.
 """
 
 from __future__ import annotations
@@ -84,9 +84,9 @@ def _is_full_file_clipboard_success(ok: bool, msg: str) -> bool:
 
 
 class SendResultsGUI(DesktopDiagnosticsCenter):
-    READY_COPIED_TITLE = "ZIP для отправки в чат готов и уже скопирован в буфер."
+    READY_COPIED_TITLE = "Архив для отправки в чат готов и уже скопирован в буфер."
     CLIPBOARD_STATUS_JSON = "latest_send_bundle_clipboard_status.json"
-    ANIM_POINTER_CAPTION = "Anim pointer diagnostics:"
+    ANIM_POINTER_CAPTION = "Диагностика последней анимации:"
 
     def __init__(self, root: tk.Misc, hosted: bool = False) -> None:
         reuse_latest = str(os.environ.get("PNEUMO_SEND_RESULTS_REUSE_LATEST", "0")).strip() == "1"
@@ -102,8 +102,8 @@ class SendResultsGUI(DesktopDiagnosticsCenter):
 
         self.send_title_var.set(self.READY_COPIED_TITLE if self._clipboard_ok else self.send_title_var.get())
 
-        # Keep the legacy eager hook visible in source/tests; reset the guard so
-        # the real autocopy still happens once the fresh ZIP is ready.
+        # Совместимый eager-hook оставлен для старых launcher-интеграций;
+        # сбрасываем guard, чтобы свежий архив всё равно скопировался один раз.
         self._attempt_clipboard_copy_once()
         self._clipboard_attempted = False
 
@@ -127,7 +127,7 @@ class SendResultsGUI(DesktopDiagnosticsCenter):
     def _on_bundle_build_finished(self, ok: bool, zip_path: str, message: str) -> None:
         if not ok:
             try:
-                _safe_write_text(_log_dir() / "send_results_gui_error.log", str(message or "bundle build failed"))
+                _safe_write_text(_log_dir() / "send_results_gui_error.log", str(message or "Не удалось собрать архив отправки"))
             except Exception:
                 pass
         super()._on_bundle_build_finished(ok, zip_path, message)

@@ -118,7 +118,8 @@ def test_postmortem_watchdog_logs_and_emits_bundle_summary(tmp_path: Path, monke
     assert "Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True" in log_text
     assert "Browser perf comparison: regression_checked / PASS / ready=True" in log_text
     assert "Ring seam: closure=strict_exact / open=True / seam_max_m=0.012 / raw_seam_max_m=0.015" in log_text
-    assert "Anim pointer diagnostics:" in log_text
+    assert "Диагностика указателя анимации:" in log_text
+    assert "Anim pointer diagnostics:" not in log_text
     assert captured_events
     assert captured_events[-1]["summary_lines"][0].startswith("Browser perf evidence:")
     assert captured_events[-1]["scenario_kind"] == "ring"

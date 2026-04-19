@@ -19,13 +19,13 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert 'workspace = ttk.Panedwindow(self, orient="horizontal")' in src
     for label in (
         "Обновить",
-        "Открыть артефакт",
-        "Экспорт HO-007",
-        "Экспорт evidence",
-        "Открыть evidence",
-        "System Influence",
-        "Full Report",
-        "Influence Staging",
+        "Открыть файл",
+        "Зафиксировать прогон",
+        "Подготовить диагностику",
+        "Открыть диагностику",
+        "Влияние системы",
+        "Полный отчёт",
+        "Диапазоны влияния",
         "Собрать диагностику",
     ):
         assert label in src
@@ -39,21 +39,21 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert "def _export_selected_run_contract_bridge" in src
     assert "discover_selected_run_candidates" in src
     assert "_candidate_by_iid" in src
-    assert "Optimization runs for HO-007" in src
+    assert "Прогоны оптимизации для выбора" in src
     assert "candidate_ready_only_var" in src
     assert "ttk.Checkbutton" in src
-    assert "READY only" in src
+    assert "Только готовые" in src
     assert "def _refresh_candidate_filter" in src
-    assert "shown=" in src
+    assert "показано" in src
     assert "def _selected_candidate_run_dir" in src
     assert "bridge_status" in src
-    assert 'label == "Export HO-007" and result.ok' in src
+    assert 'label == "Зафиксировать выбранный прогон" and result.ok' in src
     assert "def _auto_export_evidence_after_ho007" in src
     assert "write_diagnostics_evidence_manifest" in src
-    assert "evidence auto-exported after HO-007" in src
+    assert "Материалы диагностики подготовлены автоматически" in src
     assert "def _open_evidence_manifest" in src
-    assert "Evidence manifest opened" in src
-    assert "run Экспорт evidence first" in src
+    assert "Материалы диагностики открыты" in src
+    assert "Подготовить диагностику" in src
     assert "compare_influence_surface_count" in src
     assert "def _compare_surface_details" in src
     assert "def _compare_surface_preview_for_artifact" in src
@@ -61,23 +61,28 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert "compare_influence_surface_for_artifact" in src
     assert "validated_artifacts_summary" in src
     assert '"validated_artifacts"' in src
-    assert "Validated artifacts" in src
-    assert "V38 workspace pipeline / gaps" in src
+    assert "Проверенные файлы" in src
+    assert "Порядок работы и замечания" in src
     assert "analysis_workspace_pipeline_status" in src
     assert "analysis_workspace_runtime_gaps" in src
     assert '"analysis_workspace_pipeline"' in src
     assert '"runtime_data_gaps"' in src
-    assert "Calibration pipelines" in src
-    assert "Influence and compare context" in src
-    assert "Sensitivity / uncertainty" in src
-    assert "Animator / Diagnostics handoffs" in src
-    assert "Charts / tables preview" in src
-    assert "Compare influence charts" in src
-    assert "Artifact table previews" in src
+    assert "Калибровка" in src
+    assert "Влияние и сравнение" in src
+    assert "Чувствительность и неопределённость" in src
+    assert "Аниматор и диагностика" in src
+    assert "Предпросмотр графиков и таблиц" in src
+    assert "Графики влияния" in src
+    assert "Табличные файлы" in src
     assert "analysis_workspace_chart_table_preview" in src
     assert '"analysis_chart_table_preview"' in src
-    assert "Compare Viewer boundary" in runtime_src
-    assert "Results Center boundary" in runtime_src
+    assert "Связь с окном сравнения" in runtime_src
+    assert "Связь с центром результатов" in runtime_src
+    assert "Выбранный прогон для анализа" in runtime_src
+    assert "Калибровочный запуск" in runtime_src
+    assert "Статическая настройка" in runtime_src
+    assert "Неопределённость и приоритет измерений" in runtime_src
+    assert "Материалы диагностики" in runtime_src
     assert "analysis_compare_handoff_summary" in src
     assert "analysis_results_boundary_summary" in src
     assert '"compare_viewer_handoff_summary"' in src
@@ -86,8 +91,46 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert "compare_influence_diagnostics" in src
     assert "missing_required_artifacts" in src
     assert "missing_required_artifact" in src
-    assert "Required artifacts ready" in src
+    assert "Обязательные файлы готовы" in src
     assert "filedialog.askdirectory" in src
+    for forbidden in (
+        "Открыть артефакт",
+        "Открыть выбранный артефакт",
+        "Открыть контекст анимации",
+        "Проверенные артефакты",
+        "Табличные артефакты",
+        "Маршрут рабочего места",
+        "Обязательные артефакты готовы",
+        "статус:",
+        "Команда процесса",
+        "Идентификатор процесса",
+    ):
+        assert forbidden not in src
+    for forbidden in (
+        "HO-007 selected-run context",
+        "Master selected-run contract consumed by WS-ANALYSIS.",
+        "Autopilot v20 calibration pipeline",
+        "Autopilot wrapper evidence was found.",
+        "Calibration fit reports",
+        "Full/final calibration reports and fit evidence",
+        "Static-trim result evidence",
+        "Static-trim evidence is blocked",
+        "System influence report",
+        "System influence artifacts",
+        "Influence-guided staging",
+        "Compare influence surfaces",
+        "Sensitivity summary",
+        "Uncertainty/UQ artifacts",
+        "Optional UQ advisor outputs",
+        "Compare Viewer boundary",
+        "Results Center boundary",
+        "HO-008 Animator handoff",
+        "HO-009 Diagnostics evidence manifest",
+        "Diagnostics/SEND handoff",
+        "workspace/handoffs/WS-ANALYSIS",
+        "send_bundles/latest_engineering_analysis_evidence_manifest.json",
+    ):
+        assert forbidden not in runtime_src
 
 
 def test_engineering_analysis_shell_discovery_is_wired_to_module_and_aliases() -> None:

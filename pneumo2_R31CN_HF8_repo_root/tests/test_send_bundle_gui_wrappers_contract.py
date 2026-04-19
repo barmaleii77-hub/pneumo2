@@ -17,4 +17,6 @@ def test_autotest_and_test_center_guis_surface_shared_send_bundle_summary() -> N
         assert "load_latest_send_bundle_anim_dashboard" in src, str(path)
         assert "format_anim_dashboard_brief_lines" in src, str(path)
         assert "ANIM_DIAG_SIDECAR_JSON" in src, str(path)
-        assert "Anim pointer diagnostics:" in src, str(path)
+        assert "Диагностика последней анимации:" in src, str(path)
+        assert "Диагностика указателя анимации:" not in src, str(path)
+        assert "Anim pointer diagnostics:" not in src, str(path)

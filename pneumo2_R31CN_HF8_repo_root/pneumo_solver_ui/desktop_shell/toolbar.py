@@ -143,19 +143,19 @@ def build_shell_toolbar(
     ttk.Button(frame, text="Главная", command=select_home).pack(side="left")
     continue_workflow_button = ttk.Button(
         frame,
-        text="Следующий раздел",
+        text="Следующее окно",
         command=continue_workflow,
     )
     continue_workflow_button.pack(side="left", padx=(6, 0))
     previous_workflow_button = ttk.Button(
         frame,
-        text="Раздел назад",
+        text="Назад по порядку",
         command=select_previous_workflow,
     )
     previous_workflow_button.pack(side="left", padx=(6, 0))
     next_workflow_button = ttk.Button(
         frame,
-        text="Раздел вперед",
+        text="Вперёд по порядку",
         command=select_next_workflow,
     )
     next_workflow_button.pack(side="left", padx=(6, 0))

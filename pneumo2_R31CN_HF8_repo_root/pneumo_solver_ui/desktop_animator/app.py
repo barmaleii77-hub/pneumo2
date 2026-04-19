@@ -8308,7 +8308,7 @@ class Car3DWidget(QtWidgets.QWidget):
         )
         glint_rgb = _boost_rgb(glint_rgb, 0.10 + 0.20 * pressure_u + 1.8 * float(self._glass_f0))
         alpha = 0.16 + 0.18 * pressure_u + 0.28 * float(self._glass_f0)
-        if str(chamber_kind).upper() in {"РЁРџ", "ROD", "ROD_SIDE"}:
+        if str(chamber_kind).upper() in {"ШП", "ROD", "ROD_SIDE"}:
             alpha *= 0.88
         rgba_target = tuple(float(v) / 255.0 for v in glint_rgb) + (float(_clamp(alpha, 0.08, 0.54)),)
         return self._smooth_rgba(str(key), rgba_target, response=0.24)
@@ -8333,7 +8333,7 @@ class Car3DWidget(QtWidgets.QWidget):
         )
         halo_rgb = _boost_rgb(halo_rgb, 0.06 + 0.18 * pressure_u + 1.4 * float(self._glass_f0))
         alpha = 0.10 + 0.16 * pressure_u + 0.14 * float(self._glass_f0)
-        if str(chamber_kind).upper() in {"РЁРџ", "ROD", "ROD_SIDE"}:
+        if str(chamber_kind).upper() in {"ШП", "ROD", "ROD_SIDE"}:
             alpha *= 0.82
         rgba_target = tuple(float(v) / 255.0 for v in halo_rgb) + (float(_clamp(alpha, 0.05, 0.38)),)
         return self._smooth_rgba(str(key), rgba_target, response=0.20)
@@ -8358,7 +8358,7 @@ class Car3DWidget(QtWidgets.QWidget):
         )
         bloom_rgb = _boost_rgb(bloom_rgb, 0.08 + 0.22 * pressure_u + 1.5 * float(self._glass_f0))
         alpha = 0.06 + 0.12 * pressure_u + 0.10 * float(self._glass_f0)
-        if str(chamber_kind).upper() in {"РЁРџ", "ROD", "ROD_SIDE"}:
+        if str(chamber_kind).upper() in {"ШП", "ROD", "ROD_SIDE"}:
             alpha *= 0.80
         rgba_target = tuple(float(v) / 255.0 for v in bloom_rgb) + (float(_clamp(alpha, 0.03, 0.28)),)
         return self._smooth_rgba(str(key), rgba_target, response=0.18)
@@ -8648,7 +8648,7 @@ class Car3DWidget(QtWidgets.QWidget):
         fringe = np.exp(-(((rr - 0.88) / 0.20) ** 2))
         alpha = (0.02 + 0.06 * pressure_u + 0.06 * float(self._glass_f0)) * (0.54 * core + 0.32 * veil + 0.14 * fringe)
         alpha *= axial
-        if str(chamber_kind).upper() in {"РЁРџ", "ROD", "ROD_SIDE"}:
+        if str(chamber_kind).upper() in {"ШП", "ROD", "ROD_SIDE"}:
             alpha *= 0.82
         rgb_num = (
             np.asarray(core_rgb, dtype=float).reshape(1, 3) * (0.58 * core + 0.22 * veil).reshape(-1, 1)
@@ -9479,7 +9479,7 @@ class Car3DWidget(QtWidgets.QWidget):
         field: str,
         default_m: float = 0.0,
     ) -> tuple[float, bool]:
-        axle = "РїРµСЂРµРґ" if self._corner_is_front(corner) else "Р·Р°Рґ"
+        axle = "перед" if self._corner_is_front(corner) else "зад"
         key = spring_geometry_key(field, cyl, axle)
         geom_meta = dict(getattr(self, "_bundle_geometry_meta", {}) or {})
         try:
@@ -15689,7 +15689,7 @@ class Car3DWidget(QtWidgets.QWidget):
                                     key=f"{cyl_name}:{corner}:cap_bloom",
                                     pressure_pa=cap_pressure_pa,
                                     patm_pa=patm_pa,
-                                    chamber_kind="Р‘Рџ",
+                                    chamber_kind="БП",
                                 )
                                 cap_bloom_face_colors = self._cylinder_bloom_card_face_colors(
                                     cap_bloom_state["verts"],
@@ -15701,7 +15701,7 @@ class Car3DWidget(QtWidgets.QWidget):
                                     radius_v_m=float(cap_bloom_state["radius_v_m"]),
                                     pressure_pa=cap_pressure_pa,
                                     patm_pa=patm_pa,
-                                    chamber_kind="Р‘Рџ",
+                                    chamber_kind="БП",
                                 )
                                 cap_bloom_face_rgba = self._scene_graded_rgba(
                                     key=f"{cyl_name}:{corner}:cap_bloom_face_scene_grade",
@@ -15750,7 +15750,7 @@ class Car3DWidget(QtWidgets.QWidget):
                                     key=f"{cyl_name}:{corner}:rod_bloom",
                                     pressure_pa=rod_pressure_pa,
                                     patm_pa=patm_pa,
-                                    chamber_kind="РЁРџ",
+                                    chamber_kind="ШП",
                                 )
                                 rod_bloom_face_colors = self._cylinder_bloom_card_face_colors(
                                     rod_bloom_state["verts"],
@@ -15762,7 +15762,7 @@ class Car3DWidget(QtWidgets.QWidget):
                                     radius_v_m=float(rod_bloom_state["radius_v_m"]),
                                     pressure_pa=rod_pressure_pa,
                                     patm_pa=patm_pa,
-                                    chamber_kind="РЁРџ",
+                                    chamber_kind="ШП",
                                 )
                                 rod_bloom_face_rgba = self._scene_graded_rgba(
                                     key=f"{cyl_name}:{corner}:rod_bloom_face_scene_grade",
@@ -15814,13 +15814,13 @@ class Car3DWidget(QtWidgets.QWidget):
                                 key=f"{cyl_name}:{corner}:cap_glint",
                                 pressure_pa=cap_pressure_pa,
                                 patm_pa=patm_pa,
-                                chamber_kind="Р‘Рџ",
+                                chamber_kind="БП",
                             )
                             cap_caustic_rgba = self._cylinder_caustic_halo_rgba(
                                 key=f"{cyl_name}:{corner}:cap_caustic",
                                 pressure_pa=cap_pressure_pa,
                                 patm_pa=patm_pa,
-                                chamber_kind="Р‘Рџ",
+                                chamber_kind="БП",
                             )
                             cap_glint_rgba = self._scene_graded_rgba(
                                 key=f"{cyl_name}:{corner}:cap_glint_scene_grade",
@@ -15861,13 +15861,13 @@ class Car3DWidget(QtWidgets.QWidget):
                                 key=f"{cyl_name}:{corner}:rod_glint",
                                 pressure_pa=rod_pressure_pa,
                                 patm_pa=patm_pa,
-                                chamber_kind="РЁРџ",
+                                chamber_kind="ШП",
                             )
                             rod_caustic_rgba = self._cylinder_caustic_halo_rgba(
                                 key=f"{cyl_name}:{corner}:rod_caustic",
                                 pressure_pa=rod_pressure_pa,
                                 patm_pa=patm_pa,
-                                chamber_kind="РЁРџ",
+                                chamber_kind="ШП",
                             )
                             rod_glint_rgba = self._scene_graded_rgba(
                                 key=f"{cyl_name}:{corner}:rod_glint_scene_grade",

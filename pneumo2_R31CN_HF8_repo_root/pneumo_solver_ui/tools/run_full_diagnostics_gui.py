@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Shared desktop diagnostics entrypoint.
+"""Точка входа desktop-диагностики.
 
-This wrapper keeps the historical module/class API for hosted shell launchers,
-but the actual UI now lives in the unified desktop diagnostics/send center.
+Обёртка сохраняет прежний module/class API для hosted shell launchers, но
+реальное окно живёт в едином desktop-центре диагностики и отправки.
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ class App(DesktopDiagnosticsCenter):
             auto_build_bundle=False,
         )
         if not self._hosted:
-            self.root.title("Full Diagnostics (GUI) — Pneumo Solver UI")
+            self.root.title("Центр диагностики — PneumoApp")
 
     def on_close(self) -> None:
         super().on_close()

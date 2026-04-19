@@ -24,7 +24,8 @@ def test_send_results_gui_autocopies_and_persists_status_sidecar() -> None:
 
     assert 'self._attempt_clipboard_copy_once()' in src
     assert 'latest_send_bundle_clipboard_status.json' in src
-    assert 'ZIP для отправки в чат готов и уже скопирован в буфер.' in src
+    assert 'Архив для отправки в чат готов и уже скопирован в буфер.' in src
     assert 'load_latest_send_bundle_anim_dashboard' in src
     assert 'format_anim_dashboard_brief_lines' in src
-    assert 'Anim pointer diagnostics:' in src
+    assert 'Диагностика последней анимации:' in src
+    assert 'Anim pointer diagnostics:' not in src

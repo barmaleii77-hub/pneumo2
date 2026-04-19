@@ -20,7 +20,7 @@ def build_spec() -> DesktopShellToolSpec:
         mode="hosted",
         menu_section="Инструменты",
         nav_section="Инструменты",
-        details="Служебный центр упаковки и передачи результатов, bundle и сопроводительных отчётов.",
+        details="Центр подготовки архива результатов, сопроводительных файлов и отправки.",
         menu_order=150,
         nav_order=150,
         standalone_module="pneumo_solver_ui.tools.send_results_gui",

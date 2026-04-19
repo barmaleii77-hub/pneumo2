@@ -24,11 +24,11 @@ class DesktopOptimizerPackagingTab(ttk.Frame):
         actions = ttk.Frame(right)
         actions.grid(row=0, column=0, sticky="ew")
         ttk.Button(actions, text="Обновить выпуск", command=controller.refresh_packaging).pack(side="left")
-        ttk.Button(actions, text="Открыть каталог прогона", command=controller.open_selected_run_dir).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Открыть папку прогона", command=controller.open_selected_run_dir).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Открыть результаты", command=controller.open_selected_results).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Открыть лог", command=controller.open_selected_log).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Контракт целей", command=controller.open_selected_objective_contract).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Сделать текущим указателем", command=controller.make_selected_run_latest_pointer).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Открыть журнал", command=controller.open_selected_log).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Паспорт целей", command=controller.open_selected_objective_contract).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Передать в анализ", command=controller.make_selected_run_latest_pointer).pack(side="left", padx=(8, 0))
 
         filters = ttk.LabelFrame(right, text="Фильтры выпуска", padding=8)
         filters.grid(row=1, column=0, sticky="ew", pady=(10, 0))
@@ -76,7 +76,7 @@ class DesktopOptimizerPackagingTab(ttk.Frame):
         self.ranking_panel.grid(row=3, column=0, sticky="ew", pady=(10, 0))
         self.snapshot_panel = TextReportPanel(right, text="Снимок выпуска выбранного прогона", height=10)
         self.snapshot_panel.grid(row=4, column=0, sticky="ew", pady=(10, 0))
-        self.contract_panel = TextReportPanel(right, text="Контракт выпуска выбранного прогона", height=9)
+        self.contract_panel = TextReportPanel(right, text="Паспорт выпуска выбранного прогона", height=9)
         self.contract_panel.grid(row=5, column=0, sticky="ew", pady=(10, 0))
 
     def set_packaging_rows(self, rows: list[dict[str, str]], *, selected_key: str = "") -> None:

@@ -188,7 +188,7 @@ class _FakeCoexistenceManager:
         session = SimpleNamespace(
             spec=spec,
             pid=4321,
-            runtime_label="fake handoff",
+            runtime_label="Проверочное окно",
             context_payload=dict(context_payload or {}),
             status_label=lambda: "Открыто",
         )
@@ -221,10 +221,11 @@ def test_desktop_qt_shell_launcher_exposes_qt_first_cli_and_legacy_fallback() ->
     assert '"--runtime-proof-manual-template"' in src
     assert '"--runtime-proof-validate"' in src
     assert '"--runtime-proof-require-manual-pass"' in src
-    assert "Desktop shell tools:" in src
+    assert "GUI-окна рабочего места:" in src
     assert "from pneumo_solver_ui.tools import desktop_main_shell as legacy_shell" in src
     assert "from pneumo_solver_ui.desktop_qt_shell.main_window import main as run_qt_shell_main" in src
-    assert "fallback to historical shell" in src
+    assert "запускаю проверочное Tk-окно" in src
+    assert "запускаю резервное Tk-окно" not in src
 
 
 def test_desktop_qt_shell_launcher_catalog_keeps_runtime_and_migration_metadata() -> None:
@@ -234,7 +235,7 @@ def test_desktop_qt_shell_launcher_catalog_keeps_runtime_and_migration_metadata(
     assert catalog[0].key == "desktop_main_shell_qt"
     assert by_key["desktop_main_shell_qt"].module == "pneumo_solver_ui.tools.desktop_main_shell_qt"
     assert by_key["desktop_main_shell_qt"].group == "Главное окно"
-    assert by_key["desktop_gui_spec_shell"].group == "Резервные окна"
+    assert by_key["desktop_gui_spec_shell"].group == "Инструменты восстановления"
     assert by_key["desktop_gui_spec_shell"].module == "pneumo_solver_ui.tools.desktop_gui_spec_shell"
 
     assert by_key["desktop_input_editor"].runtime_kind == "tk"
@@ -252,13 +253,17 @@ def test_desktop_qt_shell_launcher_catalog_keeps_runtime_and_migration_metadata(
     )
     assert by_key["desktop_engineering_analysis_center"].runtime_kind == "tk"
     assert by_key["desktop_engineering_analysis_center"].source_of_truth_role == "derived"
-    assert "selected_run_contract" in by_key["desktop_engineering_analysis_center"].search_aliases
+    assert "selected_run_contract" not in by_key["desktop_engineering_analysis_center"].search_aliases
+    assert "контракт выбранного прогона" not in by_key[
+        "desktop_engineering_analysis_center"
+    ].search_aliases
+    assert "выбранный прогон" in by_key["desktop_engineering_analysis_center"].search_aliases
     assert "selected_run_contract_path" in by_key[
         "desktop_engineering_analysis_center"
     ].context_handoff_keys
 
     assert "исходные данные" in by_key["desktop_input_editor"].search_aliases
-    assert "stagerunner" in by_key["desktop_optimizer_center"].search_aliases
+    assert "распределённый расчёт" in by_key["desktop_optimizer_center"].search_aliases
 
 
 def test_desktop_qt_shell_spec_contract_marks_tk_workspaces_as_managed_external() -> None:
@@ -295,8 +300,11 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     )
 
     assert "class DesktopQtMainShell(QtWidgets.QMainWindow):" in src
+    assert "def _apply_cyrillic_operator_font(" in src
+    assert "QtGui.QFontDatabase.addApplicationFont" in src
+    assert '"segoeui.ttf"' in src
     assert 'self.setObjectName("DesktopQtMainShell")' in src
-    assert 'QtWidgets.QToolBar("Командная зона", self)' in src
+    assert 'QtWidgets.QToolBar("Быстрые действия", self)' in src
     assert 'menubar.addMenu("Файл")' in src
     assert 'menubar.addMenu("Правка")' in src
     assert 'menubar.addMenu("Вид")' in src
@@ -313,6 +321,7 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert 'self.browser_dock = QtWidgets.QDockWidget("Обзор проекта", self)' in src
     assert 'self.inspector_dock = QtWidgets.QDockWidget("Свойства и помощь", self)' in src
     assert 'self.runtime_dock = QtWidgets.QDockWidget("Ход выполнения и внешние окна", self)' in src
+    assert 'self.runtime_table.setHeaderLabels(("Окно", "Состояние", "Тип"))' in src
     assert 'self.diagnostics_button.setObjectName("AlwaysVisibleDiagnosticsAction")' in src
     assert 'self.diagnostics_button.setShortcut(QtGui.QKeySequence("F7"))' in src
     assert "self.central_stack = QtWidgets.QStackedWidget(central)" in src
@@ -338,6 +347,7 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert "def launch_surface_coverage(self) -> dict[str, tuple[str, ...]]:" in src
     assert "def pipeline_surface_coverage(self) -> dict[str, tuple[str, ...]]:" in src
     assert "def operator_visible_audit(self) -> dict[str, object]:" in src
+    assert '"item_visible_texts": item_visible_texts' in src
     assert "def operator_surface_snapshot(self) -> dict[str, object]:" in src
     assert "def prove_v38_pipeline_selection_sync(self) -> dict[str, object]:" in src
     assert '"desktop_engineering_analysis_center"' in src
@@ -348,13 +358,72 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert 'self.settings.setValue("layout/last_surface_key", self._selected_surface_key)' in src
     assert '"project_name": self.project_context.project_name' in src
     assert '"workspace_dir": str(self.project_context.workspace_dir)' in src
-    assert 'f"Проект: {self.project_context.project_name}"' in src
-    assert '"Маршрут проекта"' in src
+    assert "_project_display_name(self.project_context.project_name)" in src
+    assert 'f"Проект: {self.project_context.project_name}"' not in src
+    assert '"Порядок работы"' in src
     assert 'action_kind == "focus" and action_value == "project_tree"' in src
     assert '"Запустить раздел"' not in src
     assert '"Запустить текущий раздел"' not in src
     assert '"Workspace:"' not in src
     assert '"required dirs"' not in src
+    assert "ContractBadge" not in src
+    assert "contract_badge" not in src
+    assert "_refresh_contract_badge" not in src
+    assert "Служебный центр" not in src
+    assert 'return "Инструмент проекта"' in src
+    assert 'setObjectName("CalculationStatusBadge")' in src
+    assert "def _refresh_calculation_status_badge(self) -> None:" in src
+    assert '"Окна, действия, испытания, сценарии, архивы отправки, расчёты, файлы"' in src
+    assert '"Начните вводить действие, окно, расчёт, архив отправки или файл."' in src
+    forbidden_qt_visible_fragments = [
+        "Команды, экраны, тесты, сценарии, bundle, runs, artifacts",
+        "run, bundle или artifact",
+        "SEND bundle",
+        "Рабочие артефакты",
+        "артефактам и маршрутам",
+        "Артефакт не найден",
+        "Артефакт отсутствует",
+        "Открыт артефакт",
+        "Не удалось открыть артефакт",
+        "frozen HO-008 context",
+        "HO-008 analysis_context.json",
+        "HO-008 animator_link_contract.json",
+        "selected result artifact pointer",
+        "selected animation NPZ",
+        "NPZ-файл",
+        "Файл анимации NPZ",
+        "HO-010 capture_export_manifest.json",
+        "HO-008 context",
+        "road_csv, axay_csv",
+        "scenario_json — производные артефакты",
+        '"Процесс"',
+        "session.pid",
+        "активного управляемого процесса",
+        "Открыть резервное главное окно",
+        "Резервное главное окно",
+        "Контекстный инструмент",
+        "проектный контекст",
+        "Контекст анимации",
+        "контекст анимации",
+        "Контекст анализа",
+        "контекст анализа",
+        "GUI-модули",
+        "GUI-модуль",
+        "GUI-окно",
+        "GUI-окна",
+        "специализированных GUI",
+        "запущенные GUI",
+        "Compare Viewer",
+        "desktop-центр",
+        "dock-панелей",
+        "launch controls",
+        "Проект: default",
+        "C:\\",
+        "Проверочное рабочее место",
+        "dt и t_end",
+    ]
+    for fragment in forbidden_qt_visible_fragments:
+        assert fragment not in src
 
 
 def test_desktop_qt_shell_project_context_resolves_project_and_workspace(tmp_path: Path) -> None:
@@ -374,7 +443,9 @@ def test_desktop_qt_shell_project_context_resolves_project_and_workspace(tmp_pat
     assert context.project_name == "Shell Demo"
     assert context.project_dir == workspace_dir.resolve() / "ui_state" / "projects" / "Shell Demo"
     assert "exports" in context.missing_workspace_dirs
-    assert context.readiness_label.startswith("missing workspace dirs:")
+    assert context.readiness_label.startswith("Нужно подготовить папки:")
+    assert "workspace contract ok" not in context.readiness_label
+    assert "missing workspace dirs" not in context.readiness_label
 
 
 def test_desktop_shell_command_search_home_and_project_tree_actions_are_routable() -> None:
@@ -383,26 +454,62 @@ def test_desktop_shell_command_search_home_and_project_tree_actions_are_routable
 
     assert by_label["Обзор рабочего места"].action_kind == "home"
     assert by_label["Обзор рабочего места"].action_value == "home"
-    assert by_label["Показать дерево проекта"].action_kind == "focus"
-    assert by_label["Показать дерево проекта"].action_value == "project_tree"
+    assert by_label["Показать список рабочих окон"].action_kind == "focus"
+    assert by_label["Показать список рабочих окон"].action_value == "project_tree"
     assert by_label["Инженерный анализ"].action_kind == "tool"
     assert by_label["Инженерный анализ"].action_value == "desktop_engineering_analysis_center"
     assert "HO-007" in by_label["Инженерный анализ"].keywords
     engineering_matches = rank_shell_command_search_entries("Engineering Analysis", entries)
     assert engineering_matches[0].action_value == "desktop_engineering_analysis_center"
-    assert by_label["Открыть HO-008 analysis_context.json"].action_kind == "open_artifact"
-    assert by_label["Открыть HO-008 analysis_context.json"].action_value == "animator.analysis_context"
-    assert by_label["Открыть HO-008 animator_link_contract.json"].action_value == (
+    assert by_label["Показать данные для аниматора"].action_kind == "open_artifact"
+    assert by_label["Показать данные для аниматора"].action_value == "animator.analysis_context"
+    assert by_label["Показать связь анализа и аниматора"].action_value == (
         "animator.animator_link_contract"
     )
-    assert by_label["Открыть selected result artifact pointer"].action_value == (
+    assert by_label["Открыть выбранный результат"].action_value == (
         "animator.selected_result_artifact_pointer"
     )
-    assert by_label["Открыть selected animation NPZ"].action_value == "animator.selected_npz_path"
-    assert by_label["Открыть HO-010 capture_export_manifest.json"].action_kind == "open_artifact"
-    assert by_label["Открыть HO-010 capture_export_manifest.json"].action_value == (
+    assert by_label["Открыть файл анимации"].action_value == "animator.selected_npz_path"
+    assert by_label["Открыть сведения об экспорте анимации"].action_kind == "open_artifact"
+    assert by_label["Открыть сведения об экспорте анимации"].action_value == (
         "animator.capture_export_manifest"
     )
+
+
+def test_desktop_shell_visible_text_does_not_expose_service_handoff_jargon() -> None:
+    forbidden = (
+        "HO-",
+        "handoff",
+        "source-of-truth",
+        "selected_run_contract",
+        "validated_suite_snapshot",
+        "runtime overrides",
+        "derived/consumer",
+        "ring_source_of_truth_json",
+        "scenario_json",
+        "road_csv",
+        "axay_csv",
+        "meta_json",
+        "suite_snapshot_hash",
+        "health-check",
+        "Desktop Animator",
+    )
+
+    offenders: list[str] = []
+    specs = build_desktop_shell_specs()
+    for spec in specs:
+        visible = " | ".join((spec.title, spec.description, spec.details))
+        bad = [fragment for fragment in forbidden if fragment in visible]
+        if bad:
+            offenders.append(f"{spec.key}: {', '.join(bad)}")
+
+    for entry in build_shell_command_search_entries(specs):
+        visible = " | ".join((entry.label, entry.location, entry.summary))
+        bad = [fragment for fragment in forbidden if fragment in visible]
+        if bad:
+            offenders.append(f"{entry.action_value}: {', '.join(bad)}")
+
+    assert not offenders, "\n".join(offenders)
 
 
 def test_desktop_qt_shell_v38_pipeline_dot_alignment_contract() -> None:
@@ -456,7 +563,7 @@ def test_desktop_qt_shell_opens_animator_ho008_artifacts_from_command_surface(
         assert window.open_shell_artifact("animator.capture_export_manifest") is True
         assert Path(opened[-1]) == capture_manifest_path.resolve()
 
-        window.command_search_edit.setText("selected animation NPZ")
+        window.command_search_edit.setText("файл анимации")
         app.processEvents()
         first = window.search_results_list.item(0)
         assert first is not None
@@ -552,8 +659,8 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
             for index in range(window.browser_tree.topLevelItemCount())
         }
         assert "Проект: Runtime Shell" in top_level_labels
-        assert "Маршрут проекта" in top_level_labels
-        assert "GUI-модули" in top_level_labels
+        assert "Порядок работы" in top_level_labels
+        assert "Окна" in top_level_labels
 
         expected_launch_keys = {
             spec.key for spec in build_desktop_shell_specs() if spec.standalone_module
@@ -600,33 +707,81 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
             "Инструменты",
             "Справка",
         ]
-        assert "Запустить GUI" in visible_audit["toolbar_buttons"]
+        assert "Окно восстановления" in visible_audit["menu_actions"]
+        assert "Проверочное рабочее место" not in visible_audit["menu_actions"]
+        assert "Открыть окно" in visible_audit["toolbar_buttons"]
+        assert "Открепить панель" in visible_audit["auxiliary_visible_texts"]
+        assert "Закрыть панель" in visible_audit["auxiliary_visible_texts"]
+        assert "Прокрутить вкладки влево" in visible_audit["auxiliary_visible_texts"]
+        assert "Прокрутить вкладки вправо" in visible_audit["auxiliary_visible_texts"]
+        assert "Главное окно объединяет рабочие окна проекта, быстрый поиск, диагностику и запуск специализированных окон." in visible_audit["direct_visible_texts"]
+        assert "Окна, действия, испытания, сценарии, архивы отправки, расчёты, файлы" in visible_audit["direct_visible_texts"]
+        assert "Обзор проекта" in visible_audit["direct_visible_texts"]
+        assert "Окно / шаг" in visible_audit["item_visible_texts"]
+        assert "Поэтапный запуск" in visible_audit["item_visible_texts"]
+        assert "Распределённая координация" in visible_audit["item_visible_texts"]
+        assert (
+            "4. Набор испытаний - Проверить включение тестов, этапы, приоритеты, шаг расчёта и длительность."
+            in visible_audit["item_visible_texts"]
+        )
+        runtime_rows_text = "\n".join(visible_audit["runtime_rows"])
+        assert "Процесс" not in runtime_rows_text
+        assert "pid" not in runtime_rows_text.lower()
+        assert "4321" not in runtime_rows_text
         assert any(
-            row.startswith("Маршрут проекта | выбор сразу показывает раздел")
+            row.startswith("Порядок работы | выбор сразу показывает нужный экран")
             for row in visible_audit["browser_rows"]
         )
         assert "Исходные данные" in visible_audit["workspace_selector_items"]
         assert visible_audit["inspector"]["values"]["section"] == window.property_title_value.text()
         assert visible_audit["status_strip"]["message_text"].startswith("Сообщения:")
+        visible_text = "\n".join(
+            str(item)
+            for item in [
+                *visible_audit["menu_titles"],
+                *visible_audit["menu_actions"],
+                *visible_audit["toolbar_buttons"],
+                *visible_audit["workspace_selector_items"],
+                *visible_audit["gui_module_selector_items"],
+                *visible_audit["browser_rows"],
+                *visible_audit["runtime_rows"],
+                *visible_audit["inspector"]["labels"],
+                *visible_audit["inspector"]["values"].values(),
+                visible_audit["inspector"]["help_text"],
+                *visible_audit["inspector"]["warnings"],
+                *visible_audit["status_strip"].values(),
+                *visible_audit["auxiliary_visible_texts"],
+                *visible_audit["direct_visible_texts"],
+                *visible_audit["item_visible_texts"],
+            ]
+        )
+        for fragment in (
+            "open_artifact",
+            "animator_link_contract",
+            "selected_result_artifact_pointer",
+            "capture_export_manifest",
+            "dt и t_end",
+        ):
+            assert fragment not in visible_text
         catalog_labels = {
             entry["label"] for entry in visible_audit["command_search_catalog"]
         }
-        assert "Показать дерево проекта" in catalog_labels
+        assert "Показать список рабочих окон" in catalog_labels
         assert any(
             result["action_value"] == "project_tree"
-            for result in visible_audit["command_search_results"]["дерево проекта"]
+            for result in visible_audit["command_search_results"]["список проекта"]
         )
         pipeline_sync = window.prove_v38_pipeline_selection_sync()
         assert pipeline_sync["missing_workspace_ids"] == []
         assert all(row["synced"] is True for row in pipeline_sync["rows"])
 
-        window.command_search_edit.setText("дерево проекта")
+        window.command_search_edit.setText("список проекта")
         app.processEvents()
         assert window.search_results_list.count() > 0
         window._activate_primary_search_result()
         assert window.central_stack.currentWidget() is window.overview_page
         assert window.browser_tree.currentItem() is not None
-        assert "дерево проекта" in window.status_label.text()
+        assert "список проекта" in window.status_label.text()
     finally:
         window.close()
         window.deleteLater()
@@ -672,6 +827,15 @@ def test_desktop_qt_shell_handoff_payload_and_layout_state_are_runtime_checked(
         assert payload["workspace_dir"] == str((tmp_path / "workspace").resolve())
         assert payload["repo_root"] == str((tmp_path / "repo").resolve())
         assert window.runtime_table.topLevelItemCount() == 2
+        assert window.runtime_table.columnCount() == 3
+        runtime_rows = [
+            " | ".join(
+                window.runtime_table.topLevelItem(row).text(column)
+                for column in range(window.runtime_table.columnCount())
+            )
+            for row in range(window.runtime_table.topLevelItemCount())
+        ]
+        assert "4321" not in "\n".join(runtime_rows)
         assert window.status_progress_bar.value() > 0
 
         window._apply_selected_tool("desktop_results_center", announce=False)
@@ -1122,7 +1286,7 @@ def test_desktop_qt_shell_coexistence_manager_tracks_managed_external_windows() 
 def test_desktop_qt_shell_launcher_validates_registry_keys_and_formats_catalog() -> None:
     catalog = desktop_main_shell_qt_module.format_tool_catalog()
 
-    assert "Desktop shell tools:" in catalog
+    assert "GUI-окна рабочего места:" in catalog
     assert "desktop_input_editor" in catalog
     assert "desktop_animator" in catalog
     assert "master" in catalog

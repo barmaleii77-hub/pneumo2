@@ -126,17 +126,17 @@ class ShellWorkspaceContextMenuController:
         )
         self.menu.add_separator()
         self.menu.add_command(
-            label="Продолжить основной маршрут\tCtrl+Shift+N",
+            label="Продолжить основной порядок\tCtrl+Shift+N",
             command=self.continue_workflow,
             state="normal" if self.workflow_specs else "disabled",
         )
         self.menu.add_command(
-            label="Предыдущий раздел\tCtrl+Alt+Left",
+            label="Назад по порядку\tCtrl+Alt+Left",
             command=self.select_previous_workflow,
             state="normal" if has_workflow_sessions else "disabled",
         )
         self.menu.add_command(
-            label="Следующий раздел\tCtrl+Alt+Right",
+            label="Вперёд по порядку\tCtrl+Alt+Right",
             command=self.select_next_workflow,
             state="normal" if has_workflow_sessions else "disabled",
         )
@@ -270,23 +270,23 @@ def build_shell_menubar(
         section_menu = Menu(menubar, tearoff=False)
         if section_label == "Расчёт" and workflow_specs:
             section_menu.add_command(
-                label="Продолжить основной маршрут\tCtrl+Shift+N",
+                label="Продолжить основной порядок\tCtrl+Shift+N",
                 command=continue_workflow,
             )
             section_menu.add_command(
-                label="Предыдущий раздел маршрута\tCtrl+Alt+Left",
+                label="Назад по порядку\tCtrl+Alt+Left",
                 command=select_previous_workflow,
                 state="normal" if has_open_workflow_sessions() else "disabled",
             )
             section_menu.add_command(
-                label="Следующий раздел маршрута\tCtrl+Alt+Right",
+                label="Вперёд по порядку\tCtrl+Alt+Right",
                 command=select_next_workflow,
                 state="normal" if has_open_workflow_sessions() else "disabled",
             )
             if section_specs:
                 section_menu.add_separator()
         if not section_specs:
-            section_menu.add_command(label="Раздел пока пуст", state="disabled")
+            section_menu.add_command(label="Окон пока нет", state="disabled")
         else:
             for spec in section_specs:
                 section_menu.add_command(

@@ -5,6 +5,8 @@ import tkinter as tk
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from pneumo_solver_ui.desktop_ring_editor_panels import RoadPanel
 from pneumo_solver_ui.desktop_ring_editor_model import (
     apply_ring_preset,
@@ -34,6 +36,15 @@ from pneumo_solver_ui.tools.desktop_ring_scenario_editor import DesktopRingScena
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _make_tk_root_or_skip() -> tk.Tk:
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:
+        pytest.skip(f"Tk runtime is unavailable in this environment: {exc}")
+    root.withdraw()
+    return root
 
 
 class _FakeRoot:
@@ -130,12 +141,12 @@ def test_desktop_ring_editor_is_registered_as_standalone_hosted_tool() -> None:
     assert "scenarios.handoff_ho004" in spec.capability_ids
     assert "suite.source_ring_export" in spec.capability_ids
     assert "calculation" in spec.launch_contexts
-    assert "WS-RING" in spec.description
-    assert "HO-004" in spec.description
-    assert "без дополнительной навигации" in spec.details
-    assert "ring_source_of_truth_json" in spec.details
-    assert "derived/consumer handoff" in spec.details
-    assert {"WS-RING", "HO-004", "HO-005", "source-of-truth", "validated suite"} <= set(
+    assert "канонического кольца" in spec.description
+    assert "передача готового набора" in spec.description
+    assert "без промежуточного шага" in spec.details
+    assert "исходное кольцо" in spec.details
+    assert "передает согласованный набор" in spec.details
+    assert {"исходный сценарий", "выгрузка сценария", "снимок набора", "набор испытаний и сценарии"} <= set(
         spec.effective_search_aliases
     )
     for handoff_key in (
@@ -173,7 +184,7 @@ def test_ring_resolves_missing_inputs_snapshot_without_surrogate_inputs(tmp_path
     assert resolved["target_workspace"] == "WS-RING"
     assert resolved["state"] == "missing"
     assert resolved["can_consume"] is False
-    assert "surrogate inputs" in resolved["banner"]
+    assert "не должен подставлять исходные данные самостоятельно" in resolved["banner"]
     assert "inputs" not in resolved
 
 
@@ -264,7 +275,7 @@ def test_desktop_ring_editor_modules_keep_panelized_architecture() -> None:
     assert "materialize_ring_bundle_optimization_suite" in tool_src
     assert "resolve_ring_inputs_handoff" in tool_src
     assert "_refresh_inputs_handoff_state" in tool_src
-    assert "HO-002 inputs_snapshot" in tool_src
+    assert "Снимок исходных данных" in tool_src
     assert "inputs_handoff_var" in tool_src
     assert "opt_workspace_var" in tool_src
     assert "opt_window_var" in tool_src
@@ -279,13 +290,13 @@ def test_desktop_ring_editor_modules_keep_panelized_architecture() -> None:
     assert "def _open_anim_latest_exports" in tool_src
     assert "artifacts_stale" in tool_src
     assert "opt_suite_stale" in tool_src
-    assert "WS-RING source state" in tool_src
-    assert "Derived artifacts state" in tool_src
-    assert "HO-005 suite link state" in tool_src
+    assert "Исходный сценарий:" in tool_src
+    assert "Файлы выгрузки:" in tool_src
+    assert "Набор испытаний:" in tool_src
     assert "Длина кольца:" in tool_src
-    assert "Post-policy seam:" in tool_src
-    assert "WS-RING source hash" in tool_src
-    assert "Derived export-set hash" in tool_src
+    assert "Шов после обработки:" in tool_src
+    assert "Контроль исходного сценария" in tool_src
+    assert "Контроль выгрузки" in tool_src
     assert "build_ring_bundle_optimization_preview" in tool_src
     assert "build_ring_bundle_optimization_suite_preview" in tool_src
     assert "Фрагментов оптимизации:" in tool_src
@@ -308,19 +319,19 @@ def test_desktop_ring_editor_modules_keep_panelized_architecture() -> None:
     assert "class DiagnosticsPanel" in panels_src
     assert "class ExportPanel" in panels_src
     assert "Сегменты" in panels_src
-    assert "Развёрнутый циклический preview" in panels_src
+    assert "Развёрнутый предпросмотр кольца" in panels_src
     assert "Параметры дороги" in panels_src
     assert "Передача в оптимизацию" in panels_src
-    assert "Inputs handoff / HO-002" in panels_src
-    assert "WS-RING читает только frozen ref/hash из WS-INPUTS." in panels_src
+    assert "Исходные данные для сценариев" in panels_src
+    assert "Редактор сценариев использует только зафиксированную версию исходных данных." in panels_src
     assert "inputs_handoff_var" in panels_src
     assert "Окна оптимизации" in panels_src
     assert "Строки набора оптимизации" in panels_src
     assert "Открыть каталог оптимизации" in panels_src
     assert "Открыть последний набор" in panels_src
     assert "Последние артефакты" in panels_src
-    assert "Открыть meta HO-004" in panels_src
-    assert "Открыть source WS-RING" in panels_src
+    assert "Открыть описание выгрузки" in panels_src
+    assert "Открыть исходный сценарий" in panels_src
     assert "Загрузить сценарий" in panels_src
     assert "Сохранить сценарий" in panels_src
     assert "Построить набор оптимизации" in panels_src
@@ -343,6 +354,7 @@ def test_desktop_ring_editor_modules_keep_panelized_architecture() -> None:
     assert "Профиль всего кольца: полный размах левого/правого следа, мм" in panels_src
     assert "Шов замыкания слева/справа" in panels_src
     assert "не геометрическое кольцо" in panels_src
+    assert "проверка стыка" in panels_src
     assert "create_arc" not in panels_src
     assert "create_oval" not in panels_src
     assert "scroll_to_top" in panels_src
@@ -365,6 +377,18 @@ def test_desktop_ring_editor_modules_keep_panelized_architecture() -> None:
     assert "Сводка ниже специально разделяет амплитуду (A) и полный размах профиля." in panels_src
     assert "Diagnostics не собраны." not in panels_src
     assert "Optimization suite preview ещё не готов." not in panels_src
+    forbidden_visible_ring_fragments = [
+        "Развёрнутый циклический preview",
+        "Нет данных для развёрнутого preview",
+        "Открытый preview",
+        "открытый preview",
+        "seam-preview",
+        "seam-warning",
+        "downstream",
+    ]
+    for fragment in forbidden_visible_ring_fragments:
+        assert fragment not in panels_src
+        assert fragment not in runtime_src
     assert "Открыть последний axay" not in panels_src
     assert "Открыть exports anim_latest" not in panels_src
     assert "Собрать сценарий/дорогу/axay" not in panels_src
@@ -538,8 +562,7 @@ def test_desktop_ring_editor_can_materialize_optimization_auto_ring_suite(tmp_pa
 
 
 def test_desktop_ring_road_panel_renders_whole_and_local_profile() -> None:
-    root = tk.Tk()
-    root.withdraw()
+    root = _make_tk_root_or_skip()
     panel = RoadPanel(root)
     panel.pack(fill="both", expand=True)
     try:
@@ -711,7 +734,7 @@ def test_desktop_ring_editor_rebuilds_fresh_bundle_before_opt_suite_when_stale(t
     assert editor.state.export.last_bundle["scenario_json"] == generated_bundle["scenario_json"]
     assert editor.state.export.last_bundle["suite_json"].endswith("suite_auto_ring.json")
     assert float(editor.state.export.last_bundle["window_s"]) == 5.5
-    assert "derived artifacts were rebuilt from current WS-RING source" in editor.state.status_message
+    assert "файлы выгрузки пересобраны из текущего сценария" in editor.state.status_message
     assert refresh_calls == ["refresh"]
 
 
@@ -720,16 +743,16 @@ def test_desktop_ring_editor_surfaces_source_derived_stale_and_closure_labels() 
         ROOT / "pneumo_solver_ui" / "tools" / "desktop_ring_scenario_editor.py"
     ).read_text(encoding="utf-8", errors="replace")
 
-    assert "WS-RING source state" in src
-    assert "Derived artifacts state" in src
-    assert "HO-005 suite link state" in src
-    assert "WS-RING source hash" in src
-    assert "Derived export-set hash" in src
-    assert "Raw seam before export policy" in src
-    assert "Post-policy seam" in src
-    assert "Closure transform applied" in src
-    assert "Closure correction max L/R" in src
-    assert "Derived artifacts were rebuilt from current WS-RING source before suite handoff" in src
+    assert "Исходный сценарий:" in src
+    assert "Файлы выгрузки:" in src
+    assert "Набор испытаний:" in src
+    assert "Контроль исходного сценария" in src
+    assert "Контроль выгрузки" in src
+    assert "Шов до обработки" in src
+    assert "Шов после обработки" in src
+    assert "Замыкание применено" in src
+    assert "Максимальная коррекция слева/справа" in src
+    assert "Файлы выгрузки пересобраны из текущего сценария перед подготовкой набора" in src
 
 
 def test_desktop_ring_editor_export_path_change_marks_bundle_and_suite_stale(tmp_path: Path) -> None:

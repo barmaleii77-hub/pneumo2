@@ -54,25 +54,25 @@ REQUIRED_SELECTED_RUN_CONTRACT_FIELDS: tuple[str, ...] = (
     "results_artifact_index",
 )
 _ENGINEERING_ANALYSIS_ARTIFACT_SPECS: tuple[tuple[str, str, str, str, bool], ...] = (
-    ("system_influence.json", "system_influence_json", "System influence JSON", "influence", True),
-    ("SYSTEM_INFLUENCE.md", "system_influence_md", "System influence report", "report", True),
-    ("system_influence_params.csv", "system_influence_params_csv", "System influence parameter table", "influence", True),
-    ("system_influence_edges.csv", "system_influence_edges_csv", "System influence edge table", "influence", False),
-    ("system_influence_paths.csv", "system_influence_paths_csv", "System influence path table", "influence", False),
-    ("AUTOPILOT_V20_WRAPPER.json", "autopilot_v20_wrapper_json", "Autopilot v20 wrapper evidence", "calibration", False),
-    ("AUTOPILOT_V19_WRAPPER.json", "autopilot_v19_wrapper_json", "Autopilot v19 wrapper evidence", "calibration", False),
-    ("PARAM_STAGING_INFLUENCE.md", "param_staging_influence_md", "Influence-guided staging report", "calibration", False),
-    ("stages_influence.json", "stages_influence_json", "Influence-guided stages", "calibration", False),
-    ("REPORT_FULL.md", "report_full_md", "Full calibration report", "report", False),
-    ("fit_report_final.json", "fit_report_final_json", "Final fit report", "calibration", False),
-    ("fit_details_final.json", "fit_details_final_json", "Final fit details", "calibration", False),
-    ("report.md", "calibration_report_md", "Calibration detail report", "report", False),
-    ("fit_report.json", "fit_report_json", "Fit report", "calibration", False),
-    ("fit_details.json", "fit_details_json", "Fit details", "calibration", False),
-    ("uq_sensitivity_summary.csv", "uq_sensitivity_summary_csv", "UQ sensitivity summary", "uncertainty", False),
-    ("measurement_priority.csv", "measurement_priority_csv", "Measurement priority table", "uncertainty", False),
-    ("uq_runs.csv", "uq_runs_csv", "UQ run table", "uncertainty", False),
-    ("uq_report.md", "uq_report_md", "UQ report", "uncertainty", False),
+    ("system_influence.json", "system_influence_json", "Данные влияния системы", "influence", True),
+    ("SYSTEM_INFLUENCE.md", "system_influence_md", "Отчёт влияния системы", "report", True),
+    ("system_influence_params.csv", "system_influence_params_csv", "Таблица параметров влияния", "influence", True),
+    ("system_influence_edges.csv", "system_influence_edges_csv", "Таблица связей влияния", "influence", False),
+    ("system_influence_paths.csv", "system_influence_paths_csv", "Таблица путей влияния", "influence", False),
+    ("AUTOPILOT_V20_WRAPPER.json", "autopilot_v20_wrapper_json", "Данные калибровочного запуска v20", "calibration", False),
+    ("AUTOPILOT_V19_WRAPPER.json", "autopilot_v19_wrapper_json", "Данные калибровочного запуска v19", "calibration", False),
+    ("PARAM_STAGING_INFLUENCE.md", "param_staging_influence_md", "Отчёт подбора шагов по влиянию", "calibration", False),
+    ("stages_influence.json", "stages_influence_json", "Шаги подбора по влиянию", "calibration", False),
+    ("REPORT_FULL.md", "report_full_md", "Полный отчёт калибровки", "report", False),
+    ("fit_report_final.json", "fit_report_final_json", "Итоговый отчёт подгонки", "calibration", False),
+    ("fit_details_final.json", "fit_details_final_json", "Итоговые детали подгонки", "calibration", False),
+    ("report.md", "calibration_report_md", "Подробный отчёт калибровки", "report", False),
+    ("fit_report.json", "fit_report_json", "Отчёт подгонки", "calibration", False),
+    ("fit_details.json", "fit_details_json", "Детали подгонки", "calibration", False),
+    ("uq_sensitivity_summary.csv", "uq_sensitivity_summary_csv", "Сводка неопределённости", "uncertainty", False),
+    ("measurement_priority.csv", "measurement_priority_csv", "Приоритеты измерений", "uncertainty", False),
+    ("uq_runs.csv", "uq_runs_csv", "Прогоны неопределённости", "uncertainty", False),
+    ("uq_report.md", "uq_report_md", "Отчёт неопределённости", "uncertainty", False),
 )
 
 
@@ -908,11 +908,11 @@ class DesktopEngineeringAnalysisRuntime:
 
         artifact = EngineeringAnalysisArtifact(
             key="selected_run_contract_json",
-            title="Selected run contract",
+            title="Выбранный прогон",
             category="handoff",
             path=target,
             required=True,
-            detail="HO-007 selected run contract exported from an explicit optimization run directory.",
+            detail="Выбранный прогон подготовлен из явно указанной папки оптимизации.",
         )
         contract_hash = str(payload.get("selected_run_contract_hash") or "")
         return EngineeringAnalysisJobResult(
@@ -992,7 +992,7 @@ class DesktopEngineeringAnalysisRuntime:
                     title=title,
                     category=category,
                     path=path,
-                    detail="Discovered optional V38 uncertainty artifact in analysis run directory.",
+                    detail="Найден дополнительный файл расчёта неопределённости в папке анализа.",
                 )
             )
         for path in sorted(run_dir.glob("*influence*.*"), key=lambda p: p.name.lower()):
@@ -1007,7 +1007,7 @@ class DesktopEngineeringAnalysisRuntime:
                     title=path.name,
                     category="compare_influence" if "compare" in path.name.lower() else "influence",
                     path=path.resolve(),
-                    detail="Discovered influence artifact in analysis run directory.",
+                    detail="Найден дополнительный файл влияния в папке анализа.",
                 )
             )
         return tuple(items)
@@ -1358,7 +1358,7 @@ class DesktopEngineeringAnalysisRuntime:
         if snapshot.run_dir is None:
             return {
                 "status": "BLOCKED",
-                "detail": "Static-trim evidence is blocked until a selected run_dir is available.",
+                "detail": "Статическая настройка недоступна, пока не выбран прогон.",
                 "path": "",
                 "metrics": {},
                 "units": {},
@@ -1422,7 +1422,7 @@ class DesktopEngineeringAnalysisRuntime:
                 }
                 return {
                     "status": _status_from_metrics(metrics),
-                    "detail": "Static-trim result fields were found in the selected run evidence.",
+                    "detail": "Поля статической настройки найдены в данных выбранного прогона.",
                     "path": str(path),
                     "metrics": dict(metrics),
                     "units": units,
@@ -1430,7 +1430,7 @@ class DesktopEngineeringAnalysisRuntime:
 
         return {
             "status": "MISSING",
-            "detail": "No static_trim_* result fields were found in selected results or fit details.",
+            "detail": "Поля статической настройки не найдены в результатах и деталях подгонки.",
             "path": "",
             "metrics": {},
             "units": {},
@@ -1760,9 +1760,9 @@ class DesktopEngineeringAnalysisRuntime:
             EngineeringAnalysisPipelineRow(
                 key="selected_run_context",
                 section="selected_run",
-                title="HO-007 selected-run context",
+                title="Выбранный прогон для анализа",
                 status=selected_status,
-                detail="Master selected-run contract consumed by WS-ANALYSIS.",
+                detail="Выбранный прогон из оптимизатора принят как источник инженерного анализа.",
                 path=snapshot.selected_run_contract_path,
                 metrics={
                     "handoff_id": SELECTED_RUN_HANDOFF_ID,
@@ -1776,7 +1776,7 @@ class DesktopEngineeringAnalysisRuntime:
                     "contract_status": snapshot.contract_status,
                     "run_dir": str(snapshot.run_dir or ""),
                 },
-                source="workspace/handoffs/WS-OPTIMIZATION/selected_run_contract.json",
+                source="файл выбранного прогона из оптимизатора",
             )
         )
 
@@ -1789,15 +1789,15 @@ class DesktopEngineeringAnalysisRuntime:
             EngineeringAnalysisPipelineRow(
                 key="calibration_autopilot_v20",
                 section="calibration",
-                title="Autopilot v20 calibration pipeline",
+                title="Калибровочный запуск",
                 status="READY" if autopilot is not None else "AVAILABLE_NOT_RUN",
                 detail=(
-                    "Autopilot wrapper evidence was found."
+                    "Найдены данные калибровочного запуска."
                     if autopilot is not None
-                    else "Pipeline capability is available; this status pass does not launch heavy calibration."
+                    else "Калибровочный модуль доступен; эта проверка не запускает тяжёлый расчёт."
                 ),
                 path=autopilot.path if autopilot is not None else autopilot_script,
-                source="pneumo_solver_ui.calibration.pipeline_npz_autopilot_v20",
+                source="калибровочный модуль",
             )
         )
 
@@ -1812,11 +1812,11 @@ class DesktopEngineeringAnalysisRuntime:
             EngineeringAnalysisPipelineRow(
                 key="calibration_fit_reports",
                 section="calibration",
-                title="Calibration fit reports",
+                title="Отчёты калибровки",
                 status="READY" if fit_ready else ("PARTIAL" if fit_report is not None else "MISSING"),
-                detail="Full/final calibration reports and fit evidence from the selected run.",
+                detail="Полные и итоговые отчёты калибровки из выбранного прогона.",
                 path=fit_report.path if fit_report is not None else None,
-                source="report_full_from_run_v1 / fit_report artifacts",
+                source="отчёты выбранного прогона",
             )
         )
 
@@ -1825,13 +1825,13 @@ class DesktopEngineeringAnalysisRuntime:
             EngineeringAnalysisPipelineRow(
                 key="calibration_static_trim",
                 section="calibration",
-                title="Static-trim result evidence",
+                title="Статическая настройка",
                 status=str(static_trim.get("status") or "MISSING"),
                 detail=str(static_trim.get("detail") or ""),
                 path=Path(str(static_trim.get("path"))) if str(static_trim.get("path") or "") else None,
                 units=dict(static_trim.get("units") or {}),
                 metrics=dict(static_trim.get("metrics") or {}),
-                source="selected results CSV/JSON and fit details",
+                source="результаты и детали подгонки выбранного прогона",
             )
         )
 
@@ -1840,16 +1840,16 @@ class DesktopEngineeringAnalysisRuntime:
             EngineeringAnalysisPipelineRow(
                 key="influence_system",
                 section="influence",
-                title="System influence report",
+                title="Влияние системы",
                 status=(
                     "READY"
                     if snapshot.influence_status == "PASS"
                     else ("PARTIAL" if system_influence is not None else "MISSING")
                 ),
-                detail="System influence artifacts and sensitivity rows from the selected run.",
+                detail="Данные влияния системы и строки чувствительности из выбранного прогона.",
                 path=system_influence.path if system_influence is not None else None,
                 metrics={"sensitivity_row_count": len(snapshot.sensitivity_rows)},
-                source="system_influence_report_v1",
+                source="отчёт влияния системы",
             )
         )
 
@@ -1862,16 +1862,16 @@ class DesktopEngineeringAnalysisRuntime:
             EngineeringAnalysisPipelineRow(
                 key="influence_staging",
                 section="influence",
-                title="Influence-guided staging",
+                title="Подбор шагов по влиянию",
                 status=(
                     "READY"
                     if len(staging_artifacts) >= 2
                     else ("PARTIAL" if staging_artifacts else ("AVAILABLE_NOT_RUN" if system_influence else "MISSING"))
                 ),
-                detail="Param staging evidence derived from influence artifacts when run.",
+                detail="Шаги подбора параметров строятся по данным влияния после запуска расчёта.",
                 path=staging_artifacts[0].path if staging_artifacts else None,
                 metrics={"artifact_count": len(staging_artifacts)},
-                source="param_staging_v3_influence",
+                source="подбор параметров по влиянию",
             )
         )
 
@@ -1891,20 +1891,20 @@ class DesktopEngineeringAnalysisRuntime:
             EngineeringAnalysisPipelineRow(
                 key="influence_compare_surfaces",
                 section="influence",
-                title="Compare influence surfaces",
+                title="Поверхности сравнения влияния",
                 status=(
                     "READY"
                     if compare_surfaces
                     else ("PARTIAL" if compare_artifacts else "MISSING")
                 ),
-                detail=compare_surface_error or "Compare influence artifacts parsed for axes, units, and diagnostics.",
+                detail=compare_surface_error or "Поверхности влияния разобраны по осям, единицам измерения и диагностическим признакам.",
                 path=compare_artifacts[0].path if compare_artifacts else None,
                 metrics={
                     "artifact_count": len(compare_artifacts),
                     "surface_count": len(compare_surfaces),
                     "titles": [str(surface.get("title") or "") for surface in compare_surfaces],
                 },
-                source="analysis compare influence surface contract",
+                source="поверхности сравнения влияния",
             )
         )
 
@@ -1912,16 +1912,16 @@ class DesktopEngineeringAnalysisRuntime:
             EngineeringAnalysisPipelineRow(
                 key="sensitivity_summary",
                 section="sensitivity_uncertainty",
-                title="Sensitivity summary",
+                title="Сводка чувствительности",
                 status="READY" if snapshot.sensitivity_rows else "MISSING",
-                detail="Ranked sensitivity rows from system_influence.json.",
+                detail="Упорядоченные строки чувствительности из данных влияния системы.",
                 path=system_influence.path if system_influence is not None else None,
                 units={
                     "score": str(snapshot.unit_catalog.get("score") or ""),
                     "eps_rel_used": str(snapshot.unit_catalog.get("eps_rel_used") or ""),
                 },
                 metrics={"row_count": len(snapshot.sensitivity_rows)},
-                source="build_sensitivity_summary",
+                source="сводка чувствительности",
             )
         )
 
@@ -1939,19 +1939,19 @@ class DesktopEngineeringAnalysisRuntime:
             EngineeringAnalysisPipelineRow(
                 key="uncertainty_uq",
                 section="sensitivity_uncertainty",
-                title="Uncertainty/UQ artifacts",
+                title="Неопределённость и приоритет измерений",
                 status=(
                     "READY"
                     if len(uq_artifacts) >= 2
                     else ("PARTIAL" if uq_artifacts else "AVAILABLE_NOT_RUN")
                 ),
-                detail="Optional UQ advisor outputs are discovered only; this pass does not launch UQ.",
+                detail="Дополнительные расчёты неопределённости только проверяются; этот проход их не запускает.",
                 path=uq_artifacts[0].path if uq_artifacts else None,
                 metrics={
                     "artifact_count": len(uq_artifacts),
                     "artifact_keys": [artifact.key for artifact in uq_artifacts],
                 },
-                source="uncertainty_advisor outputs",
+                source="расчёты неопределённости",
             )
         )
 
@@ -1960,15 +1960,15 @@ class DesktopEngineeringAnalysisRuntime:
             EngineeringAnalysisPipelineRow(
                 key="handoff_compare_viewer_boundary",
                 section="handoffs_evidence",
-                title="Compare Viewer boundary",
+                title="Связь с окном сравнения",
                 status=str(compare_handoff_summary.get("status") or "BLOCKED"),
                 detail=(
-                    "Analysis summarizes public compare contract readiness; "
-                    "Compare Viewer remains the compare executor."
+                    "Анализ проверяет готовность данных для окна сравнения; "
+                    "само сравнение выполняется в отдельном окне."
                 ),
                 path=snapshot.selected_run_contract_path,
                 metrics=compare_handoff_summary,
-                source="build_analysis_compare_contract",
+                source="данные для окна сравнения",
             )
         )
 
@@ -1977,17 +1977,17 @@ class DesktopEngineeringAnalysisRuntime:
             EngineeringAnalysisPipelineRow(
                 key="boundary_results_center",
                 section="handoffs_evidence",
-                title="Results Center boundary",
+                title="Связь с центром результатов",
                 status=str(results_boundary_summary.get("status") or "BLOCKED"),
                 detail=(
-                    "Analysis consumes selected-run/result references; "
-                    "Results Center remains the owner of results production."
+                    "Анализ использует выбранный прогон и ссылки на результаты; "
+                    "подготовка результатов остаётся в центре результатов."
                 ),
                 path=Path(str(results_boundary_summary.get("results_csv_path") or ""))
                 if str(results_boundary_summary.get("results_csv_path") or "").strip()
                 else snapshot.selected_run_contract_path,
                 metrics=results_boundary_summary,
-                source="selected_run_contract results refs",
+                source="ссылки на результаты выбранного прогона",
             )
         )
 
@@ -1996,12 +1996,12 @@ class DesktopEngineeringAnalysisRuntime:
             EngineeringAnalysisPipelineRow(
                 key="handoff_ho008_animator",
                 section="handoffs_evidence",
-                title="HO-008 Animator handoff",
+                title="Данные для аниматора",
                 status=str(animator_summary.get("status") or "MISSING"),
-                detail="Analysis context and animator link contract preflight status.",
+                detail="Проверка готовности данных анализа для открытия аниматора.",
                 path=self.analysis_context_path(),
                 metrics=animator_summary,
-                source="workspace/handoffs/WS-ANALYSIS",
+                source="данные анализа для аниматора",
             )
         )
 
@@ -2009,9 +2009,9 @@ class DesktopEngineeringAnalysisRuntime:
             EngineeringAnalysisPipelineRow(
                 key="handoff_ho009_diagnostics",
                 section="handoffs_evidence",
-                title="HO-009 Diagnostics evidence manifest",
+                title="Материалы диагностики",
                 status=snapshot.diagnostics_evidence_manifest_status,
-                detail="Latest engineering analysis evidence manifest freshness for Diagnostics/SEND handoff.",
+                detail="Актуальность материалов инженерного анализа для диагностики и отправки.",
                 path=snapshot.diagnostics_evidence_manifest_path or (
                     self.send_bundles_dir / LATEST_ENGINEERING_ANALYSIS_EVIDENCE_MANIFEST
                 ),
@@ -2021,7 +2021,7 @@ class DesktopEngineeringAnalysisRuntime:
                     "run_dir": str(snapshot.run_dir or ""),
                     "selected_run_contract_hash": snapshot.selected_run_contract_hash,
                 },
-                source="send_bundles/latest_engineering_analysis_evidence_manifest.json",
+                source="последние материалы инженерного анализа",
             )
         )
 

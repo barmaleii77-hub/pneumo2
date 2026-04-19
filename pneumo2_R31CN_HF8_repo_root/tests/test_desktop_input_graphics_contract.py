@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import tkinter as tk
 
+import pytest
+
 from pneumo_solver_ui.desktop_input_graphics import DesktopInputGraphicPanel
 from pneumo_solver_ui.desktop_input_model import (
     desktop_section_display_title,
@@ -15,11 +17,19 @@ _ROOT: tk.Tk | None = None
 _PANEL: DesktopInputGraphicPanel | None = None
 
 
+def _make_root_or_skip() -> tk.Tk:
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:
+        pytest.skip(f"Tk runtime is unavailable in this environment: {exc}")
+    root.withdraw()
+    return root
+
+
 def _make_panel() -> tuple[tk.Tk, DesktopInputGraphicPanel]:
     global _ROOT, _PANEL
     if _ROOT is None or _PANEL is None:
-        _ROOT = tk.Tk()
-        _ROOT.withdraw()
+        _ROOT = _make_root_or_skip()
         _PANEL = DesktopInputGraphicPanel(_ROOT)
         _PANEL.pack()
         _ROOT.update_idletasks()
@@ -142,8 +152,10 @@ def test_desktop_input_graphic_panel_shows_static_trim_metrics_and_context() -> 
     joined = " ".join(_canvas_texts(panel))
     assert "Контекст: Целевое положение по ходу" in joined
     assert "Цель по ходу" in joined
-    assert "CG X" in joined
-    assert "CG Y" in joined
+    assert "ЦМ X" in joined
+    assert "ЦМ Y" in joined
+    assert "CG X" not in joined
+    assert "CG Y" not in joined
 
 
 def test_desktop_input_graphic_panel_shows_v38_source_marker_and_calculation_settings() -> None:
@@ -160,20 +172,22 @@ def test_desktop_input_graphic_panel_shows_v38_source_marker_and_calculation_set
     )
 
     marker = str(panel.source_marker_var.get() or "")
-    assert "Источник: WS-INPUTS live" in marker
-    assert "source: default_base.json" in marker
-    assert "state: dirty" in marker
+    assert "источник: исходный шаблон" in marker
+    assert "состояние: изменено" in marker
     assert "режим: По исходным данным" in marker
+    assert "WS-INPUTS" not in marker
+    assert "source:" not in marker
+    assert "state:" not in marker
 
     joined = " ".join(_canvas_texts(panel))
     assert "Контекст: Интегрирование" in joined
     assert "Шаг интегрирования" in joined
-    assert "Autoverif" in joined
+    assert "Автопроверка" in joined
+    assert "Autoverif" not in joined
 
 
 def test_desktop_input_editor_tree_selection_opens_cluster_editor_directly() -> None:
-    root = tk.Tk()
-    root.withdraw()
+    root = _make_root_or_skip()
     editor = DesktopInputEditor(host=root, hosted=True)
     try:
         for section_title in ("Механика", "Численные настройки"):

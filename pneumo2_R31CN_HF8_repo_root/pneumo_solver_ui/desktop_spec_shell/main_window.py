@@ -22,7 +22,7 @@ from .catalogs import (
 )
 from .contracts import DesktopHelpTopicSpec, DesktopShellCommandSpec, DesktopWorkspaceSpec
 from .diagnostics_panel import DiagnosticsWorkspacePage
-from .help_registry import build_help_registry
+from .help_registry import build_help_registry, _operator_text
 from .overview_state import OverviewCardState, build_overview_snapshot
 from .registry import (
     build_command_map,
@@ -79,12 +79,54 @@ _COLOR_BY_TOKEN = {
 }
 
 
+_REGION_LABELS: dict[str, str] = {
+    "верхняя_командная_панель": "быстрый поиск",
+    "левая_навигация": "список рабочих шагов",
+    "центральная_рабочая_область": "рабочая область",
+    "правая_панель_свойств_и_справки": "свойства и справка",
+    "нижняя_строка_состояния": "строка состояния",
+}
+
+
+def _apply_cyrillic_operator_font(app: QtWidgets.QApplication | None) -> str:
+    if app is None:
+        return ""
+    preferred_families = ("Segoe UI", "Tahoma", "Arial", "Noto Sans", "DejaVu Sans")
+    known_families = set(QtGui.QFontDatabase.families())
+    family = next((name for name in preferred_families if name in known_families), "")
+    if not family:
+        windir = Path(os.environ.get("WINDIR") or "C:/Windows")
+        for font_name in ("segoeui.ttf", "tahoma.ttf", "arial.ttf", "ARIALUNI.ttf"):
+            font_path = windir / "Fonts" / font_name
+            if not font_path.exists():
+                continue
+            font_id = QtGui.QFontDatabase.addApplicationFont(str(font_path))
+            if font_id < 0:
+                continue
+            loaded_families = QtGui.QFontDatabase.applicationFontFamilies(font_id)
+            if loaded_families:
+                family = loaded_families[0]
+                break
+    if not family:
+        return ""
+    current_font = app.font()
+    point_size = current_font.pointSize()
+    app.setFont(QtGui.QFont(family, point_size if point_size > 0 else 10))
+    return family
+
+
+def _region_label(region_id: str) -> str:
+    return _REGION_LABELS.get(region_id, str(region_id or "").replace("_", " "))
+
+
 def _clear_layout(layout: QtWidgets.QLayout) -> None:
     while layout.count():
         item = layout.takeAt(0)
         widget = item.widget()
         child_layout = item.layout()
         if widget is not None:
+            widget.hide()
+            widget.setParent(None)
             widget.deleteLater()
         elif child_layout is not None:
             _clear_layout(child_layout)
@@ -99,8 +141,8 @@ def _apply_element_contract(widget: QtWidgets.QWidget, element_id: str) -> None:
     widget.setAccessibleDescription(element.purpose or element.title)
     tooltip = get_tooltip(element.tooltip_id)
     if tooltip is not None and tooltip.text:
-        widget.setToolTip(tooltip.text)
-        widget.setWhatsThis(tooltip.rule)
+        widget.setToolTip(_operator_text(tooltip.text))
+        widget.setWhatsThis(_operator_text(tooltip.rule))
     if element.hotkey and isinstance(widget, QtWidgets.QPushButton):
         try:
             widget.setShortcut(QtGui.QKeySequence(element.hotkey))
@@ -135,7 +177,7 @@ class InspectorPanel(QtWidgets.QWidget):
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(10)
 
-        self.title_label = QtWidgets.QLabel("Контекст и provenance")
+        self.title_label = QtWidgets.QLabel("Свойства и происхождение данных")
         title_font = self.title_label.font()
         title_font.setPointSize(title_font.pointSize() + 2)
         title_font.setBold(True)
@@ -189,21 +231,21 @@ class InspectorPanel(QtWidgets.QWidget):
         self.title_label.setText(topic.title)
         summary_text = topic.summary
         if topic.tooltip_text:
-            summary_text = f"{summary_text}\nПодсказка: {topic.tooltip_text}"
+            summary_text = f"{summary_text}\nПодсказка. {topic.tooltip_text}"
         self.summary_label.setText(summary_text)
-        self.why_label.setText(f"Почему это важно: {topic.why_it_matters}" if topic.why_it_matters else "")
-        self.source_label.setText(f"Источник истины: {topic.source_of_truth}")
-        self.units_label.setText(f"Единицы и microcopy: {topic.units_policy}")
-        self.next_step_label.setText(f"Следующий шаг: {topic.next_step}")
-        self.hard_gate_label.setText(f"Hard gate: {topic.hard_gate}")
+        self.why_label.setText(f"Почему это важно. {topic.why_it_matters}" if topic.why_it_matters else "")
+        self.source_label.setText(f"Источник данных. {topic.source_of_truth}")
+        self.units_label.setText(f"Единицы и подписи. {topic.units_policy}")
+        self.next_step_label.setText(f"Следующий шаг. {topic.next_step}")
+        self.hard_gate_label.setText(f"Обязательное условие. {topic.hard_gate}")
         self.result_label.setText(
-            f"Где виден результат: {topic.result_location}" if topic.result_location else ""
+            f"Где виден результат. {topic.result_location}" if topic.result_location else ""
         )
         graphics_text = topic.graphics_policy
         if command_status:
-            graphics_text = f"{graphics_text}\nСтатус surface: {command_status}"
-        self.graphics_label.setText(f"Graphics honesty: {graphics_text}")
-        self.route_label.setText(f"Маршрут: {route_label}" if route_label else "")
+            graphics_text = f"{graphics_text}\nСостояние окна. {command_status}"
+        self.graphics_label.setText(f"Честность графики. {graphics_text}")
+        self.route_label.setText(f"Расположение. {route_label}" if route_label else "")
 
 
 class OverviewPage(QtWidgets.QWidget):
@@ -233,15 +275,14 @@ class OverviewPage(QtWidgets.QWidget):
         layout.addWidget(title)
 
         subtitle = QtWidgets.QLabel(
-            "Shell удерживает последовательный маршрут: исходные данные -> сценарии -> набор испытаний -> baseline -> оптимизация -> анализ -> анимация -> диагностика."
+            "Главное окно ведёт по последовательности: исходные данные -> сценарии -> набор испытаний -> опорный прогон -> оптимизация -> анализ -> анимация -> диагностика."
         )
         subtitle.setWordWrap(True)
         layout.addWidget(subtitle)
 
-        self.cards_grid = QtWidgets.QGridLayout()
-        self.cards_grid.setHorizontalSpacing(14)
-        self.cards_grid.setVerticalSpacing(14)
-        layout.addLayout(self.cards_grid)
+        self.cards_layout = QtWidgets.QVBoxLayout()
+        self.cards_layout.setSpacing(14)
+        layout.addLayout(self.cards_layout)
         layout.addStretch(1)
 
         outer = QtWidgets.QVBoxLayout(self)
@@ -249,8 +290,9 @@ class OverviewPage(QtWidgets.QWidget):
         outer.addWidget(scroll)
         self.refresh_view()
 
-    def _render_card(self, index: int, card: OverviewCardState) -> None:
+    def _render_card(self, card: OverviewCardState) -> None:
         box = QtWidgets.QGroupBox(card.title)
+        box.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         box_layout = QtWidgets.QVBoxLayout(box)
         value = QtWidgets.QLabel(card.value)
         value_font = value.font()
@@ -260,21 +302,20 @@ class OverviewPage(QtWidgets.QWidget):
         value.setWordWrap(True)
         detail = QtWidgets.QLabel(card.detail)
         detail.setWordWrap(True)
-        button = QtWidgets.QPushButton("Открыть")
+        button = QtWidgets.QPushButton(card.action_text)
         button.clicked.connect(
             lambda _checked=False, cid=card.command_id: self.on_command(cid)
         )
         box_layout.addWidget(value)
         box_layout.addWidget(detail)
-        box_layout.addStretch(1)
         box_layout.addWidget(button)
-        self.cards_grid.addWidget(box, index // 2, index % 2)
+        self.cards_layout.addWidget(box)
 
     def refresh_view(self) -> None:
         snapshot = build_overview_snapshot(self.repo_root)
-        _clear_layout(self.cards_grid)
-        for index, card in enumerate(snapshot.cards):
-            self._render_card(index, card)
+        _clear_layout(self.cards_layout)
+        for card in snapshot.cards:
+            self._render_card(card)
 
 
 class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
@@ -309,8 +350,14 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         self._primary_command_id: str | None = None
         self._current_workspace_id = "overview"
         self._active_shell_region = "верхняя_командная_панель"
+        self._operator_font_family = _apply_cyrillic_operator_font(
+            QtWidgets.QApplication.instance()
+        )
+        if self._operator_font_family:
+            point_size = self.font().pointSize()
+            self.setFont(QtGui.QFont(self._operator_font_family, point_size if point_size > 0 else 10))
 
-        self.setWindowTitle(f"PneumoApp Desktop Shell - GUI-spec ({RELEASE})")
+        self.setWindowTitle(f"PneumoApp - Главное окно приложения ({RELEASE})")
         self.resize(1680, 980)
         self.setMinimumSize(1320, 840)
         self._build_ui()
@@ -335,7 +382,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         header_layout.setSpacing(8)
 
         row1 = QtWidgets.QHBoxLayout()
-        title = QtWidgets.QLabel("PneumoApp Desktop Shell")
+        title = QtWidgets.QLabel("PneumoApp")
         title_font = title.font()
         title_font.setPointSize(title_font.pointSize() + 4)
         title_font.setBold(True)
@@ -344,7 +391,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         self.project_label = QtWidgets.QLabel(str(self.repo_root))
         self.project_label.setStyleSheet("color: #576574;")
         row1.addWidget(self.project_label, 1)
-        self.workspace_badge = QtWidgets.QLabel("Workspace: Обзор")
+        self.workspace_badge = QtWidgets.QLabel("Сейчас открыт рабочий шаг «Обзор»")
         row1.addWidget(self.workspace_badge)
         header_layout.addLayout(row1)
 
@@ -358,7 +405,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
             QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon
         )
         self.command_search.lineEdit().setPlaceholderText(
-            "Поиск команд, экранов, help-topics и legacy web routes"
+            "Быстрый поиск окон и действий"
         )
         self.command_search.lineEdit().textEdited.connect(self._refresh_search_results)
         self.command_search.lineEdit().returnPressed.connect(
@@ -366,6 +413,14 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         )
         self.command_search.activated[int].connect(self._activate_search_index)
         _apply_element_contract(self.command_search, "SH-CMD-SEARCH")
+        self.command_search.setAccessibleName("Быстрый поиск")
+        self.command_search.setAccessibleDescription(
+            "Поиск по рабочим шагам, действиям, диагностике и файлам."
+        )
+        self.command_search.setToolTip(
+            "Ctrl+K. Найдите окно, действие, диагностику или файл."
+        )
+        self.command_search.setWhatsThis("")
         row2.addWidget(self.command_search, 1)
 
         self.primary_action_button = QtWidgets.QPushButton("Главное действие")
@@ -391,18 +446,25 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         row2.addWidget(animator_button)
         header_layout.addLayout(row2)
 
-        row3 = QtWidgets.QHBoxLayout()
+        info_panel = QtWidgets.QFrame()
+        info_layout = QtWidgets.QVBoxLayout(info_panel)
+        info_layout.setContentsMargins(0, 0, 0, 0)
+        info_layout.setSpacing(4)
         self.contract_label = QtWidgets.QLabel(
-            "Контракт: StageRunner primary | diagnostics always visible"
+            "Цели и ограничения: основные показатели расчёта | диагностика всегда видима"
         )
+        self.contract_label.setWordWrap(True)
+        self.contract_label.setMinimumHeight(30)
         _apply_element_contract(self.contract_label, "SH-OBJECTIVE-CONTRACT")
-        row3.addWidget(self.contract_label, 1)
+        info_layout.addWidget(self.contract_label)
         self.warning_label = QtWidgets.QLabel(
-            "Hard gate: baseline provenance обязан быть видимым"
+            "Обязательное условие. Происхождение опорного прогона должно быть видимо"
         )
+        self.warning_label.setWordWrap(True)
+        self.warning_label.setMinimumHeight(42)
         self.warning_label.setStyleSheet("color: #8e5a00;")
-        row3.addWidget(self.warning_label)
-        header_layout.addLayout(row3)
+        info_layout.addWidget(self.warning_label)
+        header_layout.addWidget(info_panel)
         central_layout.addWidget(header)
 
         self.page_stack = QtWidgets.QStackedWidget()
@@ -417,13 +479,13 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
 
     def _build_menu(self) -> None:
         file_menu = self.menuBar().addMenu("Файл")
-        open_legacy = file_menu.addAction("Открыть legacy Tk shell")
+        open_legacy = file_menu.addAction("Открыть рабочее место с вкладками")
         open_legacy.triggered.connect(lambda: self.run_command("tools.legacy_shell.open"))
         file_menu.addSeparator()
         exit_action = file_menu.addAction("Выход")
         exit_action.triggered.connect(self.close)
 
-        workspace_menu = self.menuBar().addMenu("Рабочие пространства")
+        workspace_menu = self.menuBar().addMenu("Окна")
         for workspace in self.workspaces:
             action = workspace_menu.addAction(workspace.title)
             action.triggered.connect(
@@ -442,24 +504,26 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
                 lambda _checked=False, cid=command.command_id: self.run_command(cid)
             )
         diagnostics_menu.addSeparator()
-        legacy_action = diagnostics_menu.addAction("Открыть legacy diagnostics center")
+        legacy_action = diagnostics_menu.addAction("Открыть центр диагностики")
         legacy_action.triggered.connect(
             lambda: self.run_command("diagnostics.legacy_center.open")
         )
 
         help_menu = self.menuBar().addMenu("Справка")
-        about_action = help_menu.addAction("О shell по GUI-spec")
+        about_action = help_menu.addAction("О главном окне приложения")
         about_action.triggered.connect(self._show_about_dialog)
 
     def _build_left_dock(self) -> None:
-        dock = QtWidgets.QDockWidget("Маршрут и действия", self)
+        dock = QtWidgets.QDockWidget("Навигация и действия", self)
         dock.setObjectName("route_dock")
+        dock.setMinimumWidth(280)
         body = QtWidgets.QWidget()
+        body.setMinimumWidth(260)
         layout = QtWidgets.QVBoxLayout(body)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
 
-        layout.addWidget(QtWidgets.QLabel("Рабочие пространства"))
+        layout.addWidget(QtWidgets.QLabel("Основные окна"))
         self.workspace_list = QtWidgets.QListWidget()
         self.workspace_list.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.workspace_list.itemSelectionChanged.connect(self._on_workspace_selected)
@@ -484,8 +548,9 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, dock)
 
     def _build_right_dock(self) -> None:
-        dock = QtWidgets.QDockWidget("Свойства, помощь и provenance", self)
+        dock = QtWidgets.QDockWidget("Свойства, справка и происхождение данных", self)
         dock.setObjectName("inspector_dock")
+        dock.setMinimumWidth(360)
         self.inspector = InspectorPanel()
         self.inspector.setFocusPolicy(QtCore.Qt.StrongFocus)
         _apply_element_contract(self.inspector, "SH-INSPECTOR-CONTENT")
@@ -500,7 +565,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         status.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.setStatusBar(status)
         self.status_primary_label = QtWidgets.QLabel("Готово")
-        self.status_mode_label = QtWidgets.QLabel("Mode: GUI-spec shell")
+        self.status_mode_label = QtWidgets.QLabel("Классическое главное окно")
         self.status_progress = QtWidgets.QProgressBar()
         self.status_progress.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.status_progress.setRange(0, 100)
@@ -564,7 +629,10 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
 
     def _apply_shell_shortcuts(self) -> None:
         self._register_shortcut(
-            self._keyboard_shortcut_by_name.get("Поиск команд", "Ctrl+K"),
+            self._keyboard_shortcut_by_name.get(
+                "Быстрый поиск",
+                self._keyboard_shortcut_by_name.get("Поиск команд", "Ctrl+K"),
+            ),
             self._focus_command_search,
         )
         self._register_shortcut(
@@ -594,7 +662,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
             self.inspector_dock.raise_()
         self.inspector.setFocus(QtCore.Qt.ShortcutFocusReason)
         self._active_shell_region = "правая_панель_свойств_и_справки"
-        self.set_shell_status("Фокус перенесён в inspector/help pane", busy=False, state_id="STATE-COMPUTED")
+        self.set_shell_status("Фокус перенесён в панель свойств и справки", busy=False, state_id="STATE-COMPUTED")
 
     def _focus_target_for_region(self, region_id: str) -> QtWidgets.QWidget | None:
         if region_id == "верхняя_командная_командная_панель":
@@ -641,7 +709,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         target.setFocus(QtCore.Qt.ShortcutFocusReason)
         self._active_shell_region = next_region
         self.set_shell_status(
-            f"Фокус региона: {next_region}",
+            f"Фокус: {_region_label(next_region)}",
             busy=False,
             state_id="STATE-FOCUS",
         )
@@ -674,13 +742,27 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
 
+    def _compact_command_title(self, command: DesktopShellCommandSpec) -> str:
+        if command.kind == "open_workspace" and command.target_workspace_id:
+            workspace = self.workspace_by_id.get(command.target_workspace_id)
+            if workspace is not None:
+                return workspace.title
+        return command.title
+
+    def _primary_command_title(self, command: DesktopShellCommandSpec) -> str:
+        if command.kind == "open_workspace" and command.target_workspace_id:
+            workspace = self.workspace_by_id.get(command.target_workspace_id)
+            if workspace is not None:
+                return f"Открыть: {workspace.title}"
+        return command.title
+
     def _populate_pinned_actions(self) -> None:
         self.pinned_list.clear()
         for command_id in DEFAULT_PINNED_COMMAND_IDS:
             command = self.command_by_id.get(command_id)
             if command is None:
                 continue
-            item = QtWidgets.QListWidgetItem(command.title)
+            item = QtWidgets.QListWidgetItem(self._compact_command_title(command))
             item.setToolTip(command.route_label)
             item.setData(QtCore.Qt.UserRole, command_id)
             self.pinned_list.addItem(item)
@@ -803,7 +885,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
             command = self.command_by_id.get(recent_command_id)
             if command is None:
                 continue
-            item = QtWidgets.QListWidgetItem(command.title)
+            item = QtWidgets.QListWidgetItem(self._compact_command_title(command))
             item.setToolTip(command.route_label)
             item.setData(QtCore.Qt.UserRole, recent_command_id)
             self.recent_list.addItem(item)
@@ -849,7 +931,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
                 continue
             self._primary_command_id = command.command_id
             self.primary_action_button.setEnabled(True)
-            self.primary_action_button.setText(command.title)
+            self.primary_action_button.setText(self._primary_command_title(command))
             self.primary_action_button.setToolTip(command.summary)
             return
 
@@ -863,11 +945,13 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         handler = getattr(page, "handle_command", None)
         if callable(handler):
             handler(command.command_id)
-            self.status_mode_label.setText(f"Последняя команда: {command.title}")
+            self.status_mode_label.setText(f"Последнее действие: {command.title}")
             self._push_recent_action(command.command_id)
             return
+        workspace = self.workspace_by_id.get(command.workspace_id)
+        workspace_title = workspace.title if workspace is not None else command.workspace_id
         self.set_shell_status(
-            f"Hosted action недоступен для workspace: {command.workspace_id}",
+            f"Действие пока недоступно в окне: {workspace_title}",
             busy=False,
             state_id="STATE-ERROR",
         )
@@ -882,15 +966,15 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         refresh = getattr(page, "refresh_view", None)
         if callable(refresh):
             refresh()
-        self.workspace_badge.setText(f"Workspace: {workspace.title}")
-        self.contract_label.setText(f"Контракт: {workspace.summary}")
-        self.warning_label.setText(f"Hard gate: {workspace.hard_gate}")
+        self.workspace_badge.setText(f"Сейчас открыт рабочий шаг «{workspace.title}»")
+        self.contract_label.setText(f"Краткая сводка. {workspace.summary}")
+        self.warning_label.setText(f"Обязательное условие. {workspace.hard_gate}")
         self.set_shell_status(
-            f"Открыт workspace: {workspace.title}",
+            f"Открыт рабочий шаг «{workspace.title}»",
             busy=False,
             state_id="STATE-VALID",
         )
-        self.status_mode_label.setText(f"Mode: {workspace.title}")
+        self.status_mode_label.setText(f"Рабочий шаг «{workspace.title}»")
         self._update_primary_action(workspace)
         self._save_window_state()
 
@@ -906,7 +990,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         if topic is not None:
             self.inspector.show_topic(
                 topic,
-                route_label=f"Рабочие пространства -> {workspace.title}",
+                route_label=f"Окна -> {workspace.title}",
             )
 
     def run_command(self, command_id: str) -> None:
@@ -931,8 +1015,8 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         if command.module:
             try:
                 spawn_module(command.module)
-                self._show_busy(f"Запуск: {command.title}")
-                self.status_mode_label.setText(f"Последняя команда: {command.title}")
+                self._show_busy(f"Открываю: {command.title}")
+                self.status_mode_label.setText(f"Последнее действие: {command.title}")
                 self.open_workspace(command.workspace_id)
                 self._push_recent_action(command_id)
             except Exception as exc:
@@ -943,7 +1027,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
                 )
                 QtWidgets.QMessageBox.critical(
                     self,
-                    "PneumoApp Desktop Shell",
+                    "PneumoApp",
                     f"Не удалось запустить «{command.title}».\n\n{exc}\n\n{traceback.format_exc()}",
                 )
 
@@ -957,11 +1041,10 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
     def _show_about_dialog(self) -> None:
         QtWidgets.QMessageBox.information(
             self,
-            "О GUI-spec shell",
+            "О главном окне приложения",
             (
-                "Этот shell следует GUI-spec (17/18) и удерживает spec-driven маршрут.\n\n"
-                "Route-critical workspaces постепенно переводятся в hosted surfaces,\n"
-                "а legacy Tk shell остаётся fallback/debug surface."
+                "Главное окно собирает основные инженерные окна приложения в одном классическом интерфейсе.\n\n"
+                "Рабочие участки открываются из общего меню и остаются доступными без скрытых шагов."
             ),
         )
 

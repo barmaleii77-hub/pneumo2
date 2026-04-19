@@ -34,9 +34,9 @@ class ShellProjectContext:
     @property
     def readiness_label(self) -> str:
         if self.workspace_ready:
-            return "workspace contract ok"
+            return "Рабочая папка готова"
         missing = ", ".join(self.missing_workspace_dirs)
-        return f"missing workspace dirs: {missing}"
+        return f"Нужно подготовить папки: {missing}"
 
 
 def _default_repo_root() -> Path:

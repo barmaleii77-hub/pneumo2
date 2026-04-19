@@ -12,24 +12,87 @@ from pneumo_solver_ui.desktop_optimizer_panels import (
 from pneumo_solver_ui.optimization_contract_summary_ui import format_hard_gate
 
 
+PROBLEM_HASH_MODE_LABELS: dict[str, str] = {
+    "stable": "Обычный контроль",
+    "legacy": "Совместимый контроль",
+}
+
+
+OPERATOR_TOKEN_LABELS: dict[str, str] = {
+    "default_base.json only": "базовый файл по умолчанию",
+    "active_baseline_contract.json": "активный опорный прогон",
+    "active_contract": "активный опорный прогон",
+    "current": "актуален",
+    "stale": "устарел",
+    "missing": "не найден",
+    "invalid": "ошибка",
+}
+
+
+def _problem_hash_mode_label(value: object) -> str:
+    text = str(value or "").strip().lower()
+    return PROBLEM_HASH_MODE_LABELS.get(text, text or "режим не выбран")
+
+
+def _operator_token_text(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "—"
+    if text in OPERATOR_TOKEN_LABELS:
+        return OPERATOR_TOKEN_LABELS[text]
+    lower = text.lower()
+    if lower in OPERATOR_TOKEN_LABELS:
+        return OPERATOR_TOKEN_LABELS[lower]
+    if text.startswith("метрика_"):
+        return text.removeprefix("метрика_").replace("_", " ")
+    return text
+
+
+def _operator_list_text(values: object) -> str:
+    if isinstance(values, str):
+        items = (values,)
+    else:
+        items = tuple(values or ())
+    return ", ".join(_operator_token_text(item) for item in items) or "—"
+
+
+def _stage_count_text(rows: dict[object, object]) -> str:
+    parts: list[str] = []
+    stage_labels = {
+        "stage0_relevance": "предварительный отбор",
+        "stage1_long": "длинная проверка",
+        "stage2_final": "финальная проверка",
+        "0": "предварительный отбор",
+        "1": "длинная проверка",
+        "2": "финальная проверка",
+    }
+    for key, value in rows.items():
+        label = stage_labels.get(str(key), str(key).replace("_", " "))
+        parts.append(f"{label} - {value}")
+    return "; ".join(parts) or "нет включённых стадий"
+
+
 class DesktopOptimizerContractTab(ttk.Frame):
     def __init__(self, master: tk.Misc, controller: object) -> None:
         super().__init__(master)
         self.controller = controller
+        self.problem_hash_mode_var = tk.StringVar(
+            value=_problem_hash_mode_label(controller.var("settings_opt_problem_hash_mode").get())
+        )
         self.scrollable = ScrollableFrame(self)
         self.scrollable.pack(fill="both", expand=True)
         body = self.scrollable.body
 
         ttk.Label(
             body,
-            text="Baseline и контракт запуска",
+            text="Опорный прогон и настройки запуска",
             font=("Segoe UI", 14, "bold"),
         ).grid(row=0, column=0, sticky="w")
         ttk.Label(
             body,
             text=(
-                "Desktop center показывает честный scope текущего контракта запуска: "
-                "baseline source-of-truth, objective stack, hard gate, canonical model/base/ranges/suite и problem hash."
+                "Центр оптимизации показывает честную область текущего запуска: "
+                "источник опорного прогона, цели оптимизации, жёсткие проверки, модель, базу, диапазоны, набор и контроль задачи."
             ),
             wraplength=980,
             justify="left",
@@ -38,10 +101,10 @@ class DesktopOptimizerContractTab(ttk.Frame):
         self.summary_panel = KeyValueGridPanel(body, text="Снимок области и пространства поиска")
         self.summary_panel.grid(row=2, column=0, sticky="ew")
 
-        self.paths_panel = KeyValueGridPanel(body, text="Подготовленные артефакты")
+        self.paths_panel = KeyValueGridPanel(body, text="Подготовленные файлы")
         self.paths_panel.grid(row=3, column=0, sticky="ew", pady=(10, 0))
 
-        objective_frame = ttk.LabelFrame(body, text="Контракт целей", padding=10)
+        objective_frame = ttk.LabelFrame(body, text="Цели и ограничение", padding=10)
         objective_frame.grid(row=4, column=0, sticky="ew", pady=(10, 0))
         objective_frame.columnconfigure(1, weight=1)
         objective_frame.columnconfigure(3, weight=1)
@@ -63,20 +126,22 @@ class DesktopOptimizerContractTab(ttk.Frame):
             width=14,
         ).grid(row=1, column=3, sticky="w", pady=(8, 0))
 
-        ttk.Label(objective_frame, text="Режим хэша задачи").grid(row=2, column=0, sticky="w", pady=(8, 0))
-        ttk.Combobox(
+        ttk.Label(objective_frame, text="Режим контроля задачи").grid(row=2, column=0, sticky="w", pady=(8, 0))
+        self.problem_hash_mode_combo = ttk.Combobox(
             objective_frame,
-            textvariable=controller.var("settings_opt_problem_hash_mode"),
-            values=("stable", "legacy"),
+            textvariable=self.problem_hash_mode_var,
+            values=tuple(PROBLEM_HASH_MODE_LABELS.values()),
             state="readonly",
             width=18,
-        ).grid(row=2, column=1, sticky="w", pady=(8, 0))
+        )
+        self.problem_hash_mode_combo.grid(row=2, column=1, sticky="w", pady=(8, 0))
+        self.problem_hash_mode_combo.bind("<<ComboboxSelected>>", self._on_problem_hash_mode_selected)
 
         actions = ttk.Frame(objective_frame)
         actions.grid(row=2, column=2, columnspan=2, sticky="e", pady=(8, 0))
         ttk.Button(
             actions,
-            text="Обновить snapshot",
+            text="Обновить сводку",
             command=controller.refresh_all,
         ).pack(side="right")
 
@@ -98,12 +163,12 @@ class DesktopOptimizerContractTab(ttk.Frame):
         selection_frame.grid(row=7, column=0, sticky="ew", pady=(10, 0))
         ttk.Button(
             selection_frame,
-            text="Применить контракт",
+            text="Применить настройки запуска",
             command=controller.apply_selected_run_contract,
         ).pack(side="left")
         ttk.Button(
             selection_frame,
-            text="Открыть контракт целей",
+            text="Открыть паспорт целей",
             command=controller.open_selected_objective_contract,
         ).pack(side="left", padx=(8, 0))
         ttk.Button(
@@ -121,27 +186,27 @@ class DesktopOptimizerContractTab(ttk.Frame):
         open_frame.grid(row=8, column=0, sticky="ew", pady=(10, 0))
         ttk.Button(
             open_frame,
-            text="Открыть base.json",
+            text="Открыть исходные данные",
             command=lambda: controller.open_current_artifact("base_json_path"),
         ).pack(side="left")
         ttk.Button(
             open_frame,
-            text="Открыть ranges.json",
+            text="Открыть диапазоны",
             command=lambda: controller.open_current_artifact("ranges_json_path"),
         ).pack(side="left", padx=(8, 0))
         ttk.Button(
             open_frame,
-            text="Открыть suite.json",
+            text="Открыть набор испытаний",
             command=lambda: controller.open_current_artifact("suite_json_path"),
         ).pack(side="left", padx=(8, 0))
         ttk.Button(
             open_frame,
-            text="Открыть рабочую область",
+            text="Открыть рабочую папку",
             command=lambda: controller.open_current_artifact("workspace_dir"),
         ).pack(side="left", padx=(8, 0))
         ttk.Button(
             open_frame,
-            text="Открыть Baseline Center",
+            text="Открыть центр опорного прогона",
             command=controller.open_baseline_center,
         ).pack(side="left", padx=(8, 0))
 
@@ -151,6 +216,11 @@ class DesktopOptimizerContractTab(ttk.Frame):
     def objectives_text(self) -> str:
         return self.objective_text.get("1.0", "end").strip()
 
+    def _on_problem_hash_mode_selected(self, _event: object | None = None) -> None:
+        selected = self.problem_hash_mode_var.get()
+        by_label = {label: key for key, label in PROBLEM_HASH_MODE_LABELS.items()}
+        self.controller.var("settings_opt_problem_hash_mode").set(by_label.get(selected, "stable"))
+
     def render(
         self,
         *,
@@ -158,77 +228,81 @@ class DesktopOptimizerContractTab(ttk.Frame):
         stage_policy_text: str,
         drift_text: str,
     ) -> None:
-        stage_counts = ", ".join(
-            f"{key}={value}" for key, value in dict(getattr(snapshot, "enabled_stage_counts", {}) or {}).items()
-        ) or "нет enabled stages"
-        sample_params = ", ".join(tuple(getattr(snapshot, "sample_search_params", ()) or ())) or "—"
+        self.problem_hash_mode_var.set(_problem_hash_mode_label(getattr(snapshot, "problem_hash_mode", "")))
+        stage_counts = _stage_count_text(dict(getattr(snapshot, "enabled_stage_counts", {}) or {}))
+        sample_params = _operator_list_text(getattr(snapshot, "sample_search_params", ()))
+        baseline_source = (
+            getattr(snapshot, "baseline_source_label", "")
+            or getattr(snapshot, "baseline_source_kind", "")
+            or "default_base.json only"
+        )
         self.summary_panel.set_rows(
             [
-                ("Рабочая область", str(getattr(snapshot, "workspace_dir", ""))),
-                ("Objective stack", ", ".join(tuple(getattr(snapshot, "objective_keys", ()) or ())) or "—"),
+                ("Рабочая папка", str(getattr(snapshot, "workspace_dir", ""))),
+                ("Цели оптимизации", _operator_list_text(getattr(snapshot, "objective_keys", ()))),
                 (
-                    "Hard gate",
+                    "Жёсткая проверка",
                     format_hard_gate(
                         getattr(snapshot, "penalty_key", ""),
                         getattr(snapshot, "penalty_tol", None),
                     )
                     or "—",
                 ),
-                ("Problem hash", str(getattr(snapshot, "problem_hash", "")) or "—"),
-                ("Hash mode", str(getattr(snapshot, "problem_hash_mode", "")) or "—"),
+                ("Контроль задачи", str(getattr(snapshot, "problem_hash", "")) or "—"),
+                ("Режим контроля", _problem_hash_mode_label(getattr(snapshot, "problem_hash_mode", ""))),
                 (
-                    "Baseline source",
-                    str(getattr(snapshot, "baseline_source_label", "")) or "default_base.json only",
+                    "Источник опорного прогона",
+                    _operator_token_text(baseline_source),
                 ),
                 (
-                    "HO-006 active baseline",
+                    "Активный опорный прогон",
                     (
-                        f"{str(getattr(snapshot, 'active_baseline_state', '') or 'missing')} / "
-                        f"{'current' if bool(getattr(snapshot, 'optimizer_baseline_can_consume', False)) else 'blocked'}"
+                        f"{_operator_token_text(getattr(snapshot, 'active_baseline_state', ''))} / "
+                        f"{'доступен' if bool(getattr(snapshot, 'optimizer_baseline_can_consume', False)) else 'заблокирован'}"
                     ),
                 ),
                 (
-                    "active_baseline_hash",
+                    "Контроль активного прогона",
                     str(getattr(snapshot, "active_baseline_hash", "") or "—")[:12],
                 ),
                 (
-                    "Автообновление baseline",
+                    "Автообновление опорного прогона",
                     "включено" if bool(self.controller.var("opt_autoupdate_baseline").get()) else "выключено",
                 ),
                 (
-                    "Search-space",
-                    f"base params={int(getattr(snapshot, 'base_param_count', 0) or 0)}, "
-                    f"design params={int(getattr(snapshot, 'search_param_count', 0) or 0)}, "
-                    f"removed runtime knobs={int(getattr(snapshot, 'removed_runtime_knob_count', 0) or 0)}, "
-                    f"widened={int(getattr(snapshot, 'widened_range_count', 0) or 0)}",
+                    "Область поиска",
+                    f"Базовых параметров {int(getattr(snapshot, 'base_param_count', 0) or 0)}. "
+                    f"Проектных параметров {int(getattr(snapshot, 'search_param_count', 0) or 0)}. "
+                    f"Технических настроек скрыто {int(getattr(snapshot, 'removed_runtime_knob_count', 0) or 0)}. "
+                    f"Расширенных диапазонов {int(getattr(snapshot, 'widened_range_count', 0) or 0)}.",
                 ),
                 (
-                    "Suite coverage",
-                    f"rows={int(getattr(snapshot, 'suite_row_count', 0) or 0)}, "
-                    f"enabled={int(getattr(snapshot, 'enabled_suite_total', 0) or 0)}, "
-                    f"stages: {stage_counts}",
+                    "Покрытие набора",
+                    f"В наборе {int(getattr(snapshot, 'suite_row_count', 0) or 0)} строк. "
+                    f"Включено {int(getattr(snapshot, 'enabled_suite_total', 0) or 0)}. "
+                    f"По стадиям: {stage_counts}.",
                 ),
-                ("Sample search params", sample_params),
+                ("Примеры параметров поиска", sample_params),
             ]
         )
         self.paths_panel.set_rows(
             [
-                ("Model", str(getattr(snapshot, "model_path", ""))),
-                ("Worker", str(getattr(snapshot, "worker_path", ""))),
-                ("Base JSON", str(getattr(snapshot, "base_json_path", ""))),
-                ("Ranges JSON", str(getattr(snapshot, "ranges_json_path", ""))),
-                ("Suite JSON", str(getattr(snapshot, "suite_json_path", ""))),
+                ("Модель", str(getattr(snapshot, "model_path", ""))),
+                ("Исполнитель", str(getattr(snapshot, "worker_path", ""))),
+                ("Исходные данные", str(getattr(snapshot, "base_json_path", ""))),
+                ("Диапазоны параметров", str(getattr(snapshot, "ranges_json_path", ""))),
+                ("Набор испытаний", str(getattr(snapshot, "suite_json_path", ""))),
                 (
-                    "Stage tuner JSON",
-                    str(getattr(snapshot, "stage_tuner_json_path", "") or "not materialized"),
+                    "Настройка стадий",
+                    str(getattr(snapshot, "stage_tuner_json_path", "") or "не подготовлено"),
                 ),
                 (
-                    "Scoped baseline",
-                    str(getattr(snapshot, "baseline_path", "") or "not found"),
+                    "Опорный прогон для области",
+                    str(getattr(snapshot, "baseline_path", "") or "не найден"),
                 ),
                 (
-                    "HO-006 contract",
-                    str(getattr(snapshot, "active_baseline_contract_path", "") or "not found"),
+                    "Паспорт активного опорного прогона",
+                    str(getattr(snapshot, "active_baseline_contract_path", "") or "не найден"),
                 ),
             ]
         )

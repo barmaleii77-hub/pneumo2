@@ -27,7 +27,7 @@ class DesktopOptimizerRuntimeTab(ttk.Frame):
         ttk.Label(
             body,
             text=(
-                "Здесь видны active mode, baseline, контракт запуска, stage policy, distributed knobs, live log и запуск StageRunner / coordinator без WEB."
+                "Здесь видны активный режим, опорный прогон, настройки запуска, план стадий, распределённые параметры, живой журнал и запуск из этого окна."
             ),
             wraplength=980,
             justify="left",
@@ -59,7 +59,7 @@ class DesktopOptimizerRuntimeTab(ttk.Frame):
         ttk.Label(
             profile_frame,
             text=(
-                "Profiles быстро перенастраивают runtime knobs, но список ограничен только активным режимом запуска."
+                "Профили быстро перенастраивают параметры выполнения; список ограничен выбранным режимом запуска."
             ),
             foreground="#555555",
             wraplength=920,
@@ -74,7 +74,7 @@ class DesktopOptimizerRuntimeTab(ttk.Frame):
 
         self.contract_panel = TextReportPanel(
             body,
-            text="Baseline, objective stack и hard gate",
+            text="Опорный прогон, цели и жёсткое ограничение",
             height=7,
         )
         self.contract_panel.grid(row=5, column=0, sticky="ew", pady=(10, 0))
@@ -107,7 +107,7 @@ class DesktopOptimizerRuntimeTab(ttk.Frame):
         ).pack(side="left", padx=(12, 0))
         ttk.Label(
             mode_frame,
-            text="На экране видны только relevant controls выбранного режима.",
+            text="На экране видны только настройки выбранного режима.",
             foreground="#555555",
         ).pack(side="left", padx=(18, 0))
 
@@ -117,28 +117,28 @@ class DesktopOptimizerRuntimeTab(ttk.Frame):
             staged_frame.columnconfigure(col, weight=1)
         self._add_entry(staged_frame, row=0, col=0, label="Бюджет, мин", var_name="ui_opt_minutes")
         self._add_entry(staged_frame, row=0, col=2, label="Задач", var_name="ui_jobs")
-        self._add_entry(staged_frame, row=0, col=4, label="Seed candidates", var_name="ui_seed_candidates")
-        self._add_entry(staged_frame, row=1, col=0, label="Seed conditions", var_name="ui_seed_conditions")
-        self._add_entry(staged_frame, row=1, col=2, label="Influence eps", var_name="influence_eps_rel")
-        self._add_entry(staged_frame, row=1, col=4, label="Warmstart", var_name="warmstart_mode")
-        self._add_entry(staged_frame, row=2, col=0, label="Surrogate samples", var_name="surrogate_samples")
-        self._add_entry(staged_frame, row=2, col=2, label="Surrogate top-k", var_name="surrogate_top_k")
-        self._add_entry(staged_frame, row=2, col=4, label="Stage policy", var_name="stage_policy_mode")
-        self._add_entry(staged_frame, row=3, col=0, label="Hard gate s1", var_name="stop_pen_stage1")
-        self._add_entry(staged_frame, row=3, col=2, label="Hard gate s2", var_name="stop_pen_stage2")
+        self._add_entry(staged_frame, row=0, col=4, label="Стартовые кандидаты", var_name="ui_seed_candidates")
+        self._add_entry(staged_frame, row=1, col=0, label="Стартовые условия", var_name="ui_seed_conditions")
+        self._add_entry(staged_frame, row=1, col=2, label="Порог влияния", var_name="influence_eps_rel")
+        self._add_entry(staged_frame, row=1, col=4, label="Тёплый старт", var_name="warmstart_mode")
+        self._add_entry(staged_frame, row=2, col=0, label="Проб суррогата", var_name="surrogate_samples")
+        self._add_entry(staged_frame, row=2, col=2, label="Лучших суррогата", var_name="surrogate_top_k")
+        self._add_entry(staged_frame, row=2, col=4, label="План стадий", var_name="stage_policy_mode")
+        self._add_entry(staged_frame, row=3, col=0, label="Ограничение стадия 1", var_name="stop_pen_stage1")
+        self._add_entry(staged_frame, row=3, col=2, label="Ограничение стадия 2", var_name="stop_pen_stage2")
         ttk.Checkbutton(
             staged_frame,
-            text="Adaptive influence eps",
+            text="Автоподбор порога влияния",
             variable=controller.var("adaptive_influence_eps"),
         ).grid(row=3, column=4, columnspan=2, sticky="w")
         ttk.Checkbutton(
             staged_frame,
-            text="Автообновлять baseline",
+            text="Автообновлять опорный прогон",
             variable=controller.var("opt_autoupdate_baseline"),
         ).grid(row=4, column=0, columnspan=2, sticky="w", pady=(6, 0))
         ttk.Checkbutton(
             staged_frame,
-            text="Sort tests by cost",
+            text="Сортировать испытания по стоимости",
             variable=controller.var("sort_tests_by_cost"),
         ).grid(row=4, column=2, columnspan=2, sticky="w", pady=(6, 0))
 
@@ -146,27 +146,27 @@ class DesktopOptimizerRuntimeTab(ttk.Frame):
         dist_frame.grid(row=8, column=0, sticky="ew", pady=(10, 0))
         for col in range(6):
             dist_frame.columnconfigure(col, weight=1)
-        self._add_entry(dist_frame, row=0, col=0, label="Backend", var_name="opt_backend")
-        self._add_entry(dist_frame, row=0, col=2, label="Budget", var_name="opt_budget")
-        self._add_entry(dist_frame, row=0, col=4, label="Seed", var_name="opt_seed")
-        self._add_entry(dist_frame, row=1, col=0, label="Max inflight", var_name="opt_max_inflight")
-        self._add_entry(dist_frame, row=1, col=2, label="Proposer", var_name="opt_proposer")
-        self._add_entry(dist_frame, row=1, col=4, label="q", var_name="opt_q")
-        self._add_entry(dist_frame, row=2, col=0, label="Device", var_name="opt_device")
-        self._add_entry(dist_frame, row=2, col=2, label="DB engine", var_name="opt_db_engine")
-        self._add_entry(dist_frame, row=2, col=4, label="DB path", var_name="opt_db_path")
-        self._add_entry(dist_frame, row=3, col=0, label="Export every", var_name="opt_export_every")
-        self._add_entry(dist_frame, row=3, col=2, label="Dask mode", var_name="dask_mode")
-        self._add_entry(dist_frame, row=3, col=4, label="Ray mode", var_name="ray_mode")
-        self._add_entry(dist_frame, row=4, col=0, label="Dask workers", var_name="dask_workers")
-        self._add_entry(dist_frame, row=4, col=2, label="Dask threads", var_name="dask_threads_per_worker")
-        self._add_entry(dist_frame, row=4, col=4, label="Dask dashboard", var_name="dask_dashboard_address")
-        self._add_entry(dist_frame, row=5, col=0, label="Ray address", var_name="ray_address")
-        self._add_entry(dist_frame, row=5, col=2, label="Ray evaluators", var_name="ray_num_evaluators")
-        self._add_entry(dist_frame, row=5, col=4, label="Ray proposers", var_name="ray_num_proposers")
-        self._add_entry(dist_frame, row=6, col=0, label="CPUs / evaluator", var_name="ray_cpus_per_evaluator")
-        self._add_entry(dist_frame, row=6, col=2, label="GPUs / proposer", var_name="ray_gpus_per_proposer")
-        self._add_entry(dist_frame, row=6, col=4, label="Buffer", var_name="proposer_buffer")
+        self._add_entry(dist_frame, row=0, col=0, label="Исполнитель", var_name="opt_backend")
+        self._add_entry(dist_frame, row=0, col=2, label="Бюджет", var_name="opt_budget")
+        self._add_entry(dist_frame, row=0, col=4, label="Зерно", var_name="opt_seed")
+        self._add_entry(dist_frame, row=1, col=0, label="Одновременно задач", var_name="opt_max_inflight")
+        self._add_entry(dist_frame, row=1, col=2, label="Генератор кандидатов", var_name="opt_proposer")
+        self._add_entry(dist_frame, row=1, col=4, label="Группа кандидатов", var_name="opt_q")
+        self._add_entry(dist_frame, row=2, col=0, label="Устройство", var_name="opt_device")
+        self._add_entry(dist_frame, row=2, col=2, label="База данных", var_name="opt_db_engine")
+        self._add_entry(dist_frame, row=2, col=4, label="Путь к базе", var_name="opt_db_path")
+        self._add_entry(dist_frame, row=3, col=0, label="Выгружать каждые", var_name="opt_export_every")
+        self._add_entry(dist_frame, row=3, col=2, label="Режим Dask", var_name="dask_mode")
+        self._add_entry(dist_frame, row=3, col=4, label="Режим Ray", var_name="ray_mode")
+        self._add_entry(dist_frame, row=4, col=0, label="Процессы Dask", var_name="dask_workers")
+        self._add_entry(dist_frame, row=4, col=2, label="Потоки Dask", var_name="dask_threads_per_worker")
+        self._add_entry(dist_frame, row=4, col=4, label="Панель Dask", var_name="dask_dashboard_address")
+        self._add_entry(dist_frame, row=5, col=0, label="Адрес Ray", var_name="ray_address")
+        self._add_entry(dist_frame, row=5, col=2, label="Исполнители Ray", var_name="ray_num_evaluators")
+        self._add_entry(dist_frame, row=5, col=4, label="Генераторы Ray", var_name="ray_num_proposers")
+        self._add_entry(dist_frame, row=6, col=0, label="CPU на исполнителя", var_name="ray_cpus_per_evaluator")
+        self._add_entry(dist_frame, row=6, col=2, label="GPU на генератор", var_name="ray_gpus_per_proposer")
+        self._add_entry(dist_frame, row=6, col=4, label="Буфер кандидатов", var_name="proposer_buffer")
         ttk.Checkbutton(
             dist_frame,
             text="Журнал гиперобъёма",
@@ -179,24 +179,24 @@ class DesktopOptimizerRuntimeTab(ttk.Frame):
         ).grid(row=7, column=2, columnspan=2, sticky="w", pady=(6, 0))
         ttk.Label(
             dist_frame,
-            text=f"Dask local mode: {DASK_LOCAL_MODE} | Ray local mode: {RAY_LOCAL_MODE}",
+            text=f"Локальный режим Dask - {DASK_LOCAL_MODE}; локальный режим Ray - {RAY_LOCAL_MODE}",
             foreground="#555555",
         ).grid(row=7, column=4, columnspan=2, sticky="e", pady=(6, 0))
 
-        botorch_frame = ttk.LabelFrame(body, text="BoTorch: дополнительные параметры", padding=10)
+        botorch_frame = ttk.LabelFrame(body, text="Дополнительные параметры BoTorch", padding=10)
         botorch_frame.grid(row=9, column=0, sticky="ew", pady=(10, 0))
         for col in range(6):
             botorch_frame.columnconfigure(col, weight=1)
-        self._add_entry(botorch_frame, row=0, col=0, label="n-init", var_name="opt_botorch_n_init")
-        self._add_entry(botorch_frame, row=0, col=2, label="min feasible", var_name="opt_botorch_min_feasible")
-        self._add_entry(botorch_frame, row=0, col=4, label="restarts", var_name="opt_botorch_num_restarts")
-        self._add_entry(botorch_frame, row=1, col=0, label="raw samples", var_name="opt_botorch_raw_samples")
-        self._add_entry(botorch_frame, row=1, col=2, label="maxiter", var_name="opt_botorch_maxiter")
-        self._add_entry(botorch_frame, row=1, col=4, label="ref margin", var_name="opt_botorch_ref_margin")
+        self._add_entry(botorch_frame, row=0, col=0, label="Начальные точки", var_name="opt_botorch_n_init")
+        self._add_entry(botorch_frame, row=0, col=2, label="Минимум допустимых", var_name="opt_botorch_min_feasible")
+        self._add_entry(botorch_frame, row=0, col=4, label="Перезапусков", var_name="opt_botorch_num_restarts")
+        self._add_entry(botorch_frame, row=1, col=0, label="Черновые пробы", var_name="opt_botorch_raw_samples")
+        self._add_entry(botorch_frame, row=1, col=2, label="Итераций", var_name="opt_botorch_maxiter")
+        self._add_entry(botorch_frame, row=1, col=4, label="Запас цели", var_name="opt_botorch_ref_margin")
 
-        launch_frame = ttk.LabelFrame(body, text="Команды запуска", padding=10)
+        launch_frame = ttk.LabelFrame(body, text="Запуск", padding=10)
         launch_frame.grid(row=10, column=0, sticky="ew", pady=(10, 0))
-        ttk.Button(launch_frame, text="Обновить preview", command=controller.refresh_all).pack(side="left")
+        ttk.Button(launch_frame, text="Обновить порядок запуска", command=controller.refresh_all).pack(side="left")
         ttk.Button(
             launch_frame,
             text="Следующий рекомендуемый шаг",
@@ -210,7 +210,7 @@ class DesktopOptimizerRuntimeTab(ttk.Frame):
         self.launch_button.pack(side="left", padx=(8, 0))
         ttk.Button(launch_frame, text="Мягкая остановка", command=controller.soft_stop_job).pack(side="left", padx=(8, 0))
         ttk.Button(launch_frame, text="Жёсткая остановка", command=controller.hard_stop_job).pack(side="left", padx=(8, 0))
-        ttk.Button(launch_frame, text="Очистить статус", command=controller.clear_job_status).pack(side="left", padx=(8, 0))
+        ttk.Button(launch_frame, text="Очистить сообщение", command=controller.clear_job_status).pack(side="left", padx=(8, 0))
 
         self.resume_panel = TextReportPanel(body, text="Источник продолжения", height=6)
         self.resume_panel.grid(row=11, column=0, sticky="ew", pady=(10, 0))
@@ -218,7 +218,7 @@ class DesktopOptimizerRuntimeTab(ttk.Frame):
         self.status_panel.grid(row=12, column=0, sticky="ew", pady=(10, 0))
         self.stage_runtime_panel = TextReportPanel(body, text="Ход стадий", height=8)
         self.stage_runtime_panel.grid(row=13, column=0, sticky="ew", pady=(10, 0))
-        self.command_panel = TextReportPanel(body, text="Предпросмотр команды", height=8, wrap="none")
+        self.command_panel = TextReportPanel(body, text="Порядок запуска", height=8, wrap="none")
         self.command_panel.grid(row=14, column=0, sticky="ew", pady=(10, 0))
         self.log_panel = TextReportPanel(body, text="Последние строки журнала", height=14, wrap="none")
         self.log_panel.grid(row=15, column=0, sticky="ew", pady=(10, 0))

@@ -17,7 +17,7 @@ def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="desktop_geometry_reference_center",
         title="Справочники и геометрия",
-        description="Каталоги цилиндров, геометрия пружин, схемы и справочник параметров рядом с вводом данных, без web-дублей.",
+        description="Каталоги цилиндров, геометрия пружин, схемы и справочник параметров рядом с вводом данных, без дублей.",
         group="Встроенные окна",
         mode="hosted",
         workflow_stage="reference",

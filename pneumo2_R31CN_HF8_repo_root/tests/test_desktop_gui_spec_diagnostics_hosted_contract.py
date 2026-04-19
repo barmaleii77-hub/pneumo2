@@ -30,13 +30,13 @@ def test_hosted_diagnostics_workspace_page_builds_offscreen_and_refreshes() -> N
         page.refresh_view()
         app.processEvents()
 
-        assert page.bundle_box.title() == "Текущее состояние bundle"
+        assert page.bundle_box.title() == "Текущее состояние архива диагностики"
         assert page.run_box.title() == "Последний запуск диагностики"
-        assert page.check_box.title() == "Проверка / inspection / health"
-        assert page.baseline_box.title() == "Baseline HO-006"
+        assert page.check_box.title() == "Проверка архива диагностики"
+        assert page.baseline_box.title() == "Опорный прогон"
         assert page.actions_box.title() == "Действия"
         assert page.log_box.title() == "Журнал / последние сообщения"
-        assert "desktop_diagnostics_runtime.py" in page.source_label.text()
+        assert "Данные берутся из состояния диагностики приложения" in page.source_label.text()
     finally:
         page.close()
         page.deleteLater()
@@ -89,8 +89,12 @@ def test_hosted_diagnostics_page_links_baseline_banner_to_baseline_center(
 
         assert page.baseline_status_value.objectName() == "DG-BASELINE-STATUS"
         assert page.open_baseline_center_button.objectName() == "DG-BTN-OPEN-BASELINE"
-        assert "HO-006 state=missing" in page.baseline_status_value.text()
-        assert "silent_rebinding_allowed=False" in page.baseline_status_value.text()
+        assert "Опорный прогон не найден" in page.baseline_status_value.text()
+        assert "missing" not in page.baseline_status_value.text()
+        assert "Молчаливая подмена запрещена" in page.baseline_status_value.text()
+        assert "Объём проверки - полная" in page.request_value.text()
+        for forbidden in ("level=", "full", "False", "True", "skip_ui_smoke"):
+            assert forbidden not in page.request_value.text()
 
         page.open_baseline_center()
         app.processEvents()
@@ -136,13 +140,13 @@ def test_main_window_routes_diagnostics_baseline_link_to_restore_guard(
 
         assert window._current_workspace_id == "baseline_run"
         baseline_page = window._page_widget_by_workspace_id["baseline_run"]
-        assert baseline_page.baseline_center_box.title() == "Baseline Center: review / adopt / restore"
+        assert baseline_page.baseline_center_box.title() == "Центр опорного прогона: просмотр, принятие, восстановление"
 
         window.run_command("baseline.restore")
         app.processEvents()
 
         assert window._current_workspace_id == "baseline_run"
-        assert "restore: blocked" in baseline_page.action_result_label.text()
+        assert "Действие заблокировано" in baseline_page.action_result_label.text()
         assert "baseline.restore" in window.recent_command_ids
     finally:
         window.close()

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import inspect
 from pathlib import Path
+import subprocess
+import sys
 from types import SimpleNamespace
 import tkinter as tk
 from tkinter import ttk
@@ -11,15 +14,19 @@ import pneumo_solver_ui.tools.run_full_diagnostics_gui as full_diagnostics_gui_m
 import pneumo_solver_ui.tools.send_results_gui as send_results_gui_module
 import pneumo_solver_ui.tools.test_center_gui as test_center_gui_module
 import pytest
+from pneumo_solver_ui.desktop_shell.command_search import build_shell_command_search_entries
 from pneumo_solver_ui.desktop_shell.contracts import DesktopShellToolSpec
 from pneumo_solver_ui.desktop_shell.lifecycle import close_hosted_controller
 from pneumo_solver_ui.desktop_shell.launcher_catalog import build_desktop_launch_catalog
+from pneumo_solver_ui.desktop_shell.main_window import DesktopMainShell
 from pneumo_solver_ui.desktop_shell.navigation import (
     describe_workflow_progress,
     describe_workflow_status,
     next_workflow_spec,
+    navigation_section_label,
     numbered_recently_closed_label,
     numbered_session_label,
+    ordered_navigation_sections,
     ordered_open_workflow_sessions,
     ordered_workflow_specs,
     workflow_step_badge,
@@ -62,6 +69,7 @@ def test_desktop_main_shell_registry_separates_hosted_and_external_tools() -> No
 def test_desktop_main_shell_registry_exposes_shared_standalone_launch_catalog() -> None:
     catalog = build_desktop_launch_catalog(include_mnemo=True)
     modules = {item.module for item in catalog}
+    by_key = {item.key: item for item in catalog}
 
     assert "pneumo_solver_ui.tools.desktop_input_editor" in modules
     assert "pneumo_solver_ui.tools.desktop_geometry_reference_center" in modules
@@ -71,6 +79,166 @@ def test_desktop_main_shell_registry_exposes_shared_standalone_launch_catalog() 
     assert "pneumo_solver_ui.qt_compare_viewer" in modules
     assert "pneumo_solver_ui.desktop_animator.app" in modules
     assert "pneumo_solver_ui.desktop_mnemo.main" in modules
+    assert by_key["desktop_gui_spec_shell"].title == "Проверочное рабочее место"
+    assert by_key["desktop_gui_spec_shell"].group == "Инструменты восстановления"
+
+
+def test_desktop_main_shell_catalog_visible_text_hides_service_jargon() -> None:
+    specs = build_desktop_shell_specs()
+    catalog = build_desktop_launch_catalog(include_mnemo=True)
+    search_entries = build_shell_command_search_entries(specs)
+    forbidden = (
+        "legacy",
+        "Desktop Shell",
+        "desktop shell",
+        "gui spec shell",
+        "source-of-truth",
+        "selected_run_contract",
+        "migration",
+        "bundle",
+        "send bundle",
+        "validation summary",
+        "stagerunner",
+        "web-",
+        "web-подоб",
+        "Служебный",
+        "Служебн",
+        "служебный",
+        "служебн",
+        "Пакет",
+        "пакет",
+        "Раздел собирает",
+        "Раздел показывает",
+        "Резервное главное окно",
+        "Резервные окна",
+        "контракт выбранного прогона",
+        "NPZ-файл",
+        "Файл анимации NPZ",
+        "инженерного контекста",
+        "контекстный переход",
+    )
+
+    visible_parts: list[str] = []
+    for spec in specs:
+        visible_parts.extend(
+            [
+                spec.title,
+                spec.description,
+                spec.group,
+                spec.menu_section,
+                spec.nav_section,
+                spec.details,
+                spec.effective_tooltip,
+                spec.effective_help_topic,
+            ]
+        )
+    for item in catalog:
+        visible_parts.extend([item.title, item.description, item.group])
+        visible_parts.extend(item.search_aliases)
+    for entry in search_entries:
+        visible_parts.extend([entry.label, entry.location, entry.summary])
+
+    visible_text = "\n".join(part for part in visible_parts if part)
+    for fragment in forbidden:
+        assert fragment not in visible_text
+
+
+def test_desktop_main_shell_first_tk_update_and_quit_do_not_hang() -> None:
+    script = """
+from pneumo_solver_ui.desktop_shell.main_window import DesktopMainShell
+
+app = DesktopMainShell()
+app.root.update_idletasks()
+print("created", flush=True)
+app.root.update()
+print("updated", flush=True)
+app.quit_app()
+print("closed", flush=True)
+"""
+
+    result = subprocess.run(
+        [sys.executable, "-u", "-c", script],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert ["created", "updated", "closed"] == result.stdout.strip().splitlines()
+
+
+def test_desktop_main_shell_launches_external_tools_without_process_jargon() -> None:
+    app = DesktopMainShell()
+    launched: list[str] = []
+
+    def _fake_launcher(key: str):
+        def _launch() -> SimpleNamespace:
+            launched.append(key)
+            return SimpleNamespace(pid=12345)
+
+        return _launch
+
+    try:
+        for key in ("compare_viewer", "desktop_animator", "desktop_mnemo"):
+            spec = app.spec_by_key[key]
+            app.spec_by_key[key] = replace(spec, launch_external=_fake_launcher(key))
+            app.open_tool(key)
+            status = app.status_var.get()
+            assert "pid" not in status.lower()
+            assert "12345" not in status
+            assert status == f"Запущено внешнее окно: {spec.title}"
+    finally:
+        app.quit_app()
+
+    assert launched == ["compare_viewer", "desktop_animator", "desktop_mnemo"]
+
+
+def test_desktop_main_shell_external_adapters_spawn_expected_modules(monkeypatch, tmp_path: Path) -> None:
+    from pneumo_solver_ui.desktop_shell.adapters import (
+        compare_viewer_adapter,
+        desktop_animator_adapter,
+        desktop_mnemo_adapter,
+    )
+
+    calls: list[tuple[str, tuple[str, ...], dict[str, str]]] = []
+
+    def _fake_spawn_module(module: str, args=None, *, env_updates=None) -> SimpleNamespace:
+        calls.append(
+            (
+                module,
+                tuple(str(item) for item in (args or ())),
+                dict(env_updates or {}),
+            )
+        )
+        return SimpleNamespace(pid=54321)
+
+    analysis_context = tmp_path / "workspace" / "handoffs" / "WS-ANALYSIS" / "analysis_context.json"
+    analysis_context.parent.mkdir(parents=True)
+    analysis_context.write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(compare_viewer_adapter, "spawn_module", _fake_spawn_module)
+    monkeypatch.setattr(desktop_mnemo_adapter, "spawn_module", _fake_spawn_module)
+    monkeypatch.setattr(desktop_animator_adapter, "spawn_module", _fake_spawn_module)
+    monkeypatch.setattr(
+        desktop_animator_adapter,
+        "_default_analysis_context_path",
+        lambda: analysis_context,
+    )
+
+    compare_viewer_adapter.build_spec().launch_external()
+    desktop_animator_adapter.build_spec().launch_external()
+    desktop_mnemo_adapter.build_spec().launch_external()
+
+    assert calls == [
+        ("pneumo_solver_ui.qt_compare_viewer", (), {}),
+        (
+            "pneumo_solver_ui.desktop_animator.app",
+            ("--analysis-context", str(analysis_context), "--no-follow"),
+            {"PNEUMO_ANALYSIS_CONTEXT_PATH": str(analysis_context)},
+        ),
+        ("pneumo_solver_ui.desktop_mnemo.main", (), {}),
+    ]
 
 
 def test_desktop_main_shell_keeps_classic_menu_and_workspace_shell() -> None:
@@ -94,7 +262,7 @@ def test_desktop_main_shell_keeps_classic_menu_and_workspace_shell() -> None:
     assert "self._startup_tool_keys = startup_tool_keys" in src
     assert "self._startup_route_applied = False" in src
     assert "self._syncing_navigation_selection = False" in src
-    assert 'self.workflow_var = tk.StringVar(value="Маршрут: недоступен")' in src
+    assert 'self.workflow_var = tk.StringVar(value="Порядок работы: недоступен")' in src
     assert 'self.workspace_var = tk.StringVar(value="Обзор | Открытых окон: 0")' in src
     assert 'self.details_title_var = tk.StringVar(value="Обзор")' in src
     assert 'self.details_meta_var = tk.StringVar(value="Основное рабочее место")' in src
@@ -132,12 +300,16 @@ def test_desktop_main_shell_keeps_classic_menu_and_workspace_shell() -> None:
     assert 'return tuple(spec for spec in self.specs if spec.entry_kind == "main")' in src
     assert "return ordered_workflow_specs(self._main_nav_specs())" in src
     assert "def _entry_kind_label(self, spec: DesktopShellToolSpec) -> str:" in src
+    assert '"служебный инструмент"' not in src
+    assert '"контекстный переход"' not in src
+    assert 'return "дополнительное окно"' in src
+    assert 'return "переход по выбранному результату"' in src
     assert "def continue_workflow_route(self) -> None:" in src
     assert "def select_next_workflow_tab(self) -> None:" in src
     assert "def select_previous_workflow_tab(self) -> None:" in src
     assert "open_keys = {session.key for session in self.workspace.list_open_sessions()}" in src
     assert "spec = next_workflow_spec(self._workflow_specs(), open_keys)" in src
-    assert 'self.status_var.set("Основной маршрут пока недоступен в shell.")' in src
+    assert 'self.status_var.set("Основной порядок работы пока недоступен в главном окне.")' in src
     assert "self.workspace.select_next_workflow_tab()" in src
     assert "self.workspace.select_previous_workflow_tab()" in src
     assert "def _open_startup_route(self) -> None:" in src
@@ -216,7 +388,7 @@ def test_desktop_main_shell_extracts_workspace_manager_for_hosted_tabs() -> None
     assert '"Закрывать остальные можно только для встроенного окна."' in src
     assert '"Других встроенных окон нет."' in src
     assert '"Нет недавно закрытых встроенных окон."' in src
-    assert '"Разделы основного маршрута пока не открыты."' in src
+    assert '"Окна основного порядка работы пока не открыты."' in src
     assert '"Недавно закрытое окно #{index} недоступно."' in src
     assert "return tuple(reversed(self._recently_closed_specs))" in src
     assert "history_index = len(self._recently_closed_specs) - index" in src
@@ -247,13 +419,19 @@ def test_desktop_main_shell_extracts_navigation_helpers() -> None:
     assert "HOME_WORKSPACE_KEY" in src
     assert "MAX_DIRECT_SESSION_SHORTCUT" in src
     assert "PRIMARY_WORKFLOW_KEYS" in src
+    assert "NAVIGATION_SECTION_ORDER" in src
+    assert "WORKFLOW_STAGE_NAVIGATION_SECTIONS" in src
     assert "def workflow_step_index(" in src
     assert "def workflow_step_badge(" in src
+    assert "def navigation_section_label(" in src
+    assert "def ordered_navigation_sections(" in src
     assert "def numbered_session_label(" in src
     assert "def numbered_recently_closed_label(" in src
     assert "def ordered_workflow_specs(" in src
     assert "def next_workflow_spec(" in src
     assert "def describe_workflow_progress(" in src
+    assert '"Основной порядок работы пока недоступен в текущей сборке."' in src
+    assert "текущей сборке shell" not in src
     assert "def describe_workflow_status(" in src
     assert "def ordered_open_workflow_sessions(" in src
     assert "def home_tab_title(" in src
@@ -276,14 +454,14 @@ def test_desktop_main_shell_extracts_home_view_builder() -> None:
     assert "WORKFLOW_KEYS" in src
     assert "class ShellHomeViewController" in src
     assert "def build_shell_home_view(" in src
-    assert 'text="Pneumo Desktop Shell"' in src
-    assert '"Классическое главное окно для модульных desktop-инструментов проекта. "' in src
-    assert 'text="Основной маршрут"' in src
+    assert 'text="Pneumo: рабочее место инженера"' in src
+    assert '"Классическое главное окно для рабочих окон проекта. "' in src
+    assert 'text="Основной порядок работы"' in src
     assert 'text="Открытые встроенные окна"' in src
     assert 'text="Недавно закрытые окна"' in src
-    assert 'text="Перейти к разделу"' in src
+    assert 'text="Открыть окно"' in src
     assert 'text="Перейти"' in src
-    assert 'text="Продолжить маршрут"' in src
+    assert 'text="Продолжить работу"' in src
     assert 'text="Вернуть"' in src
     assert "def refresh(self) -> None:" in src
     assert "def focus_selected_session(self) -> bool:" in src
@@ -309,11 +487,20 @@ def test_desktop_main_shell_extracts_home_view_builder() -> None:
     assert 'main_specs = tuple(spec for spec in hosted_specs if spec.entry_kind == "main")' in src
     assert 'tool_specs = tuple(spec for spec in hosted_specs if spec.entry_kind != "main")' in src
     assert "workflow_specs = ordered_workflow_specs(main_specs)" in src
+    forbidden_visible_home_fragments = [
+        "Pneumo Desktop Shell",
+        "текущей сборке shell",
+        "через меню и toolbar",
+        "desktop-инструментов",
+        "внутрь shell",
+    ]
+    for fragment in forbidden_visible_home_fragments:
+        assert fragment not in src
     assert "continue_workflow=continue_workflow" in src
     assert '"Открыто в рабочей области" if key in open_keys else "Готов к переходу"' in src
-    assert 'button.configure(text="Перейти к окну" if key in open_keys else "Перейти к разделу")' in src
+    assert 'button.configure(text="Показать окно" if key in open_keys else "Открыть окно")' in src
     assert 'status_var = tk.StringVar(value="Готов к переходу")' in src
-    assert '_build_group_box(cards, 0, "Справочники и служебные центры", tool_specs, open_tool)' in src
+    assert '_build_group_box(cards, 0, "Справочники, анализ и диагностика", tool_specs, open_tool)' in src
     assert '_build_group_box(cards, 1, "Анализ и визуализация", external_specs, open_tool)' in src
     assert 'textvariable=status_var' in src
     assert "numbered_recently_closed_label(spec, index)" in src
@@ -322,7 +509,7 @@ def test_desktop_main_shell_extracts_home_view_builder() -> None:
     assert "controller = ShellHomeViewController(" in src
     assert "reopen_button.configure(command=controller.reopen_selected_recently_closed)" in src
     assert "numbered_session_label(session, index)" in src
-    assert '_build_group_box(cards, 0, "Справочники и служебные центры"' in src
+    assert '_build_group_box(cards, 0, "Справочники, анализ и диагностика"' in src
     assert '_build_group_box(cards, 1, "Анализ и визуализация"' in src
     assert 'text="Открыть"' in src
 
@@ -344,9 +531,9 @@ def test_desktop_main_shell_extracts_classic_toolbar_builder() -> None:
     assert 'text="Открыть окно"' in src
     assert 'text="Окна:"' in src
     assert 'text="Перейти"' in src
-    assert 'text="Следующий раздел"' in src
-    assert 'text="Раздел назад"' in src
-    assert 'text="Раздел вперед"' in src
+    assert 'text="Следующее окно"' in src
+    assert 'text="Назад по порядку"' in src
+    assert 'text="Вперёд по порядку"' in src
     assert 'text="Недавние:"' in src
     assert 'text="Вернуть"' in src
     assert "external_specs: tuple[DesktopShellToolSpec, ...]" in src
@@ -418,9 +605,9 @@ def test_desktop_main_shell_extracts_menu_builder_with_classic_navigation_comman
     assert "select_previous_workflow: Callable[[], None]" in src
     assert "select_next_workflow: Callable[[], None]" in src
     assert "label=describe_workflow_status(self.workflow_specs, open_keys)" in src
-    assert 'label="Продолжить основной маршрут\\tCtrl+Shift+N"' in src
-    assert 'label="Предыдущий раздел маршрута\\tCtrl+Alt+Left"' in src
-    assert 'label="Следующий раздел маршрута\\tCtrl+Alt+Right"' in src
+    assert 'label="Продолжить основной порядок\\tCtrl+Shift+N"' in src
+    assert 'label="Назад по порядку\\tCtrl+Alt+Left"' in src
+    assert 'label="Вперёд по порядку\\tCtrl+Alt+Right"' in src
     assert 'label="Следующее окно\\tCtrl+Tab"' in src
     assert 'label="Предыдущее окно\\tCtrl+Shift+Tab"' in src
     assert 'label="Перезагрузить текущее окно\\tF5"' in src
@@ -517,7 +704,8 @@ def test_hosted_tools_keep_host_parameter_and_standalone_entrypoints() -> None:
         encoding="utf-8",
         errors="replace",
     )
-    assert 'self.root.title(f"Autotest Harness GUI ({RELEASE})")' in autotest_src
+    assert 'self.root.title(f"Автотесты проекта ({RELEASE})")' in autotest_src
+    assert "Autotest Harness GUI" not in autotest_src
     assert "def main() -> int:" in autotest_src
 
 
@@ -618,7 +806,7 @@ def test_desktop_main_shell_launcher_exposes_cli_for_startup_route() -> None:
 def test_desktop_main_shell_launcher_validates_registry_keys_and_formats_catalog() -> None:
     catalog = desktop_main_shell_module.format_tool_catalog()
 
-    assert "Desktop shell tools:" in catalog
+    assert "GUI-окна рабочего места:" in catalog
     assert "desktop_input_editor" in catalog
     assert "compare_viewer" in catalog
 
@@ -629,7 +817,7 @@ def test_desktop_main_shell_launcher_validates_registry_keys_and_formats_catalog
     with pytest.raises(SystemExit) as exc:
         desktop_main_shell_module.resolve_startup_tool_keys(["missing_tool"])
 
-    assert "Unknown desktop shell tool key(s): missing_tool." in str(exc.value)
+    assert "Неизвестный ключ GUI-окна: missing_tool." in str(exc.value)
 
 
 def test_navigation_helpers_keep_primary_workflow_order_and_progress_text() -> None:
@@ -683,11 +871,11 @@ def test_navigation_helpers_keep_primary_workflow_order_and_progress_text() -> N
     assert next_workflow_spec(specs, {"desktop_input_editor"}).key == "desktop_ring_editor"
 
     progress = describe_workflow_progress(specs, {"desktop_input_editor"})
-    assert "Открыто разделов маршрута: 1/5." in progress
-    assert "Следующий рекомендуемый раздел: Редактор кольцевых сценариев." in progress
+    assert "Открыто окон основного порядка: 1/5." in progress
+    assert "Следующее рекомендуемое окно: Редактор кольцевых сценариев." in progress
     assert (
         describe_workflow_status(specs, {"desktop_input_editor"})
-        == "Маршрут: 1/5 -> Редактор кольцевых сценариев"
+        == "Порядок работы: 1/5 - Редактор кольцевых сценариев"
     )
     assert workflow_step_index("desktop_input_editor") == 1
     assert workflow_step_index("desktop_ring_editor") == 2
@@ -722,6 +910,38 @@ def test_navigation_helpers_keep_primary_workflow_order_and_progress_text() -> N
         numbered_recently_closed_label(workflow_session.spec, 1)
         == "1. (Шаг 5) Результаты и анализ"
     )
+
+
+def test_navigation_helpers_cover_full_user_gui_graph() -> None:
+    specs = build_desktop_shell_specs()
+    section_rows = ordered_navigation_sections(specs)
+    labels = [label for label, _items in section_rows]
+    specs_by_section = {
+        label: {spec.key for spec in section_specs}
+        for label, section_specs in section_rows
+    }
+
+    assert labels[:8] == [
+        "Исходные данные",
+        "Сценарии",
+        "Расчёт",
+        "Оптимизация",
+        "Результаты",
+        "Анализ",
+        "Визуализация",
+        "Диагностика и инструменты",
+    ]
+    assert navigation_section_label(
+        next(spec for spec in specs if spec.key == "desktop_geometry_reference_center")
+    ) == "Исходные данные"
+    assert "desktop_input_editor" in specs_by_section["Исходные данные"]
+    assert "desktop_geometry_reference_center" in specs_by_section["Исходные данные"]
+    assert "desktop_engineering_analysis_center" in specs_by_section["Анализ"]
+    assert "compare_viewer" in specs_by_section["Анализ"]
+    assert {"desktop_animator", "desktop_mnemo"} <= specs_by_section["Визуализация"]
+    assert {"desktop_diagnostics_center", "autotest_gui"} <= specs_by_section[
+        "Диагностика и инструменты"
+    ]
 
 
 def test_workspace_manager_tracks_recently_closed_history_and_can_reopen_by_index() -> None:

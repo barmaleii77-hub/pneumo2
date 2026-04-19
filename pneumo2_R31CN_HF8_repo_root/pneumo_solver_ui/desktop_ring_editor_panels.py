@@ -51,7 +51,7 @@ def _closure_policy_label(value: object) -> str:
         "closed_c1_periodic": "гладкое замыкание",
         "closed_exact": "точное замыкание без коррекции",
         "strict_exact": "строгое совпадение",
-        "preview_open_only": "открытый preview",
+        "preview_open_only": "открытый предпросмотр",
     }
     return mapping.get(str(value or "").strip(), str(value or ""))
 
@@ -231,7 +231,7 @@ class SegmentListPanel(ttk.LabelFrame):
 
 class PreviewPanel(ttk.LabelFrame):
     def __init__(self, parent: tk.Misc) -> None:
-        super().__init__(parent, text="Развёрнутый циклический preview", padding=8)
+        super().__init__(parent, text="Развёрнутый предпросмотр кольца", padding=8)
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
 
@@ -348,7 +348,7 @@ class PreviewPanel(ttk.LabelFrame):
             self.canvas.create_text(
                 width / 2.0,
                 height / 2.0,
-                text="Нет данных для развёрнутого preview",
+                text="Нет данных для развёрнутого предпросмотра",
                 fill="#e2e8f0",
                 font=("Segoe UI", 14, "bold"),
             )
@@ -363,7 +363,7 @@ class PreviewPanel(ttk.LabelFrame):
         self.canvas.create_text(
             left_pad,
             24,
-            text="Один круг показан как развёрнутая дистанция 0 → L. Повтор справа — только seam-preview, не геометрическое кольцо.",
+            text="Один круг показан как развёрнутая дистанция 0 → L. Повтор справа — только проверка стыка, не геометрическое кольцо.",
             fill="#e2e8f0",
             anchor="w",
             font=("Segoe UI", 10, "bold"),
@@ -456,7 +456,7 @@ class MotionPanel(ttk.Frame):
         self.closure_combo = ttk.Combobox(
             general,
             textvariable=self.closure_policy_var,
-            values=("Гладкое замыкание", "Строгое совпадение", "Открытый preview"),
+            values=("Гладкое замыкание", "Строгое совпадение", "Открытый предпросмотр"),
             state="readonly",
             width=20,
         )
@@ -1300,12 +1300,12 @@ class ExportPanel(ttk.Frame):
         self.opt_window_var = tk.StringVar(value="4.0")
         self.inputs_handoff_var = tk.StringVar(
             value=(
-                "HO-002 inputs_snapshot ещё не проверен. "
-                "WS-RING читает только frozen ref/hash из WS-INPUTS."
+                "Снимок исходных данных ещё не проверен. "
+                "Редактор сценариев использует только зафиксированную версию исходных данных."
             )
         )
 
-        inputs_box = ttk.LabelFrame(self, text="Inputs handoff / HO-002", padding=8)
+        inputs_box = ttk.LabelFrame(self, text="Исходные данные для сценариев", padding=8)
         inputs_box.grid(row=1, column=0, sticky="ew", pady=(8, 0))
         inputs_box.columnconfigure(0, weight=1)
         ttk.Label(
@@ -1333,8 +1333,8 @@ class ExportPanel(ttk.Frame):
         ttk.Button(artifact_box, text="Открыть последний сценарий", command=on_open_last_spec).grid(row=0, column=0, sticky="ew", padx=(0, 4))
         ttk.Button(artifact_box, text="Открыть последнюю дорогу", command=on_open_last_road).grid(row=0, column=1, sticky="ew", padx=(0, 4))
         ttk.Button(artifact_box, text="Открыть последний файл ускорений", command=on_open_last_axay).grid(row=0, column=2, sticky="ew", padx=(0, 4))
-        ttk.Button(artifact_box, text="Открыть meta HO-004", command=on_open_last_meta).grid(row=0, column=3, sticky="ew", padx=(0, 4))
-        ttk.Button(artifact_box, text="Открыть source WS-RING", command=on_open_ring_source).grid(row=0, column=4, sticky="ew", padx=(0, 4))
+        ttk.Button(artifact_box, text="Открыть описание выгрузки", command=on_open_last_meta).grid(row=0, column=3, sticky="ew", padx=(0, 4))
+        ttk.Button(artifact_box, text="Открыть исходный сценарий", command=on_open_ring_source).grid(row=0, column=4, sticky="ew", padx=(0, 4))
         ttk.Button(artifact_box, text="Открыть папку для анимации", command=on_open_anim_latest).grid(row=0, column=5, sticky="ew")
 
         buttons = ttk.Frame(self)

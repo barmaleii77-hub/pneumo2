@@ -345,7 +345,8 @@ def test_sources_wire_anim_diagnostics_into_launcher_and_send_bundle() -> None:
     assert 'ANIM_DIAG_SIDECAR_JSON' in gui_text
     assert 'load_latest_send_bundle_anim_dashboard' in gui_text
     assert 'format_anim_dashboard_brief_lines' in gui_text
-    assert 'Anim pointer diagnostics:' in gui_text
+    assert 'Диагностика последней анимации:' in gui_text
+    assert 'Anim pointer diagnostics:' not in gui_text
     assert 'pick_anim_latest_fields' in registry_text
     assert 'validation_release_risks' in registry_text
     assert 'optimizer_scope_release_gate' in registry_text

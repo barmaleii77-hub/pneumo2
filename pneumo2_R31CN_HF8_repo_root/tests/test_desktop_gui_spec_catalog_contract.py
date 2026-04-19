@@ -75,6 +75,7 @@ def test_v3_runtime_matrices_expose_shell_shortcuts_docking_and_state_contracts(
     states = ui_state_palette()
 
     assert shortcuts["Поиск команд"] == "Ctrl+K"
+    assert shortcuts["Быстрый поиск"] == "Ctrl+K"
     assert shortcuts["Главное действие шага"] == "Ctrl+Enter"
     assert shortcuts["Собрать диагностику"] == "Ctrl+Shift+D"
     assert shortcuts["Помощь по выбранному элементу"] == "F1"

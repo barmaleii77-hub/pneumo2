@@ -338,7 +338,7 @@ class DesktopOptimizerRuntime:
         base_payload: dict[str, Any] = {
             "state": "MISSING",
             "status": "info",
-            "banner": "Run identity: historical run is not selected.",
+            "banner": "Исторический запуск не выбран.",
             "selected_run_dir": resolved_run_dir,
             "selected_run_name": Path(resolved_run_dir).name if resolved_run_dir else "",
             "selected_pipeline": "",
@@ -358,8 +358,8 @@ class DesktopOptimizerRuntime:
                     **base_payload,
                     "state": "BLOCKED",
                     "status": "warn",
-                    "banner": "Resume safety: resume is enabled, but no history run is selected.",
-                    "blocking_reasons": ("resume target missing",),
+                    "banner": "Продолжение включено, но запуск из истории не выбран.",
+                    "blocking_reasons": ("не выбран запуск для продолжения",),
                 }
             return base_payload
 
@@ -369,8 +369,8 @@ class DesktopOptimizerRuntime:
                 **base_payload,
                 "state": "BLOCKED" if resume_requested else "MISSING",
                 "status": "warn",
-                "banner": "Run identity: selected run is no longer available in workspace history.",
-                "blocking_reasons": ("selected run missing from history",),
+                "banner": "Выбранный запуск больше не найден в истории рабочей области.",
+                "blocking_reasons": ("выбранный запуск отсутствует в истории",),
             }
 
         summary = details.summary
@@ -393,42 +393,42 @@ class DesktopOptimizerRuntime:
 
         if resume_requested and selected_pipeline and selected_pipeline != launch_pipeline:
             blocking_reasons.append(
-                f"resume pipeline mismatch: selected={selected_pipeline}, launch={launch_pipeline}"
+                f"конвейер продолжения не совпадает: выбранный={selected_pipeline}, запуск={launch_pipeline}"
             )
         if resume_requested and not str(summary.problem_hash or "").strip():
-            blocking_reasons.append("selected run problem_hash missing")
+            blocking_reasons.append("у выбранного запуска нет контрольной области задачи")
         if scope_mismatch or mode_mismatch:
-            reason = "problem scope mismatch"
+            reason = "область задачи не совпадает"
             if mode_mismatch:
-                reason += " / hash mode mismatch"
+                reason += " / режим контрольной суммы не совпадает"
             if resume_requested:
                 blocking_reasons.append(reason)
             else:
                 warnings.append(reason)
         if baseline_mismatch:
             if resume_requested:
-                blocking_reasons.append("active baseline source mismatch")
+                blocking_reasons.append("источник активного опорного прогона не совпадает")
             else:
-                warnings.append("active baseline source differs")
+                warnings.append("источник активного опорного прогона отличается")
         if diff_bits:
-            warnings.append("objective contract drift: " + ", ".join(diff_bits))
+            warnings.append("изменились настройки целей: " + ", ".join(diff_bits))
 
         if blocking_reasons:
             state = "BLOCKED"
             status = "warn"
-            banner = "Resume safety: selected run cannot be resumed under the current launch contract."
+            banner = "Выбранный запуск нельзя продолжить с текущими настройками запуска."
         elif scope_mismatch or mode_mismatch or baseline_mismatch or diff_bits:
             state = "STALE"
             status = "info" if not resume_requested else "warn"
-            banner = "Run identity: selected run is historical/stale against the current launch contract."
+            banner = "Выбранный запуск исторический или устарел относительно текущих настроек запуска."
         elif selected_pipeline:
             state = "CURRENT"
             status = "ok"
-            banner = "Run identity: selected run matches the current launch contract."
+            banner = "Выбранный запуск согласован с текущими настройками запуска."
         else:
             state = "HISTORICAL"
             status = "info"
-            banner = "Run identity: selected run is historical and has limited pipeline evidence."
+            banner = "Выбранный запуск исторический; часть данных конвейера ограничена."
 
         return {
             **base_payload,
@@ -490,13 +490,13 @@ class DesktopOptimizerRuntime:
             snapshot.optimizer_baseline_can_consume
         ):
             blocking_reasons.append(
-                "Active baseline HO-006 is "
+                "Активный опорный прогон имеет состояние "
                 + baseline_state
                 + (": " + baseline_banner if baseline_banner else "")
             )
         elif not bool(snapshot.optimizer_baseline_can_consume):
             warnings.append(
-                "Active baseline HO-006 is not current; launch will use the explicit baseline source only."
+                "Активный опорный прогон не актуален; запуск использует только явно выбранный источник."
             )
 
         if bool(identity.get("resume_requested")) and str(identity.get("state") or "") == "BLOCKED":
@@ -566,17 +566,17 @@ class DesktopOptimizerRuntime:
         if str(scope_payload.get("compatibility") or "") == "different" or str(
             scope_payload.get("mode_compatibility") or ""
         ) == "different":
-            blocking_states.append("problem scope mismatch")
+            blocking_states.append("область задачи не совпадает")
         if baseline_compatibility == "different":
-            blocking_states.append("active baseline mismatch")
+            blocking_states.append("активный опорный прогон не совпадает")
         if diff_bits:
-            warnings.append("objective contract drift: " + ", ".join(diff_bits))
+            warnings.append("изменились настройки целей: " + ", ".join(diff_bits))
 
         active_baseline_hash = str(summary.active_baseline_hash or "").strip()
         if not active_baseline_hash:
             active_baseline_hash = _file_sha256(summary.baseline_source_path)
         if not active_baseline_hash:
-            warnings.append("active baseline hash missing")
+            warnings.append("нет контрольной суммы активного опорного прогона")
 
         suite_snapshot_hash = str(summary.suite_snapshot_hash or "").strip()
         if not suite_snapshot_hash:
@@ -801,30 +801,30 @@ class DesktopOptimizerRuntime:
         )
         if not resolved_run_dir:
             return {
-                "headline": "Selected run is not chosen yet.",
-                "next_action": "History",
+                "headline": "Запуск ещё не выбран.",
+                "next_action": "История запусков",
                 "next_action_kind": "show_history_tab",
                 "rows": (
                     {
-                        "title": "Selection",
+                        "title": "Выбор запуска",
                         "status": "info",
-                        "summary": "Choose a run in History, Finished Jobs, Handoff or Packaging first.",
-                        "action": "History",
+                        "summary": "Сначала выберите запуск в истории, завершённых запусках, передаче стадий или выпуске.",
+                        "action": "История запусков",
                     },
                 ),
             }
         details = self.selected_run_details(resolved_run_dir)
         if details is None:
             return {
-                "headline": "Selected run is no longer available in workspace history.",
-                "next_action": "History",
+                "headline": "Выбранный запуск больше недоступен в списке.",
+                "next_action": "История запусков",
                 "next_action_kind": "show_history_tab",
                 "rows": (
                     {
-                        "title": "Selection",
+                        "title": "Выбор запуска",
                         "status": "warn",
-                        "summary": "The selected run directory is missing or no longer discoverable.",
-                        "action": "History",
+                        "summary": "Папка выбранного запуска отсутствует или больше не находится.",
+                        "action": "История запусков",
                     },
                 ),
             }
@@ -852,18 +852,18 @@ class DesktopOptimizerRuntime:
         rows: list[dict[str, Any]] = []
         rows.append(
             {
-                "title": "Run materialization",
+                "title": "Материализация запуска",
                 "status": (
                     "ok"
                     if has_results
                     else ("warn" if str(summary.status or "").strip().lower() in {"done", "partial"} else "info")
                 ),
                 "summary": (
-                    f"Results artifact is available: {summary.result_path}."
+                    f"Файл результатов доступен: {summary.result_path}."
                     if has_results
-                    else "Selected run has no results artifact yet; downstream review surfaces will stay partial."
+                    else "У выбранного запуска пока нет файла результатов; последующие окна покажут неполные данные."
                 ),
-                "action": "History",
+                "action": "История",
                 "action_kind": "show_history_tab",
             }
         )
@@ -871,55 +871,56 @@ class DesktopOptimizerRuntime:
             scope_payload.get("mode_compatibility") or ""
         ) == "different":
             compat_status = "warn"
-            compat_summary = "Current launch contract uses another problem scope/hash mode than this selected run."
+            compat_summary = "Текущие настройки запуска используют другую область задачи или режим контрольной суммы."
         elif baseline_compatibility == "different":
             compat_status = "warn"
-            compat_summary = "Selected run points to another baseline source than the current launch contract."
+            compat_summary = "Выбранный запуск ссылается на другой источник опорного прогона."
         elif diff_bits:
             compat_status = "info"
-            compat_summary = "Objective contract drift exists: " + ", ".join(diff_bits) + "."
+            compat_summary = "Настройки целей изменились: " + ", ".join(diff_bits) + "."
         else:
             compat_status = "ok"
-            compat_summary = "Selected run is aligned with the current launch contract."
+            compat_summary = "Выбранный запуск согласован с текущими настройками запуска."
         rows.append(
             {
-                "title": "Launch compatibility",
+                "title": "Совместимость запуска",
                 "status": compat_status,
                 "summary": compat_summary,
-                "action": "Contract",
+                "action": "Настройки запуска",
                 "action_kind": "show_contract_tab",
             }
         )
         if rows_with_packaging <= 0:
             packaging_status = "info"
-            packaging_summary = "Packaging verdicts are not materialized for this run yet."
+            packaging_summary = "Данные выпуска для этого запуска пока не подготовлены."
         elif truth_ready_rows > 0 and interference_rows == 0 and fallback_rows == 0:
             packaging_status = "ok"
             packaging_summary = (
-                f"Packaging is truth-ready with zero interference across {truth_ready_rows} rows."
+                f"Выпуск готов к проверке: строк без рисков {truth_ready_rows}."
             )
         elif interference_rows > 0 or fallback_rows > 0:
             packaging_status = "warn"
             packaging_summary = (
-                f"Packaging review is needed: interference={interference_rows}, fallback={fallback_rows}, "
-                f"verification={verification_rows}."
+                f"Нужно проверить выпуск: строк с рисками {interference_rows}, "
+                f"резервных данных {fallback_rows}, проверенных строк {verification_rows}."
             )
         elif verification_rows > 0:
             packaging_status = "info"
             packaging_summary = (
-                f"Verification rows exist ({verification_rows}), but packaging is not truth-ready yet."
+                f"Есть проверенные строки ({verification_rows}), но выпуск ещё не готов к итоговой проверке."
             )
         else:
             packaging_status = "info"
             packaging_summary = (
-                f"Packaging evidence is partial: rows_with_packaging={rows_with_packaging}, truth_ready={truth_ready_rows}."
+                f"Данные выпуска неполные: строк для выпуска {rows_with_packaging}, "
+                f"готовых к проверке {truth_ready_rows}."
             )
         rows.append(
             {
-                "title": "Packaging route",
+                "title": "Готовность выпуска",
                 "status": packaging_status,
                 "summary": packaging_summary,
-                "action": "Packaging",
+                "action": "Упаковка и выпуск",
                 "action_kind": "show_packaging_tab",
             }
         )
@@ -927,92 +928,92 @@ class DesktopOptimizerRuntime:
             if bool(summary.handoff_available or summary.handoff_preset_tag):
                 handoff_status = "ok"
                 handoff_summary = (
-                    "Staged run has a continuation plan: "
-                    f"preset={summary.handoff_preset_tag or '—'}, budget={int(summary.handoff_budget or 0)}, "
-                    f"seeds={int(summary.handoff_seed_count or 0)}."
+                    "Поэтапный запуск подготовил продолжение: "
+                    f"профиль {summary.handoff_preset_tag or '—'}, бюджет {int(summary.handoff_budget or 0)}, "
+                    f"стартовых вариантов {int(summary.handoff_seed_count or 0)}."
                 )
             else:
                 handoff_status = "info"
-                handoff_summary = "This staged run has not produced a coordinator handoff plan yet."
+                handoff_summary = "Поэтапный запуск ещё не подготовил продолжение для координатора."
         else:
             handoff_status = "info"
-            handoff_summary = "Coordinator run is already beyond the staged handoff step."
+            handoff_summary = "Координатор уже выполняет этап после передачи стадий."
         rows.append(
             {
-                "title": "Continuation route",
+                "title": "Продолжение расчёта",
                 "status": handoff_status,
                 "summary": handoff_summary,
-                "action": "Handoff",
+                "action": "Передача стадий",
                 "action_kind": "show_handoff_tab",
             }
         )
         if pointer_matches:
             pointer_status = "ok"
-            pointer_summary = "selected_run_contract.json is ready for WS-ANALYSIS."
+            pointer_summary = "Выбранный запуск уже подготовлен для анализа."
         elif has_results:
             pointer_status = "info"
-            pointer_summary = "Selecting this run in the GUI refreshes selected_run_contract.json for WS-ANALYSIS."
+            pointer_summary = "При выборе этого запуска данные для анализа обновятся автоматически."
         else:
             pointer_status = "info"
             pointer_summary = (
-                "Analysis handoff can be refreshed, but downstream review remains limited "
-                "without results artifacts."
+                "Данные для анализа можно обновить, но без файла результатов "
+                "последующие окна покажут неполную картину."
             )
         rows.append(
             {
-                "title": "Analysis handoff",
+                "title": "Передача в анализ",
                 "status": pointer_status,
                 "summary": pointer_summary,
-                "action": "Review selected run",
+                "action": "Проверить выбранный запуск",
                 "action_kind": "show_history_tab",
             }
         )
         if live_now:
             runtime_status = "info"
-            runtime_summary = "Selected run is live now; follow runtime progress before making downstream decisions."
+            runtime_summary = "Выбранный запуск сейчас выполняется; сначала проверьте ход расчёта."
         else:
             runtime_status = "ok"
-            runtime_summary = "Selected run is not running right now."
+            runtime_summary = "Выбранный запуск сейчас не выполняется."
         rows.append(
             {
-                "title": "Runtime state",
+                "title": "Выполнение",
                 "status": runtime_status,
                 "summary": runtime_summary,
-                "action": "Runtime",
+                "action": "Выполнение",
                 "action_kind": "show_runtime_tab",
             }
         )
 
-        next_action = "Runtime"
+        next_action = "Выполнение"
         next_action_kind = "show_runtime_tab"
-        headline = "Selected run looks stable for review."
+        headline = "Выбранный запуск готов к проверке."
         if live_now:
-            headline = "Selected run is active now."
-            next_action = "Runtime"
+            headline = "Выбранный запуск сейчас выполняется."
+            next_action = "Выполнение"
             next_action_kind = "show_runtime_tab"
         elif compat_status == "warn":
-            headline = "Selected run needs contract review before reuse."
-            next_action = "Contract"
+            headline = "Перед повторным использованием нужно проверить настройки запуска."
+            next_action = "Настройки запуска"
             next_action_kind = "show_contract_tab"
         elif packaging_status == "warn":
-            headline = "Selected run needs packaging review before promotion."
-            next_action = "Packaging"
+            headline = "Перед выпуском нужно проверить готовность результатов."
+            next_action = "Упаковка и выпуск"
             next_action_kind = "show_packaging_tab"
         elif str(summary.pipeline_mode or "") == "staged" and bool(summary.handoff_available or summary.handoff_preset_tag):
-            headline = "Selected staged run is ready for coordinator continuation."
-            next_action = "Handoff"
+            headline = "Поэтапный запуск готов к продолжению координатором."
+            next_action = "Передача стадий"
             next_action_kind = "show_handoff_tab"
         elif not pointer_matches and has_results:
-            headline = "Selected run will be handed to analysis from selection."
-            next_action = "History"
+            headline = "Выбранный запуск будет передан в анализ после выбора."
+            next_action = "История запусков"
             next_action_kind = "show_history_tab"
         elif not has_results:
-            headline = "Selected run is still missing results artifacts."
-            next_action = "History"
+            headline = "У выбранного запуска ещё нет файла результатов."
+            next_action = "История запусков"
             next_action_kind = "show_history_tab"
         elif pointer_matches:
-            headline = "Selected run is already aligned with downstream analysis."
-            next_action = "Packaging"
+            headline = "Выбранный запуск уже используется в анализе."
+            next_action = "Упаковка и выпуск"
             next_action_kind = "show_packaging_tab"
         return {
             "headline": headline,
@@ -1447,42 +1448,42 @@ class DesktopOptimizerRuntime:
 
         contract_issues: list[str] = []
         if not tuple(snapshot.objective_keys or ()):
-            contract_issues.append("objective keys missing")
+            contract_issues.append("нет целей оптимизации")
         if not str(snapshot.penalty_key or "").strip():
-            contract_issues.append("penalty key missing")
+            contract_issues.append("нет штрафного критерия")
         if not str(snapshot.problem_hash or "").strip():
-            contract_issues.append("problem hash missing")
+            contract_issues.append("нет контрольной области задачи")
         rows.append(
             {
-                "title": "Contract & scope",
+                "title": "Цели и область задачи",
                 "status": "warn" if contract_issues else "ok",
                 "summary": (
-                    "Blockers: " + ", ".join(contract_issues) + "."
+                    "Блокировки: " + ", ".join(contract_issues) + "."
                     if contract_issues
-                    else "Objective contract, penalty gate and problem scope are materialized."
+                    else "Цели, штрафной критерий и область задачи зафиксированы."
                 ),
-                "action": "Contract",
+                "action": "Настройки запуска",
             }
         )
 
         search_space_issues: list[str] = []
         if int(snapshot.search_param_count or 0) <= 0:
-            search_space_issues.append("no design params in ranges.json")
+            search_space_issues.append("нет параметров проектирования в диапазонах")
         if int(snapshot.enabled_suite_total or 0) <= 0:
-            search_space_issues.append("no enabled suite rows")
+            search_space_issues.append("нет включённых строк набора испытаний")
         rows.append(
             {
-                "title": "Search space & suite",
+                "title": "Область поиска и набор испытаний",
                 "status": "warn" if search_space_issues else "ok",
                 "summary": (
-                    "Blockers: " + ", ".join(search_space_issues) + "."
+                    "Блокировки: " + ", ".join(search_space_issues) + "."
                     if search_space_issues
                     else (
-                        f"Design params={int(snapshot.search_param_count or 0)}, "
-                        f"enabled suite rows={int(snapshot.enabled_suite_total or 0)}."
+                        f"Параметров проектирования: {int(snapshot.search_param_count or 0)}, "
+                        f"включённых строк набора: {int(snapshot.enabled_suite_total or 0)}."
                     )
                 ),
-                "action": "Contract",
+                "action": "Настройки запуска",
             }
         )
 
@@ -1492,21 +1493,21 @@ class DesktopOptimizerRuntime:
         if bool(snapshot.optimizer_baseline_can_consume):
             baseline_status = "ok"
             baseline_summary = (
-                f"HO-006 current: active_baseline_hash={baseline_hash[:12] or '—'}, "
-                f"suite_snapshot_hash={str(snapshot.active_baseline_suite_snapshot_hash or '')[:12] or '—'}."
+                f"Опорный прогон актуален: контроль={baseline_hash[:12] or '—'}, "
+                f"контроль набора={str(snapshot.active_baseline_suite_snapshot_hash or '')[:12] or '—'}."
             )
         else:
             baseline_status = "warn"
             baseline_summary = (
-                f"Blocking HO-006 state={baseline_state}: "
-                + (baseline_banner or "Open Baseline Center and explicitly review/adopt/restore active baseline.")
+                f"Опорный прогон заблокирован, состояние={baseline_state}: "
+                + (baseline_banner or "Откройте центр опорного прогона и явно просмотрите, примите или восстановите активный прогон.")
             )
         rows.append(
             {
-                "title": "Active baseline HO-006",
+                "title": "Активный опорный прогон",
                 "status": baseline_status,
                 "summary": baseline_summary,
-                "action": "Baseline Center",
+                "action": "Центр опорного прогона",
                 "handoff_id": "HO-006",
                 "state": baseline_state,
                 "optimizer_baseline_can_consume": bool(snapshot.optimizer_baseline_can_consume),
@@ -1518,31 +1519,31 @@ class DesktopOptimizerRuntime:
         baseline_compatibility = str(drift.get("baseline_compatibility") or "")
         if selected_summary is None:
             align_status = "info"
-            align_summary = "Historical run is not selected; launch will use the current desktop contract only."
+            align_summary = "Исторический запуск не выбран; запуск использует только текущие настройки."
         elif str(selected_scope.get("compatibility") or "") == "different" or str(
             selected_scope.get("mode_compatibility") or ""
         ) == "different":
             align_status = "warn"
             align_summary = (
-                "Selected run belongs to a different problem scope/hash mode than the current launch contract."
+                "Выбранный запуск относится к другой области задачи или режиму контрольной суммы."
             )
         elif baseline_compatibility == "different":
             align_status = "warn"
-            align_summary = "Selected run uses another baseline source than the current launch contract."
+            align_summary = "Выбранный запуск использует другой источник опорного прогона, чем текущие настройки запуска."
         elif diff_bits:
             align_status = "info"
             align_summary = (
-                "Selected run differs by objective contract: " + ", ".join(diff_bits) + "."
+                "Выбранный запуск отличается по настройкам целей: " + ", ".join(diff_bits) + "."
             )
         else:
             align_status = "ok"
-            align_summary = "Selected run is aligned with the current launch contract and problem scope."
+            align_summary = "Выбранный запуск согласован с текущими настройками запуска и областью задачи."
         rows.append(
             {
-                "title": "Selected run alignment",
+                "title": "Согласованность выбранного запуска",
                 "status": align_status,
                 "summary": align_summary,
-                "action": "Contract drift",
+                "action": "Настройки запуска",
             }
         )
 
@@ -1566,15 +1567,15 @@ class DesktopOptimizerRuntime:
             identity_status = "ok"
         identity_summary = str(identity.get("banner") or "")
         if identity_reasons:
-            identity_summary += " Blockers: " + ", ".join(identity_reasons) + "."
+            identity_summary += " Блокировки: " + ", ".join(identity_reasons) + "."
         elif identity_warnings:
-            identity_summary += " Notes: " + ", ".join(identity_warnings[:2]) + "."
+            identity_summary += " Примечания: " + ", ".join(identity_warnings[:2]) + "."
         rows.append(
             {
-                "title": "Run identity & resume safety",
+                "title": "Идентичность запуска и безопасное продолжение",
                 "status": identity_status,
                 "summary": identity_summary,
-                "action": "History",
+                "action": "История",
                 "state": identity_state,
                 "resume_requested": bool(identity.get("resume_requested")),
                 "selected_run_contract_hash": str(
@@ -1587,53 +1588,53 @@ class DesktopOptimizerRuntime:
 
         if int(packaging_overview.get("total_runs", 0) or 0) <= 0:
             packaging_status = "info"
-            packaging_summary = "No finished packaging evidence yet; launch can proceed, but comparison history is still empty."
+            packaging_summary = "Готовых сведений по упаковке пока нет; запуск возможен, но история сравнения ещё пустая."
         elif int(packaging_overview.get("truth_ready_runs", 0) or 0) <= 0:
             packaging_status = "warn"
-            packaging_summary = "Finished runs exist, but none is truth-ready for packaging yet."
+            packaging_summary = "Готовые запуски есть, но ни один пока не готов к упаковке по проверке достоверности."
         elif int(packaging_overview.get("zero_interference_runs", 0) or 0) <= 0:
             packaging_status = "warn"
-            packaging_summary = "Packaging evidence exists, but all visible runs still show interference rows."
+            packaging_summary = "Сведения по упаковке есть, но во всех видимых запусках ещё есть строки с пересечениями."
         else:
             packaging_status = "ok"
             packaging_summary = (
-                f"Packaging evidence is available: truth-ready runs={int(packaging_overview.get('truth_ready_runs', 0) or 0)}, "
-                f"zero-interference runs={int(packaging_overview.get('zero_interference_runs', 0) or 0)}."
+                f"Сведения по упаковке готовы: запусков с проверенной достоверностью={int(packaging_overview.get('truth_ready_runs', 0) or 0)}, "
+                f"запусков без пересечений={int(packaging_overview.get('zero_interference_runs', 0) or 0)}."
             )
         rows.append(
             {
-                "title": "Packaging evidence",
+                "title": "Сведения по упаковке",
                 "status": packaging_status,
                 "summary": packaging_summary,
-                "action": "Packaging",
+                "action": "Упаковка",
             }
         )
 
         if str(launch_profile.get("launch_pipeline") or "") == "coordinator":
             if int(handoff_overview.get("total_candidates", 0) or 0) <= 0:
                 handoff_status = "info"
-                handoff_summary = "Coordinator launch is available directly, but no staged handoff candidate is selected in history."
+                handoff_summary = "Распределённый запуск доступен напрямую, но кандидат продолжения из стадий в истории не выбран."
             else:
                 handoff_status = "ok"
                 handoff_summary = (
-                    f"Handoff candidates are available: best={handoff_overview.get('best_run') or '—'} "
-                    f"preset={handoff_overview.get('best_preset') or '—'}."
+                    f"Кандидаты продолжения доступны: лучший={handoff_overview.get('best_run') or '—'} "
+                    f"пресет={handoff_overview.get('best_preset') or '—'}."
                 )
         else:
             if int(handoff_overview.get("total_candidates", 0) or 0) <= 0:
                 handoff_status = "info"
-                handoff_summary = "No handoff candidates yet; they will appear after staged runs produce continuation plans."
+                handoff_summary = "Кандидатов продолжения пока нет; они появятся после стадийных запусков с планами продолжения."
             else:
                 handoff_status = "ok"
                 handoff_summary = (
-                    f"Staged continuation inventory already exists: candidates={int(handoff_overview.get('total_candidates', 0) or 0)}."
+                    f"Список стадийных продолжений уже есть: кандидатов={int(handoff_overview.get('total_candidates', 0) or 0)}."
                 )
         rows.append(
             {
-                "title": "Handoff inventory",
+                "title": "Кандидаты продолжения",
                 "status": handoff_status,
                 "summary": handoff_summary,
-                "action": "Handoff",
+                "action": "Передача стадий",
             }
         )
 
@@ -1641,21 +1642,21 @@ class DesktopOptimizerRuntime:
             active_job = active_surface.get("job")
             runtime_status = "info"
             runtime_summary = (
-                f"Active job is running: {getattr(active_job, 'pipeline_mode', '') or '—'} / "
+                f"Активное задание выполняется: {getattr(active_job, 'pipeline_mode', '') or '—'} / "
                 f"{getattr(active_job, 'backend', '') or '—'}."
             )
         else:
             runtime_status = "ok"
             runtime_summary = (
-                f"Launch surface is idle and ready: profile={launch_profile.get('profile_label') or '—'}, "
-                f"pipeline={launch_profile.get('launch_pipeline') or '—'}."
+                f"Окно запуска свободно и готово: профиль={launch_profile.get('profile_label') or '—'}, "
+                f"маршрут={launch_profile.get('launch_pipeline') or '—'}."
             )
         rows.append(
             {
-                "title": "Runtime state",
+                "title": "Состояние выполнения",
                 "status": runtime_status,
                 "summary": runtime_summary,
-                "action": "Runtime",
+                "action": "Выполнение",
             }
         )
 
@@ -1663,14 +1664,14 @@ class DesktopOptimizerRuntime:
         info_count = sum(1 for row in rows if str(row.get("status") or "") == "info")
         ok_count = sum(1 for row in rows if str(row.get("status") or "") == "ok")
         if warn_count > 0:
-            headline = "Review blockers before launch."
-            next_action = str(next((row.get("action") for row in rows if row.get("status") == "warn"), "Contract"))
+            headline = "Перед запуском нужно разобрать блокировки."
+            next_action = str(next((row.get("action") for row in rows if row.get("status") == "warn"), "Настройки запуска"))
         elif info_count > 0:
-            headline = "Launch is usable, but there are contextual notes for the operator."
-            next_action = str(next((row.get("action") for row in rows if row.get("status") == "info"), "Runtime"))
+            headline = "Запуск доступен, но есть примечания для оператора."
+            next_action = str(next((row.get("action") for row in rows if row.get("status") == "info"), "Выполнение"))
         else:
-            headline = "Launch surface looks aligned and ready."
-            next_action = "Runtime"
+            headline = "Окно запуска согласовано и готово."
+            next_action = "Выполнение"
         return {
             "rows": tuple(rows),
             "warn_count": int(warn_count),

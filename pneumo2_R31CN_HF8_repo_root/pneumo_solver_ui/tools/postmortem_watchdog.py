@@ -140,7 +140,7 @@ def _log_bundle_summary(path: Path, meta: object) -> None:
         _log(path, f"[watchdog] {line}")
     diag_path = str(summary.get("anim_pointer_diagnostics_path") or "").strip()
     if diag_path:
-        _log(path, f"[watchdog] Anim pointer diagnostics: {diag_path}")
+        _log(path, f"[watchdog] Диагностика указателя анимации: {diag_path}")
 
 
 def main() -> int:

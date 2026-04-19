@@ -393,10 +393,10 @@ def build_suite_matrix_preview(
             )
     validation_obj = dict(validation or {})
     summary_text = (
-        f"rows={len(normalized)} | enabled={len(enabled_rows)} | "
-        f"stages={','.join(f'{k}:{v}' for k, v in sorted(stage_counts.items())) or 'none'} | "
-        f"types={len(type_counts)} | ref_rows={ref_row_count} | "
-        f"missing_refs={int(validation_obj.get('missing_ref_count', 0) or 0)}"
+        f"строк={len(normalized)} | включено={len(enabled_rows)} | "
+        f"стадии={','.join(f'{k}:{v}' for k, v in sorted(stage_counts.items())) or 'нет'} | "
+        f"типов={len(type_counts)} | строк со ссылками={ref_row_count} | "
+        f"не хватает ссылок={int(validation_obj.get('missing_ref_count', 0) or 0)}"
     )
     return {
         "row_count": int(len(normalized)),
@@ -489,7 +489,7 @@ def describe_suite_snapshot_state(
             "is_stale": True,
             "handoff_ready": False,
             "stale_reasons": ["missing_validated_suite_snapshot"],
-            "banner": "validated_suite_snapshot не найден: WS-SUITE должен создать HO-005 перед baseline.",
+            "banner": "Снимок набора испытаний не найден: сначала обновите набор перед кратким предпросмотром.",
         }
 
     if str(snapshot.get("schema_version") or "") != VALIDATED_SUITE_SNAPSHOT_SCHEMA_VERSION:
@@ -498,7 +498,7 @@ def describe_suite_snapshot_state(
             "is_stale": True,
             "handoff_ready": False,
             "stale_reasons": ["unsupported_validated_suite_snapshot_schema"],
-            "banner": "validated_suite_snapshot имеет неподдерживаемую схему; baseline не должен молча продолжать.",
+            "banner": "Снимок набора испытаний имеет неподдерживаемую схему; запуск остановлен.",
         }
 
     validation = dict(snapshot.get("validation") or {})
@@ -525,10 +525,10 @@ def describe_suite_snapshot_state(
             "handoff_ready": False,
             "stale_reasons": reasons or ["suite_validation_failed"],
             "banner": (
-                "validated_suite_snapshot не готов для HO-005: "
-                f"enabled={enabled}, missing_refs={missing}, "
-                f"ownership_violations={ownership}, override_rejections={rejections}, "
-                f"upstream_ref_errors={upstream}."
+                "Снимок набора испытаний не готов: "
+                f"включено={enabled}, не хватает ссылок={missing}, "
+                f"ошибок владения данными={ownership}, отклонено изменений={rejections}, "
+                f"ошибок входных ссылок={upstream}."
             ),
         }
 
@@ -556,9 +556,9 @@ def describe_suite_snapshot_state(
             "handoff_ready": False,
             "stale_reasons": stale_reasons,
             "banner": (
-                "validated_suite_snapshot устарел для HO-005: "
+                "Снимок набора испытаний устарел: "
                 + ", ".join(stale_reasons)
-                + ". Обновите WS-SUITE snapshot перед baseline."
+                + ". Обновите набор перед кратким предпросмотром."
             ),
         }
 
@@ -568,8 +568,8 @@ def describe_suite_snapshot_state(
         "handoff_ready": True,
         "stale_reasons": [],
         "banner": (
-            "validated_suite_snapshot актуален: WS-BASELINE может потребить HO-005 "
-            f"с suite_snapshot_hash={str(snapshot.get('suite_snapshot_hash') or '')[:12]}."
+            "Снимок набора испытаний актуален: краткий предпросмотр может использовать его "
+            f"с контролем={str(snapshot.get('suite_snapshot_hash') or '')[:12]}."
         ),
     }
 

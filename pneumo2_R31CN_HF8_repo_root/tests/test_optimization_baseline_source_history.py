@@ -203,7 +203,7 @@ def test_stale_active_baseline_banner_blocks_optimizer_and_silent_rebinding(tmp_
     assert resolved["silent_rebinding_allowed"] is False
     assert missing["state"] == "missing"
     assert missing["silent_rebinding_allowed"] is False
-    assert "baseline_best.json" in missing["banner"]
+    assert "запасной опорный прогон" in missing["banner"]
 
 
 def test_baseline_suite_handoff_launch_gate_blocks_missing_stale_invalid_and_force(tmp_path: Path) -> None:
@@ -250,7 +250,7 @@ def test_baseline_suite_handoff_launch_gate_blocks_missing_stale_invalid_and_for
     assert missing["state"] == "missing"
     assert missing["baseline_launch_allowed"] is False
     assert missing["runtime_policy_can_bypass"] is False
-    assert "runtime_policy не может обойти" in missing["banner"]
+    assert "Режим выполнения не может обойти" in missing["banner"]
     assert current["state"] == "current"
     assert current["baseline_launch_allowed"] is True
     assert stale["state"] == "stale"
@@ -260,7 +260,7 @@ def test_baseline_suite_handoff_launch_gate_blocks_missing_stale_invalid_and_for
     assert invalid["baseline_launch_allowed"] is False
     assert detail_warning["warning_only"] is True
     assert detail_warning["baseline_launch_allowed"] is True
-    assert "не блокирует detail/full" in detail_warning["banner"]
+    assert "не блокирует детальный и полный запуск" in detail_warning["banner"]
 
 
 def test_optimization_baseline_source_ui_surfaces_ho005_next_to_active_state(tmp_path: Path) -> None:

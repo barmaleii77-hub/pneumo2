@@ -27,7 +27,10 @@ def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="desktop_engineering_analysis_center",
         title="Инженерный анализ",
-        description="Consumer HO-007: selected optimization run, influence artifacts, compare integrity and HO-009 evidence handoff.",
+        description=(
+            "Анализ выбранного результата оптимизации: влияние параметров, контроль целостности "
+            "сравнения и подготовка материалов для диагностики."
+        ),
         group="Встроенные окна",
         mode="hosted",
         workflow_stage="analysis",
@@ -41,9 +44,9 @@ def build_spec() -> DesktopShellToolSpec:
         menu_section="Результаты",
         nav_section="Результаты",
         details=(
-            "Открывает frozen selected_run_contract.json из HO-007 как master-source "
-            "для анализа, показывает objective/hard-gate/baseline lineage и готовит "
-            "HO-009 evidence manifest без финализации diagnostics bundle."
+            "Открывает выбранный прогон как неизменяемую основу анализа, показывает цель, "
+            "ограничения и связь с базовым прогоном, затем готовит подтверждающие материалы "
+            "без автоматической финализации архива диагностики."
         ),
         menu_order=55,
         nav_order=55,
@@ -53,13 +56,13 @@ def build_spec() -> DesktopShellToolSpec:
         source_of_truth_role="derived",
         search_aliases=(
             "engineering analysis",
-            "selected_run_contract",
             "HO-007",
             "HO-009",
             "influence",
             "sensitivity",
             "инженерный анализ",
-            "контракт выбранного прогона",
+            "выбранный прогон",
+            "влияние параметров",
         ),
         context_handoff_keys=(
             "selected_tool_key",

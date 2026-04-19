@@ -24,11 +24,11 @@ def build_desktop_launch_catalog(*, include_mnemo: bool = True) -> tuple[Desktop
     items: list[DesktopLaunchCatalogItem] = [
         DesktopLaunchCatalogItem(
             key="desktop_main_shell_qt",
-            title="Desktop Main Shell",
+            title="Главное окно приложения",
             module="pneumo_solver_ui.tools.desktop_main_shell_qt",
             description=(
-                "Главное Windows-окно оператора: верхнее меню, поиск команд, дерево маршрута, "
-                "инспектор, status/progress strip и единый запуск GUI-модулей."
+                "Главное Windows-окно оператора: верхнее меню, быстрый поиск, список порядка работы, "
+                "инспектор, строка состояния, индикатор выполнения и единый запуск инженерных окон."
             ),
             group="Главное окно",
             runtime_kind="qt",
@@ -36,12 +36,9 @@ def build_desktop_launch_catalog(*, include_mnemo: bool = True) -> tuple[Desktop
             source_of_truth_role="launcher",
             migration_status="native",
             search_aliases=(
-                "desktop main shell",
-                "desktop shell",
-                "qt main shell",
                 "главное окно",
                 "рабочее место инженера",
-                "WS-SHELL",
+                "основное рабочее место",
             ),
             context_handoff_keys=(
                 "selected_tool_key",
@@ -55,20 +52,20 @@ def build_desktop_launch_catalog(*, include_mnemo: bool = True) -> tuple[Desktop
         ),
         DesktopLaunchCatalogItem(
             key="desktop_gui_spec_shell",
-            title="Резервный GUI-spec shell",
+            title="Проверочное рабочее место",
             module="pneumo_solver_ui.tools.desktop_gui_spec_shell",
             description=(
-                "Legacy/reference shell surface. Primary operator launch target is Desktop Main Shell."
+                "Проверочное рабочее место для сверки порядка работы и восстановления доступа к окнам."
             ),
-            group="Резервные окна",
+            group="Инструменты восстановления",
             runtime_kind="qt",
             workspace_role="workspace",
             source_of_truth_role="launcher",
             migration_status="in_development",
             search_aliases=(
-                "gui spec shell",
-                "legacy shell",
-                "reference shell",
+                "проверочное рабочее место",
+                "восстановление доступа",
+                "сверка окон",
             ),
             context_handoff_keys=(
                 "selected_tool_key",

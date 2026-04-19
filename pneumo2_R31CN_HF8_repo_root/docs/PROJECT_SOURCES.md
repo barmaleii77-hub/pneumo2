@@ -33,6 +33,7 @@
 - `docs/context/gui_spec_imports/v38_github_kb_commit_ready/REPO_OPEN_GAPS_TO_KEEP_OPEN.csv` — V38 gaps, которые нельзя скрывать как закрытые.
 - `docs/context/gui_spec_imports/v38_github_kb_commit_ready/NON_RUNTIME_CLOSURE_NOTICE.md` — явное ограничение: V38 не является runtime-closure proof.
 - `docs/context/release_readiness/V38_KB_IMPORT_AUDIT_2026-04-18.md` — local V38 import audit: полный read coverage, ambiguity resolution and current read order.
+- `docs/context/release_readiness/GUI_TEXT_SEMANTIC_AUDIT_2026-04-19.md` — semantic audit кнопок, надписей, user-facing vocabulary, V38 naming ambiguities and `PIPELINE_OPTIMIZED.dot` alignment for desktop GUI.
 - `docs/context/gui_spec_imports/v37_github_kb_supplement/README.md` — predecessor consolidated GitHub knowledge-base supplement layer; не является runtime-closure proof.
 - `docs/context/gui_spec_imports/v37_github_kb_supplement/TECHNICAL_SPECIFICATION.md` — predecessor human-readable ТЗ/spec connector для Windows desktop GUI.
 - `docs/context/gui_spec_imports/v37_github_kb_supplement/GUI_SPEC.yaml` — predecessor machine-readable GUI-spec/TZ connector.
