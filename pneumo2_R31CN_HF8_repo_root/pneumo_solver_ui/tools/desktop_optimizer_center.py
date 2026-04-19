@@ -200,7 +200,7 @@ class DesktopOptimizerCenter:
         self._hosted = bool(hosted or not self._owns_root)
         self.root = host if host is not None else tk.Tk()
         if self._owns_root:
-            self.root.title(f"Центр автоматизированной оптимизации ({RELEASE})")
+            self.root.title(f"Автоматизированная оптимизация ({RELEASE})")
             self.root.geometry("1480x980")
             self.root.minsize(1220, 820)
         self.repo_root = Path(__file__).resolve().parents[2]
@@ -211,7 +211,7 @@ class DesktopOptimizerCenter:
             platform_name=sys.platform,
         )
         self.status_var = tk.StringVar(
-            value="Готово. Автоматизированная оптимизация доступна в отдельном инженерном центре."
+            value="Готово. Автоматизированная оптимизация доступна в отдельном инженерном окне."
         )
         self.mode_summary_var = tk.StringVar(
             value="Порядок работы: опорный прогон, оптимизация, анализ. Режим и опорный прогон будут показаны после первого обновления."
@@ -273,7 +273,7 @@ class DesktopOptimizerCenter:
         header_actions.pack(side="right", anchor="ne")
         ttk.Button(
             header_actions,
-            text="Маршрут",
+            text="Порядок работы",
             command=self.show_dashboard_tab,
         ).pack(side="left")
         ttk.Button(
@@ -288,7 +288,7 @@ class DesktopOptimizerCenter:
         ).pack(side="left", padx=(8, 0))
         ttk.Button(
             header_actions,
-            text="Обновить",
+            text="Обновить данные",
             command=self.refresh_all,
         ).pack(side="left", padx=(12, 0))
 
@@ -326,7 +326,7 @@ class DesktopOptimizerCenter:
 
         nav_frame = ttk.LabelFrame(sidebar, text="Переходы", padding=8)
         nav_frame.pack(fill="x", pady=(8, 0))
-        ttk.Button(nav_frame, text="Открыть центр опорного прогона", command=self.open_baseline_center).pack(fill="x")
+        ttk.Button(nav_frame, text="Открыть базовый прогон", command=self.open_baseline_center).pack(fill="x")
         ttk.Button(nav_frame, text="Опорный прогон и настройки", command=self.show_contract_tab).pack(fill="x", pady=(6, 0))
         ttk.Button(nav_frame, text="Выполнение оптимизации", command=self.show_runtime_tab).pack(fill="x", pady=(6, 0))
         ttk.Button(nav_frame, text="История", command=self.show_history_tab).pack(fill="x", pady=(6, 0))
@@ -411,11 +411,11 @@ class DesktopOptimizerCenter:
             )
         except Exception as exc:
             messagebox.showerror(
-                "Центр опорного прогона",
-                f"Не удалось открыть центр опорного прогона:\n{exc}",
+                "Базовый прогон",
+                f"Не удалось открыть базовый прогон:\n{exc}",
             )
             return
-        self.status_var.set("Открыт центр опорного прогона.")
+        self.status_var.set("Открыт базовый прогон.")
 
     def open_current_artifact(self, attr_name: str) -> None:
         snapshot = self._contract_snapshot
@@ -428,7 +428,7 @@ class DesktopOptimizerCenter:
             self._open_path(getattr(snapshot, attr_name, None))
         except Exception as exc:
             messagebox.showerror(
-                "Центр оптимизации",
+                "Оптимизация",
                 f"Не удалось открыть путь:\n{exc}",
             )
 
@@ -510,7 +510,7 @@ class DesktopOptimizerCenter:
             lines.extend(
                 [
                     f"Запуск - {payload.get('selected_run_name') or '—'}",
-                    f"Идентификатор запуска - {payload.get('run_id') or '—'}",
+                    f"Метка запуска - {payload.get('run_id') or '—'}",
                     f"Папка запуска - {payload.get('selected_run_dir')}",
                     (
                         "Контрольные метки - "
@@ -562,18 +562,18 @@ class DesktopOptimizerCenter:
             f"Контур текущего запуска - {_operator_token_text(payload.get('launch_pipeline'))}",
         ]
         if payload.get("selected_run_id"):
-            lines.append(f"Идентификатор координатора - {payload.get('selected_run_id')}")
+            lines.append(f"Метка координатора - {payload.get('selected_run_id')}")
         if bool(payload.get("stage_resume_enabled")):
             lines.append("Продолжение стадий включено.")
         else:
             lines.append("Продолжение стадий выключено.")
         if bool(payload.get("coord_resume_enabled")):
             lines.append(
-                f"Продолжение координатора включено. Идентификатор - {payload.get('coord_run_id') or 'автоматически'}."
+                f"Продолжение координатора включено. Метка - {payload.get('coord_run_id') or 'автоматически'}."
             )
         else:
             lines.append("Продолжение координатора выключено.")
-        lines.extend(["", "Идентичность запуска и безопасное продолжение:", identity_text])
+        lines.extend(["", "Сводка запуска и безопасное продолжение:", identity_text])
         return "\n".join(lines)
 
     def _format_dashboard_workspace_text(self) -> str:
@@ -628,7 +628,7 @@ class DesktopOptimizerCenter:
                 f"{_operator_token_text(resume_target.get('selected_pipeline'))}"
             ),
             (
-                "Идентичность запуска - "
+                "Сводка запуска - "
                 f"{_operator_state(identity.get('state'), fallback='не найден')}. "
                 f"Цели {_short_hash(identity.get('objective_contract_hash'))}; "
                 f"задача {_short_hash(identity.get('problem_hash'))}; "
@@ -734,7 +734,7 @@ class DesktopOptimizerCenter:
 
     def _format_compact_mode_summary(self) -> str:
         payload = self.runtime.launch_profile_summary()
-        profile = str(payload.get("profile_label") or "Автоматический маршрут")
+        profile = str(payload.get("profile_label") or "Автоматический порядок работы")
         pipeline = _operator_token_text(payload.get("launch_pipeline"))
         backend = _operator_token_text(payload.get("backend"))
         drift_keys = tuple(str(key) for key in payload.get("drift_keys") or ())
@@ -844,7 +844,7 @@ class DesktopOptimizerCenter:
                 f"Цели оптимизации - {objective_stack}",
                 f"Жёсткий критерий - {hard_gate}",
                 (
-                    "Идентичность запуска - "
+                    "Сводка запуска - "
                     f"{_operator_state(identity.get('state'), fallback='не найден')}. "
                     f"Цели {_short_hash(identity.get('objective_contract_hash'))}; "
                     f"задача {_short_hash(identity.get('problem_hash'))}; "
@@ -894,7 +894,7 @@ class DesktopOptimizerCenter:
     def _format_selected_run_next_step_text(self, payload: dict[str, Any]) -> str:
         rows = tuple(payload.get("rows") or ())
         if not rows:
-            return "Следующий шаг по выбранному прогону пока недоступен."
+            return "Рекомендация по выбранному прогону пока недоступна."
         lines = [
             f"Сводка - {payload.get('headline') or '—'}",
             f"Следующее действие - {payload.get('next_action') or '—'}",
@@ -914,7 +914,7 @@ class DesktopOptimizerCenter:
             return "Прогон пока не выбран. Используйте историю, готовые прогоны, передачу или выпуск."
         details = self.runtime.selected_run_details(self._selected_run_dir)
         if details is None:
-            return f"Контекст выбранного запуска: {self._selected_run_dir}\nЗапуск уже недоступен в истории рабочей области."
+            return f"Выбранный запуск: {self._selected_run_dir}\nЗапуск уже недоступен в истории рабочей области."
         summary = getattr(details, "summary")
         drift = self.runtime.contract_drift_summary(summary)
         identity = self.runtime.selected_run_identity_summary(self._selected_run_dir)
@@ -925,10 +925,10 @@ class DesktopOptimizerCenter:
             f"Выбранный запуск - {summary.run_dir}",
             f"Состояние - {_operator_state(summary.status_label or summary.status, fallback='нет данных')}",
             f"Контур и исполнитель - {_operator_token_text(summary.pipeline_mode)} / {_operator_token_text(summary.backend)}",
-            f"Идентичность запуска - {_operator_state(identity.get('state'), fallback='не найден')}. {identity.get('banner') or '—'}",
+            f"Сводка запуска - {_operator_state(identity.get('state'), fallback='не найден')}. {identity.get('banner') or '—'}",
             (
                 "Контрольные метки - "
-                f"идентификатор {identity.get('run_id') or '—'}; "
+                f"метка {identity.get('run_id') or '—'}; "
                 f"цели {_short_hash(identity.get('objective_contract_hash'))}; "
                 f"задача {_short_hash(identity.get('problem_hash'))}; "
                 f"опорный прогон {_short_hash(identity.get('active_baseline_hash'))}."
@@ -997,11 +997,11 @@ class DesktopOptimizerCenter:
             return _operator_compat_text(value)
 
         lines = [
-            f"Состояние идентичности - {_operator_state(identity.get('state'), fallback='не найден')}",
+            f"Состояние запуска - {_operator_state(identity.get('state'), fallback='не найден')}",
             f"Пояснение - {identity.get('banner') or '—'}",
             (
                 "Контрольные метки - "
-                f"идентификатор {identity.get('run_id') or '—'}; "
+                f"метка {identity.get('run_id') or '—'}; "
                 f"цели {_short_hash(identity.get('objective_contract_hash'))}; "
                 f"задача {_short_hash(identity.get('problem_hash'))}; "
                 f"опорный прогон {_short_hash(identity.get('active_baseline_hash'))}; "
@@ -1275,7 +1275,7 @@ class DesktopOptimizerCenter:
         lines = [
             f"Исходный поэтапный прогон - {summary.run_dir}",
             f"Состояние - {_operator_state(summary.status_label or summary.status, fallback='нет данных')}",
-            f"Идентичность - {_operator_state(identity.get('state'), fallback='не найден')}; запуск {identity.get('run_id') or '—'}; цели {_short_hash(identity.get('objective_contract_hash'))}",
+            f"Сводка запуска - {_operator_state(identity.get('state'), fallback='не найден')}; метка {identity.get('run_id') or '—'}; цели {_short_hash(identity.get('objective_contract_hash'))}",
             (
                 "Профиль передачи - "
                 f"{_operator_preset_text(summary.handoff_preset_tag or row.get('preset'))}. "
@@ -1462,7 +1462,7 @@ class DesktopOptimizerCenter:
                 f"Папка запуска - {summary.run_dir}",
                 f"Контур и исполнитель - {_operator_token_text(summary.pipeline_mode)} / {_operator_token_text(summary.backend)}",
                 f"Состояние - {_operator_state(summary.status_label or summary.status, fallback='нет данных')}",
-                f"Идентичность запуска - {_operator_state(identity.get('state'), fallback='не найден')}; идентификатор {identity.get('run_id') or '—'}",
+                f"Сводка запуска - {_operator_state(identity.get('state'), fallback='не найден')}; метка {identity.get('run_id') or '—'}",
                 (
                     "Контрольные метки - "
                     f"цели {_short_hash(identity.get('objective_contract_hash'))}; "
@@ -1589,7 +1589,7 @@ class DesktopOptimizerCenter:
             [
                 f"Папка запуска - {summary.run_dir}",
                 f"Контур и исполнитель - {_operator_token_text(summary.pipeline_mode)} / {_operator_token_text(summary.backend)}",
-                f"Идентичность запуска - {_operator_state(identity.get('state'), fallback='не найден')}; идентификатор {identity.get('run_id') or '—'}",
+                f"Сводка запуска - {_operator_state(identity.get('state'), fallback='не найден')}; метка {identity.get('run_id') or '—'}",
                 f"Цели - {_operator_list_text(summary.objective_keys)}",
                 f"Ограничение - {summary.penalty_key or '—'}, допуск {summary.penalty_tol if summary.penalty_tol is not None else '—'}",
                 f"Контроль задачи - {summary.problem_hash or '—'}",
@@ -1612,8 +1612,8 @@ class DesktopOptimizerCenter:
             f"Папка запуска - {summary.run_dir}",
             f"Состояние - {_operator_state(summary.status_label or summary.status, fallback='нет данных')}",
             f"Контур и исполнитель - {_operator_token_text(summary.pipeline_mode)} / {_operator_token_text(summary.backend)}",
-            f"Идентификатор запуска - {identity.get('run_id') or '—'}",
-            f"Состояние идентичности - {_operator_state(identity.get('state'), fallback='не найден')}",
+            f"Метка запуска - {identity.get('run_id') or '—'}",
+            f"Состояние запуска - {_operator_state(identity.get('state'), fallback='не найден')}",
             f"Строки - всего {summary.row_count}, завершено {summary.done_count}, выполняется {summary.running_count}, ошибок {summary.error_count}",
             f"Примечание - {summary.note or '—'}",
         ]
@@ -1706,7 +1706,7 @@ class DesktopOptimizerCenter:
         self.refresh_handoff()
         self.refresh_packaging()
         self.refresh_dashboard()
-        self.status_var.set("Сводка центра оптимизации обновлена.")
+        self.status_var.set("Сводка оптимизации обновлена.")
 
     def refresh_history(self) -> None:
         self._sync_widget_state()
@@ -1866,7 +1866,7 @@ class DesktopOptimizerCenter:
         self._sync_widget_state()
         readiness = self.runtime.launch_readiness_summary()
         action = str(readiness.get("next_action") or "Runtime").strip()
-        if action in {"Contract", "Contract drift", "Контракт", "Настройки запуска"}:
+        if action in {"Contract", "Contract drift", "Настройки запуска"}:
             self.show_contract_tab()
         elif action in {"History", "История"}:
             self.show_history_tab()
@@ -1912,9 +1912,7 @@ class DesktopOptimizerCenter:
             self.show_finished_tab()
         else:
             self.show_history_tab()
-        self.status_var.set(
-            f"Следующий шаг выбранного запуска рекомендует перейти к разделу: {action_label}."
-        )
+        self.status_var.set(f"Рекомендация по выбранному запуску: перейти к разделу {action_label}.")
 
     def open_selected_run_dir(self) -> None:
         if not self._selected_run_dir:
@@ -1923,7 +1921,7 @@ class DesktopOptimizerCenter:
             self._open_path(Path(self._selected_run_dir))
         except Exception as exc:
             messagebox.showerror(
-                "Центр оптимизации",
+                "Оптимизация",
                 f"Не удалось открыть папку запуска:\n{exc}",
             )
 
@@ -1943,7 +1941,7 @@ class DesktopOptimizerCenter:
             self._open_path(path)
         except Exception as exc:
             messagebox.showerror(
-                "Центр оптимизации",
+                "Оптимизация",
             f"Не удалось открыть журнал:\n{exc}",
             )
 
@@ -1959,7 +1957,7 @@ class DesktopOptimizerCenter:
         path = summary.result_path if summary.result_path is not None else None
         if path is None:
             messagebox.showinfo(
-                "Центр оптимизации",
+                "Оптимизация",
                 "У выбранного прогона пока нет файла результатов.",
             )
             return
@@ -1967,7 +1965,7 @@ class DesktopOptimizerCenter:
             self._open_path(path)
         except Exception as exc:
             messagebox.showerror(
-                "Центр оптимизации",
+                "Оптимизация",
                 f"Не удалось открыть файл результатов:\n{exc}",
             )
 
@@ -1983,7 +1981,7 @@ class DesktopOptimizerCenter:
         path = summary.objective_contract_path if summary.objective_contract_path is not None else None
         if path is None:
             messagebox.showinfo(
-                "Центр оптимизации",
+                "Оптимизация",
                 "У выбранного запуска нет файла с паспортом целей.",
             )
             return
@@ -1991,7 +1989,7 @@ class DesktopOptimizerCenter:
             self._open_path(path)
         except Exception as exc:
             messagebox.showerror(
-                "Центр оптимизации",
+                "Оптимизация",
                 f"Не удалось открыть паспорт целей:\n{exc}",
             )
 
@@ -2007,7 +2005,7 @@ class DesktopOptimizerCenter:
         path = summary.handoff_plan_path if summary.handoff_plan_path is not None else None
         if path is None:
             messagebox.showinfo(
-                "Центр оптимизации",
+                "Оптимизация",
                 "У выбранного запуска нет плана передачи данных.",
             )
             return
@@ -2015,7 +2013,7 @@ class DesktopOptimizerCenter:
             self._open_path(path)
         except Exception as exc:
             messagebox.showerror(
-                "Центр оптимизации",
+                "Оптимизация",
                 f"Не удалось открыть план передачи данных:\n{exc}",
             )
 
@@ -2023,7 +2021,7 @@ class DesktopOptimizerCenter:
         pointer = self.runtime.latest_pointer_summary()
         if not bool(pointer.get("exists")):
             messagebox.showinfo(
-                "Центр оптимизации",
+                "Оптимизация",
                 "Прогон для анализа пока не выбран.",
             )
             return
@@ -2031,7 +2029,7 @@ class DesktopOptimizerCenter:
             self._open_path(Path(str(pointer.get("pointer_path") or "")))
         except Exception as exc:
             messagebox.showerror(
-                "Центр оптимизации",
+                "Оптимизация",
                 f"Не удалось открыть прогон для анализа:\n{exc}",
             )
 
@@ -2043,7 +2041,7 @@ class DesktopOptimizerCenter:
         )
         if details is None:
             messagebox.showinfo(
-                "Центр оптимизации",
+                "Оптимизация",
                 "Сначала выберите прогон, который нужно передать в анализ.",
             )
             return
@@ -2071,7 +2069,7 @@ class DesktopOptimizerCenter:
         updates = self.runtime.apply_run_contract(summary)
         if not updates:
             messagebox.showinfo(
-                "Центр оптимизации",
+                "Оптимизация",
                 "У выбранного запуска нет настроек, которые можно подставить в текущий запуск.",
             )
             return
@@ -2113,7 +2111,7 @@ class DesktopOptimizerCenter:
                 if str(item).strip()
             )
             messagebox.showwarning(
-                "Центр оптимизации",
+                "Оптимизация",
                 "Запуск заблокирован предварительной проверкой:\n" + (reasons or "- причина не указана"),
             )
             self.status_var.set("Запуск заблокирован: проверьте разделы выполнения и настроек запуска.")
@@ -2124,7 +2122,7 @@ class DesktopOptimizerCenter:
             job = self.runtime.start_job()
         except Exception as exc:
             messagebox.showerror(
-                "Центр оптимизации",
+                "Оптимизация",
                 f"Не удалось запустить оптимизацию:\n{exc}",
             )
             return
@@ -2160,13 +2158,13 @@ class DesktopOptimizerCenter:
         summary = getattr(details, "summary")
         if str(summary.pipeline_mode) != "staged":
             messagebox.showinfo(
-                "Центр оптимизации",
+                "Оптимизация",
                 "Передача доступна только для поэтапного прогона.",
             )
             return
         if not bool(summary.handoff_available):
             messagebox.showinfo(
-                "Центр оптимизации",
+                "Оптимизация",
                 "Для этого поэтапного прогона передача координатору пока не подготовлена.",
             )
             return
@@ -2174,7 +2172,7 @@ class DesktopOptimizerCenter:
             job = self.runtime.start_handoff(summary.run_dir)
         except Exception as exc:
             messagebox.showerror(
-                "Центр оптимизации",
+                "Оптимизация",
                 f"Не удалось запустить передачу:\n{exc}",
             )
             return

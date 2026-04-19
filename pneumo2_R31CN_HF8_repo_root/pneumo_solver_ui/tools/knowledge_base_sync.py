@@ -136,6 +136,15 @@ def add_chat_requirement(
     return True
 
 
+def _normalize_artifact_path(artifact_path: str) -> str:
+    path = artifact_path.strip().replace("\\", "/")
+    if path.startswith("./"):
+        path = path[2:]
+    if path.startswith("docs/"):
+        path = path[len("docs/") :]
+    return path
+
+
 def add_chat_plan(
     store: dict[str, Any],
     *,
@@ -155,7 +164,7 @@ def add_chat_plan(
             "source": source,
             "title": title.strip(),
             "details": details.strip(),
-            "artifact_path": artifact_path.strip(),
+            "artifact_path": _normalize_artifact_path(artifact_path),
             "status": status.strip(),
         }
     )
@@ -241,7 +250,7 @@ def render_chat_plans_markdown(store: dict[str, Any]) -> str:
             details = str(entry.get("details", "")).strip()
             if details:
                 lines.append(f"Назначение: {details}")
-            artifact_path = str(entry.get("artifact_path", "")).strip()
+            artifact_path = _normalize_artifact_path(str(entry.get("artifact_path", "")))
             if artifact_path:
                 lines.append(f"Артефакт: [{artifact_path}](./{artifact_path})")
             lines.append(f"Статус: {entry.get('status', 'актуален')}.")

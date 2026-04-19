@@ -267,7 +267,7 @@ class OverviewPage(QtWidgets.QWidget):
         layout.setContentsMargins(18, 18, 18, 18)
         layout.setSpacing(16)
 
-        title = QtWidgets.QLabel("Обзор проекта")
+        title = QtWidgets.QLabel("Панель проекта")
         title_font = title.font()
         title_font.setPointSize(title_font.pointSize() + 6)
         title_font.setBold(True)
@@ -391,7 +391,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         self.project_label = QtWidgets.QLabel(str(self.repo_root))
         self.project_label.setStyleSheet("color: #576574;")
         row1.addWidget(self.project_label, 1)
-        self.workspace_badge = QtWidgets.QLabel("Сейчас открыт рабочий шаг «Обзор»")
+        self.workspace_badge = QtWidgets.QLabel("Сейчас открыт рабочий шаг «Панель проекта»")
         row1.addWidget(self.workspace_badge)
         header_layout.addLayout(row1)
 
@@ -435,11 +435,11 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         _apply_element_contract(self.diagnostics_button, "SH-DIAG-BUTTON")
         row2.addWidget(self.diagnostics_button)
 
-        compare_button = QtWidgets.QPushButton("Открыть сравнение")
+        compare_button = QtWidgets.QPushButton("Сравнить прогоны")
         compare_button.clicked.connect(lambda: self.run_command("results.compare.open"))
         row2.addWidget(compare_button)
 
-        animator_button = QtWidgets.QPushButton("Открыть анимацию")
+        animator_button = QtWidgets.QPushButton("Показать анимацию")
         animator_button.clicked.connect(
             lambda: self.run_command("animation.animator.open")
         )
@@ -479,7 +479,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
 
     def _build_menu(self) -> None:
         file_menu = self.menuBar().addMenu("Файл")
-        open_legacy = file_menu.addAction("Открыть рабочее место с вкладками")
+        open_legacy = file_menu.addAction("Открыть рабочие окна во вкладках")
         open_legacy.triggered.connect(lambda: self.run_command("tools.legacy_shell.open"))
         file_menu.addSeparator()
         exit_action = file_menu.addAction("Выход")
@@ -504,7 +504,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
                 lambda _checked=False, cid=command.command_id: self.run_command(cid)
             )
         diagnostics_menu.addSeparator()
-        legacy_action = diagnostics_menu.addAction("Открыть центр диагностики")
+        legacy_action = diagnostics_menu.addAction("Открыть диагностику отдельным окном")
         legacy_action.triggered.connect(
             lambda: self.run_command("diagnostics.legacy_center.open")
         )

@@ -12,7 +12,10 @@ def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="desktop_mnemo",
         title="Мнемосхема",
-        description="Внешнее окно мнемосхемы с отображением состояния, событий и связи компонентов.",
+        description=(
+            "Отдельное окно пневматической схемы: показывает состояние контуров, событий "
+            "и связи компонентов по выбранному результату."
+        ),
         group="Внешние окна",
         mode="external",
         workflow_stage="visualization",
@@ -21,7 +24,10 @@ def build_spec() -> DesktopShellToolSpec:
         launch_contexts=("data", "results", "analysis"),
         menu_section="Визуализация",
         nav_section="Визуализация",
-        details="Наглядное состояние системы и связей компонентов в отдельном окне мнемосхемы.",
+        details=(
+            "Мнемосхема помогает проверить пневматику и сигналы рядом с аниматором; "
+            "движение и геометрию смотрите в окне Аниматор."
+        ),
         menu_order=80,
         nav_order=80,
         standalone_module="pneumo_solver_ui.desktop_mnemo.main",

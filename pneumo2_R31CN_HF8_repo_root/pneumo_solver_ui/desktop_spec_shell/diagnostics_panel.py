@@ -152,15 +152,15 @@ def _baseline_status_text(evidence: dict[str, Any]) -> str:
     lines = [
         f"Опорный прогон {active_state}.",
         (
-            f"Идентификатор прогона - {active_hash[:12]}."
+            f"Метка прогона - {active_hash[:12]}."
             if active_hash
-            else "Идентификатор прогона пока отсутствует."
+            else "Метка прогона пока отсутствует."
         ),
         f"Сверка истории: {mismatch_state}. Добавить сведения в архив: {_bool_marker(bool(evidence.get('send_bundle_should_include', False)))}.",
         "Молчаливая подмена запрещена.",
     ]
     if banner_text:
-        lines.append(f"Пояснение: {banner_text}")
+        lines.append(f"Причина: {banner_text}")
     return "\n".join(lines)
 
 
@@ -316,7 +316,7 @@ class DiagnosticsShellController(QtCore.QObject):
             center_state_path=path_str(Path(bundle.out_dir) / "latest_desktop_diagnostics_center_state.json"),
             summary_md_path=path_str(Path(bundle.out_dir) / "latest_desktop_diagnostics_summary.md"),
             recommended_next_step=(
-                "Опорный прогон требует просмотра в центре опорного прогона перед отправкой."
+                "Проверьте базовый прогон перед отправкой результатов."
                 if baseline_attention
                 else "Если архив диагностики уже собран, проверьте состав и состояние, затем переходите к отправке."
                 if bundle.latest_zip_path
@@ -412,7 +412,7 @@ class DiagnosticsShellController(QtCore.QObject):
 
     def open_legacy_center(self) -> None:
         self.spawn_module_fn("pneumo_solver_ui.tools.desktop_diagnostics_center")
-        self._set_status("Открыт центр диагностики.", busy=False)
+        self._set_status("Диагностика открыта отдельным окном.", busy=False)
 
     def _set_status(self, text: str, *, busy: bool) -> None:
         self._status_text = text
@@ -658,7 +658,7 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         self.baseline_status_value = QtWidgets.QLabel("")
         self.baseline_status_value.setObjectName("DG-BASELINE-STATUS")
         self.baseline_status_value.setWordWrap(True)
-        self.open_baseline_center_button = QtWidgets.QPushButton("Открыть центр опорного прогона")
+        self.open_baseline_center_button = QtWidgets.QPushButton("Перейти к базовому прогону")
         self.open_baseline_center_button.setObjectName("DG-BTN-OPEN-BASELINE")
         self.open_baseline_center_button.clicked.connect(self.open_baseline_center)
         baseline_layout.addWidget(self.baseline_status_value)
@@ -672,7 +672,7 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         self.send_button = QtWidgets.QPushButton("Отправить результаты")
         self.open_dir_button = QtWidgets.QPushButton("Открыть каталог")
         self.refresh_button = QtWidgets.QPushButton("Обновить состояние")
-        self.legacy_button = QtWidgets.QPushButton("Открыть центр диагностики")
+        self.legacy_button = QtWidgets.QPushButton("Открыть диагностику отдельным окном")
         _apply_action_contract(self.collect_button, "DG-BTN-COLLECT")
         self.collect_button.clicked.connect(lambda: self.handle_command("diagnostics.collect_bundle"))
         self.verify_button.clicked.connect(lambda: self.handle_command("diagnostics.verify_bundle"))
@@ -716,9 +716,9 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
     def open_baseline_center(self) -> None:
         if self.on_command is not None:
             self.on_command("baseline.center.open")
-            self.status_label.setText("Открыт центр опорного прогона из окна диагностики.")
+            self.status_label.setText("Открыт базовый прогон из окна диагностики.")
             return
-        self.status_label.setText("Центр опорного прогона доступен из основного окна приложения.")
+        self.status_label.setText("Базовый прогон доступен из основного окна приложения.")
 
     def _on_controller_status(self, text: str, busy: bool) -> None:
         self.status_label.setText(text)

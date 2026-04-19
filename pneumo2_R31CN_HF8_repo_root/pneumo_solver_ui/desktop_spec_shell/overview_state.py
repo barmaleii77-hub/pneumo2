@@ -174,7 +174,7 @@ def build_overview_snapshot(repo_root: Path | None = None) -> OverviewSnapshot:
         OverviewCardState(
             title="Последние результаты",
             value=_safe_relative(result_path, root) if result_path else "Пока нет файлов результатов",
-            detail="Результаты и сравнение открываются из центра анализа результатов.",
+            detail="Результаты и сравнение открываются из окна анализа результатов.",
             command_id="results.center.open",
             action_text="Открыть анализ результатов",
         ),
@@ -195,7 +195,7 @@ def build_overview_snapshot(repo_root: Path | None = None) -> OverviewSnapshot:
             detail=(
                 "Схема последовательности "
                 + ("готова" if workflow_graphs_ready else "не найдена")
-                + "; главное окно должно открывать существующие инженерные центры без скрытой подмены."
+                + "; главное окно должно открывать существующие инженерные окна без скрытой подмены."
             ),
             command_id="workspace.diagnostics.open",
             action_text="Открыть диагностику",

@@ -487,19 +487,19 @@ def format_compare_mismatch_banner(summary: Mapping[str, Any] | None) -> str:
     banner_id = str(data.get("banner_id") or "")
     dims = [str(x) for x in (data.get("mismatch_dimensions") or []) if str(x).strip()]
     if banner_id == "BANNER-HIST-002":
-        suffix = ", ".join(_human_compare_dimension(dim) for dim in dims[:6]) if dims else "сохранённые refs сравнения"
+        suffix = ", ".join(_human_compare_dimension(dim) for dim in dims[:6]) if dims else "сохранённые файлы сравнения"
         return (
-            "Текущий и сохранённый контекст отличаются: "
-            f"{suffix}. Сравнение остаётся историческим и использует сохранённые NPZ refs."
+            "Текущий проект отличается от выбранного сохранённого прогона: "
+            f"{suffix}. Сравнение показывает сохранённые результаты без подмены данными текущего проекта."
         )
     if banner_id == "BANNER-HIST-003":
-        suffix = ", ".join(_human_compare_dimension(dim) for dim in dims[:6]) if dims else "refs артефактов"
+        suffix = ", ".join(_human_compare_dimension(dim) for dim in dims[:6]) if dims else "ссылки на файлы"
         return (
-            "Не хватает артефактов для полного compare contract: "
-            f"{suffix}. Тихий fallback на текущий проект запрещен."
+            "Не хватает файлов для полного сравнения: "
+            f"{suffix}. Автоматическая подмена данными текущего проекта запрещена."
         )
     if banner_id == "BANNER-HIST-001":
-        return "Открыт исторический compare context; refs совпадают с выбранным контекстом."
+        return "Открыто сравнение сохранённого прогона: ссылки на файлы совпадают с выбранными данными."
     return ""
 
 
@@ -515,7 +515,7 @@ def _human_compare_dimension(value: Any) -> str:
         "scenario_lineage_hash": "происхождение сценария",
         "ring_source_hash": "хэш источника кольца",
         "problem_hash": "хэш задачи",
-        "artifact_missing": "нет артефакта",
+        "artifact_missing": "нет файла",
     }
     return labels.get(raw, raw.replace("_", " ") or "-")
 
@@ -556,16 +556,16 @@ def format_compare_contract_summary(contract: Mapping[str, Any] | None) -> str:
     if dims:
         warning_text = f"контекст отличается: {', '.join(_human_compare_dimension(dim) for dim in dims[:6])}"
     lines = [
-        f"Хэш контракта сравнения: {_short(payload.get('compare_contract_hash'), 16)}",
+        f"Хэш правил сравнения: {_short(payload.get('compare_contract_hash'), 16)}",
         f"Режим: {mode} | Выбранных расчётов: {len(refs)}",
         f"Метки выбранных расчётов: {_join_short(selected_runs[:4])}",
         f"Таблица: {selected_table} | Сигналы: {len(signals)} | Окно времени: {time_text}",
-        f"Контракт расчёта: {_join_short(run_hashes)}",
+        f"Хэш расчёта: {_join_short(run_hashes)}",
         f"Хэш цели: {_join_short(objective_hashes)}",
-        f"Хэш baseline: {_join_short(baseline_hashes)}",
+        f"Хэш базового прогона: {_join_short(baseline_hashes)}",
         f"Хэш источника: {_join_short(source_hashes)}",
         f"Предупреждение: {warning_text}",
-        "Действия экспорта: сохранить сессию JSON; экспортировать compare_contract.json; экспортировать снимок workspace",
+        "Сохранение: сессия сравнения; файл правил сравнения; снимок рабочего окна",
     ]
     return "\n".join(lines)
 

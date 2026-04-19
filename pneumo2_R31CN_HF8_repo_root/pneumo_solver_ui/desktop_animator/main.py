@@ -32,19 +32,19 @@ def _default_pointer() -> Path:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="pneumo-desktop-animator")
-    ap.add_argument("--npz", type=str, default="", help="Путь к NPZ-файлу анимационной выгрузки")
-    ap.add_argument("--follow", action="store_true", help="Следить за указателем anim_latest.json")
+    ap.add_argument("--npz", type=str, default="", help="Путь к файлу анимации")
+    ap.add_argument("--follow", action="store_true", help="Автоматически загружать последний файл анимации")
     ap.add_argument(
         "--analysis-context",
         type=str,
         default=os.environ.get("PNEUMO_ANALYSIS_CONTEXT_PATH", ""),
-        help="Путь к frozen HO-008 analysis_context.json",
+        help="Путь к файлу связи с выбранным результатом анализа",
     )
     ap.add_argument(
         "--pointer",
         type=str,
         default="",
-        help="Путь к JSON-указателю anim_latest",
+        help="Путь к файлу с указанием последней анимации",
     )
     ap.add_argument("--no-gl", action="store_true", help="Отключить 3D OpenGL вид")
     ap.add_argument("--theme", type=str, default="dark", choices=["dark", "light"], help="Тема интерфейса")

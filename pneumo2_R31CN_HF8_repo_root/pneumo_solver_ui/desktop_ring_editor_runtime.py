@@ -155,7 +155,7 @@ def _build_road_profile_preview(tracks: dict[str, Any]) -> RingRoadProfilePrevie
 
 def _build_summary_text(errors: list[str], warnings: list[str], metrics: dict[str, float | str]) -> str:
     lines: list[str] = []
-    lines.append("Сводка кольца")
+    lines.append("Сводка сценария")
     lines.append(
         "Длина круга ≈ "
         f"{float(metrics.get('ring_length_m', 0.0) or 0.0):.2f} м, "
@@ -181,7 +181,7 @@ def _build_summary_text(errors: list[str], warnings: list[str], metrics: dict[st
             f"{float(metrics.get('raw_seam_max_mm', 0.0) or 0.0):.2f} мм."
         )
     lines.append(
-        "Амплитуда всего кольца A L/R: "
+        "Амплитуда всего цикла A L/R: "
         f"{float(metrics.get('ring_amp_left_mm', 0.0) or 0.0):.2f} / "
         f"{float(metrics.get('ring_amp_right_mm', 0.0) or 0.0):.2f} мм; "
         "размах p-p L/R: "
@@ -288,7 +288,7 @@ def build_ring_editor_diagnostics(spec: dict[str, Any]) -> RingEditorDiagnostics
             if isinstance(visual, dict):
                 visual_segments = list(visual.get("segments", []) or [])
         except Exception as exc:
-            warnings.append(f"Предпросмотр кольца собран частично: {exc}")
+            warnings.append(f"Предпросмотр сценария собран частично: {exc}")
 
     preview_segments = _build_preview_segments(segment_rows, ring_length_m, visual_segments)
     metrics: dict[str, float | str] = {

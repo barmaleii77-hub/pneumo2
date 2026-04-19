@@ -1,0 +1,19 @@
+--- a/docs/PROJECT_SOURCES.md
++++ b/docs/PROJECT_SOURCES.md
+@@
+ - `docs/context/gui_spec_imports/foundations/README.md` — upstream prompt layer, предшествующий серии архивов `v1…v13`.
+ - `docs/context/gui_spec_imports/foundations/prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md` — foundational prompt source (`PROMPT_V2`).
++- `docs/context/gui_spec_imports/v38_github_kb_commit_ready/README.md` — successor consolidated GUI-spec / knowledge-base commit-ready layer.
++- `docs/context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml` — successor top-level machine-readable GUI spec.
++- `docs/context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md` — successor human-readable technical specification.
++- `docs/context/gui_spec_imports/v38_github_kb_commit_ready/WORKSPACE_CONTRACT_MATRIX.csv` — successor workspace contract matrix.
++- `docs/context/gui_spec_imports/v38_github_kb_commit_ready/PARAMETER_CATALOG.csv` — successor parameter catalog.
+@@
+ 3. `docs/context/gui_spec_imports/foundations/*` как upstream intent/provenance layer
+-4. `docs/context/gui_spec_imports/v3/*`
+-5. `docs/context/gui_spec_imports/v13_ring_editor_migration/*` для `WS-RING` и handoff `WS-RING -> WS-SUITE`
+-6. `docs/context/gui_spec_imports/v12_design_recovery/*` как historical design-recovery layer
++4. `docs/context/gui_spec_imports/v38_github_kb_commit_ready/*` как successor consolidated GUI-spec layer
++5. `docs/context/gui_spec_imports/v3/*`
++6. `docs/context/gui_spec_imports/v13_ring_editor_migration/*` для `WS-RING` и handoff `WS-RING -> WS-SUITE`
++7. `docs/context/gui_spec_imports/v12_design_recovery/*` как historical design-recovery layer

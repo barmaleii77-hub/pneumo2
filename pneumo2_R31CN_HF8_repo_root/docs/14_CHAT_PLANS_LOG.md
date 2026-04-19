@@ -339,7 +339,7 @@ ID: `PLAN-0046`.
 
 47. Actualize 10 chat prompts for V37 visual compliance
 Назначение: Prompt pack 16 now requires visual GUI checks against V37 GUI_SPEC/WORKSPACE/ACCEPTANCE/PIPELINE, blocks service-jargon leaks, requires direct shell tree/search/selection sync and rejects ad-hoc labels such as machine-data wording.
-Артефакт: [docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
+Артефакт: [gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
 Статус: done.
 Источник: chat: V37 compliance correction 2026-04-18.
 ID: `PLAN-0047`.
@@ -353,7 +353,7 @@ ID: `PLAN-0048`.
 
 49. Завершить интеграционную уборку после 10 GUI-чатов
 Назначение: После приемки V38-направлений проверить тесты, diff-check, синхронизировать codex/work с origin, удалить временные локальные worktree и локальные chat-ветки, удалять remote-ветки только если их изменения уже доставлены в codex/work.
-Артефакт: [docs/14_CHAT_PLANS_LOG.md](./docs/14_CHAT_PLANS_LOG.md)
+Артефакт: [14_CHAT_PLANS_LOG.md](./14_CHAT_PLANS_LOG.md)
 Статус: completed.
 Источник: chat:2026-04-18 accept 10 chats cleanup.
 ID: `PLAN-0049`.
@@ -380,10 +380,31 @@ ID: `PLAN-0052`.
 
 53. Семантический аудит всех GUI-кнопок и надписей относительно V38 и PIPELINE_OPTIMIZED.dot
 Назначение: Сформирован локальный audit-документ с нормализованным pipeline, найденными неоднозначностями V38, высоковероятными нарушениями текста и приоритетным порядком исправлений.
-Артефакт: [docs/context/release_readiness/GUI_TEXT_SEMANTIC_AUDIT_2026-04-19.md](./context/release_readiness/GUI_TEXT_SEMANTIC_AUDIT_2026-04-19.md)
+Артефакт: [context/release_readiness/GUI_TEXT_SEMANTIC_AUDIT_2026-04-19.md](./context/release_readiness/GUI_TEXT_SEMANTIC_AUDIT_2026-04-19.md)
 Статус: active.
 Источник: chat:2026-04-19 semantic GUI audit.
 ID: `PLAN-0053`.
+
+54. Human GUI V6: remediation маршрута пользователя
+Назначение: Следующий слой GUI-доработок должен начинаться с иерархии маршрута: один стартовый путь после запуска, первоклассный Редактор кольца, единая диагностика через Собрать диагностику, сравнение без первого-level дубля, крупные состояния достоверности и отдельная визуальная проверка внутренних экранов launchpoint-only окон.
+Артефакт: [context/release_readiness/HUMAN_GUI_REPORT_ONLY_V6_2026-04-19.md](./context/release_readiness/HUMAN_GUI_REPORT_ONLY_V6_2026-04-19.md)
+Статус: актуален.
+Источник: chat + archive:pneumo_human_gui_report_only_v6.zip.
+ID: `PLAN-0054`.
+
+55. Human GUI V10: привести launcher-shell к иерархии первого маршрута
+Назначение: Продолжать GUI-правки от V10: стартовая поверхность показывает один маршрут из 8 шагов, Редактор кольца становится явным сценарным центром, Diagnostics имеет одну доминирующую команду Собрать диагностику, отправка результатов переезжает внутрь Diagnostics, встроенное сравнение становится основным compare-path, Compare Viewer/Mnemo/Tools получают second-layer роль, а кнопки файла анимации формулируются как загрузка/просмотр в аниматоре.
+Артефакт: [context/release_readiness/HUMAN_GUI_REPORT_ONLY_V10_LAUNCHER_HIERARCHY_2026-04-19.md](./context/release_readiness/HUMAN_GUI_REPORT_ONLY_V10_LAUNCHER_HIERARCHY_2026-04-19.md)
+Статус: актуален.
+Источник: chat + archive:pneumo_human_gui_report_only_v10_launcher_hierarchy.zip.
+ID: `PLAN-0055`.
+
+56. V38 actualized with V10 import and read-order audit
+Назначение: Current KB import layer and audit for future GUI/TZ/spec work. Use it as the active package before previous V38/V10 provenance and keep open gaps evidence-required.
+Артефакт: [context/release_readiness/V38_ACTUALIZED_WITH_V10_KB_IMPORT_AUDIT_2026-04-19.md](./context/release_readiness/V38_ACTUALIZED_WITH_V10_KB_IMPORT_AUDIT_2026-04-19.md)
+Статус: актуален.
+Источник: chat + archive:pneumo_codex_tz_spec_connector_reconciled_v38_actualized_with_v10.
+ID: `PLAN-0056`.
 
 ## Текущее правило интерпретации
 

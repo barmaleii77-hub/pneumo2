@@ -134,10 +134,16 @@ def test_qt_compare_viewer_real_bundle_runtime_smoke_syncs_live_analysis_docks(m
         assert viewer.lbl_workspace_assistant_title.text() != ""
         assert viewer.lbl_workspace_assistant.text() != ""
         insights_plain = viewer.txt_workspace_insights.toPlainText()
-        assert "Delta hotspot" in insights_plain
-        assert "Peak" in insights_plain
-        assert "Top meta driver" in insights_plain
-        assert ("corr=" in insights_plain) or ("Need influence refresh" in insights_plain) or ("Need 3+ runs" in insights_plain)
+        assert "Локальный максимум Δ" in insights_plain
+        assert "Пик" in insights_plain
+        assert "Главный параметр влияния" in insights_plain
+        assert (
+            "корреляция=" in insights_plain
+            or "Нужно обновить влияние" in insights_plain
+            or "Нужно 3+ прогона" in insights_plain
+        )
+        for forbidden_text in ("Delta hotspot", "Top meta driver", "Need influence refresh", "Need 3+ runs"):
+            assert forbidden_text not in insights_plain
 
         viewer.act_view_focus_multivar.trigger()
         app.processEvents()
@@ -162,8 +168,14 @@ def test_qt_compare_viewer_real_bundle_runtime_smoke_syncs_live_analysis_docks(m
         assert "\u042d\u0442\u0430\u043b\u043e\u043d " in viewer.lbl_status_layout.text()
         assert viewer.lbl_workspace_assistant.text() != ""
         insights_plain = viewer.txt_workspace_insights.toPlainText()
-        assert "Quality / next step" in insights_plain
-        assert ("Ready for all-to-all scouting" in insights_plain) or ("QA flagged" in insights_plain) or ("Trust attention required" in insights_plain)
+        assert "Качество и следующий шаг" in insights_plain
+        assert (
+            "Готово к поиску связей всех со всеми" in insights_plain
+            or "Проверка нашла" in insights_plain
+            or "Нужно проверить достоверность" in insights_plain
+        )
+        for forbidden_text in ("Quality / next step", "Ready for all-to-all scouting", "QA flagged", "Trust attention required"):
+            assert forbidden_text not in insights_plain
     finally:
         viewer.close()
         app.processEvents()

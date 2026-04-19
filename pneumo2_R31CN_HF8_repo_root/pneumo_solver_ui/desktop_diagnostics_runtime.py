@@ -154,7 +154,7 @@ def _load_analysis_evidence_summary(repo_root: Path, out_dir: Path) -> dict:
         )
     elif analysis_context_status == "DEGRADED":
         summary["analysis_context_action"] = (
-            "Проверьте HO-008 degraded artifacts; доступные артефакты видимы, но сравнение/анимация требуют внимания."
+            "Проверьте данные анализа: доступные файлы видимы, но сравнение и анимация требуют внимания."
         )
     else:
         summary["analysis_context_action"] = ""

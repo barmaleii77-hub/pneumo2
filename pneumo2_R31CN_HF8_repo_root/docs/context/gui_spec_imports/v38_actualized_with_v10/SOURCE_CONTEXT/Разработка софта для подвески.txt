@@ -1,0 +1,95 @@
+## Сделал. Собрал **HF8** ⚙️🔧
+
+Это уже следующий шаг **после HF7 objective-contract alignment**.
+Я шёл от **живого HF7 source release**, а не от старых summary.
+
+### Что реально поймал
+В HF7 был неприятный хвост:
+
+- **StageRunner** и **coordinator** уже читали один и тот же visible objective stack,
+- но distributed `problem_hash` всё ещё **не менялся**, если менялись:
+  - `penalty_key`
+  - `penalty_tol`
+
+То есть UI и scoring уже были согласованы, а вот **resume/cache identity** — ещё нет.
+Это означало риск: coordinator мог **тихо смешать** два запуска с разным hard-gate contract в один и тот же `problem_hash`.
+
+### Что исправил в HF8
+Сделал objective-contract **первоклассным runtime artifact** и частью resume semantics:
+
+- `stable_hash_problem(...)` теперь учитывает не только `objective_keys`, но и:
+  - `penalty_key`
+  - `penalty_tol`
+- coordinator теперь пишет в run dir:
+  - `objective_contract.json`
+- история запусков на странице **Optimization** теперь показывает для каждого run:
+  - `Objective stack`
+  - `Hard gate`
+- если выбранный исторический run собран на **другом objective-contract**, UI это **честно показывает**, а не маскирует
+- metadata у `latest_optimization` теперь тоже несёт objective-contract
+
+### Почему это правильный следующий шаг
+HF7 связал StageRunner и coordinator по **функции качества**.
+HF8 дожал это до **операционного контракта**:
+
+- одна и та же quality function
+- один и тот же explicit contract на диске
+- и **разные** `problem_hash`, если hard gate реально другой
+
+Именно так и должно быть в инженерном приложении:
+не просто красивый UI, а честная разделимость разных постановок задачи.
+
+## Проверка ✅
+- `py_compile` — **PASS**
+- `pytest -q tests/test_r31c*.py` — **56 passed**
+- source zip unzip smoke — **PASS**
+- portable zip unzip smoke — **PASS**
+- patch zip unzip smoke — **PASS**
+- Windows Desktop path budget для portable — **212**
+
+## Артефакты
+
+### Главное для проверки
+- [Portable HF8 release](sandbox:/mnt/data/release_build_r31cn_hf8/PneumoApp_R31CN_HF8_portable_20260403.zip)
+
+### Полный комплект
+- [HF8 release bundle](sandbox:/mnt/data/release_build_r31cn_hf8/PneumoApp_R31CN_HF8_release_bundle_20260403.zip)
+- [HF8 source release](sandbox:/mnt/data/release_build_r31cn_hf8/PneumoApp_v6_80_R176_R31CN_HF8_2026-04-03.zip)
+- [HF8 patch zip](sandbox:/mnt/data/release_build_r31cn_hf8/PneumoApp_R31CN_HF8_objective_contract_persistence_patch_20260403.zip)
+
+### Доказательства
+- [HF7 live gap analysis](sandbox:/mnt/data/release_build_r31cn_hf8/R31CN_HF7_live_problem_hash_contract_gap_analysis.md)
+- [HF8 build report](sandbox:/mnt/data/release_build_r31cn_hf8/R31CN_HF8_release_build_report.md)
+- [HF8 release summary](sandbox:/mnt/data/release_build_r31cn_hf8/R31CN_HF8_release_summary.md)
+- [Targeted pytest log](sandbox:/mnt/data/release_build_r31cn_hf8/R31CN_HF8_targeted_pytest_log.txt)
+- [Unified diff](sandbox:/mnt/data/release_build_r31cn_hf8/R31CN_HF8_objective_contract_persistence_20260403.diff)
+- [Changed files list](sandbox:/mnt/data/release_build_r31cn_hf8/CHANGED_FILES_R31CN_HF8_2026-04-03.txt)
+- [Portable path budget](sandbox:/mnt/data/release_build_r31cn_hf8/R31CN_HF8_portable_path_budget.txt)
+
+### SHA256
+- [Portable sha256](sandbox:/mnt/data/release_build_r31cn_hf8/PneumoApp_R31CN_HF8_portable_20260403.zip.sha256)
+- [Release bundle sha256](sandbox:/mnt/data/release_build_r31cn_hf8/PneumoApp_R31CN_HF8_release_bundle_20260403.zip.sha256)
+- [Source sha256](sandbox:/mnt/data/release_build_r31cn_hf8/PneumoApp_v6_80_R176_R31CN_HF8_2026-04-03.zip.sha256)
+- [Patch sha256](sandbox:/mnt/data/release_build_r31cn_hf8/PneumoApp_R31CN_HF8_objective_contract_persistence_patch_20260403.zip.sha256)
+
+## Что проверять у себя
+В **HF8 portable** проверь такой сценарий:
+
+1. Запусти оптимизацию с одним `objective stack / penalty key / penalty tol`
+2. Потом поменяй hard gate или objective stack
+3. Снова запусти coordinator
+4. Убедись, что:
+   - в истории запусков виден **реальный contract** каждого run
+   - UI показывает различие контрактов
+   - resume не ведёт себя так, будто это одна и та же задача
+
+## Честная граница
+HF8 закрывает **objective-contract persistence / problem-hash gap**.
+Он **не заявляет**, что уже закрыто:
+
+- `solver / hardpoints` truth
+- advanced cylinder producer truth
+- browser perf acceptance
+- animator visual acceptance
+
+И ещё один момент: часть старых вложений уже протухла для индексного чтения. Если нужно снова открыть **конкретный старый архив / MHTML / bundle**, загрузи его ещё раз. Для этого шага я работал по живому HF7 source release, который был доступен локально.

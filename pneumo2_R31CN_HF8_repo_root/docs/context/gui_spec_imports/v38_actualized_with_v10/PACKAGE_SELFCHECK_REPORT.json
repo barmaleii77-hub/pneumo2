@@ -1,0 +1,18 @@
+{
+  "package_id": "pneumo_codex_tz_spec_connector_reconciled_v38_actualized_with_v10",
+  "mandatory_files_present_root": true,
+  "mandatory_files_missing_root": [],
+  "mandatory_files_present_import_ready": true,
+  "mandatory_files_missing_import_ready": [],
+  "project_sources_patch_present": true,
+  "repo_import_ready_present": true,
+  "runtime_closure_claimed": false,
+  "repo_write_performed": false,
+  "package_manifest_self_hashed": false,
+  "notes": [
+    "Package actualized with verified V10 launcher-shell findings.",
+    "Direct remote GitHub write was not performed in this environment.",
+    "17/18 remain authoritative above imported layers.",
+    "Open runtime gaps intentionally remain open."
+  ]
+}

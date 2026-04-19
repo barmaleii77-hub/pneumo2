@@ -1,0 +1,151 @@
+ID,TYPE,PRIMARY_FILE,TITLE,LINKS,STATUS
+REQ-001,REQ,REQUIREMENTS_MATRIX.csv,Единый канонический реестр ключей и запрет runtime-алиасов,ACC-001;TST-001,covered
+REQ-002,REQ,REQUIREMENTS_MATRIX.csv,Проект является основной пользовательской сущностью и хранится в файле,ACC-002;TST-002,covered
+REQ-003,REQ,REQUIREMENTS_MATRIX.csv,Для каждого класса сущностей существует один source-of-truth,ACC-003;TST-003,covered
+REQ-004,REQ,REQUIREMENTS_MATRIX.csv,Графика обязана использовать truth-state solver_confirmed/source_data_confirmed/approximate_inferred_with_warning/unavailable,ACC-004;TST-004,covered
+REQ-005,REQ,REQUIREMENTS_MATRIX.csv,"При неполной геометрии допускается только честная approximate/degraded визуализация или unavailable, но не красивая ложь",ACC-005;TST-005,covered
+REQ-006,REQ,REQUIREMENTS_MATRIX.csv,Потеря существующей функциональности при web->desktop migration запрещена,ACC-006;TST-006,covered
+REQ-007,REQ,REQUIREMENTS_MATRIX.csv,Приложение проектируется как нативный Windows desktop shell на Qt6/PySide6,ACC-007;TST-007,covered
+REQ-008,REQ,REQUIREMENTS_MATRIX.csv,"Главное окно имеет верхнее меню, command search, левое дерево, центральную рабочую область, правый inspector и нижнюю status/progress strip",ACC-008;TST-008,covered
+REQ-009,REQ,REQUIREMENTS_MATRIX.csv,Docking/undocking/floating/auto-hide/second-monitor/restore-layout обязательны,ACC-009;TST-009,covered
+REQ-010,REQ,REQUIREMENTS_MATRIX.csv,"Клавиатурная доступность, видимый focus, F6 между крупными регионами и screen-reader compatibility обязательны",ACC-010;TST-010,covered
+REQ-011,REQ,REQUIREMENTS_MATRIX.csv,"High DPI, mixed-DPI и Windows snap semantics обязательны",ACC-011;TST-011,covered
+REQ-012,REQ,REQUIREMENTS_MATRIX.csv,"Глобальный поиск команд, экранов, сущностей и артефактов обязателен",ACC-012;TST-012,covered
+REQ-013,REQ,REQUIREMENTS_MATRIX.csv,Команда «Собрать диагностику» всегда заметна и доступна из любого рабочего пространства,ACC-013;TST-013,covered
+REQ-014,REQ,REQUIREMENTS_MATRIX.csv,"WS-PROJECT показывает состояние проекта, блокеры и следующее действие, но не дублирует редактирование инженерных чисел",ACC-014;TST-014,covered
+REQ-015,REQ,REQUIREMENTS_MATRIX.csv,WS-INPUTS является единственной editable-поверхностью для model input master copy до handoff дальше по pipeline,ACC-015;TST-015,covered
+REQ-016,REQ,REQUIREMENTS_MATRIX.csv,У каждой core-группы входных данных есть обязательный графический двойник и двусторонняя синхронизация число↔графика,ACC-016;TST-016,covered
+REQ-017,REQ,REQUIREMENTS_MATRIX.csv,Редактор циклического сценария является единственным источником истины для дороги и маршрута движения,ACC-017;TST-017,covered
+REQ-018,REQ,REQUIREMENTS_MATRIX.csv,Циклический сценарий нигде не должен рисоваться как геометрическое кольцо; используются только unfolded cyclic views,ACC-018;TST-018,covered
+REQ-019,REQ,REQUIREMENTS_MATRIX.csv,"Сегмент 0 задаёт начальное и конечное состояние, сегменты 1..N-1 задают только конец, последний сегмент логически замыкается на первый",ACC-019;TST-019,covered
+REQ-020,REQ,REQUIREMENTS_MATRIX.csv,Поворот задаётся явно; продольная геометрия через конечные высоты; поперечный уклон одним параметром; разгон/торможение не тип сегмента,ACC-020;TST-020,covered
+REQ-021,REQ,REQUIREMENTS_MATRIX.csv,"WS-SUITE потребляет scenario refs и validated snapshot, но не владеет геометрией сценария",ACC-021;TST-021,covered
+REQ-022,REQ,REQUIREMENTS_MATRIX.csv,Validated suite snapshot обязателен как handoff в WS-BASELINE и несёт upstream lineage,ACC-022;TST-022,covered
+REQ-023,REQ,REQUIREMENTS_MATRIX.csv,WS-BASELINE читает только validated snapshot и ведёт active baseline contract с явной политикой auto-update,ACC-023;TST-023,covered
+REQ-024,REQ,REQUIREMENTS_MATRIX.csv,"WS-OPTIMIZATION читает active_baseline_contract и objective_contract, а run identity включает lineage и hard gate",ACC-024;TST-024,covered
+REQ-025,REQ,REQUIREMENTS_MATRIX.csv,Для оптимизации существует только один активный режим запуска в конкретный момент времени,ACC-025;TST-025,covered
+REQ-026,REQ,REQUIREMENTS_MATRIX.csv,StageRunner и distributed coordinator поддерживаются как разные execution engines с общим objective-contract и явной history semantics,ACC-026;TST-026,covered_partially
+REQ-027,REQ,REQUIREMENTS_MATRIX.csv,"Stage-specific influence summary, seed budgeting и promotion policy должны быть видимы и объяснимы на текущем экране",ACC-027;TST-027,covered
+REQ-028,REQ,REQUIREMENTS_MATRIX.csv,"WS-ANALYSIS работает только от selected run contract и explicit compare contract, а не от live runtime-state",ACC-028;TST-028,covered
+REQ-029,REQ,REQUIREMENTS_MATRIX.csv,"WS-ANIMATOR открывается только по explicit analysis context и explicit artifact pointers, не rebindится молча к текущему проекту",ACC-029;TST-029,covered
+REQ-030,REQ,REQUIREMENTS_MATRIX.csv,Для цилиндров full-truth body/rod/piston разрешён только при complete packaging passport; иначе только axis-only honesty mode,ACC-030;TST-030,covered_partially
+REQ-031,REQ,REQUIREMENTS_MATRIX.csv,"Animator и схемы обязаны показывать источник представления, truth warnings и export/capture provenance",ACC-031;TST-031,covered
+REQ-032,REQ,REQUIREMENTS_MATRIX.csv,"WS-DIAGNOSTICS потребляет explicit evidence manifest, health report, selfcheck и SEND bundle contract",ACC-032;TST-032,covered
+REQ-033,REQ,REQUIREMENTS_MATRIX.csv,"Latest bundle, SHA256, interpreter provenance и freshness обязаны быть видимы пользователю",ACC-033;TST-033,covered
+REQ-034,REQ,REQUIREMENTS_MATRIX.csv,"У каждого значимого поля, кнопки, графика, предупреждения и столбца есть tooltip и знак вопроса с развёрнутым help",ACC-034;TST-034,covered
+REQ-035,REQ,REQUIREMENTS_MATRIX.csv,Обозначения без названия и значения без единиц измерения запрещены,ACC-035;TST-035,covered
+REQ-036,REQ,REQUIREMENTS_MATRIX.csv,"Значимые графические surfaces интерактивны и синхронизированы с деревом, inspector, таблицами и графиками",ACC-036;TST-036,covered
+REQ-037,REQ,REQUIREMENTS_MATRIX.csv,"Пневмосхема/мнемосхема обязана показывать направление, давление, расход и статусы дискретных элементов",ACC-037;TST-037,covered_partially
+REQ-038,REQ,REQUIREMENTS_MATRIX.csv,Диапазоны как first-class сущности редактируются dual-range control или эквивалентом с точными полями,ACC-038;TST-038,covered
+REQ-039,REQ,REQUIREMENTS_MATRIX.csv,"Длительные операции показывают progress на текущем экране, а shell strip дублирует его только как вторичный сигнал",ACC-039;TST-039,covered
+REQ-040,REQ,REQUIREMENTS_MATRIX.csv,Current-vs-historical и mismatch состояния вынесены в явные banners и compare policies,ACC-040;TST-040,covered
+REQ-041,REQ,REQUIREMENTS_MATRIX.csv,Производительность обязана быть доказуемой trace-артефактами; скрытые панели и фоновые web-surface не крадут budget playback,ACC-041;TST-041,covered_partially
+REQ-042,REQ,REQUIREMENTS_MATRIX.csv,"Producer-side hardpoints, solver_points и cylinder packaging contract остаются P0 до доказанного runtime evidence",ACC-042;TST-042,covered_partially
+REQ-043,REQ,REQUIREMENTS_MATRIX.csv,"Специализированные окна Desktop Animator, Compare Viewer и Desktop Mnemo остаются отдельными top-level surfaces",ACC-043;TST-043,covered
+REQ-044,REQ,REQUIREMENTS_MATRIX.csv,Скрытые expert/legacy-маршруты запрещены; незавершённые элементы маркируются «В разработке»,ACC-044;TST-044,covered
+REQ-045,REQ,REQUIREMENTS_MATRIX.csv,"Пакет для CODEX обязан быть recipient-neutral, самодостаточным, с traceability, lint и reconciliation backlog without rediscovery",ACC-045;TST-045,covered
+REQ-046,REQ,REQUIREMENTS_MATRIX.csv,"Стартовый shell обязан показывать один доминирующий 8-шаговый маршрут, а не каталог равноправных входов",ACC-046;TST-046,covered
+REQ-047,REQ,REQUIREMENTS_MATRIX.csv,Редактор кольца должен быть явно выделен как доминирующий сценарный центр и единственный editable source-of-truth сценариев,ACC-047;TST-047,covered
+REQ-048,REQ,REQUIREMENTS_MATRIX.csv,Диагностика должна иметь один доминирующий маршрут; отправка результатов является вложенным действием после готового bundle,ACC-048;TST-048,covered
+REQ-049,REQ,REQUIREMENTS_MATRIX.csv,"Встроенное сравнение в Analysis является основным compare-route, а Compare Viewer — расширенным режимом из Analysis",ACC-049;TST-049,covered
+REQ-050,REQ,REQUIREMENTS_MATRIX.csv,Desktop Mnemo и Инструменты должны быть secondary/advanced surfaces и не конкурировать с основным маршрутом первых минут,ACC-050;TST-050,covered
+ACC-001,ACC,ACCEPTANCE_MATRIX.csv,Единый канонический реестр ключей и запрет runtime-алиасов,REQ-001;TST-001,covered
+ACC-002,ACC,ACCEPTANCE_MATRIX.csv,Проект является основной пользовательской сущностью и хранится в файле,REQ-002;TST-002,covered
+ACC-003,ACC,ACCEPTANCE_MATRIX.csv,Для каждого класса сущностей существует один source-of-truth,REQ-003;TST-003,covered
+ACC-004,ACC,ACCEPTANCE_MATRIX.csv,Графика обязана использовать truth-state solver_confirmed/source_data_confirmed/approximate_inferred_with_warning/unavailable,REQ-004;TST-004,covered
+ACC-005,ACC,ACCEPTANCE_MATRIX.csv,"При неполной геометрии допускается только честная approximate/degraded визуализация или unavailable, но не красивая ложь",REQ-005;TST-005,covered
+ACC-006,ACC,ACCEPTANCE_MATRIX.csv,Потеря существующей функциональности при web->desktop migration запрещена,REQ-006;TST-006,covered
+ACC-007,ACC,ACCEPTANCE_MATRIX.csv,Приложение проектируется как нативный Windows desktop shell на Qt6/PySide6,REQ-007;TST-007,covered
+ACC-008,ACC,ACCEPTANCE_MATRIX.csv,"Главное окно имеет верхнее меню, command search, левое дерево, центральную рабочую область, правый inspector и нижнюю status/progress strip",REQ-008;TST-008,covered
+ACC-009,ACC,ACCEPTANCE_MATRIX.csv,Docking/undocking/floating/auto-hide/second-monitor/restore-layout обязательны,REQ-009;TST-009,covered
+ACC-010,ACC,ACCEPTANCE_MATRIX.csv,"Клавиатурная доступность, видимый focus, F6 между крупными регионами и screen-reader compatibility обязательны",REQ-010;TST-010,covered
+ACC-011,ACC,ACCEPTANCE_MATRIX.csv,"High DPI, mixed-DPI и Windows snap semantics обязательны",REQ-011;TST-011,covered
+ACC-012,ACC,ACCEPTANCE_MATRIX.csv,"Глобальный поиск команд, экранов, сущностей и артефактов обязателен",REQ-012;TST-012,covered
+ACC-013,ACC,ACCEPTANCE_MATRIX.csv,Команда «Собрать диагностику» всегда заметна и доступна из любого рабочего пространства,REQ-013;TST-013,covered
+ACC-014,ACC,ACCEPTANCE_MATRIX.csv,"WS-PROJECT показывает состояние проекта, блокеры и следующее действие, но не дублирует редактирование инженерных чисел",REQ-014;TST-014,covered
+ACC-015,ACC,ACCEPTANCE_MATRIX.csv,WS-INPUTS является единственной editable-поверхностью для model input master copy до handoff дальше по pipeline,REQ-015;TST-015,covered
+ACC-016,ACC,ACCEPTANCE_MATRIX.csv,У каждой core-группы входных данных есть обязательный графический двойник и двусторонняя синхронизация число↔графика,REQ-016;TST-016,covered
+ACC-017,ACC,ACCEPTANCE_MATRIX.csv,Редактор циклического сценария является единственным источником истины для дороги и маршрута движения,REQ-017;TST-017,covered
+ACC-018,ACC,ACCEPTANCE_MATRIX.csv,Циклический сценарий нигде не должен рисоваться как геометрическое кольцо; используются только unfolded cyclic views,REQ-018;TST-018,covered
+ACC-019,ACC,ACCEPTANCE_MATRIX.csv,"Сегмент 0 задаёт начальное и конечное состояние, сегменты 1..N-1 задают только конец, последний сегмент логически замыкается на первый",REQ-019;TST-019,covered
+ACC-020,ACC,ACCEPTANCE_MATRIX.csv,Поворот задаётся явно; продольная геометрия через конечные высоты; поперечный уклон одним параметром; разгон/торможение не тип сегмента,REQ-020;TST-020,covered
+ACC-021,ACC,ACCEPTANCE_MATRIX.csv,"WS-SUITE потребляет scenario refs и validated snapshot, но не владеет геометрией сценария",REQ-021;TST-021,covered
+ACC-022,ACC,ACCEPTANCE_MATRIX.csv,Validated suite snapshot обязателен как handoff в WS-BASELINE и несёт upstream lineage,REQ-022;TST-022,covered
+ACC-023,ACC,ACCEPTANCE_MATRIX.csv,WS-BASELINE читает только validated snapshot и ведёт active baseline contract с явной политикой auto-update,REQ-023;TST-023,covered
+ACC-024,ACC,ACCEPTANCE_MATRIX.csv,"WS-OPTIMIZATION читает active_baseline_contract и objective_contract, а run identity включает lineage и hard gate",REQ-024;TST-024,covered
+ACC-025,ACC,ACCEPTANCE_MATRIX.csv,Для оптимизации существует только один активный режим запуска в конкретный момент времени,REQ-025;TST-025,covered
+ACC-026,ACC,ACCEPTANCE_MATRIX.csv,StageRunner и distributed coordinator поддерживаются как разные execution engines с общим objective-contract и явной history semantics,REQ-026;TST-026,covered_partially
+ACC-027,ACC,ACCEPTANCE_MATRIX.csv,"Stage-specific influence summary, seed budgeting и promotion policy должны быть видимы и объяснимы на текущем экране",REQ-027;TST-027,covered
+ACC-028,ACC,ACCEPTANCE_MATRIX.csv,"WS-ANALYSIS работает только от selected run contract и explicit compare contract, а не от live runtime-state",REQ-028;TST-028,covered
+ACC-029,ACC,ACCEPTANCE_MATRIX.csv,"WS-ANIMATOR открывается только по explicit analysis context и explicit artifact pointers, не rebindится молча к текущему проекту",REQ-029;TST-029,covered
+ACC-030,ACC,ACCEPTANCE_MATRIX.csv,Для цилиндров full-truth body/rod/piston разрешён только при complete packaging passport; иначе только axis-only honesty mode,REQ-030;TST-030,covered_partially
+ACC-031,ACC,ACCEPTANCE_MATRIX.csv,"Animator и схемы обязаны показывать источник представления, truth warnings и export/capture provenance",REQ-031;TST-031,covered
+ACC-032,ACC,ACCEPTANCE_MATRIX.csv,"WS-DIAGNOSTICS потребляет explicit evidence manifest, health report, selfcheck и SEND bundle contract",REQ-032;TST-032,covered
+ACC-033,ACC,ACCEPTANCE_MATRIX.csv,"Latest bundle, SHA256, interpreter provenance и freshness обязаны быть видимы пользователю",REQ-033;TST-033,covered
+ACC-034,ACC,ACCEPTANCE_MATRIX.csv,"У каждого значимого поля, кнопки, графика, предупреждения и столбца есть tooltip и знак вопроса с развёрнутым help",REQ-034;TST-034,covered
+ACC-035,ACC,ACCEPTANCE_MATRIX.csv,Обозначения без названия и значения без единиц измерения запрещены,REQ-035;TST-035,covered
+ACC-036,ACC,ACCEPTANCE_MATRIX.csv,"Значимые графические surfaces интерактивны и синхронизированы с деревом, inspector, таблицами и графиками",REQ-036;TST-036,covered
+ACC-037,ACC,ACCEPTANCE_MATRIX.csv,"Пневмосхема/мнемосхема обязана показывать направление, давление, расход и статусы дискретных элементов",REQ-037;TST-037,covered_partially
+ACC-038,ACC,ACCEPTANCE_MATRIX.csv,Диапазоны как first-class сущности редактируются dual-range control или эквивалентом с точными полями,REQ-038;TST-038,covered
+ACC-039,ACC,ACCEPTANCE_MATRIX.csv,"Длительные операции показывают progress на текущем экране, а shell strip дублирует его только как вторичный сигнал",REQ-039;TST-039,covered
+ACC-040,ACC,ACCEPTANCE_MATRIX.csv,Current-vs-historical и mismatch состояния вынесены в явные banners и compare policies,REQ-040;TST-040,covered
+ACC-041,ACC,ACCEPTANCE_MATRIX.csv,Производительность обязана быть доказуемой trace-артефактами; скрытые панели и фоновые web-surface не крадут budget playback,REQ-041;TST-041,covered_partially
+ACC-042,ACC,ACCEPTANCE_MATRIX.csv,"Producer-side hardpoints, solver_points и cylinder packaging contract остаются P0 до доказанного runtime evidence",REQ-042;TST-042,covered_partially
+ACC-043,ACC,ACCEPTANCE_MATRIX.csv,"Специализированные окна Desktop Animator, Compare Viewer и Desktop Mnemo остаются отдельными top-level surfaces",REQ-043;TST-043,covered
+ACC-044,ACC,ACCEPTANCE_MATRIX.csv,Скрытые expert/legacy-маршруты запрещены; незавершённые элементы маркируются «В разработке»,REQ-044;TST-044,covered
+ACC-045,ACC,ACCEPTANCE_MATRIX.csv,"Пакет для CODEX обязан быть recipient-neutral, самодостаточным, с traceability, lint и reconciliation backlog without rediscovery",REQ-045;TST-045,covered
+ACC-046,ACC,ACCEPTANCE_MATRIX.csv,"Стартовый shell обязан показывать один доминирующий 8-шаговый маршрут, а не каталог равноправных входов",REQ-046;TST-046,covered
+ACC-047,ACC,ACCEPTANCE_MATRIX.csv,Редактор кольца должен быть явно выделен как доминирующий сценарный центр и единственный editable source-of-truth сценариев,REQ-047;TST-047,covered
+ACC-048,ACC,ACCEPTANCE_MATRIX.csv,Диагностика должна иметь один доминирующий маршрут; отправка результатов является вложенным действием после готового bundle,REQ-048;TST-048,covered
+ACC-049,ACC,ACCEPTANCE_MATRIX.csv,"Встроенное сравнение в Analysis является основным compare-route, а Compare Viewer — расширенным режимом из Analysis",REQ-049;TST-049,covered
+ACC-050,ACC,ACCEPTANCE_MATRIX.csv,Desktop Mnemo и Инструменты должны быть secondary/advanced surfaces и не конкурировать с основным маршрутом первых минут,REQ-050;TST-050,covered
+TST-001,TST,TEST_CATALOG.csv,Проверка REQ-001,REQ-001,covered
+TST-002,TST,TEST_CATALOG.csv,Проверка REQ-002,REQ-002,covered
+TST-003,TST,TEST_CATALOG.csv,Проверка REQ-003,REQ-003,covered
+TST-004,TST,TEST_CATALOG.csv,Проверка REQ-004,REQ-004,covered
+TST-005,TST,TEST_CATALOG.csv,Проверка REQ-005,REQ-005,covered
+TST-006,TST,TEST_CATALOG.csv,Проверка REQ-006,REQ-006,covered
+TST-007,TST,TEST_CATALOG.csv,Проверка REQ-007,REQ-007,covered
+TST-008,TST,TEST_CATALOG.csv,Проверка REQ-008,REQ-008,covered
+TST-009,TST,TEST_CATALOG.csv,Проверка REQ-009,REQ-009,covered
+TST-010,TST,TEST_CATALOG.csv,Проверка REQ-010,REQ-010,covered
+TST-011,TST,TEST_CATALOG.csv,Проверка REQ-011,REQ-011,covered
+TST-012,TST,TEST_CATALOG.csv,Проверка REQ-012,REQ-012,covered
+TST-013,TST,TEST_CATALOG.csv,Проверка REQ-013,REQ-013,covered
+TST-014,TST,TEST_CATALOG.csv,Проверка REQ-014,REQ-014,covered
+TST-015,TST,TEST_CATALOG.csv,Проверка REQ-015,REQ-015,covered
+TST-016,TST,TEST_CATALOG.csv,Проверка REQ-016,REQ-016,covered
+TST-017,TST,TEST_CATALOG.csv,Проверка REQ-017,REQ-017,covered
+TST-018,TST,TEST_CATALOG.csv,Проверка REQ-018,REQ-018,covered
+TST-019,TST,TEST_CATALOG.csv,Проверка REQ-019,REQ-019,covered
+TST-020,TST,TEST_CATALOG.csv,Проверка REQ-020,REQ-020,covered
+TST-021,TST,TEST_CATALOG.csv,Проверка REQ-021,REQ-021,covered
+TST-022,TST,TEST_CATALOG.csv,Проверка REQ-022,REQ-022,covered
+TST-023,TST,TEST_CATALOG.csv,Проверка REQ-023,REQ-023,covered
+TST-024,TST,TEST_CATALOG.csv,Проверка REQ-024,REQ-024,covered
+TST-025,TST,TEST_CATALOG.csv,Проверка REQ-025,REQ-025,covered
+TST-026,TST,TEST_CATALOG.csv,Проверка REQ-026,REQ-026,covered_partially
+TST-027,TST,TEST_CATALOG.csv,Проверка REQ-027,REQ-027,covered
+TST-028,TST,TEST_CATALOG.csv,Проверка REQ-028,REQ-028,covered
+TST-029,TST,TEST_CATALOG.csv,Проверка REQ-029,REQ-029,covered
+TST-030,TST,TEST_CATALOG.csv,Проверка REQ-030,REQ-030,covered_partially
+TST-031,TST,TEST_CATALOG.csv,Проверка REQ-031,REQ-031,covered
+TST-032,TST,TEST_CATALOG.csv,Проверка REQ-032,REQ-032,covered
+TST-033,TST,TEST_CATALOG.csv,Проверка REQ-033,REQ-033,covered
+TST-034,TST,TEST_CATALOG.csv,Проверка REQ-034,REQ-034,covered
+TST-035,TST,TEST_CATALOG.csv,Проверка REQ-035,REQ-035,covered
+TST-036,TST,TEST_CATALOG.csv,Проверка REQ-036,REQ-036,covered
+TST-037,TST,TEST_CATALOG.csv,Проверка REQ-037,REQ-037,covered_partially
+TST-038,TST,TEST_CATALOG.csv,Проверка REQ-038,REQ-038,covered
+TST-039,TST,TEST_CATALOG.csv,Проверка REQ-039,REQ-039,covered
+TST-040,TST,TEST_CATALOG.csv,Проверка REQ-040,REQ-040,covered
+TST-041,TST,TEST_CATALOG.csv,Проверка REQ-041,REQ-041,covered_partially
+TST-042,TST,TEST_CATALOG.csv,Проверка REQ-042,REQ-042,covered_partially
+TST-043,TST,TEST_CATALOG.csv,Проверка REQ-043,REQ-043,covered
+TST-044,TST,TEST_CATALOG.csv,Проверка REQ-044,REQ-044,covered
+TST-045,TST,TEST_CATALOG.csv,Проверка REQ-045,REQ-045,covered
+TST-046,TST,TEST_CATALOG.csv,Проверка REQ-046,REQ-046,covered
+TST-047,TST,TEST_CATALOG.csv,Проверка REQ-047,REQ-047,covered
+TST-048,TST,TEST_CATALOG.csv,Проверка REQ-048,REQ-048,covered
+TST-049,TST,TEST_CATALOG.csv,Проверка REQ-049,REQ-049,covered
+TST-050,TST,TEST_CATALOG.csv,Проверка REQ-050,REQ-050,covered

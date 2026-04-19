@@ -22,7 +22,18 @@ def test_desktop_run_setup_center_uses_workspace_layout_instead_of_long_vertical
     assert 'create_scrollable_tab(' in src
     assert 'self._build_profile_tab()' in src
     assert 'self._build_artifacts_tab()' in src
+    assert 'text="Запустить расчёт"' in src
+    assert 'text="Запустить"' not in src
+    assert 'text="Папка результатов"' in src
+    assert 'text="Открыть папку результатов"' in src
+    assert "Папка запусков" not in src
+    assert "Открыть папку запусков" not in src
     assert 'footer = build_status_strip(' in src
+
+    build_ui_block = src[src.index("def _build_ui"): src.index("def _build_workspace_ui")]
+    assert "return" not in build_ui_block
+    assert "_ScrollableBody(outer)" not in build_ui_block
+    assert '.pack(fill="both", expand=True)' not in build_ui_block
 
 
 def test_desktop_run_setup_center_uses_russian_operator_facing_sections() -> None:
@@ -50,7 +61,9 @@ def test_desktop_run_setup_center_uses_russian_operator_facing_sections() -> Non
     assert '"Сбросить ручные изменения"' in src
     assert "self._build_suite_tab()" in src
     assert "self.suite_tree = ttk.Treeview" in src
-    assert '"Открыть файл анимации"' in src
+    assert '"Загрузить файл анимации"' in src
+    assert '"Показать файл анимации"' not in src
+    assert '"Открыть файл анимации"' not in src
     assert '"Открыть сводку"' in src
     assert '"Открыть снимок набора (JSON)"' not in src
     assert '"Открыть набор NPZ"' not in src
@@ -140,6 +153,10 @@ def test_desktop_run_setup_center_formats_suite_lineage_and_stale_rows() -> None
     assert "Устаревшие строки: ring_auto_full" in status
     assert "изменился исходный сценарий" in status
     assert "изменилась выгрузка сценария" in status
-    assert rows[0][6] == "road_csv, axay_csv, scenario_json, segment_meta_ref"
-    assert rows[0][7] == "источник=ssssssssssss | экспорт=eeeeeeeeeeee"
-    assert rows[0][8] == "устарело: да; изменилась выгрузка сценария, не хватает ссылок: 1"
+    assert rows[0][3] == "манёвр из файла"
+    assert rows[0][6] == "профиль дороги, ускорения, сценарий, описание сегмента"
+    assert rows[0][7] == "исходный сценарий ssssssssssss | выгрузка eeeeeeeeeeee"
+    assert rows[0][8] == "устарело: да; изменилась выгрузка сценария, не хватает файлов: 1"
+    assert "road_csv" not in " | ".join(rows[0])
+    assert "axay_csv" not in " | ".join(rows[0])
+    assert "scenario_json" not in " | ".join(rows[0])

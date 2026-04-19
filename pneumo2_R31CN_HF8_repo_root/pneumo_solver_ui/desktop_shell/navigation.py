@@ -13,8 +13,11 @@ PRIMARY_WORKFLOW_KEYS = (
     "desktop_input_editor",
     "desktop_ring_editor",
     "test_center",
+    "desktop_run_setup_center",
     "desktop_optimizer_center",
     "desktop_results_center",
+    "desktop_animator",
+    "desktop_diagnostics_center",
 )
 NAVIGATION_SECTION_ORDER = (
     "Проект",
@@ -195,8 +198,8 @@ def ordered_open_workflow_sessions(
 
 def home_tab_title(open_count: int) -> str:
     if open_count <= 0:
-        return "Главная"
-    return f"Главная ({open_count})"
+        return "Панель проекта"
+    return f"Панель проекта ({open_count})"
 
 
 def hosted_session_at_index(
@@ -275,7 +278,7 @@ def describe_workspace_state(
     open_count = len(ordered)
 
     if current_key == HOME_WORKSPACE_KEY:
-        return f"Главная | Встроенных окон: {open_count}"
+        return f"Панель проекта | Встроенных окон: {open_count}"
     if current_key is None:
         return f"Рабочая область не выбрана | Встроенных окон: {open_count}"
 

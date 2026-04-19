@@ -161,6 +161,36 @@ ID: `REQ-0024`.
 Источник: chat:2026-04-19 semantic GUI audit.
 ID: `REQ-0025`.
 
+26. V5 human GUI simulation audit is an evidence-first remediation layer
+Archive C:/Users/Admin/Downloads/pneumo_human_gui_simulation_audit_v5_module_internals.zip уточняет текущий GUI-проход: нельзя считать окно полностью понятным по одной кнопке запуска; нужно различать launchpoint_only, launchpoint_plus_prelaunch, source_contract_opened и runtime_opened; ближайший фокус: иерархия launcher, единый маршрут Собрать диагностику, различение embedded compare и Compare Viewer, pre-launch карточки для Mnemo/Diagnostics/Compare/Input/Test.
+Статус: активно.
+Источник: chat + archive:pneumo_human_gui_simulation_audit_v5_module_internals.
+ID: `REQ-0026`.
+
+27. Human GUI V6: единый стартовый маршрут и первоклассный Редактор кольца
+Отчётный аудит V6 требует вести GUI к одному понятному стартовому маршруту: Редактор кольца должен быть верхнеуровневым входом для сценариев; диагностика должна иметь одно доминирующее действие Собрать диагностику; сравнение не должно дублироваться как равнозначный первый маршрут; графика, анимация, схема и результаты должны иметь крупные видимые состояния достоверности; стартовые кнопки должны пояснять назначение без служебных терминов.
+Статус: активно.
+Источник: chat + archive:pneumo_human_gui_report_only_v6.zip.
+ID: `REQ-0027`.
+
+28. Human GUI V10: launcher-shell должен быть маршрутом, а не каталогом окон
+Archive C:/Users/Admin/Downloads/pneumo_human_gui_report_only_v10_launcher_hierarchy.zip закрепляет иерархию стартового shell: primary route = Исходные данные -> Сценарии/Редактор кольца -> Набор испытаний -> Базовый прогон -> Оптимизация -> Анализ -> Анимация -> Диагностика; Send Results должен быть вторым шагом внутри Diagnostics, Compare Viewer - advanced режимом из Анализа, Desktop Mnemo и Tools Center - second-layer/advanced, не первыми обязательными входами. Действия с файлом анимации должны вести к просмотру/загрузке в аниматоре, а не к сырому открытию файла через системную ассоциацию.
+Статус: активно.
+Источник: chat + archive:pneumo_human_gui_report_only_v10_launcher_hierarchy.zip.
+ID: `REQ-0028`.
+
+29. V38 actualized with V10 is the active GUI/TZ/spec imported layer
+Archive C:/Users/Admin/Downloads/pneumo_codex_tz_spec_connector_reconciled_v38_actualized_with_v10.zip was imported to docs/context/gui_spec_imports/v38_actualized_with_v10. Future GUI/TZ/spec work must read it after 17/18 and before previous V38/V10 provenance. It integrates V10 launcher hierarchy findings and adds REQ-046 ... REQ-050 while keeping runtime closure gaps open.
+Статус: активно.
+Источник: chat + archive:pneumo_codex_tz_spec_connector_reconciled_v38_actualized_with_v10.
+ID: `REQ-0029`.
+
+30. Launcher shell must follow the V10-actualized eight-step route
+The first screen must show one dominant route: Исходные данные -> Редактор кольца / сценариев -> Набор испытаний -> Базовый прогон -> Оптимизация -> Анализ результатов -> Анимация -> Диагностика. Compare Viewer, Desktop Mnemo and Tools remain available but secondary/advanced; send-results is nested under Diagnostics after diagnostics is ready.
+Статус: активно.
+Источник: chat + V38 actualized with V10.
+ID: `REQ-0030`.
+
 ## Как ссылаться из будущих задач
 
 Если новая задача опирается на решение из чата, но не отражена в старом каноне, сначала проверить этот файл, а затем соответствующие plan-файлы из [docs/14_CHAT_PLANS_LOG.md](./14_CHAT_PLANS_LOG.md).

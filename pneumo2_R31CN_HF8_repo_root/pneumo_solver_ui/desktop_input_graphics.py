@@ -193,7 +193,7 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
         panel_title = "Пневмосхема проекта" if str(section_title or "").strip() == "Пневматика" else "Схема подвески проекта"
         self.canvas.create_text(18, 20, anchor="w", text=panel_title, font=("Segoe UI", 9, "bold"))
         context_title = self._context_title(active_context) or str(field_label or "").strip() or str(section_title or "").strip()
-        self.canvas.create_text(18, 38, anchor="w", text=f"Контекст: {context_title}", font=("Segoe UI", 8), fill="#355070")
+        self.canvas.create_text(18, 38, anchor="w", text=f"Показано: {context_title}", font=("Segoe UI", 8), fill="#355070")
 
         scheme_x0 = self.SCHEME_X0
         scheme_y0 = self.SCHEME_Y0
@@ -453,7 +453,7 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
         if unit_label:
             lines.insert(0, f"Единица: {unit_label}")
         if active_context:
-            lines.insert(0, f"Контекст: {self._context_title(active_context)}")
+            lines.insert(0, f"Показано: {self._context_title(active_context)}")
         for idx, text in enumerate(lines[:8]):
             self.canvas.create_text(
                 x,
@@ -532,8 +532,8 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
             return [
                 f"Шаг интегрирования: {self._safe_float(payload, 'макс_шаг_интегрирования_с', 0.0):.4f} с",
                 f"Внутренних шагов: {self._safe_float(payload, 'макс_число_внутренних_шагов_на_dt', 0.0):.0f}",
-                f"Автопроверка: {'включён' if bool(payload.get('autoverif_enable')) else 'выключен'}",
-                f"Самопроверка механики: {'включён' if bool(payload.get('mechanics_selfcheck')) else 'выключен'}",
+                f"Проверка: {'включён' if bool(payload.get('autoverif_enable')) else 'выключен'}",
+                f"Проверка механики: {'включён' if bool(payload.get('mechanics_selfcheck')) else 'выключен'}",
             ]
         return [
             f"База: {geom['wheelbase']:.2f} м",

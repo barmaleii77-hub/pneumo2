@@ -1,0 +1,5 @@
+gap_id,topic,status,why_kept_open
+GAP-001,producer-side hardpoints/solver_points truth,open,repo TODO keeps this open
+GAP-002,cylinder packaging passport,open,repo TODO and graphics honesty contract keep it open
+GAP-003,browser perf trace / viewport gating,open,measured acceptance not proven
+GAP-004,Windows visual/runtime acceptance,open,no runtime proof embedded in repo canon

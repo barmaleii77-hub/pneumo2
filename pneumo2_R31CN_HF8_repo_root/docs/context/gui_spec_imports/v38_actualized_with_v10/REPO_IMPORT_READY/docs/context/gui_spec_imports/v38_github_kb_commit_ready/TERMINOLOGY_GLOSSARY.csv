@@ -1,0 +1,41 @@
+TERM_CANONICAL_RU,ALIASES_OR_EN,DEFINITION,USAGE_RULE,SOURCE_IDS
+проекты,project,"Основная пользовательская сущность, содержащая исходные данные, сценарии, baseline, optimization runs, анализ и диагностику.","Всегда показывать как объект верхнего уровня, а не как набор случайных файлов.",SRC-000;SRC-007;SRC-021
+редактор циклического сценария,ring editor,Единственный источник сценарной истины для дороги и маршрута движения.,Не использовать альтернативные editable источники геометрии сценария.,SRC-000;SRC-007;SRC-013;SRC-025
+циклический сценарий,ring/cyclic scenario,Периодическая последовательность сегментов без геометрического отображения в виде кольца.,Показывать только в unfolded cyclic views.,SRC-000;SRC-013;SRC-025
+сегмент,segment,Минимальный участок сценария со стабильным segment_id и явной геометрической семантикой.,"Сегмент 0 задаёт старт/конец, остальные — только конец.",SRC-000;SRC-013
+поворот,turn,"Явный direction enum сегмента: прямо, влево или вправо.",Не вычислять как derived physics label вместо геометрической семантики.,SRC-000;SRC-013
+режим прохождения,passage mode,"Контекст прохождения сегмента: скорость, разгон/торможение, заметки испытания.",Не смешивать с геометрическим типом сегмента.,SRC-000;SRC-013;SRC-025
+матрица испытаний,suite,"Frozen потребитель ring contract, задающий набор тестов, dt, t_end, stage entry и локальные overrides.",Не владеть геометрией сценария.,SRC-014;SRC-022;SRC-026
+validated suite snapshot,validated_suite_snapshot,"Frozen snapshot матрицы испытаний, проходящий downstream.",Обязателен как handoff в baseline.,SRC-014;SRC-022
+baseline,baseline,"Базовый прогон, являющийся источником сравнения и стартовой точкой optimization.",Отделять active baseline contract от истории baseline.,SRC-015;SRC-023
+active baseline contract,active_baseline_contract,"Явный контракт активного baseline с policy mode, hashes и provenance.","Optimization читает только его, а не живую историю baseline.",SRC-015;SRC-023
+objective stack,objective keys,Стек целевых показателей optimization.,Визуализировать как first-class runtime contract.,SRC-016;SRC-023
+hard gate,penalty key + tolerance,"Жёсткое ограничение optimization, определяющее feasibility и identity задачи.",История и compare обязаны учитывать hard gate.,SRC-016;SRC-023
+selected run contract,selected optimization run,Frozen контекст выбранного прогона для анализа и анимации.,Не подменять live runtime-state.,SRC-017;SRC-023
+compare contract,compare,Явный контракт сравнения baseline/run/run или scenario/segment slices.,Не допускать молчаливого смешивания mismatch contexts.,SRC-017;SRC-024
+truth state,graphics truth,"Степень достоверности графической поверхности: solver_confirmed, source_data_confirmed, approximate_inferred_with_warning, unavailable.",Обязателен для каждой графической surface.,SRC-000;SRC-012
+solver-confirmed,solver_confirmed,Геометрия или сигнал подтверждены расчётом/экспортом solver.,Можно использовать как инженерную истину без warning.,SRC-000;SRC-012
+данные исходного ввода подтверждены,source_data_confirmed,"Геометрия построена по исходным данным, но не как solver-confirmed.",Маркировать отдельно от solver-confirmed.,SRC-000;SRC-012
+приблизительное представление с предупреждением,approximate_inferred_with_warning,"Приближённая графика на основе неполных данных, допустимая только с явным warning.","Показывать источник, пробелы и запрет на трактовку как solver truth.",SRC-000;SRC-012
+недоступно,unavailable,"Состояние, где даже approximate view был бы вводящим в заблуждение.",Предпочтительнее красивой лжи.,SRC-000
+axis-only honesty mode,axis-only,"Режим цилиндров/пневмоактуаторов без body/rod/piston full-truth, когда есть только ось и базовые точки.",Обязателен до completion packaging passport.,SRC-018;SRC-025;SRC-026
+packaging passport,cylinder packaging passport,"Полный producer-side контракт геометрии цилиндра: body length, gland/sleeve, rod eye, retracted/extended lengths, mount points.",Только при его полноте разрешать full-truth body/rod/piston.,SRC-002;SRC-025;SRC-026
+hardpoints,solver hardpoints,Экспортируемые канонические точки геометрии подвески и цилиндров.,Не восстанавливать молча из legacy dw_* ключей.,SRC-002
+solver_points,solver points,Канонический экспортный слой точек из solver/export в animator.,Producer-side truth P0.,SRC-005;SRC-024
+Desktop Animator,Desktop Animator,Специализированное top-level окно анимации и truthful graphics.,Не схлопывать в обычную вкладку.,SRC-007;SRC-018;SRC-020
+Compare Viewer,Compare Viewer,Специализированное top-level окно сравнения результатов.,Открывается из Analysis и shell history.,SRC-007;SRC-020
+Desktop Mnemo,Desktop Mnemo,Специализированное окно пневмосхемы/мнемосхемы.,"Показывает давление, расход, состояние дискретных элементов и легенды.",SRC-007
+dock-окно,dock widget,"Прикрепляемая панель shell-а с возможностью docking, floating, auto-hide и second-monitor workflow.",Использовать как first-class shell elements.,SRC-006;SRC-020
+command search,global search,"Глобальный поиск команд, экранов, параметров, артефактов и сущностей.",Обязателен на уровне shell.,SRC-006;SRC-020
+selection sync,selection synchronization,"Синхронизация выбранного объекта между деревом, графикой, таблицами и inspector.",Обязательна для кликабельных инженерных surfaces.,SRC-007;SRC-013
+visual twin,graphical twin,Графический двойник числового слоя входных данных или результата.,Должен обновляться двусторонне.,SRC-021
+project-bound history,project history,История baseline/optimization/analysis в рамках проекта.,Отличать от global archive.,SRC-007;SRC-021
+global archive,archive,Внешний архив warm-start/resume/heuristics.,Не подменяет user-facing truth текущего проекта.,SRC-000;SRC-016
+warm-start,warm-start,Использование archive/surrogate/history для ускорения optimization.,Всегда показывать provenance warm-start.,SRC-016
+underfill,underfill,Недобор seed budget или selection budget на стадии optimization.,"Объяснять причинами, а не скрывать.",SRC-016
+gate reason,gate reason,"Причина отсечения кандидата, seed или stage path.",Показывать live на экране optimization.,SRC-016
+autosave diagnostics,auto-exit/crash bundle,Автоматическое сохранение диагностики при штатном выходе или аварии.,Живёт в одном общем diagnostics contract с manual collect.,SRC-019
+message bar,message strip,Глобальный banner/status слой shell для важных сообщений и stale states.,"Не подменяет полноценные error dialogs, но обязателен как shell layer.",SRC-020;SRC-024
+stale-link,stale link,"Ссылка на artifact или context, которая устарела относительно lineage/hash/version.","Визуализировать явно, а не молча пересчитывать.",SRC-022;SRC-023;SRC-024
+context stale,context stale,"Состояние, когда upstream input/suite/ring context изменился и downstream artifact уже историчен.",Показывать banner и mismatch policy.,SRC-022;SRC-023;SRC-024
+recipient-neutral,recipient neutral,"Формат пакета без внутренних ролей, ярлыков и неявных ссылок на автора.",Обязателен для финального package for CODEX.,SRC-000

@@ -1,9 +1,18 @@
 from __future__ import annotations
 
+import json
+import os
 import traceback
 import tkinter as tk
+import webbrowser
+from pathlib import Path
 from tkinter import messagebox, ttk
 
+from pneumo_solver_ui.desktop_animator.analysis_context import load_analysis_context
+from pneumo_solver_ui.desktop_qt_shell.project_context import (
+    ShellProjectContext,
+    build_shell_project_context,
+)
 from pneumo_solver_ui.desktop_ui_core import ScrollableFrame
 from pneumo_solver_ui.release_info import get_release
 
@@ -42,31 +51,33 @@ class DesktopMainShell:
         self.specs = build_desktop_shell_specs()
         self.spec_by_key = {spec.key: spec for spec in self.specs}
         self.command_search_entries = build_shell_command_search_entries(self.specs)
+        self.project_context: ShellProjectContext = build_shell_project_context()
         self.status_var = tk.StringVar(
-            value="Готово. Выберите окно слева, верхнее меню или обзорную страницу."
+            value="Готово. Выберите окно слева: оно откроется сразу."
         )
         self.runtime_var = tk.StringVar(
             value="Ход выполнения: нет активной инженерной операции."
         )
         self.workflow_var = tk.StringVar(value="Порядок работы: недоступен")
-        self.workspace_var = tk.StringVar(value="Обзор | Открытых окон: 0")
+        self.workspace_var = tk.StringVar(value="Панель проекта | Открытых окон: 0")
         self.command_search_var = tk.StringVar(value="")
         self.command_search_hint_var = tk.StringVar(
             value="Быстрый поиск: начните вводить название окна, действия или файла."
         )
-        self.details_title_var = tk.StringVar(value="Обзор")
+        self.details_title_var = tk.StringVar(value="Панель проекта")
         self.details_meta_var = tk.StringVar(value="Основное рабочее место")
         self.details_body_var = tk.StringVar(
             value="Слева доступны рабочие окна проекта: данные, сценарии, расчёт, оптимизация, результаты, анализ и визуализация."
         )
         self.details_hint_var = tk.StringVar(
-            value="Подсказка: основные пользовательские окна идут в порядке инженерной работы."
+            value="Основные пользовательские окна идут в порядке инженерной работы."
         )
         self.home_view: ShellHomeViewController | None = None
         self.toolbar: ShellToolbarController | None = None
         self.workspace_context_menu: ShellWorkspaceContextMenuController | None = None
         self._startup_tool_keys = startup_tool_keys
         self._startup_route_applied = False
+        self._workflow_visited_keys: set[str] = set()
         self._startup_after_id: str | None = None
         self._is_closing = False
         self._nav_item_to_key: dict[str, str] = {}
@@ -162,7 +173,7 @@ class DesktopMainShell:
         self.notebook.bind("<<NotebookTabChanged>>", self._on_tab_changed)
 
         self.home_tab = ttk.Frame(self.notebook, padding=16)
-        self.notebook.add(self.home_tab, text="Обзор")
+        self.notebook.add(self.home_tab, text="Панель проекта")
         self.workspace = DesktopWorkspaceManager(
             self.root,
             self.notebook,
@@ -253,10 +264,6 @@ class DesktopMainShell:
         nav_scroll.pack(side="right", fill="y")
         self.nav_tree.configure(yscrollcommand=nav_scroll.set)
         self.nav_tree.bind("<<TreeviewSelect>>", self._on_navigation_selected)
-        ttk.Button(panel, text="Открыть окно", command=self._open_selected_navigation_item).pack(
-            fill="x",
-            pady=(8, 0),
-        )
         self._rebuild_navigation_tree()
 
     def _build_details_panel(self, parent: ttk.Frame) -> None:
@@ -294,7 +301,7 @@ class DesktopMainShell:
         ).pack(anchor="w", pady=(8, 0))
         self.details_open_button = ttk.Button(
             body,
-            text="Открыть окно",
+            text="Показать в рабочей области",
             command=self._open_current_detail_target,
         )
         self.details_open_button.pack(
@@ -320,12 +327,12 @@ class DesktopMainShell:
         ).pack(side="left")
         ttk.Button(
             actions,
-            text="Открыть сравнение",
+            text="Сравнить прогоны",
             command=self._open_compare_viewer,
         ).pack(side="left", padx=(8, 0))
         ttk.Button(
             actions,
-            text="Открыть в аниматоре",
+            text="Показать в аниматоре",
             command=self._open_animator,
         ).pack(side="left", padx=(8, 0))
         ttk.Button(
@@ -359,7 +366,7 @@ class DesktopMainShell:
         )
         ttk.Button(
             search,
-            text="Открыть",
+            text="Выполнить действие",
             command=self._execute_command_search,
         ).grid(row=0, column=2, sticky="e")
         ttk.Label(
@@ -374,7 +381,7 @@ class DesktopMainShell:
     def _rebuild_navigation_tree(self) -> None:
         self.nav_tree.delete(*self.nav_tree.get_children())
         self._nav_item_to_key = {}
-        overview_id = self.nav_tree.insert("", "end", text="Обзор", open=True)
+        overview_id = self.nav_tree.insert("", "end", text="Панель проекта", open=True)
         self._nav_item_to_key[overview_id] = "__home__"
         for section_label, specs in ordered_navigation_sections(self._navigation_specs()):
             section_id = self.nav_tree.insert("", "end", text=section_label, open=True)
@@ -419,7 +426,12 @@ class DesktopMainShell:
             self.home_view.refresh()
         if self.toolbar is not None:
             self.toolbar.refresh()
-        self.workflow_var.set(describe_workflow_status(self._workflow_specs(), open_keys))
+        self.workflow_var.set(
+            describe_workflow_status(
+                self._workflow_specs(),
+                open_keys | self._workflow_visited_keys,
+            )
+        )
         self.workspace_var.set(self.workspace.describe_workspace())
         self._sync_navigation_selection()
         self._refresh_details_panel()
@@ -447,13 +459,13 @@ class DesktopMainShell:
     def _refresh_details_panel(self) -> None:
         current_key = self.workspace.selected_workspace_key() or "__home__"
         if current_key == "__home__":
-            self.details_title_var.set("Обзор")
+            self.details_title_var.set("Панель проекта")
             self.details_meta_var.set(self.workflow_var.get())
             self.details_body_var.set(
-                "Используйте список слева для перехода к исходным данным, сценариям, расчёту, оптимизации, результатам, анализу, визуализации и диагностике."
+                "Панель проекта собирает порядок работы, открытые окна и переходы к исходным данным, сценариям, расчёту, оптимизации, результатам, анализу, визуализации и диагностике."
             )
             self.details_hint_var.set(
-                "Подсказка: выбор в списке сразу открывает окно; отдельная кнопка нужна только для повторного перехода."
+                "Выбор в списке сразу открывает окно; меню и поиск нужны только для быстрых переходов."
             )
             return
         spec = self.spec_by_key.get(current_key)
@@ -480,13 +492,13 @@ class DesktopMainShell:
         return self.specs
 
     def _workflow_specs(self) -> tuple[DesktopShellToolSpec, ...]:
-        return ordered_workflow_specs(self._main_nav_specs())
+        return ordered_workflow_specs(self.specs)
 
     def _entry_kind_label(self, spec: DesktopShellToolSpec) -> str:
         if spec.entry_kind == "main":
             return "основное окно"
         if spec.entry_kind == "contextual":
-            return "переход по выбранному результату"
+            return "переход по результатам расчёта"
         if spec.entry_kind == "external":
             return "внешнее специализированное окно"
         return "дополнительное окно"
@@ -501,12 +513,12 @@ class DesktopMainShell:
         item_id = next(iter(self.nav_tree.selection()), "")
         key = self._nav_item_to_key.get(item_id, "")
         if key == "__home__":
-            self.details_title_var.set("Обзор")
-            self.details_meta_var.set("Главная страница")
+            self.details_title_var.set("Панель проекта")
+            self.details_meta_var.set("Стартовая панель")
             self.details_body_var.set(
-                "Обзор собирает порядок работы, открытые окна и быстрые переходы по пользовательским окнам."
+            "Панель проекта собирает порядок работы, открытые окна и быстрые переходы по пользовательским окнам."
             )
-            self.details_hint_var.set("Выбор в списке сразу синхронизирует рабочую область и пояснение.")
+            self.details_hint_var.set("Выбор в списке сразу открывает окно и обновляет пояснение.")
             return
         spec = self.spec_by_key.get(key)
         if spec is None:
@@ -535,7 +547,9 @@ class DesktopMainShell:
         self.open_tool(current_key)
 
     def continue_workflow_route(self) -> None:
-        open_keys = {session.key for session in self.workspace.list_open_sessions()}
+        open_keys = {
+            session.key for session in self.workspace.list_open_sessions()
+        } | self._workflow_visited_keys
         spec = next_workflow_spec(self._workflow_specs(), open_keys)
         if spec is None:
             self.status_var.set("Основной порядок работы пока недоступен в главном окне.")
@@ -658,12 +672,133 @@ class DesktopMainShell:
         elif best.action_kind == "focus" and best.action_value == "project_tree":
             self.nav_tree.focus_set()
             self.status_var.set("Фокус переведён в список рабочих окон проекта.")
+        elif best.action_kind == "open_artifact":
+            if not self.open_shell_artifact(best.action_value):
+                return
         else:
             self.status_var.set(f"Действие «{best.label}» пока недоступно.")
             return
         self.status_var.set(f"Выполнено: {best.label}")
         self.command_search_var.set(best.label)
         self._refresh_command_search_hint()
+
+    def _analysis_context_path(self) -> Path:
+        return (
+            self.project_context.workspace_dir
+            / "handoffs"
+            / "WS-ANALYSIS"
+            / "analysis_context.json"
+        ).resolve(strict=False)
+
+    def _read_json_dict(self, path: Path) -> dict[str, object]:
+        try:
+            obj = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+        except Exception:
+            return {}
+        return dict(obj) if isinstance(obj, dict) else {}
+
+    def _resolve_capture_export_manifest_path(self) -> Path | None:
+        workspace_dir = self.project_context.workspace_dir
+        pointer_candidates = (
+            workspace_dir / "exports" / "anim_latest.json",
+            workspace_dir / "_pointers" / "anim_latest.json",
+        )
+        for pointer_path in pointer_candidates:
+            if not pointer_path.exists():
+                continue
+            payload = self._read_json_dict(pointer_path)
+            meta = payload.get("meta")
+            meta_obj = dict(meta) if isinstance(meta, dict) else {}
+            file_refs = meta_obj.get("anim_export_contract_artifacts")
+            refs_obj = dict(file_refs) if isinstance(file_refs, dict) else {}
+            raw_ref = str(refs_obj.get("capture_export_manifest") or "").strip()
+            if not raw_ref:
+                continue
+            target = Path(raw_ref)
+            if not target.is_absolute():
+                target = pointer_path.parent / target
+            try:
+                target = target.resolve(strict=False)
+            except Exception:
+                pass
+            if target.exists():
+                return target
+
+        default_path = workspace_dir / "exports" / "capture_export_manifest.json"
+        try:
+            return default_path.resolve(strict=False)
+        except Exception:
+            return default_path
+
+    def _resolve_animator_file_path(self, file_id: str) -> Path | None:
+        context_path = self._analysis_context_path()
+        if file_id == "animator.analysis_context":
+            return context_path
+        if file_id == "animator.animator_link_contract":
+            return context_path.with_name("animator_link_contract.json")
+        if file_id == "animator.capture_export_manifest":
+            return self._resolve_capture_export_manifest_path()
+
+        snapshot = load_analysis_context(
+            context_path,
+            repo_root=self.project_context.repo_root,
+        )
+        if file_id == "animator.selected_result_artifact_pointer":
+            return snapshot.selected_result_artifact_path
+        if file_id == "animator.selected_npz_path":
+            return snapshot.selected_npz_path
+        return None
+
+    def _open_local_file_path(self, path: Path | None, *, file_label: str) -> bool:
+        if path is None:
+            self.status_var.set(f"Файл не найден: {file_label}")
+            messagebox.showwarning(
+                "Файл не найден",
+                f"{file_label}\n\nПуть к файлу не указан в данных анимации.",
+            )
+            return False
+        target = Path(path).expanduser().resolve(strict=False)
+        if not target.exists():
+            self.status_var.set(f"Файл отсутствует: {target}")
+            messagebox.showwarning(
+                "Файл отсутствует",
+                f"{file_label}\n\n{target}",
+            )
+            return False
+        try:
+            if os.name == "nt":
+                os.startfile(str(target))  # type: ignore[attr-defined]
+            else:
+                webbrowser.open(target.as_uri())
+        except Exception as exc:
+            self.status_var.set(f"Не удалось открыть файл: {target}")
+            messagebox.showwarning(
+                "Не удалось открыть файл",
+                f"{file_label}\n\n{target}\n\n{exc}",
+            )
+            return False
+        self.status_var.set(f"Открыт файл: {target}")
+        return True
+
+    def open_shell_artifact(self, artifact_id: str) -> bool:
+        labels = {
+            "animator.analysis_context": "Подготовка анимации",
+            "animator.animator_link_contract": "Проверка связи с аниматором",
+            "animator.selected_result_artifact_pointer": "Файл результатов расчёта",
+            "animator.selected_npz_path": "Файл анимации",
+            "animator.capture_export_manifest": "Сохранение анимации",
+        }
+        artifact_label = labels.get(str(artifact_id), str(artifact_id))
+        try:
+            target = self._resolve_animator_file_path(str(artifact_id))
+        except Exception as exc:
+            self.status_var.set(f"Не удалось прочитать сведения для аниматора: {exc}")
+            messagebox.showwarning(
+                "Не удалось прочитать сведения для аниматора",
+                f"{artifact_label}\n\n{exc}",
+            )
+            return False
+        return self._open_local_file_path(target, file_label=artifact_label)
 
     def _compact_runtime_text(self, raw_text: str) -> str:
         text = " | ".join(part.strip() for part in str(raw_text or "").splitlines() if part.strip())
@@ -784,6 +919,8 @@ class DesktopMainShell:
     def _open_hosted_tool(self, spec: DesktopShellToolSpec) -> None:
         try:
             self.workspace.open_hosted_tool(spec)
+            self._workflow_visited_keys.add(spec.key)
+            self._refresh_shell_state()
         except Exception:
             tb = traceback.format_exc()
             messagebox.showerror(
@@ -796,7 +933,9 @@ class DesktopMainShell:
         try:
             if spec.launch_external:
                 spec.launch_external()
+            self._workflow_visited_keys.add(spec.key)
             self.status_var.set(f"Запущено внешнее окно: {spec.title}")
+            self._refresh_shell_state()
         except Exception:
             tb = traceback.format_exc()
             messagebox.showerror(

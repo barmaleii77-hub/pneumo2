@@ -91,7 +91,7 @@ class DesktopOptimizerContractTab(ttk.Frame):
         ttk.Label(
             body,
             text=(
-                "Центр оптимизации показывает честную область текущего запуска: "
+                "Окно оптимизации показывает честную область текущего запуска: "
                 "источник опорного прогона, цели оптимизации, жёсткие проверки, модель, базу, диапазоны, набор и контроль задачи."
             ),
             wraplength=980,
@@ -206,7 +206,7 @@ class DesktopOptimizerContractTab(ttk.Frame):
         ).pack(side="left", padx=(8, 0))
         ttk.Button(
             open_frame,
-            text="Открыть центр опорного прогона",
+            text="Открыть базовый прогон",
             command=controller.open_baseline_center,
         ).pack(side="left", padx=(8, 0))
 

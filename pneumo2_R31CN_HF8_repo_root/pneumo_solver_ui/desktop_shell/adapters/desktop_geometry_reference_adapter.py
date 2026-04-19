@@ -30,7 +30,7 @@ def build_spec() -> DesktopShellToolSpec:
         launch_contexts=("data", "baseline", "optimization", "results", "animator"),
         menu_section="Данные",
         nav_section="Инструменты",
-        details="Наглядный справочный центр для геометрии подвески, подбора цилиндров и пружин, схемных связей и инженерных пояснений к параметрам.",
+        details="Наглядный справочник для геометрии подвески, подбора цилиндров и пружин, схемных связей и инженерных пояснений к параметрам.",
         menu_order=15,
         nav_order=115,
         standalone_module="pneumo_solver_ui.tools.desktop_geometry_reference_center",

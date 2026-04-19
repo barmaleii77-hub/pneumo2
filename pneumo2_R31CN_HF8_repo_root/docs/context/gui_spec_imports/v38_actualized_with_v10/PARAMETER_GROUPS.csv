@@ -1,0 +1,21 @@
+GROUP_ID,GROUP_NAME_RU
+GRP-SHELL,"Глобальная оболочка, поиск и shell state"
+GRP-PROJECT,Метаданные проекта и next-action
+GRP-INPUT-FRAME,"Геометрия рамы, базы и высоты"
+GRP-INPUT-MASS,Массы и инерции
+GRP-INPUT-CYL,"Цилиндры, ход, packaging и крепления"
+GRP-INPUT-SPRING,Пружины и режимы авто-подбора
+GRP-INPUT-PNEU,"Пневматика, дроссели, ресиверы, регуляторы и потоки"
+GRP-INPUT-NUM,"Численные параметры solver, step-size, tolerances"
+GRP-INPUT-FLAG,"Режимы, флаги и переключатели модели"
+GRP-RING-GLOBAL,Глобальные настройки циклического сценария
+GRP-RING-SEGMENT,Параметры сегментов сценария
+GRP-SUITE,"Матрица испытаний, row-overrides, stage entry"
+GRP-BASELINE,"Baseline source, provenance, policy, history"
+GRP-OPT-CONTRACT,"Optimization objective stack, hard gate, problem identity"
+GRP-OPT-RUN,Параметры запуска optimization и distributed settings
+GRP-ANALYSIS,"Selected run, compare, report export"
+GRP-ANIMATOR,"Playback, overlays, view mode, truthful graphics"
+GRP-DIAGNOSTICS,"Диагностика, selfcheck, evidence manifest, bundle"
+GRP-SETTINGS,"Параметры приложения, темы, DPI, layout profiles"
+GRP-TOOLS,Инструменты и редкие инженерные действия

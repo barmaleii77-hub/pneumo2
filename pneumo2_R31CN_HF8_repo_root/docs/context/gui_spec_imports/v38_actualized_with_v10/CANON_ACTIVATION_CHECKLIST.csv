@@ -1,0 +1,7 @@
+check_id,check_text,status_target
+ACT-001,Imported layer `v38_github_kb_commit_ready` copied into repo,done
+ACT-002,PROJECT_SOURCES updated with new read order,done
+ACT-003,gui_spec_imports README updated,done
+ACT-004,Mandatory files present in imported subtree,done
+ACT-005,17/18 remain above imported layers,done
+ACT-006,Open runtime gaps remain open,done

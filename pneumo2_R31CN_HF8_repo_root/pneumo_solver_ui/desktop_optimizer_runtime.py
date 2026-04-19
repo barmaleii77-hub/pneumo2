@@ -1500,14 +1500,14 @@ class DesktopOptimizerRuntime:
             baseline_status = "warn"
             baseline_summary = (
                 f"Опорный прогон заблокирован, состояние={baseline_state}: "
-                + (baseline_banner or "Откройте центр опорного прогона и явно просмотрите, примите или восстановите активный прогон.")
+                + (baseline_banner or "Откройте базовый прогон и явно просмотрите, примите или восстановите активный прогон.")
             )
         rows.append(
             {
                 "title": "Активный опорный прогон",
                 "status": baseline_status,
                 "summary": baseline_summary,
-                "action": "Центр опорного прогона",
+                "action": "Базовый прогон",
                 "handoff_id": "HO-006",
                 "state": baseline_state,
                 "optimizer_baseline_can_consume": bool(snapshot.optimizer_baseline_can_consume),
@@ -1572,7 +1572,7 @@ class DesktopOptimizerRuntime:
             identity_summary += " Примечания: " + ", ".join(identity_warnings[:2]) + "."
         rows.append(
             {
-                "title": "Идентичность запуска и безопасное продолжение",
+                "title": "Сводка запуска и безопасное продолжение",
                 "status": identity_status,
                 "summary": identity_summary,
                 "action": "История",

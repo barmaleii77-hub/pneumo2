@@ -1,0 +1,24 @@
+{
+  "package_id": "pneumo_codex_tz_spec_connector_reconciled_v38_actualized_with_v10",
+  "package_status": "V38 actualized with V10 launcher-shell findings",
+  "self_contained": true,
+  "runtime_closure_proof": false,
+  "actualization_scope": [
+    "dominant launcher route",
+    "ring editor elevation",
+    "diagnostics route consolidation",
+    "compare route hierarchy",
+    "advanced surfaces demotion"
+  ],
+  "primary_sources": [
+    "V38 commit-ready package",
+    "V10 launcher-shell report-only audit"
+  ],
+  "new_requirements": [
+    "REQ-046",
+    "REQ-047",
+    "REQ-048",
+    "REQ-049",
+    "REQ-050"
+  ]
+}

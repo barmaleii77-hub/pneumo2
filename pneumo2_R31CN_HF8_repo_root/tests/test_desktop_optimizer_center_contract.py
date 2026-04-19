@@ -123,7 +123,13 @@ def test_desktop_optimizer_center_uses_workspace_layout_instead_of_big_intro_pan
     assert 'workspace = ttk.Panedwindow(outer, orient="horizontal")' in src
     assert 'context_frame = ttk.LabelFrame(sidebar, text="Сводка", padding=8)' in src
     assert 'nav_frame = ttk.LabelFrame(sidebar, text="Переходы", padding=8)' in src
-    assert 'text="Открыть центр опорного прогона", command=self.open_baseline_center' in src
+    assert 'text="Обновить данные"' in src
+    assert 'text="Обновить"' not in src
+    assert 'text="Открыть базовый прогон", command=self.open_baseline_center' in src
+    assert "Центр оптимизации" not in src
+    assert "Центр автоматизированной оптимизации" not in src
+    assert "инженерном центре" not in src
+    assert "Автоматизированная оптимизация" in src
     assert "PNEUMO_GUI_SPEC_SHELL_OPEN_WORKSPACE" in src
     assert '"baseline_run"' in src
     assert '"pneumo_solver_ui.tools.desktop_gui_spec_shell"' in src
@@ -137,8 +143,10 @@ def test_desktop_optimizer_contract_tab_links_blocked_ho006_to_baseline_center()
     )
 
     assert '"Активный опорный прогон"' in src
+    assert "Окно оптимизации показывает честную область текущего запуска" in src
+    assert "Центр оптимизации" not in src
     assert "optimizer_baseline_can_consume" in src
-    assert 'text="Открыть центр опорного прогона"' in src
+    assert 'text="Открыть базовый прогон"' in src
     assert "command=controller.open_baseline_center" in src
 
 
@@ -435,7 +443,7 @@ def test_desktop_optimizer_runtime_builds_launch_readiness_summary(tmp_path: Pat
 
     assert readiness["warn_count"] >= 1
     assert readiness["headline"] == "Перед запуском нужно разобрать блокировки."
-    assert readiness["next_action"] == "Центр опорного прогона"
+    assert readiness["next_action"] == "Базовый прогон"
     assert by_title["Активный опорный прогон"]["status"] == "warn"
     assert by_title["Активный опорный прогон"]["optimizer_baseline_can_consume"] is False
     assert by_title["Сведения по упаковке"]["status"] == "warn"
@@ -469,7 +477,7 @@ def test_desktop_optimizer_runtime_launch_readiness_blocks_stale_ho006(
     ho006_row = by_title["Активный опорный прогон"]
 
     assert readiness["headline"] == "Перед запуском нужно разобрать блокировки."
-    assert readiness["next_action"] == "Центр опорного прогона"
+    assert readiness["next_action"] == "Базовый прогон"
     assert ho006_row["status"] == "warn"
     assert ho006_row["state"] == "stale"
     assert ho006_row["optimizer_baseline_can_consume"] is False
@@ -538,8 +546,8 @@ def test_desktop_optimizer_runtime_blocks_resume_preflight_for_mismatched_select
     assert "область задачи не совпадает" in ", ".join(identity["blocking_reasons"])
     assert preflight["can_launch"] is False
     assert "область задачи не совпадает" in ", ".join(preflight["blocking_reasons"])
-    assert by_title["Идентичность запуска и безопасное продолжение"]["status"] == "warn"
-    assert by_title["Идентичность запуска и безопасное продолжение"]["state"] == "BLOCKED"
+    assert by_title["Сводка запуска и безопасное продолжение"]["status"] == "warn"
+    assert by_title["Сводка запуска и безопасное продолжение"]["state"] == "BLOCKED"
 
 
 def test_desktop_optimizer_center_formats_stale_ho006_as_blocked_summary() -> None:
@@ -911,6 +919,9 @@ def test_desktop_optimizer_runtime_builds_selected_run_next_step_summary(tmp_pat
         "selected_run_contract.json",
         "GUI",
         "artifacts",
+        "Идентификатор",
+        "идентификатор",
+        "Идентичность запуска",
     ):
         assert forbidden not in visible_summary
 
@@ -1272,6 +1283,9 @@ def test_desktop_optimizer_center_keeps_tabbed_modular_architecture() -> None:
         "Packaging verdicts are not materialized",
         "Контракт и область задачи",
         "изменился контракт целей",
+        "Идентичность запуска и безопасное продолжение",
+        "Идентификатор запуска",
+        "идентификатор",
     ):
         assert forbidden_runtime_text not in runtime_src
 
@@ -1291,9 +1305,9 @@ def test_desktop_optimizer_center_keeps_tabbed_modular_architecture() -> None:
     assert 'text="Состояние рабочей области"' in dashboard_tab_src
     assert 'text="Готовность к запуску"' in dashboard_tab_src
     assert 'text="Текущий прогон для анализа"' in dashboard_tab_src
-    assert 'text="Следующий шаг по выбранному прогону"' in dashboard_tab_src
+    assert 'text="Рекомендация по выбранному прогону"' in dashboard_tab_src
     assert 'text="Текущий прогон анализа"' in dashboard_tab_src
-    assert 'text="Следующий шаг выбранного прогона"' in dashboard_tab_src
+    assert 'text="Перейти по рекомендации"' in dashboard_tab_src
     assert 'text="Лучший прогон для выпуска"' in dashboard_tab_src
     assert 'values=tuple(PROBLEM_HASH_MODE_LABELS.values())' in contract_tab_src
     assert 'text="Профили запуска"' in runtime_tab_src
@@ -1359,14 +1373,25 @@ def test_desktop_optimizer_center_visible_text_uses_operator_language() -> None:
         "Открыть лог",
         "без WEB",
         "Маршрут:",
+        'text="Маршрут"',
+        "Автоматический маршрут",
         'text="Контекст"',
         'text="Последний указатель"',
         'text="Сделать текущим указателем"',
+        "Идентичность запуска",
+        "Идентификатор запуска",
+        "идентификатор ",
+        "Контекст выбранного запуска",
+        '"Контракт"',
+        'text="Следующий шаг выбранного прогона"',
+        'text="Следующий шаг по выбранному прогону"',
     ):
         assert forbidden not in visible_sources
 
     for required in (
         "Порядок работы:",
+        'text="Порядок работы"',
+        "Автоматический порядок работы",
         "Подготовленные файлы",
         "Группа кандидатов",
         "Открыть журнал",

@@ -268,7 +268,7 @@ def test_desktop_diagnostics_surfaces_ho008_analysis_context_warning(tmp_path: P
     assert "Engineering Analysis Center" in bundle.analysis_context_action
     assert any("HO-008 analysis context is BLOCKED" in msg for msg in bundle.analysis_evidence_warnings)
     summary_lines = DesktopDiagnosticsCenter._analysis_evidence_summary_lines(object(), bundle)
-    assert "- Захват для анимации: готово | хэш захвата=capture-ho008" in summary_lines
+    assert "- Файлы для аниматора: готово | проверка=capture-ho008" in summary_lines
 
     center_state = write_desktop_diagnostics_center_state(out_dir, bundle_record=bundle)
     payload = json.loads(center_state.read_text(encoding="utf-8"))
@@ -709,7 +709,8 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
 
     assert "DesktopDiagnosticsCenter" in diag_src
     assert 'initial_tab="diagnostics"' in diag_src
-    assert "Центр диагностики — PneumoApp" in diag_src
+    assert "Диагностика - PneumoApp" in diag_src
+    assert "Центр диагностики" not in diag_src
     assert "Full Diagnostics (GUI)" not in diag_src
     assert "DesktopDiagnosticsCenter" in send_src
     assert 'initial_tab="send"' in send_src
@@ -721,6 +722,9 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "bundle build failed" not in send_src
     assert "load_desktop_diagnostics_bundle_record" in send_src
     assert "ttk.Notebook" in center_src
+    assert "Диагностика и отправка" in center_src
+    assert "Центр диагностики и отправки" not in center_src
+    assert "Из этого центра" not in center_src
     assert "write_desktop_diagnostics_center_state" in center_src
     assert "Полезные файлы и отчёты" in center_src
     assert "Сводка и полезные файлы" in center_src
@@ -741,7 +745,9 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "def _engineering_analysis_status_text(self, bundle) -> str:" in center_src
     assert "Готовность данных для отправки" in center_src
     assert "Связь с анимацией" in center_src
-    assert "Захват для анимации" in center_src
+    assert "Файлы для аниматора" in center_src
+    assert "Захват для анимации" not in center_src
+    assert "хэш захвата" not in center_src
     assert "analysis_capture_export_manifest_status" in center_src
     assert "capture_export_manifest_status" in runtime_src
     assert "analysis_context_status" in runtime_src
@@ -749,12 +755,15 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "Данные справочника геометрии" in center_src
     assert "Актуальность данных" in center_src
     assert "Данные источника" in center_src
+    assert "источник={_producer_owner_ru" in center_src
+    assert "владелец=" not in center_src
     assert "Причины неготовности источника" in center_src
-    assert "Справочнику разрешено достраивать геометрию" in center_src
+    assert "Автоматически добавлять недостающую геометрию" in center_src
+    assert "Справочнику разрешено достраивать геометрию" not in center_src
     assert "geometry_reference_artifact_freshness_relation" in center_src
     assert "Проверка актуального архива" in center_src
     assert "Предупреждения источников данных остаются предупреждениями" in center_src
-    assert "Снимок тихих предупреждений самопроверки" in center_src
+    assert "Снимок скрытых предупреждений проверки" in center_src
     assert "latest_integrity_proof" in runtime_src
     assert "self_check_silent_warnings" in runtime_src
     assert "geometry_reference_producer_artifact_status" in runtime_src
@@ -783,6 +792,9 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "status=\"running\"" in center_src
     assert "status=\"stopping\"" in center_src
     assert "- Состояние:" in center_src
+    assert "- Метка расчёта:" in center_src
+    assert "- Файл подробностей:" in center_src
+    assert "- Краткий отчёт:" in center_src
     assert "latest_desktop_diagnostics_summary.md" in center_src
     assert 'DesktopDiagnosticsCenter(root, initial_tab="restore")' in center_src
     assert "<<NotebookTabChanged>>" in center_src
@@ -809,6 +821,9 @@ def test_desktop_diagnostics_center_uses_split_workspace_and_sidebar_actions() -
     assert "def _start_run(self) -> None:" in center_src
     assert "def _open_bundle_dir(self) -> None:" in center_src
 
+    start_run_block = center_src[center_src.index("def _start_run"): center_src.index("def _open_bundle_dir")]
+    assert "self.notebook.select" not in start_run_block
+
 
 def test_desktop_diagnostics_center_operator_text_is_russian_and_progress_global() -> None:
     center_src = (ROOT / "pneumo_solver_ui" / "tools" / "desktop_diagnostics_center.py").read_text(
@@ -818,22 +833,34 @@ def test_desktop_diagnostics_center_operator_text_is_russian_and_progress_global
 
     required = [
         "Текущий процесс",
-        "Прогресс диагностики и сборки архива всегда показывается здесь",
-        "независимо от выбранной вкладки",
-        "Идёт автономная диагностика. Прогресс показан здесь",
-        "Идёт сборка диагностического архива. Прогресс показан здесь",
+        "Прогресс диагностики и сборки архива всегда показывается здесь.",
+        "Идёт автономная диагностика. Прогресс показан здесь; можно оставаться в текущем разделе.",
+        "Идёт сборка диагностического архива. Прогресс показан здесь; можно оставаться в текущем разделе.",
+        "Пропустить быструю проверку окон приложения",
+        "Папки для проверки",
+        "Открыть результат диагностики",
+        "Обновить сводку",
         "Открыт шаг",
         "Прогресс любой длительной операции",
+        "без переключения разделов",
+        "Здесь можно собрать архив диагностики",
+        "Сохранённое состояние диагностики",
         "Скопировать архив в буфер обмена",
-        "Папка данных анимации",
-        "Выберите папку с данными анимации",
+        "Папка файлов анимации",
+        "Выберите папку с файлами анимации",
         "- Файл анимации:",
         "Данные анализа результатов:",
         "Данные инженерного анализа:",
         "Данные справочника геометрии:",
+        "Снимок скрытых предупреждений проверки",
     ]
     for fragment in required:
         assert fragment in center_src
+
+    assert '"Results Center": "анализ результатов"' in center_src
+    assert '"Engineering Analysis Center": "инженерный анализ"' in center_src
+    assert '"Reference Center": "справочник"' in center_src
+    assert "справочник не должен создавать данные геометрии за источник" in center_src
 
     forbidden = [
         'text="Открыть Analysis JSON"',
@@ -873,6 +900,16 @@ def test_desktop_diagnostics_center_operator_text_is_russian_and_progress_global
         "Запущен автономный",
         "Открыт раздел",
         "выбранного раздела",
+        "Центр диагностики",
+        "Из этого центра",
+        "Снимок состояния центра",
+        "старого интерфейса",
+        "старый интерфейс",
+        "вкладку менять не нужно",
+        "не зависит от выбранной вкладки",
+        "Пути (если нужно)",
+        'text="..."',
+        'text="Открыть результат"',
         'last_message="rc',
         "Каталог прогона",
         "Папка с NPZ",
@@ -880,6 +917,24 @@ def test_desktop_diagnostics_center_operator_text_is_russian_and_progress_global
         "Выбранный NPZ",
         "Путь NPZ",
         "Каталог:",
+        "Идентификатор",
+        "идентификатор",
+        "Артефакт",
+        "артефакт",
+        "статус миграции",
+        "Открыть выбранный этап",
+        "Данные машины",
+        "ID расчёта",
+        "Снимок тихих предупреждений самопроверки",
+        "Тихие предупреждения самопроверки",
+        "Предупреждения самопроверки",
+        "Читаемые предупреждения самопроверки",
+        '"Results Center": "центр результатов"',
+        '"Engineering Analysis Center": "центр инженерного анализа"',
+        '"Reference Center": "центр справочников"',
+        "центр справочников не должен создавать данные геометрии за источник",
+        "- JSON:",
+        "- Markdown:",
     ]
     for fragment in forbidden:
         assert fragment not in center_src

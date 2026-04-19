@@ -195,7 +195,7 @@ class App:
         self._hosted = bool(hosted or not self._owns_root)
         self.root = host if host is not None else Tk()
         if self._owns_root:
-            self.root.title(f"Центр опорного прогона, тестов и проверки ({RELEASE})")
+            self.root.title(f"Набор испытаний и проверка ({RELEASE})")
             self.root.geometry("1180x760")
             self.root.minsize(1040, 720)
 
@@ -222,7 +222,7 @@ class App:
         self.auto_open_folder = BooleanVar(value=False)
         self.continue_on_failure = BooleanVar(value=True)
         self.context_summary = StringVar(
-            value="Слева настройки опорного и тестового прогона, справа журнал, результаты и быстрый переход к диагностике."
+            value="Слева настройки набора и автономных проверок, справа журнал, результаты и быстрый переход к диагностике."
         )
         self.suite_handoff_status = StringVar(value="Снимок набора испытаний: состояние ещё не прочитано.")
         self.status = StringVar(value="Готов.")
@@ -243,7 +243,7 @@ class App:
         header.pack(fill="x")
         title_box = ttk.Frame(header)
         title_box.pack(side="left", fill="x", expand=True)
-        ttk.Label(title_box, text="Центр опорного прогона, тестов и проверки", font=("Segoe UI", 14, "bold")).pack(anchor="w")
+        ttk.Label(title_box, text="Набор испытаний и проверка", font=("Segoe UI", 14, "bold")).pack(anchor="w")
         ttk.Label(
             title_box,
             textvariable=self.context_summary,
@@ -263,7 +263,7 @@ class App:
             self.notebook,
             runtime=self.results_runtime,
         )
-        self.notebook.add(run_tab, text="Опорный прогон и тесты")
+        self.notebook.add(run_tab, text="Набор испытаний")
         self.notebook.add(self.results_center, text="Результаты и анализ")
 
         run_split = ttk.Panedwindow(run_tab, orient="horizontal")
@@ -362,14 +362,14 @@ class App:
         aft = ttk.LabelFrame(config_body, text="После завершения", padding=pad)
         aft.pack(fill="x", padx=pad, pady=(0, pad))
         ttk.Checkbutton(aft, text="Подготовить архив для отправки в чат", variable=self.make_send_bundle).grid(row=0, column=0, sticky="w")
-        ttk.Checkbutton(aft, text="Сразу открыть центр диагностики и отправки", variable=self.open_send_gui).grid(row=0, column=1, sticky="w", padx=(16, 0))
+        ttk.Checkbutton(aft, text="Сразу открыть диагностику и отправку", variable=self.open_send_gui).grid(row=0, column=1, sticky="w", padx=(16, 0))
         ttk.Checkbutton(aft, text="Открыть папку архивов отправки", variable=self.auto_open_folder).grid(row=0, column=2, sticky="w", padx=(16, 0))
         aft.columnconfigure(3, weight=1)
 
         # Buttons
         btns = ttk.LabelFrame(config_body, text="Команды", padding=pad)
         btns.pack(fill="x", padx=pad, pady=(0, pad))
-        self.btn_run = ttk.Button(btns, text="Запустить опорный прогон / автономное тестирование", command=self._on_run)
+        self.btn_run = ttk.Button(btns, text="Запустить проверку набора", command=self._on_run)
         self.btn_run.pack(side="left")
 
         self.btn_stop = ttk.Button(btns, text="Остановить", command=self._on_stop, state="disabled")
@@ -387,7 +387,7 @@ class App:
 
         output_body, self.text = build_scrolled_text(log_frame, wrap="word", height=16)
         output_body.pack(fill="both", expand=True)
-        self._append("Центр тестов и проверки результатов готов.\n")
+        self._append("Набор испытаний и проверка готовы.\n")
 
         footer = build_status_strip(self.root, primary_var=self.status)
         footer.pack(fill="x", padx=pad, pady=(0, pad))

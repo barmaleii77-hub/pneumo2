@@ -1,0 +1,98 @@
+Контекст прогрет. И я добил следующий реальный баг в **solver → optimizer**. 🔧
+
+По канону проекта рабочая опора сейчас такая: **R32 — docs-only sync поверх R31B**, а незакрытые P0 всё ещё лежат в truth-contract слое: `ring seam`, `full-ring summary`, `latest-pointer/triage`, measured `browser performance trace + viewport gating`, неполный `solver-points` и `cylinder packaging contract`, дубли в `default_base.json`, недоформализованный `road_width_m`. То есть правильное направление по‑прежнему не “косметика UI”, а **solver → export → animator truth-contract**. fileciteturn32file0 fileciteturn32file6 fileciteturn32file11
+
+## Что нашёл в свежем bundle
+Проверил твой последний Windows SEND bundle `8660b718-5356-4807-9e44-62761788192c.zip`.
+
+Там staged optimization падала не потому, что “ничего не считалось”, а потому что **stage runner ложно объявлял timeout**:
+
+- `bundle/meta.json` показывает релиз **R31BJ**;
+- `workspace/opt_runs/main/p_78743e860b24/sp.json` заканчивается на:
+  - `status = failed_stage_timeout`
+  - `stage = stage0_relevance`
+  - `stage_budget_sec = 132.0`
+  - `stage_elapsed_sec = 198.65`
+- при этом worker progress file `s0/o0_progress.json` уже успел записать:
+  - `готово_кандидатов = 3`
+  - `готово_кандидатов_в_файле = 1`
+  - `прошло_сек = 126.24`
+
+То есть worker **уже посчитал частичные кандидаты**, но stage runner убил его как “stalled”, а часть результатов осталась только в progress JSON и не успела долиться в CSV.
+
+Дополнительно в `_proc.err.log` видны `ResourceWarning` по **незакрытым log file handles** и предупреждение, что subprocess всё ещё running. Это отдельный реальный баг housekeeping/runtime.
+
+## Корень бага
+Корень здесь был двойной:
+
+### 1) Worker не был deadline-aware внутри параллельного batch
+В `opt_worker_v3_margins_energy.py` time-limit проверялся **между batch-ами**, а не во время самого batch.
+Если batch уже стартовал и ProcessPool ещё считает futures, worker мог выйти за бюджет стадии и не успеть нормально завершиться.
+
+### 2) Stage runner пользовался слепым hard-timeout
+`opt_stage_runner_v1.py` рубил стадию по wall-time, даже если worker ещё делал прогресс.
+В результате:
+- часть кандидатов уже была вычислена;
+- часть строк ещё сидела в буфере;
+- runner объявлял `failed_stage_timeout`;
+- CSV оставался неполным.
+
+## Что я исправил: **R31BK**
+Собрал следующий patch-релиз:
+
+### В worker
+- сделал **deadline-aware parallel loop**;
+- worker теперь проверяет **time-limit / stop request прямо во время batch execution**, а не только между batch-ами;
+- partial rows теперь **принудительно flush-ятся** перед остановкой по времени/stop;
+- для staged drain добавил **fast shutdown/termination ProcessPool**, чтобы worker не зависал до завершения всех lingering tasks.
+
+### В stage runner
+- timeout перевёл с тупого wall-time на **activity-based watchdog**;
+- stage timeout теперь срабатывает только если worker **реально перестал делать прогресс**;
+- parent log handles после `Popen()`/`wait()` теперь **закрываются**, чтобы убрать Windows `ResourceWarning` шум.
+
+## Проверка
+Проверил на patched tree:
+
+- `py_compile` — **PASS**
+- `compileall` — **PASS**
+- targeted `pytest` — **23 passed**
+- `opt_stage_runner_v1.py --help` — **PASS**
+- `opt_worker_v3_margins_energy.py --help` — **PASS**
+- отдельный smoke на worker time-limit — **PASS**
+
+## Артефакты
+Главное:
+- [Portable runtime ZIP — R31BK](sandbox:/mnt/data/r31bk_staged_timeout_drain_fix/PneumoApp_R31BK_portable_20260329.zip)
+- [SHA256 portable](sandbox:/mnt/data/r31bk_staged_timeout_drain_fix/PneumoApp_R31BK_portable_20260329.zip.sha256)
+- [Source ZIP — R31BK](sandbox:/mnt/data/r31bk_staged_timeout_drain_fix/PneumoApp_v6_80_R176_R31BK_staged_timeout_drain_fix_2026-03-29.zip)
+- [SHA256 source](sandbox:/mnt/data/r31bk_staged_timeout_drain_fix/PneumoApp_v6_80_R176_R31BK_staged_timeout_drain_fix_2026-03-29.zip.sha256)
+- [Patch pack ZIP](sandbox:/mnt/data/r31bk_staged_timeout_drain_fix.zip)
+
+Разбор:
+- [Аудит по свежему bundle](sandbox:/mnt/data/r31bk_staged_timeout_drain_fix/R31BK_staged_timeout_drain_audit.md)
+- [Audit JSON](sandbox:/mnt/data/r31bk_staged_timeout_drain_fix/R31BK_staged_timeout_drain_audit.json)
+- [Summary](sandbox:/mnt/data/r31bk_staged_timeout_drain_fix/R31BK_staged_timeout_drain_fix_summary.md)
+- [Unified diff](sandbox:/mnt/data/r31bk_staged_timeout_drain_fix/R31BK_staged_timeout_drain_fix.diff)
+
+Проверка:
+- [pytest log](sandbox:/mnt/data/r31bk_staged_timeout_drain_fix/R31BK_targeted_pytest_log.txt)
+- [py_compile log](sandbox:/mnt/data/r31bk_staged_timeout_drain_fix/R31BK_py_compile_log.txt)
+- [compileall log](sandbox:/mnt/data/r31bk_staged_timeout_drain_fix/R31BK_compileall_log.txt)
+- [stage runner help](sandbox:/mnt/data/r31bk_staged_timeout_drain_fix/R31BK_stage_runner_help.txt)
+- [worker help](sandbox:/mnt/data/r31bk_staged_timeout_drain_fix/R31BK_worker_help.txt)
+- [worker smoke summary](sandbox:/mnt/data/r31bk_staged_timeout_drain_fix/R31BK_worker_smoke_summary.txt)
+- [portable unzip test](sandbox:/mnt/data/r31bk_staged_timeout_drain_fix/R31BK_portable_unzip_test.txt)
+- [source unzip test](sandbox:/mnt/data/r31bk_staged_timeout_drain_fix/R31BK_source_unzip_test.txt)
+- [changed files](sandbox:/mnt/data/r31bk_staged_timeout_drain_fix/CHANGED_FILES_R31BK_staged_timeout_drain_fix.txt)
+
+## Честно по статусу
+Этот шаг закрывает **следующий конкретный runtime-bug staged optimization**.
+Я **не прогонял живой Windows run** уже на `R31BK` внутри этой среды, поэтому end-to-end подтверждение на твоём железе ещё нужно.
+
+Но здесь уже не гадание:
+- свежий bundle доказал ложный `failed_stage_timeout`;
+- патч бьёт ровно в этот корень;
+- тесты и smoke на patched tree зелёные.
+
+Следующий рациональный удар после `R31BK` — уже не в stage-timeout, а обратно в главные P0 truth-contract узлы: measured `browser trace`, `viewport gating`, `solver-points completeness` и `cylinder packaging passport` — они по канону всё ещё открыты. fileciteturn32file2 fileciteturn32file10

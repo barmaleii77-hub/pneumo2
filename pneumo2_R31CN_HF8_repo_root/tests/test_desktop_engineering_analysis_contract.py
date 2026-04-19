@@ -969,9 +969,14 @@ def test_desktop_engineering_analysis_center_shell_is_materialized() -> None:
     assert hasattr(DesktopEngineeringAnalysisCenter, "_export_animator_link")
     assert hasattr(DesktopEngineeringAnalysisCenter, "_run_command_surface_action")
     command_labels = {label for _key, label in ANALYSIS_COMMAND_OPEN_TARGETS}
-    assert "Открыть выбранный прогон" in command_labels
-    assert "Открыть папку прогона" in command_labels
-    assert "Открыть выбранный файл" in command_labels
-    assert "Открыть материалы диагностики" in command_labels
-    assert "Открыть данные для анимации" in command_labels
-    assert "Открыть связь анализа с аниматором" in command_labels
+    assert "Показать выбранный прогон" in command_labels
+    assert "Показать папку прогона" in command_labels
+    assert "Показать выбранный файл" in command_labels
+    assert "Показать материалы диагностики" in command_labels
+    assert "Проверить подготовку анимации" in command_labels
+    assert "Проверить связь с аниматором" in command_labels
+    assert "Показать данные для анимации" not in command_labels
+    assert "Показать сведения для аниматора" not in command_labels
+    assert "Проверить связь анализа с аниматором" not in command_labels
+    assert "Открыть выбранный прогон" not in command_labels
+    assert "Открыть выбранный файл" not in command_labels

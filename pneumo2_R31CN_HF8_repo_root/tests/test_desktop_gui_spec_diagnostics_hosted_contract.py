@@ -140,7 +140,7 @@ def test_main_window_routes_diagnostics_baseline_link_to_restore_guard(
 
         assert window._current_workspace_id == "baseline_run"
         baseline_page = window._page_widget_by_workspace_id["baseline_run"]
-        assert baseline_page.baseline_center_box.title() == "Центр опорного прогона: просмотр, принятие, восстановление"
+        assert baseline_page.baseline_center_box.title() == "Базовый прогон: просмотр, принятие, восстановление"
 
         window.run_command("baseline.restore")
         app.processEvents()
@@ -158,3 +158,19 @@ def test_diagnostics_fallback_command_remains_available() -> None:
     commands = build_command_map()
     assert commands["diagnostics.legacy_center.open"].kind == "launch_module"
     assert commands["diagnostics.legacy_center.open"].module == "pneumo_solver_ui.tools.desktop_diagnostics_center"
+    assert commands["diagnostics.legacy_center.open"].title == "Открыть диагностику отдельным окном"
+    assert "центр диагностики" not in commands["diagnostics.legacy_center.open"].title.lower()
+
+
+def test_hosted_diagnostics_visible_text_avoids_stale_center_labels() -> None:
+    src = (ROOT / "pneumo_solver_ui" / "desktop_spec_shell" / "diagnostics_panel.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    for forbidden in (
+        "центр опорного прогона",
+        "Открыть центр диагностики",
+        "Открыт центр диагностики",
+    ):
+        assert forbidden not in src

@@ -1513,7 +1513,7 @@ def evidence_manifest_warnings(manifest: Mapping[str, Any] | None) -> List[str]:
             warnings.append(
                 "Опорный прогон имеет состояние "
                 f"{state}; передача в оптимизацию заблокирована. "
-                f"Причины: {reason_text}. Откройте центр опорного прогона для просмотра, принятия или восстановления."
+                f"Причины: {reason_text}. Откройте базовый прогон для просмотра, принятия или восстановления."
             )
     return list(dict.fromkeys(warnings))
 

@@ -186,6 +186,28 @@ def test_chat_knowledge_base_renderers_emit_operator_facing_logs() -> None:
     assert "ID: `PLAN-0001`." in plan_md
 
 
+def test_chat_knowledge_base_normalizes_docs_prefixed_artifact_paths() -> None:
+    store = {"schema": "x", "updated_at": "x", "requirements": [], "plans": []}
+
+    add_chat_plan(
+        store,
+        title="V6 audit",
+        details="Маршрут пользователя.",
+        artifact_path="docs/context/release_readiness/HUMAN_GUI_REPORT_ONLY_V6_2026-04-19.md",
+    )
+
+    assert store["plans"][0]["artifact_path"] == (
+        "context/release_readiness/HUMAN_GUI_REPORT_ONLY_V6_2026-04-19.md"
+    )
+
+    plan_md = render_chat_plans_markdown(store)
+    assert (
+        "Артефакт: [context/release_readiness/HUMAN_GUI_REPORT_ONLY_V6_2026-04-19.md]"
+        in plan_md
+    )
+    assert "./docs/context/" not in plan_md
+
+
 def test_chat_knowledge_base_store_roundtrip_uses_docs_folder() -> None:
     temp_root = ROOT / "workspace" / "tmp_kb_contract_root"
     docs_dir = temp_root / "docs"

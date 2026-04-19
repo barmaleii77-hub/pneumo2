@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Единый запуск инженерных окон без обращения к web-интерфейсу."""
+"""Единый запуск инженерных окон."""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ def _spawn_module(module: str) -> subprocess.Popen:
 class DesktopControlCenter:
     def __init__(self) -> None:
         self.root = tk.Tk()
-        self.root.title(f"Центр запуска инженерных окон - {RELEASE}")
+        self.root.title(f"Запуск инженерных окон - {RELEASE}")
         self.root.geometry("860x540")
         self.root.minsize(820, 500)
         self.launch_targets = build_desktop_launch_catalog(include_mnemo=False)
@@ -60,7 +60,7 @@ class DesktopControlCenter:
         title_box.pack(side="left", fill="x", expand=True)
         ttk.Label(
             title_box,
-            text="Центр запуска инженерных окон",
+            text="Запуск инженерных окон",
             font=("Segoe UI", 16, "bold"),
         ).pack(anchor="w")
         ttk.Label(
@@ -98,7 +98,7 @@ class DesktopControlCenter:
 
         left_actions = ttk.Frame(list_box)
         left_actions.pack(fill="x", pady=(8, 0))
-        ttk.Button(left_actions, text="Запустить GUI", command=self._launch_selected_target).pack(side="left")
+        ttk.Button(left_actions, text="Открыть окно", command=self._launch_selected_target).pack(side="left")
         ttk.Button(left_actions, text="Папка проекта", command=self._open_repo_root).pack(side="left", padx=(8, 0))
 
         right_split = ttk.Panedwindow(right, orient="vertical")
@@ -113,7 +113,7 @@ class DesktopControlCenter:
         ).pack(anchor="w")
         detail_actions = ttk.Frame(detail_box)
         detail_actions.pack(fill="x", pady=(10, 0))
-        ttk.Button(detail_actions, text="Запустить этот GUI", command=self._launch_selected_target).pack(side="left")
+        ttk.Button(detail_actions, text="Открыть это окно", command=self._launch_selected_target).pack(side="left")
 
         log_frame = ttk.LabelFrame(right_split, text="Журнал запуска", padding=8)
         log_body, self.log = build_scrolled_text(log_frame, height=12, wrap="word")
@@ -134,7 +134,7 @@ class DesktopControlCenter:
         ).grid(row=0, column=1, sticky="e", padx=(12, 0))
 
         self._populate_targets()
-        self._append_log("Центр запуска готов. Для этих окон web-интерфейс не требуется.")
+        self._append_log("Запуск готов. Выберите окно из списка.")
 
     def _populate_targets(self) -> None:
         self.target_by_iid.clear()
@@ -196,20 +196,17 @@ class DesktopControlCenter:
             self.status_var.set(f"Открыта папка проекта: {root}")
             self._append_log(f"Открыта папка проекта: {root}")
         except Exception as exc:
-            messagebox.showerror("Центр запуска инженерных окон", f"Не удалось открыть папку проекта:\n{exc}")
+            messagebox.showerror("Запуск инженерных окон", f"Не удалось открыть папку проекта:\n{exc}")
             self._append_log("Ошибка открытия папки проекта.\n" + traceback.format_exc())
 
     def _launch(self, target: DesktopLaunchCatalogItem) -> None:
         try:
-            proc = _spawn_module(target.module)
+            _spawn_module(target.module)
             self.status_var.set(f"Запущено: {target.title}")
-            self._append_log(
-                f"Запущено окно: {target.title}\n"
-                f"Идентификатор процесса: {getattr(proc, 'pid', 'нет данных')}"
-            )
+            self._append_log(f"Окно открыто: {target.title}")
         except Exception as exc:
             messagebox.showerror(
-                "Центр запуска инженерных окон",
+                "Запуск инженерных окон",
                 f"Не удалось запустить «{target.title}»:\n{exc}",
             )
             self.status_var.set(f"Ошибка запуска: {target.title}")

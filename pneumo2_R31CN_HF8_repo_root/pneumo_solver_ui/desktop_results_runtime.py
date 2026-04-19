@@ -174,6 +174,15 @@ def _status_ru(value: Any) -> str:
 def _operator_text(value: Any) -> str:
     text = str(value or "").strip()
     replacements = {
+        "Open Desktop Animator first and inspect Mnemo red flags before send.": (
+            "Сначала откройте аниматор и проверьте красные флаги мнемосхемы перед отправкой."
+        ),
+        "Open Desktop Animator first": "Сначала откройте аниматор",
+        "Then inspect Compare Viewer": "Затем проверьте окно сравнения",
+        "Open Compare Viewer next": "Откройте окно сравнения следующим шагом",
+        "Открыть Compare Viewer следующим шагом": "Открыть окно сравнения следующим шагом",
+        "Desktop Mnemo recent:": "Недавнее событие мнемосхемы:",
+        "Pointer drift": "Расхождение данных сопровождения",
         "Compare Viewer": "окно сравнения",
         "Desktop Animator": "аниматор",
         "Desktop Mnemo": "мнемосхема",
@@ -219,49 +228,49 @@ def _dedupe_text_items(items: list[str] | tuple[str, ...]) -> tuple[str, ...]:
 
 _OPERATOR_RECOMMENDATION_TRANSLATIONS_RU: dict[str, str] = {
     "Open Desktop Animator first and inspect Mnemo red flags before send.": (
-        "Сначала откройте Desktop Animator и проверьте красные флаги мнемосхемы перед отправкой."
+        "Сначала откройте аниматор и проверьте красные флаги мнемосхемы перед отправкой."
     ),
-    "Open Desktop Animator first": "Сначала откройте Desktop Animator.",
-    "Then inspect Compare Viewer": "Затем проверьте Compare Viewer.",
-    "Open Compare Viewer next": "Откройте Compare Viewer следующим шагом.",
+    "Open Desktop Animator first": "Сначала откройте аниматор.",
+    "Then inspect Compare Viewer": "Затем проверьте окно сравнения.",
+    "Open Compare Viewer next": "Откройте окно сравнения следующим шагом.",
 }
 
 
 def _operator_recommendation_ru(value: object) -> str:
     text = str(value or "").strip()
-    return _OPERATOR_RECOMMENDATION_TRANSLATIONS_RU.get(text, text)
+    return _operator_text(_OPERATOR_RECOMMENDATION_TRANSLATIONS_RU.get(text, text))
 
 
 _CONTEXT_FIELD_TITLES: dict[str, str] = {
     "run_id": "Номер прогона",
-    "run_contract_hash": "Идентификатор прогона",
-    "selected_run_hash": "Идентификатор выбранного прогона",
-    "analysis_context_hash": "Идентификатор данных анализа",
+    "run_contract_hash": "Метка прогона",
+    "selected_run_hash": "Метка выбранного прогона",
+    "analysis_context_hash": "Метка данных анализа",
     "analysis_context_status": "Состояние данных анализа",
-    "animator_link_contract_hash": "Идентификатор связи с аниматором",
-    "selected_run_contract_hash": "Идентификатор выбранного прогона",
+    "animator_link_contract_hash": "Метка данных анимации",
+    "selected_run_contract_hash": "Метка выбранного прогона",
     "selected_run_contract_path": "Файл выбранного прогона",
     "run_dir": "Папка прогона оптимизатора",
     "results_csv_path": "Таблица результатов оптимизатора",
     "selected_test_id": "Номер выбранного испытания",
     "selected_npz_path": "Файл выбранной анимации",
-    "compare_contract_hash": "Идентификатор сравнения",
-    "evidence_manifest_hash": "Идентификатор материалов диагностики",
-    "objective_contract_hash": "Идентификатор целевого профиля",
+    "compare_contract_hash": "Метка сравнения",
+    "evidence_manifest_hash": "Метка материалов диагностики",
+    "objective_contract_hash": "Метка целевого профиля",
     "hard_gate_key": "Ограничение",
     "hard_gate_tolerance": "Допуск ограничения",
-    "active_baseline_hash": "Идентификатор базового варианта",
-    "suite_snapshot_hash": "Идентификатор набора испытаний",
-    "scenario_lineage_hash": "Идентификатор сценария",
-    "problem_hash": "Идентификатор задачи",
-    "problem_hash_mode": "Режим идентификатора задачи",
+    "active_baseline_hash": "Метка базового варианта",
+    "suite_snapshot_hash": "Метка набора испытаний",
+    "scenario_lineage_hash": "Метка сценария",
+    "problem_hash": "Метка задачи",
+    "problem_hash_mode": "Режим метки задачи",
     "objective_keys": "Показатели цели",
     "penalty_key": "Штраф",
     "penalty_tol": "Допуск штрафа",
-    "capture_export_manifest_handoff_id": "Идентификатор передачи захвата",
-    "capture_hash": "Идентификатор захвата",
-    "truth_mode_hash": "Идентификатор режима отображения",
-    "visual_cache_token": "Метка визуального кэша аниматора",
+    "capture_export_manifest_handoff_id": "Метка записи анимации",
+    "capture_hash": "Метка сохранённой анимации",
+    "truth_mode_hash": "Метка режима отображения",
+    "visual_cache_token": "Метка готовых данных анимации",
 }
 
 _CONTEXT_FIELD_KEYS: tuple[str, ...] = tuple(_CONTEXT_FIELD_TITLES)
@@ -588,7 +597,7 @@ def _extract_result_context(
                 mismatches.append(key)
         elif current_value and not selected_value:
             status = "MISSING"
-            detail = f"{key}: текущее значение есть, выбранный результат его не опубликовал"
+            detail = f"{key}: текущее значение есть, результаты расчёта его не опубликовали"
         fields.append(
             DesktopResultsContextField(
                 key=key,
@@ -611,33 +620,33 @@ def _extract_result_context(
 
     if mismatches:
         state = "STALE"
-        banner = "Текущая постановка отличается от выбранного результата."
+        banner = "Текущая постановка отличается от результатов расчёта."
         detail = "Различаются поля: " + ", ".join(mismatches)
         action = "Откройте окно сравнения или переключите выбранные данные; сохранение материалов диагностики оставит оба набора данных."
     elif explicit_state in {"CURRENT", "HISTORICAL", "STALE"}:
         state = explicit_state
         banner = {
-            "CURRENT": "Выбранный результат соответствует текущим данным.",
-            "HISTORICAL": "Открыт исторический результат с закреплёнными данными.",
-            "STALE": "Текущие данные помечены как устаревшие для выбранного результата.",
+            "CURRENT": "Результаты расчёта соответствуют текущим данным.",
+            "HISTORICAL": "Открыты исторические результаты расчёта с закреплёнными данными.",
+            "STALE": "Текущие данные помечены как устаревшие для результатов расчёта.",
         }[state]
         detail = str(result_context.get("detail") or result_context.get("banner_detail") or "")
         action = str(result_context.get("action") or result_context.get("required_action") or "")
     elif selected_has_signal and current_has_signal and comparable_count > 0:
         state = "CURRENT"
-        banner = "Выбранный результат соответствует текущим данным."
-        detail = "Совпали опубликованные поля данных и идентификаторов."
+        banner = "Результаты расчёта соответствуют текущим данным."
+        detail = "Совпали опубликованные поля данных и метки результатов расчёта."
         action = "Можно переходить к сравнению, аниматору или сохранению материалов диагностики."
     elif selected_has_signal:
         state = "HISTORICAL"
-        banner = "Открыт исторический результат с закреплёнными данными."
-        detail = "Текущие данные не опубликованы для полной сверки; результат остаётся историческим."
-        action = "Для актуализации откройте текущий прогон или сохраните материалы как исторический результат."
+        banner = "Открыты исторические результаты расчёта с закреплёнными данными."
+        detail = "Текущие данные не опубликованы для полной сверки; результаты расчёта остаются историческими."
+        action = "Для актуализации откройте текущий прогон или сохраните материалы как исторические результаты расчёта."
     else:
         state = "MISSING"
-        banner = "Данные результата отсутствуют."
-        detail = "Отчёт проверки не опубликовал идентификаторы прогона и результата."
-        action = "Запустите диагностику или подготовьте архив отправки со свежими данными результата."
+        banner = "Результаты расчёта отсутствуют."
+        detail = "Отчёт проверки не опубликовал метки прогона и результатов расчёта."
+        action = "Запустите диагностику или подготовьте архив отправки со свежими результатами расчёта."
 
     return {
         "state": state,
@@ -733,20 +742,20 @@ def _suggested_next_step(
         if latest_pointer_json_path is not None:
             return (
                 anim_recommendations[0],
-                "Диагностика визуализации рекомендует именно этот следующий шаг.",
+                "Проверка анимации рекомендует именно это действие.",
                 "open_animator_follow",
                 "latest_pointer",
             )
         if latest_npz_path is not None:
             return (
                 anim_recommendations[0],
-                "Диагностика визуализации рекомендует именно этот следующий шаг.",
+                "Проверка анимации рекомендует именно это действие.",
                 "open_compare_viewer",
                 "latest_npz",
             )
         return (
             anim_recommendations[0],
-            "Диагностика визуализации рекомендует именно этот следующий шаг.",
+            "Проверка анимации рекомендует именно это действие.",
             "open_artifact",
             "anim_diag_json",
         )
@@ -896,16 +905,16 @@ class DesktopResultsRuntime:
         _append_artifact(items, key="triage_json", title="Данные разбора замечаний", category="triage", path=triage_json_path)
         _append_artifact(items, key="triage_md", title="Отчёт разбора замечаний", category="triage", path=triage_md_path)
         _append_artifact(items, key="dashboard_html", title="Сводная страница результатов", category="results", path=dashboard_html_path)
-        _append_artifact(items, key="anim_diag_json", title="Диагностика визуализации", category="anim_latest", path=anim_diag_json_path)
+        _append_artifact(items, key="anim_diag_json", title="Проверка анимации", category="anim_latest", path=anim_diag_json_path)
         _append_artifact(items, key="latest_npz", title="Последний файл анимации", category="results", path=latest_npz_path)
         _append_artifact(items, key="latest_pointer", title="Данные последней анимации", category="results", path=latest_pointer_json_path)
         _append_artifact(
             items,
             key="capture_export_manifest",
-            title="Запись экспорта анимации",
+            title="Запись сохранения анимации",
             category="evidence",
             path=latest_capture_export_manifest_path,
-            detail="Связь экспорта анимации с выбранным результатом.",
+            detail="Сохранённая связь выбранной анимации с результатом.",
         )
         _append_artifact(items, key="mnemo_event_log", title="Журнал событий мнемосхемы", category="results", path=latest_mnemo_event_log_path)
         _append_artifact(items, key="autotest_run", title="Последний каталог автотеста", category="runs", path=latest_autotest_run_dir)
@@ -924,7 +933,7 @@ class DesktopResultsRuntime:
             title="Данные для окна сравнения",
             category="evidence",
             path=compare_current_context_sidecar_path,
-            detail="Материалы для передачи выбранного результата в окно сравнения.",
+            detail="Материалы для открытия результатов расчёта в окне сравнения.",
         )
         _append_artifact(
             items,
@@ -955,7 +964,7 @@ class DesktopResultsRuntime:
         triage_warn_count = _to_int(triage_severity.get("warn"))
         triage_info_count = _to_int(triage_severity.get("info"))
         triage_red_flags = tuple(
-            str(item)
+            _operator_text(item)
             for item in (triage_payload.get("red_flags") or [])
             if str(item).strip()
         )
@@ -1047,7 +1056,7 @@ class DesktopResultsRuntime:
             ),
             DesktopResultsOverviewRow(
                 key="selected_result_context",
-                title="Данные выбранного результата",
+                title="Данные результатов расчёта",
                 status=str(context.get("state") or "MISSING"),
                 detail=str(context.get("banner") or ""),
                 next_action=str(context.get("action") or "Сохранить материалы диагностики"),
@@ -1061,7 +1070,7 @@ class DesktopResultsRuntime:
                 status=str(optimizer_contract_info.get("status") or "MISSING"),
                 detail=(
                     str(optimizer_contract_info.get("banner") or "")
-                    + " Идентификатор: "
+                    + " Метка: "
                     + _short_text(
                         optimizer_contract_info.get("selected_run_contract_hash"),
                         limit=18,
@@ -1092,31 +1101,31 @@ class DesktopResultsRuntime:
             ),
             DesktopResultsOverviewRow(
                 key="animator_pointer",
-                title="Данные для аниматора",
+                title="Анимация результатов расчёта",
                 status="READY" if latest_pointer_json_path is not None else "MISSING",
                 detail=str(
                     latest_pointer_json_path.name
                     if latest_pointer_json_path is not None
                     else "Данные анимации пока недоступны."
                 ),
-                next_action="Открыть аниматор" if latest_pointer_json_path is not None else "Сформировать данные анимации",
+                next_action="Открыть анимацию расчёта" if latest_pointer_json_path is not None else "Сформировать данные анимации",
                 evidence_path=latest_pointer_json_path,
                 action_key="open_animator_follow" if latest_pointer_json_path is not None else "open_diagnostics_gui",
                 artifact_key="latest_pointer",
             ),
             DesktopResultsOverviewRow(
                 key="capture_export_manifest",
-                title="Запись экспорта анимации",
+                title="Запись сохранения анимации",
                 status=capture_manifest_status,
                 detail=(
-                    f"идентификатор захвата: {_short_text(capture_hash, limit=18) or '—'}; "
+                    f"метка записи: {_short_text(capture_hash, limit=18) or '—'}; "
                     f"данные анализа: {_status_ru(capture_analysis_context_status)}; "
                     f"достоверность: {_status_ru(capture_truth_state)}"
                 ),
                 next_action=(
-                    "Открыть запись экспорта анимации"
+                    "Открыть запись сохранения анимации"
                     if latest_capture_export_manifest_path is not None
-                    else "Экспортировать выбранную анимацию из аниматора"
+                    else "Сохранить выбранную анимацию в аниматоре"
                 ),
                 evidence_path=latest_capture_export_manifest_path,
                 action_key=(
@@ -1153,7 +1162,7 @@ class DesktopResultsRuntime:
                     f"разбор: {'есть' if triage_md_path is not None else 'нет'}; "
                     f"панель: {'есть' if dashboard_html_path is not None else 'нет'}"
                 ),
-                next_action="Открыть центр отправки" if latest_zip_path is not None else "Подготовить архив отправки",
+                next_action="Открыть отправку результатов" if latest_zip_path is not None else "Подготовить архив отправки",
                 evidence_path=latest_zip_path or triage_md_path or dashboard_html_path,
                 action_key="open_send_center" if latest_zip_path is not None else "open_send_bundles",
                 artifact_key=(
@@ -1406,10 +1415,10 @@ class DesktopResultsRuntime:
             ("triage_json", "Данные разбора замечаний текущего прогона"),
             ("triage_md", "Отчёт разбора замечаний текущего прогона"),
             ("dashboard_html", "Сводная страница текущего прогона"),
-            ("anim_diag_json", "Диагностика анимации текущего прогона"),
+            ("anim_diag_json", "Проверка анимации текущего прогона"),
             ("latest_npz", "Файл анимации текущего прогона"),
-            ("latest_pointer", "Данные аниматора текущего прогона"),
-            ("capture_export_manifest", "Запись экспорта текущего прогона"),
+            ("latest_pointer", "Анимация текущего прогона"),
+            ("capture_export_manifest", "Запись сохранения анимации текущего прогона"),
             ("mnemo_event_log", "Журнал мнемосхемы текущего прогона"),
             ("compare_current_context_sidecar", "Данные сравнения текущего прогона"),
             ("selected_optimizer_run_contract", "Выбранный прогон оптимизации для текущих результатов"),
@@ -1831,7 +1840,7 @@ class DesktopResultsRuntime:
                     ]
                     if obj.get("evidence_manifest_hash"):
                         lines.append(
-                            "Идентификатор материалов: "
+                            "Метка материалов: "
                             + _short_text(obj.get("evidence_manifest_hash"), limit=36)
                         )
                     if mismatch.get("banner"):
@@ -1852,7 +1861,7 @@ class DesktopResultsRuntime:
                     ]
                     if obj.get("current_context_ref_hash"):
                         lines.append(
-                            "Идентификатор текущих данных: "
+                            "Метка текущих данных: "
                             + _short_text(obj.get("current_context_ref_hash"), limit=36)
                         )
                     return tuple(lines)
@@ -1861,7 +1870,7 @@ class DesktopResultsRuntime:
                     lines = [
                         "Тип: выбранный прогон оптимизации",
                         f"Прогон: {obj.get('run_id') or '—'}",
-                        "Идентификатор прогона: "
+                        "Метка прогона: "
                         + _short_text(obj.get("selected_run_contract_hash"), limit=36),
                         "Целевой профиль: "
                         + _short_text(obj.get("objective_contract_hash"), limit=36),
@@ -1885,8 +1894,8 @@ class DesktopResultsRuntime:
                         if str(item).strip()
                     ]
                     lines = [
-                        "Тип: экспорт анимации",
-                        "Идентификатор захвата: "
+                        "Тип: сохранение анимации",
+                        "Метка записи: "
                         + _short_text(obj.get("capture_hash"), limit=36),
                         "Данные анализа: "
                         + _short_text(
@@ -1957,7 +1966,7 @@ class DesktopResultsRuntime:
                     for item in red_flags[:3]:
                         lines.append("Красный флаг: " + _short_text(_operator_text(item)))
                     for item in recommendations[:2]:
-                        lines.append("Следующий шаг: " + _short_text(_operator_text(item)))
+                        lines.append("Рекомендация: " + _short_text(_operator_text(item)))
                     return tuple(lines)
 
                 if artifact.key in {"anim_diag_json", "latest_pointer"}:
@@ -1966,9 +1975,9 @@ class DesktopResultsRuntime:
                     npz_path = obj.get("anim_latest_npz_path") or obj.get("npz_path")
                     lines = []
                     if token:
-                        lines.append(f"Метка визуального кэша: {token}")
+                        lines.append(f"Метка готовых данных анимации: {token}")
                     if reload_inputs:
-                        lines.append("Входные данные перезагрузки: " + _short_text(reload_inputs))
+                        lines.append("Состав данных анимации: " + _short_text(reload_inputs))
                     if npz_path:
                         lines.append("Файл анимации: " + _short_text(Path(str(npz_path)).name))
                     if obj.get("anim_latest_mnemo_event_log_current_mode"):

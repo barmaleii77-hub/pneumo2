@@ -94,6 +94,10 @@ def test_desktop_input_model_exposes_main_operator_sections() -> None:
     assert specs["использовать_паспорт_компонентов"].control == "bool"
     assert specs["газ_модель_теплоемкости"].control == "choice"
     assert specs["static_trim_enable"].control == "bool"
+    assert specs["autoverif_enable"].label == "Включить проверку после расчёта"
+    assert specs["mechanics_selfcheck"].label == "Включить проверку механики"
+    assert "Включить автопроверку" not in specs["autoverif_enable"].label
+    assert "Включить самопроверку механики" not in specs["mechanics_selfcheck"].label
 
 
 def test_desktop_input_model_requires_units_tooltips_and_help_for_user_fields() -> None:
@@ -143,8 +147,8 @@ def test_desktop_input_graphic_contexts_are_registered_and_canonical() -> None:
     assert "ЦМ X:" in graphics_src
     assert "ЦМ Y:" in graphics_src
     assert "Запас до смыкания витков:" in graphics_src
-    assert "Автопроверка:" in graphics_src
-    assert "Самопроверка механики:" in graphics_src
+    assert "Проверка:" in graphics_src
+    assert "Проверка механики:" in graphics_src
 
     forbidden_graphics_fragments = [
         "Источник: WS-INPUTS live",
@@ -155,6 +159,8 @@ def test_desktop_input_graphic_contexts_are_registered_and_canonical() -> None:
         "coil bind:",
         "Autoverif:",
         "Mechanics selfcheck:",
+        "Автопроверка:",
+        "Самопроверка механики:",
     ]
     for fragment in forbidden_graphics_fragments:
         assert fragment not in graphics_src
@@ -975,6 +981,8 @@ def test_desktop_input_editor_is_wired_into_desktop_control_center() -> None:
     assert "apply_desktop_quick_preset" in editor_src
     assert "quick_preset_label" in editor_src
     assert "quick_preset_description" in editor_src
+    assert "Открыт справочник геометрии и каталогов." in editor_src
+    assert "Открыт справочный центр геометрии и каталогов." not in editor_src
     assert "История последних действий" in editor_src
     assert "Отменить последнее действие" in editor_src
     assert "_remember_safe_action" in editor_src
@@ -982,7 +990,8 @@ def test_desktop_input_editor_is_wired_into_desktop_control_center() -> None:
     assert "_refresh_safe_action_history_view" in editor_src
     assert "[undo]" in editor_src
     assert "История пока пуста." in editor_src
-    assert "Пошаговый маршрут настройки" in editor_src
+    assert "Пошаговый порядок настройки" in editor_src
+    assert "Быстрый порядок работы помогает идти по кластерам" in editor_src
     assert "self.section_titles" in editor_src
     assert "display_title = self._display_section_title(title)" in editor_src
     assert 'text=f"{idx + 1}. {display_title}"' in editor_src
@@ -1176,8 +1185,8 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "_run_quick_preview(self, *, prechecked: bool = False)" in editor_src
     assert "_run_single_desktop_run(self, *, prechecked: bool = False)" in editor_src
     assert "run_auto_check_var" in editor_src
-    assert "Автопроверка перед «" in editor_src
-    assert "последняя сохранённая автопроверка" in editor_src
+    assert "Проверка перед «" in editor_src
+    assert "последняя сохранённая проверка" in editor_src
     assert "persist_stdout_json=True" in editor_src
     assert '"  " + " ".join(cmd)' not in editor_src
     assert "Команда подготовлена; технические детали сохранены в журнале процесса." in editor_src
@@ -1225,14 +1234,14 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "_open_run_setup_cache_root" in editor_src
     assert "_open_run_setup_log_root" in editor_src
     assert "_runtime_preview_report_path" in editor_src
-    assert 'artifacts_notebook.add(latest_selfcheck_frame, text="Самопроверка")' in editor_src
+    assert 'artifacts_notebook.add(latest_selfcheck_frame, text="Проверка")' in editor_src
     assert "latest_selfcheck_summary_var" in editor_src
     assert "active_selfcheck_report_path" in editor_src
     assert "active_selfcheck_log_path" in editor_src
     assert "_refresh_latest_selfcheck_summary" in editor_src
-    assert "Обновить сводку самопроверки" in editor_src
-    assert "Открыть отчёт самопроверки" in editor_src
-    assert "Открыть журнал самопроверки" in editor_src
+    assert "Обновить сводку проверки" in editor_src
+    assert "Открыть отчёт проверки" in editor_src
+    assert "Открыть журнал проверки" in editor_src
     assert "_open_latest_selfcheck_report_json" in editor_src
     assert "_open_latest_selfcheck_log" in editor_src
     assert "_runtime_selfcheck_report_path" in editor_src
@@ -1250,12 +1259,17 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "self.root.after_idle(self._complete_initial_load)" in editor_src
     assert "self._initial_load_after_id" in editor_src
     assert "Обновить сводку" in editor_src
-    assert "Открыть папку запуска" in editor_src
+    assert "Открыть папку результата" in editor_src
     assert "Открыть сводку расчёта" in editor_src
-    assert "Открыть журнал запуска" in editor_src
+    assert "Открыть журнал расчёта" in editor_src
     assert "Открыть основную таблицу результатов" in editor_src
-    assert "Открыть файл анимации" in editor_src
-    assert "Открыть папку всех запусков" in editor_src
+    assert "Загрузить файл анимации" in editor_src
+    assert "Показать файл анимации" not in editor_src
+    assert "Открыть файл анимации" not in editor_src
+    assert "pneumo_solver_ui.desktop_animator.app" in editor_src
+    assert '"--npz"' in editor_src
+    assert '"--no-follow"' in editor_src
+    assert "Открыть папку всех результатов" in editor_src
     assert "Подробные расчёты ещё не запускались." in editor_src
     assert "Сводка расчёта пока не найдена." in editor_src
     assert "Папка результатов:" in run_setup_model_src
@@ -1366,16 +1380,20 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
         "dt=",
         "длительность=",
         "расширенный лог=",
+        "Для полного маршрута запуска",
+        "Пошаговый маршрут настройки",
+        "Быстрый маршрут помогает",
+        "Маршрут запуска:",
     ]
     for fragment in forbidden_visible_editor_fragments:
         assert fragment not in editor_src
 
     assert "Профиль запуска" in run_setup_src
-    assert "Профиль дороги для предпросмотра" in run_setup_src
-    assert "Настройки запуска расчёта" in run_setup_src
-    assert "Пресеты запуска" in run_setup_src
-    assert "Повторное использование, выгрузка и режим выполнения" in run_setup_src
-    assert "Будет запущено сейчас" in run_setup_src
+    assert "Предпросмотр дороги" in run_setup_src
+    assert "Режим расчёта" in run_setup_src
+    assert "Быстрые пресеты" in run_setup_src
+    assert "Поведение расчёта и выгрузка" in run_setup_src
+    assert "Что будет запущено" in run_setup_src
     assert "Проверить и запустить" in run_setup_src
     assert "Запустить расчёт" in run_setup_src
     assert "_run_selected_profile_with_check" in run_setup_src
@@ -1385,9 +1403,9 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "недоступно" in run_setup_src
     assert "_refresh_launch_action_hint" in run_setup_src
     assert "prechecked=True" in run_setup_src
-    assert "Последние результаты и журналы" in run_setup_src
+    assert "Результаты и журналы" in run_setup_src
     assert "Последний предпросмотр" in run_setup_src
-    assert "Последняя самопроверка" in run_setup_src
+    assert "Последняя проверка" in run_setup_src
     assert "Последний подробный расчёт" in run_setup_src
     assert "Открыть сводку" in run_setup_src
     assert "Открыть журнал" in run_setup_src
@@ -1398,8 +1416,8 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "_refresh_runtime_summaries" in run_setup_src
     assert "Сохранять таблицы результатов для подробных режимов" in run_setup_src
     assert "Сохранять файл анимации для подробных режимов" in run_setup_src
-    assert "Запускать самопроверку перед расчётом" in run_setup_src
-    assert "Сохранять журнал процесса в файл" in run_setup_src
+    assert "Запускать проверку перед расчётом" in run_setup_src
+    assert "Сохранять журнал запуска в файл" in run_setup_src
     forbidden_visible_run_setup_fragments = [
         "Профиль preview-дороги",
         "Cache, export и runtime policy",
@@ -1421,10 +1439,22 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
         "Экспортировать NPZ bundle",
         "Автоматический auto-check",
         "Писать subprocess-лог",
+        "Открыть папку запуска",
+        "Открыть папку всех запусков",
+        "Открыть папку запусков",
+        "Папка запусков:",
+        "Папка запуска:",
+        "Лог последнего запуска",
+        "последнего запуска",
+        "расширенный лог",
         "HO-005",
         "validated_suite_snapshot",
         "Открыть папку handoff",
         "Preview матрицы",
+        "Самопроверка",
+        "самопроверка",
+        "Автопроверка",
+        "автопроверка",
     ]
     for fragment in forbidden_visible_run_setup_fragments:
         assert fragment not in run_setup_src
@@ -1446,15 +1476,15 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "describe_run_setup_snapshot" in run_setup_model_src
     assert "artifact_state_line" in run_setup_model_src
     assert "Повторное использование результата:" in run_setup_model_src
-    assert "Последняя самопроверка:" in run_setup_model_src
-    assert "Маршрут запуска:" in run_setup_model_src
+    assert "Последняя проверка:" in run_setup_model_src
+    assert "Порядок запуска:" in run_setup_model_src
     assert "Прогноз обычного запуска:" in run_setup_model_src
     assert "Рекомендация:" in run_setup_model_src
     assert "таблиц результатов:" in run_setup_model_src
     assert "Сводка предпросмотра:" in run_setup_model_src
     assert "Журнал предпросмотра:" in run_setup_model_src
-    assert "Сводка самопроверки:" in run_setup_model_src
-    assert "Журнал самопроверки:" in run_setup_model_src
+    assert "Сводка проверки:" in run_setup_model_src
+    assert "Журнал проверки:" in run_setup_model_src
     forbidden_visible_run_setup_model_fragments = [
         "Cache entry:",
         "Последний auto-check:",
@@ -1471,6 +1501,10 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
         "таблиц CSV:",
         "Сводка предпросмотра (JSON):",
         "Сводка самопроверки (JSON):",
+        "Самопроверка",
+        "самопроверка",
+        "Автопроверка",
+        "автопроверка",
         "Не использовать кэш",
         "cache-hit",
         "policy=",
@@ -1533,7 +1567,7 @@ def test_desktop_input_editor_hides_service_layers_behind_explicit_toggle() -> N
     assert 'ttk.LabelFrame(actions_left_col, text="Быстрые пресеты", padding=10)' in editor_src
     assert 'ttk.LabelFrame(actions_left_col, text="История последних действий", padding=10)' in editor_src
     assert 'ttk.LabelFrame(actions_right_col, text="Проверка и расчёт", padding=10)' in editor_src
-    assert 'ttk.LabelFrame(tools_service_tab.body, text="Пошаговый маршрут настройки", padding=10)' in editor_src
+    assert 'ttk.LabelFrame(tools_service_tab.body, text="Пошаговый порядок настройки", padding=10)' in editor_src
     assert 'ttk.LabelFrame(tools_service_tab.body, text="Быстрый поиск по параметрам", padding=10)' in editor_src
     assert 'ttk.LabelFrame(actions_service_tab.body, text="Журнал проверки и расчёта", padding=8)' in editor_src
     assert "_set_service_panels_visible(False)" in editor_src

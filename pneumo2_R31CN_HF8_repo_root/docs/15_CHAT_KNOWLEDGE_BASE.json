@@ -1,6 +1,6 @@
 {
   "schema": "pneumo.chat_knowledge_base.v1",
-  "updated_at": "2026-04-18T19:53:55+00:00",
+  "updated_at": "2026-04-19T15:44:21+00:00",
   "requirements": [
     {
       "id": "REQ-0001",
@@ -201,6 +201,46 @@
       "title": "GUI-кнопки и надписи должны смыслово соответствовать V38 и оптимизированному пользовательскому pipeline",
       "details": "Все operator-facing кнопки, заголовки, статусы, подсказки и диалоги desktop GUI должны вести пользователя по графу PIPELINE_OPTIMIZED.dot без лишних этапов, без service-jargon leaks, без английских служебных терминов и без подмены доменной логики. Animator, Desktop Mnemo и Compare Viewer не являются запрещёнными зонами: их можно развивать, но нельзя ломать рабочее поведение и нельзя дублировать их ответственность в чужих окнах.",
       "status": "active"
+    },
+    {
+      "id": "REQ-0026",
+      "created_at": "2026-04-19T10:46:11+00:00",
+      "source": "chat + archive:pneumo_human_gui_simulation_audit_v5_module_internals",
+      "title": "V5 human GUI simulation audit is an evidence-first remediation layer",
+      "details": "Archive C:/Users/Admin/Downloads/pneumo_human_gui_simulation_audit_v5_module_internals.zip уточняет текущий GUI-проход: нельзя считать окно полностью понятным по одной кнопке запуска; нужно различать launchpoint_only, launchpoint_plus_prelaunch, source_contract_opened и runtime_opened; ближайший фокус: иерархия launcher, единый маршрут Собрать диагностику, различение embedded compare и Compare Viewer, pre-launch карточки для Mnemo/Diagnostics/Compare/Input/Test.",
+      "status": "активно"
+    },
+    {
+      "id": "REQ-0027",
+      "created_at": "2026-04-19T11:23:56+00:00",
+      "source": "chat + archive:pneumo_human_gui_report_only_v6.zip",
+      "title": "Human GUI V6: единый стартовый маршрут и первоклассный Редактор кольца",
+      "details": "Отчётный аудит V6 требует вести GUI к одному понятному стартовому маршруту: Редактор кольца должен быть верхнеуровневым входом для сценариев; диагностика должна иметь одно доминирующее действие Собрать диагностику; сравнение не должно дублироваться как равнозначный первый маршрут; графика, анимация, схема и результаты должны иметь крупные видимые состояния достоверности; стартовые кнопки должны пояснять назначение без служебных терминов.",
+      "status": "активно"
+    },
+    {
+      "id": "REQ-0028",
+      "created_at": "2026-04-19T12:53:41+00:00",
+      "source": "chat + archive:pneumo_human_gui_report_only_v10_launcher_hierarchy.zip",
+      "title": "Human GUI V10: launcher-shell должен быть маршрутом, а не каталогом окон",
+      "details": "Archive C:/Users/Admin/Downloads/pneumo_human_gui_report_only_v10_launcher_hierarchy.zip закрепляет иерархию стартового shell: primary route = Исходные данные -> Сценарии/Редактор кольца -> Набор испытаний -> Базовый прогон -> Оптимизация -> Анализ -> Анимация -> Диагностика; Send Results должен быть вторым шагом внутри Diagnostics, Compare Viewer - advanced режимом из Анализа, Desktop Mnemo и Tools Center - second-layer/advanced, не первыми обязательными входами. Действия с файлом анимации должны вести к просмотру/загрузке в аниматоре, а не к сырому открытию файла через системную ассоциацию.",
+      "status": "активно"
+    },
+    {
+      "id": "REQ-0029",
+      "created_at": "2026-04-19T15:44:05+00:00",
+      "source": "chat + archive:pneumo_codex_tz_spec_connector_reconciled_v38_actualized_with_v10",
+      "title": "V38 actualized with V10 is the active GUI/TZ/spec imported layer",
+      "details": "Archive C:/Users/Admin/Downloads/pneumo_codex_tz_spec_connector_reconciled_v38_actualized_with_v10.zip was imported to docs/context/gui_spec_imports/v38_actualized_with_v10. Future GUI/TZ/spec work must read it after 17/18 and before previous V38/V10 provenance. It integrates V10 launcher hierarchy findings and adds REQ-046 ... REQ-050 while keeping runtime closure gaps open.",
+      "status": "активно"
+    },
+    {
+      "id": "REQ-0030",
+      "created_at": "2026-04-19T15:44:13+00:00",
+      "source": "chat + V38 actualized with V10",
+      "title": "Launcher shell must follow the V10-actualized eight-step route",
+      "details": "The first screen must show one dominant route: Исходные данные -> Редактор кольца / сценариев -> Набор испытаний -> Базовый прогон -> Оптимизация -> Анализ результатов -> Анимация -> Диагностика. Compare Viewer, Desktop Mnemo and Tools remain available but secondary/advanced; send-results is nested under Diagnostics after diagnostics is ready.",
+      "status": "активно"
     }
   ],
   "plans": [
@@ -624,7 +664,7 @@
       "source": "chat: V37 compliance correction 2026-04-18",
       "title": "Actualize 10 chat prompts for V37 visual compliance",
       "details": "Prompt pack 16 now requires visual GUI checks against V37 GUI_SPEC/WORKSPACE/ACCEPTANCE/PIPELINE, blocks service-jargon leaks, requires direct shell tree/search/selection sync and rejects ad-hoc labels such as machine-data wording.",
-      "artifact_path": "docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md",
+      "artifact_path": "gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md",
       "status": "done"
     },
     {
@@ -642,7 +682,7 @@
       "source": "chat:2026-04-18 accept 10 chats cleanup",
       "title": "Завершить интеграционную уборку после 10 GUI-чатов",
       "details": "После приемки V38-направлений проверить тесты, diff-check, синхронизировать codex/work с origin, удалить временные локальные worktree и локальные chat-ветки, удалять remote-ветки только если их изменения уже доставлены в codex/work.",
-      "artifact_path": "docs/14_CHAT_PLANS_LOG.md",
+      "artifact_path": "14_CHAT_PLANS_LOG.md",
       "status": "completed"
     },
     {
@@ -678,8 +718,35 @@
       "source": "chat:2026-04-19 semantic GUI audit",
       "title": "Семантический аудит всех GUI-кнопок и надписей относительно V38 и PIPELINE_OPTIMIZED.dot",
       "details": "Сформирован локальный audit-документ с нормализованным pipeline, найденными неоднозначностями V38, высоковероятными нарушениями текста и приоритетным порядком исправлений.",
-      "artifact_path": "docs/context/release_readiness/GUI_TEXT_SEMANTIC_AUDIT_2026-04-19.md",
+      "artifact_path": "context/release_readiness/GUI_TEXT_SEMANTIC_AUDIT_2026-04-19.md",
       "status": "active"
+    },
+    {
+      "id": "PLAN-0054",
+      "created_at": "2026-04-19T11:24:06+00:00",
+      "source": "chat + archive:pneumo_human_gui_report_only_v6.zip",
+      "title": "Human GUI V6: remediation маршрута пользователя",
+      "details": "Следующий слой GUI-доработок должен начинаться с иерархии маршрута: один стартовый путь после запуска, первоклассный Редактор кольца, единая диагностика через Собрать диагностику, сравнение без первого-level дубля, крупные состояния достоверности и отдельная визуальная проверка внутренних экранов launchpoint-only окон.",
+      "artifact_path": "context/release_readiness/HUMAN_GUI_REPORT_ONLY_V6_2026-04-19.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0055",
+      "created_at": "2026-04-19T12:53:41+00:00",
+      "source": "chat + archive:pneumo_human_gui_report_only_v10_launcher_hierarchy.zip",
+      "title": "Human GUI V10: привести launcher-shell к иерархии первого маршрута",
+      "details": "Продолжать GUI-правки от V10: стартовая поверхность показывает один маршрут из 8 шагов, Редактор кольца становится явным сценарным центром, Diagnostics имеет одну доминирующую команду Собрать диагностику, отправка результатов переезжает внутрь Diagnostics, встроенное сравнение становится основным compare-path, Compare Viewer/Mnemo/Tools получают second-layer роль, а кнопки файла анимации формулируются как загрузка/просмотр в аниматоре.",
+      "artifact_path": "context/release_readiness/HUMAN_GUI_REPORT_ONLY_V10_LAUNCHER_HIERARCHY_2026-04-19.md",
+      "status": "актуален"
+    },
+    {
+      "id": "PLAN-0056",
+      "created_at": "2026-04-19T15:44:21+00:00",
+      "source": "chat + archive:pneumo_codex_tz_spec_connector_reconciled_v38_actualized_with_v10",
+      "title": "V38 actualized with V10 import and read-order audit",
+      "details": "Current KB import layer and audit for future GUI/TZ/spec work. Use it as the active package before previous V38/V10 provenance and keep open gaps evidence-required.",
+      "artifact_path": "context/release_readiness/V38_ACTUALIZED_WITH_V10_KB_IMPORT_AUDIT_2026-04-19.md",
+      "status": "актуален"
     }
   ]
 }

@@ -1,0 +1,26 @@
+BACKLOG_ID,BACKLOG_ITEM,PRIORITY,SOURCE_IDS,REQ_IDS,PACKAGE_STATUS,NOTES
+BL-001,ring seam correctness and seam diagnostics,P0,SRC-005;SRC-025,REQ-017;REQ-018;REQ-019;REQ-020,covered_partially,WS-RING contract defined; runtime/release evidence remains open.
+BL-002,post-run CPU load in Web UI and idle-loop elimination,P0,SRC-005,REQ-041,covered_partially,"Performance contract captured, runtime evidence still required."
+BL-003,Desktop Animator honest dt-aware FPS and playback,P0,SRC-005,REQ-031;REQ-041,covered_partially,Animator contract defined; measured runtime acceptance still open.
+BL-004,dense/adaptive road mesh without accordion artifacts,P0,SRC-005,REQ-031;REQ-018,covered_partially,Visual/animator contracts include road truth and cyclic non-ring display.
+BL-005,"contact patch only by local road surface, no fake ellipse/rectangle",P0,SRC-005,REQ-004;REQ-005,covered_partially,Honest graphics law captured; producer-side evidence still needed.
+BL-006,return cylinder bodies/rods/pistons only after full packaging contract,P0,SRC-005;SRC-002,REQ-030;REQ-042,covered,Explicit in truthful graphics and animator contracts.
+BL-007,wheel geometry under suspension travel,P0,SRC-005,REQ-004;REQ-016,covered_partially,"Inputs/animator/dtruth matrices cover it, runtime proof open."
+BL-008,pneumatic telemetry and mnemo clarity,P0,SRC-005,REQ-037,covered_partially,"Visual semantics and mnemo contract defined, runtime evidence open."
+BL-009,Windows viewer of graphs/diagrams restore and stability,P0,SRC-005,REQ-043,covered_partially,"Specialized windows preserved, implementation evidence not proven here."
+BL-010,Desktop animator detached external window stability,P0,SRC-005;SRC-029,REQ-043;REQ-011,covered_partially,Specialized window contract captured; runtime acceptance still open.
+BL-011,canonical road_width_m in export/meta,P0,SRC-005,REQ-004;REQ-031;REQ-042,covered_partially,Truth/source contracts note this as open producer-side field.
+BL-012,browser performance trace and viewport gating,P0,SRC-005,REQ-041,covered_partially,"Acceptance and diagnostics contracts require trace, not yet runtime-proven."
+BL-013,solver-points contract completeness,P0,SRC-005;SRC-002,REQ-042,covered_partially,Explicitly tracked as open producer-side truth gap.
+BL-014,cylinder packaging contract completeness,P0,SRC-005;SRC-002,REQ-030;REQ-042,covered_partially,Explicitly tracked as open producer-side truth gap.
+BL-015,cleanup duplicate values in default_base.json,P0,SRC-005,REQ-001;REQ-003,covered_partially,Canon and source-of-truth law capture need; runtime cleanup left open.
+BL-016,scenario ring editor becomes sole source of truth,P0,SRC-025;SRC-026,REQ-017;REQ-021;REQ-022,covered,Scenario source uplift and enforcement are fully modeled.
+BL-017,no hidden expert/legacy routes,P1,SRC-007,REQ-044,covered,Governance requirement explicit.
+BL-018,all significant GUI elements have tooltip and help,P1,SRC-007;SRC-021,REQ-034,covered,UI element catalog marks tooltip/help mandatory.
+BL-019,graphical representation for all key inputs,P1,SRC-007;SRC-021,REQ-016,covered,Visual twin coverage matrix from V21 integrated.
+BL-020,single visible diagnostics button and autosave on exit/crash,P1,SRC-007;SRC-019,REQ-013;REQ-032;REQ-033,covered,Diagnostics first-class surface and bundle lifecycle formalized.
+BL-021,clear explanations and human-readable error messages,P1,SRC-007,REQ-034;REQ-044,covered,Help system and governance contracts enforce explainability.
+BL-022,project-bound results and histories,P1,SRC-007;SRC-021,REQ-002;REQ-023;REQ-024;REQ-028,covered,Project-centric model retained across workspaces.
+BL-023,stable dock layout and second-monitor workflow,P1,SRC-006;SRC-007,REQ-009;REQ-043,covered,Shell contract includes docking/floating/restore/second-monitor.
+BL-024,AI snapshot says runtime acceptance not proven by evidence,P0,SRC-011,REQ-041;REQ-042,gap,"Kept explicit as open gap, not silently marked done."
+BL-025,"catalogue-aware cylinder packaging after base contract, with honest degraded states until closure",P0/P1,SRC-005;SRC-031,REQ-004;REQ-028;REQ-029,covered_partially,Repo TODO/Wishlist keeps packaging as open producer-side truth frontier; package preserves open gap and downstream honesty mode.

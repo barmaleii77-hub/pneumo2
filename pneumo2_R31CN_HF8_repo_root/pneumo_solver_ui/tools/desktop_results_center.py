@@ -49,6 +49,9 @@ def _operator_text(value: object) -> str:
     if not text:
         return ""
     replacements = {
+        "Open Desktop Animator first and inspect Mnemo red flags before send.": (
+            "Сначала откройте аниматор и проверьте красные флаги мнемосхемы перед отправкой."
+        ),
         "rc=": "код завершения ",
         "duration=": "длительность ",
         "ZIP": "архив",
@@ -59,6 +62,10 @@ def _operator_text(value: object) -> str:
         "Pinned current run.": "Текущий прогон закреплён.",
         "Open Desktop Animator first": "Сначала откройте аниматор",
         "Then inspect Compare Viewer": "Затем проверьте окно сравнения",
+        "Open Compare Viewer next": "Откройте окно сравнения следующим шагом",
+        "Открыть Compare Viewer следующим шагом": "Открыть окно сравнения следующим шагом",
+        "Desktop Mnemo recent:": "Недавнее событие мнемосхемы:",
+        "Pointer drift": "Расхождение данных сопровождения",
         "Compare Viewer": "окно сравнения",
         "Desktop Animator": "аниматор",
         "Desktop Mnemo": "мнемосхема",
@@ -70,7 +77,7 @@ def _operator_text(value: object) -> str:
         "optimizer scope": "область оптимизации",
         "artifacts are missing": "материалы не найдены",
         "frozen context": "закреплёнными данными",
-        "hash=": "идентификатор ",
+        "hash=": "метка ",
         "path=": "файл ",
         "current=": "текущее ",
         "selected=": "выбранное ",
@@ -102,9 +109,9 @@ def _action_label(action_key: str) -> str:
         "open_artifact": "открыт материал",
         "open_compare_viewer": "открыто окно сравнения",
         "open_animator": "открыт аниматор",
-        "open_animator_follow": "открыт аниматор с привязкой к результату",
+        "open_animator_follow": "открыта анимация результатов расчёта",
         "open_diagnostics_gui": "открыта диагностика проекта",
-        "open_send_center": "открыт центр отправки",
+        "open_send_center": "открыта отправка результатов",
         "open_send_bundles": "открыта папка архивов",
         "export_diagnostics_evidence": "сохранены материалы диагностики",
     }
@@ -209,18 +216,18 @@ class DesktopResultsCenter(ttk.Frame):
         self.triage_var = tk.StringVar(master=self, value="Разбор замечаний: критичных: 0; предупреждений: 0; справочных: 0; красных флагов: 0")
         self.npz_var = tk.StringVar(master=self, value="Последний файл анимации: пока недоступен.")
         self.runs_var = tk.StringVar(master=self, value="Последние прогоны: автотест: —; диагностика: —")
-        self.context_var = tk.StringVar(master=self, value="Данные результата: не определены")
-        self.context_banner_var = tk.StringVar(master=self, value="Данные результата: выбранный результат пока не определён.")
+        self.context_var = tk.StringVar(master=self, value="Результаты расчёта: не определены")
+        self.context_banner_var = tk.StringVar(master=self, value="Результаты расчёта пока не определены.")
         self.evidence_manifest_var = tk.StringVar(master=self, value="Материалы диагностики: пока не сохранены.")
-        self.next_step_var = tk.StringVar(master=self, value="Следующий шаг: дождитесь первого снимка проверки и результатов.")
-        self.next_detail_var = tk.StringVar(master=self, value="Пояснение: свежие материалы проверки и результатов пока не появились.")
+        self.next_step_var = tk.StringVar(master=self, value="Рекомендация: дождитесь первого снимка проверки и результатов.")
+        self.next_detail_var = tk.StringVar(master=self, value="Свежие материалы проверки и результатов пока не появились.")
         self.handoff_summary_var = tk.StringVar(master=self, value="Последний прогон: материалы пока не подготовлены.")
-        self.handoff_detail_var = tk.StringVar(master=self, value="Запустите проверки на первой вкладке, чтобы закрепить текущий прогон в этом центре.")
+        self.handoff_detail_var = tk.StringVar(master=self, value="Запустите проверки на первой вкладке, чтобы закрепить текущий прогон в анализе результатов.")
         self.handoff_steps_var = tk.StringVar(master=self, value="")
         self.show_current_run_only = tk.BooleanVar(master=self, value=False)
         self.browse_category_var = tk.StringVar(master=self, value=_browse_category_label("all"))
         self.browse_query_var = tk.StringVar(master=self, value="")
-        self.status_var = tk.StringVar(master=self, value="Центр результатов готов.")
+        self.status_var = tk.StringVar(master=self, value="Анализ результатов готов.")
 
         self._build_ui()
         self.refresh()
@@ -244,18 +251,22 @@ class DesktopResultsCenter(ttk.Frame):
 
         actions = ttk.Frame(header)
         actions.pack(side="right", anchor="ne")
-        ttk.Button(actions, text="Обновить", command=self.refresh).pack(side="left")
+        ttk.Button(actions, text="Обновить результаты", command=self.refresh).pack(side="left")
         self.btn_open_selected = ttk.Button(actions, text="Открыть материал", command=self._open_selected)
         self.btn_open_selected.pack(side="left", padx=(8, 0))
         self.btn_diagnostics = ttk.Button(actions, text="Собрать диагностику", command=self._launch_full_diagnostics_gui)
         self.btn_diagnostics.pack(side="left", padx=(8, 0))
         self.btn_export_evidence = ttk.Button(actions, text="Сохранить материалы", command=self._export_diagnostics_evidence)
         self.btn_export_evidence.pack(side="left", padx=(8, 0))
-        self.btn_compare = ttk.Button(actions, text="Сравнение", command=self._launch_compare_viewer)
+        self.btn_compare = ttk.Button(actions, text="Сравнить в отдельном окне", command=self._launch_compare_viewer)
         self.btn_compare.pack(side="left", padx=(8, 0))
         self.btn_animator = ttk.Button(actions, text="Аниматор", command=self._launch_animator)
         self.btn_animator.pack(side="left", padx=(8, 0))
-        self.btn_animator_follow = ttk.Button(actions, text="Сопровождение", command=self._launch_animator_follow)
+        self.btn_animator_follow = ttk.Button(
+            actions,
+            text="Аниматор по результату",
+            command=self._launch_animator_follow,
+        )
         self.btn_animator_follow.pack(side="left", padx=(8, 0))
 
         workspace = ttk.Panedwindow(self, orient="horizontal")
@@ -285,7 +296,7 @@ class DesktopResultsCenter(ttk.Frame):
         ttk.Label(summary, textvariable=self.context_banner_var, wraplength=420, justify="left").pack(anchor="w", pady=(4, 0))
         ttk.Label(summary, textvariable=self.evidence_manifest_var, wraplength=420, justify="left").pack(anchor="w", pady=(4, 0))
 
-        handoff = ttk.LabelFrame(summary_body, text="Следующий шаг", padding=10)
+        handoff = ttk.LabelFrame(summary_body, text="Рекомендация", padding=10)
         handoff.pack(fill="x", pady=(10, 0))
         ttk.Label(
             handoff,
@@ -372,13 +383,13 @@ class DesktopResultsCenter(ttk.Frame):
         self.btn_handoff_triage.pack(side="left", padx=(8, 0))
         self.btn_handoff_compare = ttk.Button(
             run_handoff_shortcuts,
-            text="Открыть текущее сравнение",
+            text="Сравнить текущий прогон в отдельном окне",
             command=self._branch_handoff_compare,
         )
         self.btn_handoff_compare.pack(side="left", padx=(8, 0))
         self.btn_handoff_animator = ttk.Button(
             run_handoff_shortcuts,
-            text="Открыть текущую визуализацию",
+            text="Открыть текущую анимацию",
             command=self._branch_handoff_animator,
         )
         self.btn_handoff_animator.pack(side="left", padx=(8, 0))
@@ -388,7 +399,7 @@ class DesktopResultsCenter(ttk.Frame):
         ttk.Button(tools, text="Открыть папку архивов", command=self._open_send_bundles).pack(fill="x")
         ttk.Button(tools, text="Собрать диагностику", command=self._launch_full_diagnostics_gui).pack(fill="x", pady=(6, 0))
         ttk.Button(tools, text="Сохранить материалы диагностики", command=self._export_diagnostics_evidence).pack(fill="x", pady=(6, 0))
-        ttk.Button(tools, text="Открыть центр отправки", command=self._launch_send_results_gui).pack(fill="x", pady=(6, 0))
+        ttk.Button(tools, text="Открыть отправку результатов", command=self._launch_send_results_gui).pack(fill="x", pady=(6, 0))
 
         overview = ttk.LabelFrame(left_pane, text="Обзор проверок", padding=8)
         overview_tree_frame, self.overview_tree = build_scrolled_treeview(
@@ -520,8 +531,8 @@ class DesktopResultsCenter(ttk.Frame):
                 + f"состояние: {_status_label(snapshot.selected_run_contract_status)}; "
                 + f"файл: {snapshot.selected_run_contract_path}"
             )
-        self.next_step_var.set("Следующий шаг: " + _operator_text(snapshot.suggested_next_step))
-        self.next_detail_var.set("Почему сейчас: " + _operator_text(snapshot.suggested_next_detail))
+        self.next_step_var.set("Рекомендация: " + _operator_text(snapshot.suggested_next_step))
+        self.next_detail_var.set("Причина: " + _operator_text(snapshot.suggested_next_detail))
         self._render_overview(snapshot)
         self._render_artifacts(snapshot)
         self._select_initial_overview(snapshot)
@@ -571,7 +582,7 @@ class DesktopResultsCenter(ttk.Frame):
         )
         self.btn_export_evidence.configure(state="normal")
         self.btn_run_next_step.configure(
-            text=_button_text("Выполнить следующий шаг", snapshot.suggested_next_step),
+            text=_button_text("Выполнить рекомендацию", snapshot.suggested_next_step),
             state=(
                 "normal"
                 if self._can_run_action(
@@ -806,7 +817,7 @@ class DesktopResultsCenter(ttk.Frame):
         if handoff is None:
             self.handoff_summary_var.set("Последний прогон: материалы пока не подготовлены.")
             self.handoff_detail_var.set(
-                "Запустите проверки с первой вкладки, чтобы закрепить текущую сессию в этом центре."
+                "Запустите проверки с первой вкладки, чтобы закрепить текущую сессию в анализе результатов."
             )
             self.handoff_steps_var.set("")
             return
@@ -918,7 +929,7 @@ class DesktopResultsCenter(ttk.Frame):
         selected_run_line = (
             "Выбранный расчёт для анализа: "
             f"состояние: {_status_label(snapshot.selected_run_contract_status)}; "
-            f"идентификатор: {_short_value(snapshot.selected_run_contract_hash)}; "
+            f"метка: {_short_value(snapshot.selected_run_contract_hash)}; "
             f"файл: {snapshot.selected_run_contract_path or '—'}"
         )
         lines = [
@@ -939,11 +950,11 @@ class DesktopResultsCenter(ttk.Frame):
             f"Почему сейчас: {_operator_text(snapshot.suggested_next_detail)}",
         ]
         if snapshot.result_context_detail:
-            lines.append("Детали результата: " + _operator_text(snapshot.result_context_detail))
+            lines.append("Детали расчёта: " + _operator_text(snapshot.result_context_detail))
         if snapshot.result_context_action:
             lines.append("Действие по результату: " + _operator_text(snapshot.result_context_action))
         if snapshot.result_context_fields:
-            lines.extend(["", "Поля данных результата:"])
+            lines.extend(["", "Поля результатов расчёта:"])
             for field in snapshot.result_context_fields[:12]:
                 lines.append(
                     "- "
@@ -1225,7 +1236,7 @@ class DesktopResultsCenter(ttk.Frame):
         self._run_action(
             "open_animator_follow",
             artifact=artifact,
-            success_message="Открыта визуализация текущего прогона.",
+            success_message="Открыта анимация текущего прогона.",
         )
 
     def _open_handoff_autotest_run(self) -> None:
@@ -1267,7 +1278,7 @@ class DesktopResultsCenter(ttk.Frame):
         self._run_action(
             "open_compare_viewer",
             artifact=self._selected_artifact(),
-            success_message="Открыто окно сравнения для выбранного результата.",
+            success_message="Открыто окно сравнения для результатов расчёта.",
         )
 
     def _launch_animator(self) -> None:
@@ -1277,7 +1288,7 @@ class DesktopResultsCenter(ttk.Frame):
         self._run_action(
             "open_animator",
             artifact=self._selected_artifact(),
-            success_message="Открыт аниматор для последнего результата.",
+            success_message="Открыт аниматор для последних результатов расчёта.",
         )
 
     def _launch_animator_follow(self) -> None:
@@ -1287,7 +1298,7 @@ class DesktopResultsCenter(ttk.Frame):
         self._run_action(
             "open_animator_follow",
             artifact=self._selected_artifact(),
-            success_message="Открыт аниматор с привязкой к выбранному результату.",
+            success_message="Открыта анимация результатов расчёта.",
         )
 
     def _launch_full_diagnostics_gui(self) -> None:
@@ -1299,7 +1310,7 @@ class DesktopResultsCenter(ttk.Frame):
     def _launch_send_results_gui(self) -> None:
         self._run_action(
             "open_send_center",
-            success_message="Открыт центр отправки.",
+            success_message="Открыта отправка результатов.",
         )
 
 

@@ -20,7 +20,7 @@ def build_spec() -> DesktopShellToolSpec:
         mode="hosted",
         menu_section="Инструменты",
         nav_section="Инструменты",
-        details="Подробный диагностический центр для углублённого разбора состояния проекта и файлов.",
+        details="Подробная диагностика для углублённого разбора состояния проекта и файлов.",
         menu_order=140,
         nav_order=140,
         standalone_module="pneumo_solver_ui.tools.run_full_diagnostics_gui",

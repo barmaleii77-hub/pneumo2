@@ -33,7 +33,7 @@ class DesktopOptimizerDashboardTab(ttk.Frame):
         actions.grid(row=2, column=0, sticky="ew")
         ttk.Button(actions, text="Обновить всё", command=controller.refresh_all).pack(side="left")
         ttk.Button(actions, text="Следующий шаг готовности", command=controller.follow_launch_readiness_next_action).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Следующий шаг выбранного прогона", command=controller.follow_selected_run_next_step).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Перейти по рекомендации", command=controller.follow_selected_run_next_step).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Текущий прогон анализа", command=controller.open_latest_optimization_pointer).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Рабочая папка", command=lambda: controller.open_current_artifact("workspace_dir")).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Настройки запуска", command=controller.show_contract_tab).pack(side="left", padx=(8, 0))
@@ -59,7 +59,7 @@ class DesktopOptimizerDashboardTab(ttk.Frame):
         self.packaging_panel.grid(row=9, column=0, sticky="ew", pady=(10, 0))
         self.selection_panel = TextReportPanel(body, text="Выбранный прогон", height=8)
         self.selection_panel.grid(row=10, column=0, sticky="ew", pady=(10, 0))
-        self.next_step_panel = TextReportPanel(body, text="Следующий шаг по выбранному прогону", height=10)
+        self.next_step_panel = TextReportPanel(body, text="Рекомендация по выбранному прогону", height=10)
         self.next_step_panel.grid(row=11, column=0, sticky="ew", pady=(10, 0))
 
     def render(

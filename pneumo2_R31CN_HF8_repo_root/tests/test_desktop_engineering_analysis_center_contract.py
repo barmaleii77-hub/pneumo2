@@ -18,18 +18,21 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert "DesktopEngineeringAnalysisRuntime" in src
     assert 'workspace = ttk.Panedwindow(self, orient="horizontal")' in src
     for label in (
-        "Обновить",
-        "Открыть файл",
+        "Обновить данные",
+        "Показать выбранный файл",
         "Зафиксировать прогон",
         "Подготовить диагностику",
-        "Открыть диагностику",
+        "Показать диагностику",
         "Влияние системы",
         "Полный отчёт",
         "Диапазоны влияния",
         "Собрать диагностику",
+        "Что показать",
+        "Показать выбранное",
     ):
         assert label in src
     assert "threading.Thread" in src
+    assert 'text="Обновить"' not in src
     assert "ttk.Progressbar" in src
     assert "status_var" in src
     assert "log_text" in src
@@ -52,7 +55,7 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert "write_diagnostics_evidence_manifest" in src
     assert "Материалы диагностики подготовлены автоматически" in src
     assert "def _open_evidence_manifest" in src
-    assert "Материалы диагностики открыты" in src
+    assert "Материалы диагностики показаны" in src
     assert "Подготовить диагностику" in src
     assert "compare_influence_surface_count" in src
     assert "def _compare_surface_details" in src
@@ -74,6 +77,10 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert "Предпросмотр графиков и таблиц" in src
     assert "Графики влияния" in src
     assert "Табличные файлы" in src
+    assert "Таблица данных" in src
+    assert "CSV-таблица" not in src
+    assert "метка: {snapshot.diagnostics_evidence_manifest_hash[:12] or '-'}" in src
+    assert "код: {snapshot.diagnostics_evidence_manifest_hash[:12] or '-'}" not in src
     assert "analysis_workspace_chart_table_preview" in src
     assert '"analysis_chart_table_preview"' in src
     assert "Связь с окном сравнения" in runtime_src
@@ -93,9 +100,16 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert "missing_required_artifact" in src
     assert "Обязательные файлы готовы" in src
     assert "filedialog.askdirectory" in src
+    assert "Инженерный анализ готов." in src
     for forbidden in (
+        "Центр инженерного анализа готов",
         "Открыть артефакт",
         "Открыть выбранный артефакт",
+        "Открыть выбранный файл",
+        "Открыть выбранное",
+        "Открыть выбранный прогон",
+        "Открыть связь анализа с аниматором",
+        "Открыть данные для анимации",
         "Открыть контекст анимации",
         "Проверенные артефакты",
         "Табличные артефакты",
@@ -104,6 +118,9 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
         "статус:",
         "Команда процесса",
         "Идентификатор процесса",
+        'text="Открыть файл"',
+        'text="Открыть"',
+        "Быстро открыть",
     ):
         assert forbidden not in src
     for forbidden in (

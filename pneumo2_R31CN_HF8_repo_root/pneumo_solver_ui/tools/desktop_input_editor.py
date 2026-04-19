@@ -68,6 +68,7 @@ from pneumo_solver_ui.desktop_input_model import (
     save_base_payload,
 )
 from pneumo_solver_ui.desktop_input_graphics import DesktopInputGraphicPanel
+from pneumo_solver_ui.desktop_shell.external_launch import spawn_module
 from pneumo_solver_ui.desktop_ui_core import ScrollableFrame, build_scrolled_text, build_scrolled_treeview
 from pneumo_solver_ui.desktop_ui_help import attach_tooltip, show_help_dialog
 from pneumo_solver_ui.desktop_run_setup_model import (
@@ -246,7 +247,7 @@ class DesktopInputEditor:
         self.inspector_section_var = tk.StringVar(value="Раздел: —")
         self.inspector_unit_var = tk.StringVar(value="Единица: —")
         self.inspector_range_var = tk.StringVar(value="Диапазон: —")
-        self.inspector_context_var = tk.StringVar(value="Контекст: —")
+        self.inspector_context_var = tk.StringVar(value="Показано: —")
         self.inspector_source_state_var = tk.StringVar(value="Источник/состояние: —")
         self.inspector_help_var = tk.StringVar(value="Выберите параметр слева или в форме, чтобы увидеть пояснение.")
         self.inspector_related_summary_var = tk.StringVar(value="Связанные параметры появятся после выбора поля.")
@@ -296,7 +297,7 @@ class DesktopInputEditor:
         self.run_mode_usage_var = tk.StringVar()
         self.run_launch_summary_var = tk.StringVar()
         self.run_preset_hint_var = tk.StringVar(
-            value="Пресеты запуска меняют только режим расчёта: шаг, длительность и расширенный лог."
+            value="Пресеты запуска меняют только режим расчёта: шаг, длительность и расширенный журнал."
         )
         self.run_launch_label: ttk.Label | None = None
         self.preview_surface_primary_spin: ttk.Spinbox | None = None
@@ -2098,7 +2099,7 @@ class DesktopInputEditor:
         ).grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
 
         latest_selfcheck_frame = ttk.Frame(artifacts_notebook, padding=10)
-        artifacts_notebook.add(latest_selfcheck_frame, text="Самопроверка")
+        artifacts_notebook.add(latest_selfcheck_frame, text="Проверка")
         latest_selfcheck_frame.columnconfigure(0, weight=1)
         ttk.Label(
             latest_selfcheck_frame,
@@ -2109,17 +2110,17 @@ class DesktopInputEditor:
         ).grid(row=0, column=0, columnspan=3, sticky="w")
         ttk.Button(
             latest_selfcheck_frame,
-            text="Обновить сводку самопроверки",
+            text="Обновить сводку проверки",
             command=self._refresh_latest_selfcheck_summary,
         ).grid(row=1, column=0, sticky="w", pady=(10, 0))
         ttk.Button(
             latest_selfcheck_frame,
-            text="Открыть отчёт самопроверки",
+            text="Открыть отчёт проверки",
             command=self._open_latest_selfcheck_report_json,
         ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
             latest_selfcheck_frame,
-            text="Открыть журнал самопроверки",
+            text="Открыть журнал проверки",
             command=self._open_latest_selfcheck_log,
         ).grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
 
@@ -2140,7 +2141,7 @@ class DesktopInputEditor:
         ).grid(row=1, column=0, sticky="w", pady=(10, 0))
         ttk.Button(
             latest_run_frame,
-            text="Открыть папку запуска",
+            text="Открыть папку результата",
             command=self._open_latest_run_dir,
         ).grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
@@ -2150,12 +2151,12 @@ class DesktopInputEditor:
         ).grid(row=1, column=2, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
             latest_run_frame,
-            text="Открыть журнал запуска",
+            text="Открыть журнал расчёта",
             command=self._open_latest_run_log,
         ).grid(row=1, column=3, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
             latest_run_frame,
-            text="Открыть папку всех запусков",
+            text="Открыть папку всех результатов",
             command=self._open_desktop_runs_dir,
         ).grid(row=1, column=4, sticky="w", padx=(12, 0), pady=(10, 0))
         ttk.Button(
@@ -2165,17 +2166,17 @@ class DesktopInputEditor:
         ).grid(row=2, column=0, sticky="w", pady=(10, 0))
         ttk.Button(
             latest_run_frame,
-            text="Открыть файл анимации",
+            text="Загрузить файл анимации",
             command=self._open_latest_npz_bundle,
         ).grid(row=2, column=1, sticky="w", padx=(12, 0), pady=(10, 0))
 
         ttk.Label(
             actions,
-            text="Для полного маршрута запуска, результатов и журналов используйте отдельное окно настроек расчёта.",
+            text="Для полного порядка запуска, результатов и журналов используйте отдельное окно настроек расчёта.",
             foreground="#555555",
         ).grid(row=5, column=0, columnspan=6, sticky="w", pady=(12, 0))
 
-        route_frame = ttk.LabelFrame(tools_service_tab.body, text="Пошаговый маршрут настройки", padding=10)
+        route_frame = ttk.LabelFrame(tools_service_tab.body, text="Пошаговый порядок настройки", padding=10)
         route_frame.pack(fill="x", pady=(12, 0))
         route_col_count = max(4, len(self.section_titles))
         for col in range(route_col_count):
@@ -2183,7 +2184,7 @@ class DesktopInputEditor:
         ttk.Label(
             route_frame,
             text=(
-                "Быстрый маршрут помогает идти по кластерам: сначала геометрия, затем пневматика, "
+                "Быстрый порядок работы помогает идти по кластерам: сначала геометрия, затем пневматика, "
                 "массы, механика, статическая настройка, компоненты, справочные данные "
                 "и расчётные настройки. "
                 "Это только навигация по текущему окну "
@@ -2625,7 +2626,7 @@ class DesktopInputEditor:
         ttk.Label(footer, textvariable=self.status_var).pack(side="left", anchor="w")
         ttk.Label(
             footer,
-            text="Подсказка: исходный шаблон не перезаписывается автоматически.",
+            text="Исходный шаблон не перезаписывается автоматически.",
             foreground="#555555",
         ).pack(side="right", anchor="e")
         ttk.Sizegrip(footer).pack(side="right", anchor="se", padx=(12, 0))
@@ -2793,7 +2794,7 @@ class DesktopInputEditor:
         self.inspector_unit_var.set(f"Единица: {spec.unit_label or 'безразмерно'}")
         self.inspector_range_var.set(f"Диапазон: {spec.range_text}")
         self.inspector_context_var.set(
-            f"Контекст: {self._graphic_context_title(spec.effective_graphic_context) or 'общий'}"
+            f"Показано: {self._graphic_context_title(spec.effective_graphic_context) or 'общий'}"
         )
         self.inspector_source_state_var.set(f"Источник/состояние: {source_state.get('marker') or '—'}")
         self.inspector_help_var.set(spec.effective_tooltip_text or spec.description)
@@ -3266,7 +3267,7 @@ class DesktopInputEditor:
             self.active_run_cache_dir = None
             self.active_run_saved_files = {}
             self.latest_run_summary_var.set(
-                f"Подробные расчёты ещё не запускались.\nПапка запусков: {desktop_runs_dir_path()}"
+                f"Подробные расчёты ещё не запускались.\nПапка результатов: {desktop_runs_dir_path()}"
             )
             return
 
@@ -3280,9 +3281,9 @@ class DesktopInputEditor:
             self.latest_run_summary_var.set(
                 "\n".join(
                     (
-                        f"Последний запуск: {latest_dir.name}",
+                        f"Последний расчёт: {latest_dir.name}",
                         "Сводка расчёта пока не найдена.",
-                        f"Папка запуска: {latest_dir}",
+                        f"Папка результата: {latest_dir}",
                     )
                 )
             )
@@ -3297,7 +3298,7 @@ class DesktopInputEditor:
             self.latest_run_summary_var.set(
                 "\n".join(
                     (
-                        f"Последний запуск: {latest_dir.name}",
+                        f"Последний расчёт: {latest_dir.name}",
                         f"Не удалось прочитать сводку расчёта: {exc}",
                         f"Путь к сводке: {summary_path}",
                     )
@@ -3519,7 +3520,7 @@ class DesktopInputEditor:
         existing = self._geometry_reference_center
         try:
             if existing is not None and self._focus_toplevel_controller(existing):
-                self._set_status("Открыт справочный центр геометрии и каталогов.")
+                self._set_status("Открыт справочник геометрии и каталогов.")
                 return
         except Exception:
             pass
@@ -3530,13 +3531,13 @@ class DesktopInputEditor:
 
         window = tk.Toplevel(self.root)
         self._geometry_reference_center = DesktopGeometryReferenceCenter(window, hosted=True)
-        self._set_status("Открыт справочный центр геометрии и каталогов.")
+        self._set_status("Открыт справочник геометрии и каталогов.")
 
     def _open_diagnostics_center(self) -> None:
         existing = self._diagnostics_center
         try:
             if existing is not None and self._focus_toplevel_controller(existing):
-                self._set_status("Открыт центр диагностики и отправки.")
+                self._set_status("Диагностика и отправка открыты.")
                 return
         except Exception:
             pass
@@ -3545,7 +3546,7 @@ class DesktopInputEditor:
 
         window = tk.Toplevel(self.root)
         self._diagnostics_center = DesktopDiagnosticsCenter(window, hosted=True, initial_tab="restore")
-        self._set_status("Открыт центр диагностики и отправки.")
+        self._set_status("Диагностика и отправка открыты.")
 
     def _notify_run_setup_center_closed(self) -> None:
         self._run_setup_center = None
@@ -3598,7 +3599,7 @@ class DesktopInputEditor:
                 f"Настройки расчёта: {run_profile_label(self._selected_run_profile_key())}; "
                 f"повторное использование: {cache_policy_label(str(self.run_cache_policy_var.get() or 'reuse'))}; "
                 f"файл анимации: {'да' if bool(self.run_export_npz_var.get()) else 'нет'}; "
-                f"самопроверка: {'да' if bool(self.run_auto_check_var.get()) else 'нет'}."
+                f"проверка: {'да' if bool(self.run_auto_check_var.get()) else 'нет'}."
             ),
         ]
         self.config_summary_var.set("\n".join(lines))
@@ -4031,12 +4032,12 @@ class DesktopInputEditor:
     def _open_latest_run_dir(self) -> None:
         latest_dir = self._current_latest_run_dir()
         if latest_dir is None:
-            messagebox.showinfo(DIALOG_TITLE, "Папка последнего запуска пока не найдена.")
+            messagebox.showinfo(DIALOG_TITLE, "Папка последнего расчёта пока не найдена.")
             return
         self._open_path(
             latest_dir,
-            success_text=f"Открыта папка запуска: {latest_dir}",
-            error_title="Не удалось открыть папку запуска",
+            success_text=f"Открыта папка результата: {latest_dir}",
+            error_title="Не удалось открыть папку результата",
         )
 
     def _open_latest_preview_report_json(self) -> None:
@@ -4055,12 +4056,12 @@ class DesktopInputEditor:
         report_path = self._runtime_selfcheck_report_path()
         self.active_selfcheck_report_path = report_path
         if not report_path.exists():
-            messagebox.showinfo(DIALOG_TITLE, "Отчёт самопроверки пока не найден.")
+            messagebox.showinfo(DIALOG_TITLE, "Отчёт проверки пока не найден.")
             return
         self._open_path(
             report_path,
-            success_text=f"Открыт отчёт самопроверки: {report_path}",
-            error_title="Не удалось открыть отчёт самопроверки",
+            success_text=f"Открыт отчёт проверки: {report_path}",
+            error_title="Не удалось открыть отчёт проверки",
         )
 
     def _open_latest_selfcheck_log(self) -> None:
@@ -4074,18 +4075,18 @@ class DesktopInputEditor:
                 pass
         log_path = self.active_selfcheck_log_path
         if log_path is None:
-            messagebox.showinfo(DIALOG_TITLE, "Журнал последней самопроверки пока не найден.")
+            messagebox.showinfo(DIALOG_TITLE, "Журнал последней проверки пока не найден.")
             return
         if not log_path.exists():
             messagebox.showinfo(
                 DIALOG_TITLE,
-                f"Файл журнала последней самопроверки не найден:\n{log_path}",
+                f"Файл журнала последней проверки не найден:\n{log_path}",
             )
             return
         self._open_path(
             log_path,
-            success_text=f"Открыт журнал самопроверки: {log_path}",
-            error_title="Не удалось открыть журнал самопроверки",
+            success_text=f"Открыт журнал проверки: {log_path}",
+            error_title="Не удалось открыть журнал проверки",
         )
 
     def _open_latest_preview_log(self) -> None:
@@ -4157,12 +4158,12 @@ class DesktopInputEditor:
                 pass
         log_path = self.active_run_log_path
         if log_path is None:
-            messagebox.showinfo(DIALOG_TITLE, "Лог последнего запуска пока не найден.")
+            messagebox.showinfo(DIALOG_TITLE, "Журнал последнего расчёта пока не найден.")
             return
         if not log_path.exists():
             messagebox.showinfo(
                 DIALOG_TITLE,
-                f"Файл лога последнего запуска не найден:\n{log_path}",
+                f"Файл журнала последнего расчёта не найден:\n{log_path}",
             )
             return
         self._open_path(
@@ -4205,12 +4206,12 @@ class DesktopInputEditor:
                 pass
         target = self._latest_saved_file_path(key)
         if target is None:
-            messagebox.showinfo(DIALOG_TITLE, f"{label} последнего запуска пока не найден.")
+            messagebox.showinfo(DIALOG_TITLE, f"{label} последнего расчёта пока не найден.")
             return
         if not target.exists():
             messagebox.showinfo(
                 DIALOG_TITLE,
-                f"Файл {label} последнего запуска не найден:\n{target}",
+                f"Файл {label} последнего расчёта не найден:\n{target}",
             )
             return
         self._open_path(
@@ -4223,15 +4224,39 @@ class DesktopInputEditor:
         self._open_latest_saved_file("df_main", label="основная таблица результатов")
 
     def _open_latest_npz_bundle(self) -> None:
-        self._open_latest_saved_file("npz_bundle", label="файл анимации")
+        if self.active_run_summary_path is not None and self.active_run_summary_path.exists():
+            try:
+                summary = load_desktop_run_summary(self.active_run_summary_path)
+                self.active_run_cache_dir = self._latest_run_cache_dir_from_summary(summary)
+                self.active_run_saved_files = self._latest_run_saved_files_from_summary(summary)
+            except Exception:
+                pass
+        target = self._latest_saved_file_path("npz_bundle")
+        if target is None:
+            messagebox.showinfo(DIALOG_TITLE, "Файл анимации последнего расчёта пока не найден.")
+            return
+        if not target.exists():
+            messagebox.showinfo(
+                DIALOG_TITLE,
+                f"Файл анимации последнего расчёта не найден:\n{target}",
+            )
+            return
+        try:
+            spawn_module(
+                "pneumo_solver_ui.desktop_animator.app",
+                args=("--npz", str(target), "--no-follow"),
+            )
+            self._set_status(f"Файл анимации загружен в аниматор: {target.name}")
+        except Exception as exc:
+            messagebox.showerror(DIALOG_TITLE, f"Не удалось загрузить файл анимации в аниматор:\n{exc}")
 
     def _open_desktop_runs_dir(self) -> None:
         root = desktop_runs_dir_path()
         root.mkdir(parents=True, exist_ok=True)
         self._open_path(
             root,
-            success_text=f"Открыта папка запусков: {root}",
-            error_title="Не удалось открыть папку запусков",
+            success_text=f"Открыта папка результатов: {root}",
+            error_title="Не удалось открыть папку результатов",
         )
 
     def _autosave_snapshot_before_run(self, run_label: str) -> None:
@@ -4933,7 +4958,7 @@ class DesktopInputEditor:
         try:
             report = json.loads(report_path.read_text(encoding="utf-8"))
             if not isinstance(report, dict):
-                raise ValueError("сводка самопроверки должна быть структурированным отчётом")
+                raise ValueError("сводка проверки должна быть структурированным отчётом")
             report["ui_subject_signature"] = self._current_selfcheck_subject_signature()
             if log_file_path is not None:
                 report["ui_subprocess_log"] = str(log_file_path.resolve())
@@ -4956,7 +4981,7 @@ class DesktopInputEditor:
                 self._append_run_log(f"  предупреждение: {msg}")
         except Exception as exc:
             self.active_selfcheck_log_path = None
-            self._append_run_log(f"[warn] Не удалось разобрать сводку самопроверки: {exc}")
+            self._append_run_log(f"[warn] Не удалось разобрать сводку проверки: {exc}")
         self._refresh_latest_selfcheck_summary()
 
     def _preview_log_path_from_report(self, report: dict[str, object] | None) -> Path | None:
@@ -4985,7 +5010,7 @@ class DesktopInputEditor:
             self.latest_selfcheck_summary_var.set(
                 "\n".join(
                     (
-                        "Автоматическая самопроверка ещё не запускалась.",
+                        "Автоматическая проверка ещё не запускалась.",
                         f"Ожидаемый отчёт: {report_path}",
                     )
                 )
@@ -4995,14 +5020,14 @@ class DesktopInputEditor:
         try:
             report = json.loads(report_path.read_text(encoding="utf-8"))
             if not isinstance(report, dict):
-                raise ValueError("сводка самопроверки должна быть структурированным отчётом")
+                raise ValueError("сводка проверки должна быть структурированным отчётом")
         except Exception as exc:
             self.active_selfcheck_log_path = None
             self.latest_selfcheck_summary_var.set(
                 "\n".join(
                     (
-                        "Последняя автопроверка найдена, но отчёт не читается.",
-                        f"Не удалось прочитать сводку самопроверки: {exc}",
+                        "Последняя проверка найдена, но отчёт не читается.",
+                        f"Не удалось прочитать сводку проверки: {exc}",
                         f"Путь к отчёту: {report_path}",
                     )
                 )
@@ -5162,7 +5187,7 @@ class DesktopInputEditor:
             mech_msg = str(report.get("mech_selfcheck_msg") or "").strip()
             if mech_ok is not None:
                 self._append_run_log(
-                    f"[summary] Самопроверка механики: {'в норме' if bool(mech_ok) else 'требует внимания'}"
+                    f"[summary] Проверка механики: {'в норме' if bool(mech_ok) else 'требует внимания'}"
                 )
             if mech_msg:
                 self._append_run_log(f"[summary] Сообщение: {mech_msg}")
@@ -5217,22 +5242,22 @@ class DesktopInputEditor:
         report_path = self._runtime_selfcheck_report_path()
         report = self._load_selfcheck_report(report_path)
         if report is None:
-            issue_text = "последняя сохранённая автопроверка не найдена"
+            issue_text = "последняя сохранённая проверка не найдена"
             if runtime_policy == "force":
                 self._append_run_log(
-                    f"[автопроверка] {run_label}: {issue_text}, продолжаем без повторной проверки по режиму force."
+                    f"[проверка] {run_label}: {issue_text}, продолжаем без повторной проверки по режиму force."
                 )
                 return True
             if runtime_policy == "strict":
                 self._append_run_log(
-                    f"[автопроверка] {run_label}: {issue_text}, запуск остановлен по режиму strict."
+                    f"[проверка] {run_label}: {issue_text}, запуск остановлен по режиму strict."
                 )
                 self._set_status(f"Запуск остановлен: {run_label}")
                 messagebox.showwarning(
                     DIALOG_TITLE,
                     (
-                        f"Автопроверка перед «{run_label}» выключена.\n\n"
-                        "Последняя сохранённая автопроверка не найдена.\n\n"
+                        f"Проверка перед «{run_label}» выключена.\n\n"
+                        "Последняя сохранённая проверка не найдена.\n\n"
                         "Строгий режим блокирует запуск без актуальной проверки. "
                         "Сначала выполните «Проверить конфигурацию»."
                     ),
@@ -5241,17 +5266,17 @@ class DesktopInputEditor:
             if messagebox.askyesno(
                 DIALOG_TITLE,
                 (
-                    f"Автопроверка перед «{run_label}» выключена.\n\n"
-                    "Последняя сохранённая автопроверка не найдена.\n\n"
+                    f"Проверка перед «{run_label}» выключена.\n\n"
+                    "Последняя сохранённая проверка не найдена.\n\n"
                     "Продолжить запуск без повторной проверки?"
                 ),
             ):
                 self._append_run_log(
-                    f"[автопроверка] {run_label}: запуск подтверждён без сохранённой автопроверки."
+                    f"[проверка] {run_label}: запуск подтверждён без сохранённой проверки."
                 )
                 return True
             self._append_run_log(
-                f"[автопроверка] {run_label}: запуск отменён пользователем без сохранённой автопроверки."
+                f"[проверка] {run_label}: запуск отменён пользователем без сохранённой проверки."
             )
             self._set_status(f"Запуск отменён: {run_label}")
             return False
@@ -5259,24 +5284,24 @@ class DesktopInputEditor:
         has_signature, is_stale = self._selfcheck_freshness_state(report)
         if not has_signature or is_stale:
             issue_text = (
-                "последняя сохранённая автопроверка устарела для текущих настроек"
+                "последняя сохранённая проверка устарела для текущих настроек"
                 if is_stale
-                else "последняя сохранённая автопроверка не привязана к текущей конфигурации"
+                else "последняя сохранённая проверка не привязана к текущей конфигурации"
             )
             if runtime_policy == "force":
                 self._append_run_log(
-                    f"[автопроверка] {run_label}: {issue_text}, продолжаем без повторной проверки по режиму force."
+                    f"[проверка] {run_label}: {issue_text}, продолжаем без повторной проверки по режиму force."
                 )
                 return True
             if runtime_policy == "strict":
                 self._append_run_log(
-                    f"[автопроверка] {run_label}: {issue_text}, запуск остановлен по режиму strict."
+                    f"[проверка] {run_label}: {issue_text}, запуск остановлен по режиму strict."
                 )
                 self._set_status(f"Запуск остановлен: {run_label}")
                 messagebox.showwarning(
                     DIALOG_TITLE,
                     (
-                        f"Автопроверка перед «{run_label}» выключена.\n\n"
+                        f"Проверка перед «{run_label}» выключена.\n\n"
                         f"{issue_text.capitalize()}.\n\n"
                         "Строгий режим блокирует запуск без актуальной проверки. "
                         "Сначала выполните «Проверить конфигурацию»."
@@ -5286,17 +5311,17 @@ class DesktopInputEditor:
             if messagebox.askyesno(
                 DIALOG_TITLE,
                 (
-                    f"Автопроверка перед «{run_label}» выключена.\n\n"
+                    f"Проверка перед «{run_label}» выключена.\n\n"
                     f"{issue_text.capitalize()}.\n\n"
                     "Продолжить запуск без повторной проверки?"
                 ),
             ):
                 self._append_run_log(
-                    f"[автопроверка] {run_label}: запуск подтверждён несмотря на то, что {issue_text}."
+                    f"[проверка] {run_label}: запуск подтверждён несмотря на то, что {issue_text}."
                 )
                 return True
             self._append_run_log(
-                f"[автопроверка] {run_label}: запуск отменён пользователем, потому что {issue_text}."
+                f"[проверка] {run_label}: запуск отменён пользователем, потому что {issue_text}."
             )
             self._set_status(f"Запуск отменён: {run_label}")
             return False
@@ -5306,25 +5331,25 @@ class DesktopInputEditor:
         warnings = list(report.get("warnings") or [])
         if ok:
             self._append_run_log(
-                f"[автопроверка] {run_label}: используем актуальную сохранённую самопроверку; предупреждений={len(warnings)}."
+                f"[проверка] {run_label}: используем актуальную сохранённую проверку; предупреждений={len(warnings)}."
             )
             return True
 
         if runtime_policy == "force":
             self._append_run_log(
-                f"[автопроверка] {run_label}: актуальная сохранённая самопроверка содержит ошибки, продолжаем по режиму force."
+                f"[проверка] {run_label}: актуальная сохранённая проверка содержит ошибки, продолжаем по режиму force."
             )
             return True
         if runtime_policy == "strict":
             self._append_run_log(
-                f"[автопроверка] {run_label}: актуальная сохранённая самопроверка содержит ошибки, запуск остановлен по режиму strict."
+                f"[проверка] {run_label}: актуальная сохранённая проверка содержит ошибки, запуск остановлен по режиму strict."
             )
             self._set_status(f"Запуск остановлен: {run_label}")
             preview_errors = "\n".join(f"- {msg}" for msg in errors[:4]) or "- Без деталей"
             messagebox.showwarning(
                 DIALOG_TITLE,
                 (
-                    f"Автопроверка перед «{run_label}» выключена, но есть актуальная самопроверка с ошибками.\n\n"
+                    f"Проверка перед «{run_label}» выключена, но есть актуальная проверка с ошибками.\n\n"
                     + preview_errors
                     + "\n\nСтрогий режим блокирует запуск, пока проблемы не будут исправлены."
                 ),
@@ -5335,18 +5360,18 @@ class DesktopInputEditor:
         if messagebox.askyesno(
             DIALOG_TITLE,
             (
-                f"Автопроверка перед «{run_label}» выключена, "
-                "но актуальная сохранённая самопроверка нашла проблемы:\n\n"
+                f"Проверка перед «{run_label}» выключена, "
+                "но актуальная сохранённая проверка нашла проблемы:\n\n"
                 f"{preview_errors}\n\n"
                 "Продолжить запуск без повторной проверки?"
             ),
         ):
             self._append_run_log(
-                f"[автопроверка] {run_label}: запуск подтверждён несмотря на ошибки в актуальной сохранённой самопроверке."
+                f"[проверка] {run_label}: запуск подтверждён несмотря на ошибки в актуальной сохранённой проверке."
             )
             return True
         self._append_run_log(
-            f"[автопроверка] {run_label}: запуск отменён пользователем после чтения актуальной сохранённой самопроверки."
+            f"[проверка] {run_label}: запуск отменён пользователем после чтения актуальной сохранённой проверки."
         )
         self._set_status(f"Запуск отменён: {run_label}")
         return False
@@ -5356,15 +5381,15 @@ class DesktopInputEditor:
         report = self._load_selfcheck_report(report_path)
         if report is None:
             if runtime_policy == "force":
-                self._append_run_log(f"[автопроверка] {run_label}: отчёт недоступен, продолжаем по режиму force.")
+                self._append_run_log(f"[проверка] {run_label}: отчёт недоступен, продолжаем по режиму force.")
                 return True
             if runtime_policy == "strict":
-                self._append_run_log(f"[автопроверка] {run_label}: отчёт недоступен, запуск остановлен по режиму strict.")
+                self._append_run_log(f"[проверка] {run_label}: отчёт недоступен, запуск остановлен по режиму strict.")
                 self._set_status(f"Запуск остановлен: {run_label}")
                 return False
             return messagebox.askyesno(
                 DIALOG_TITLE,
-                f"Отчёт автопроверки для «{run_label}» не найден.\n\nПродолжить запуск?",
+                f"Отчёт проверки для «{run_label}» не найден.\n\nПродолжить запуск?",
             )
 
         ok = bool(report.get("ok", False))
@@ -5372,18 +5397,18 @@ class DesktopInputEditor:
         warnings = list(report.get("warnings") or [])
         if ok:
             self._append_run_log(
-                f"[автопроверка] {run_label}: отчёт в норме; предупреждений={len(warnings)}."
+                f"[проверка] {run_label}: отчёт в норме; предупреждений={len(warnings)}."
             )
             return True
 
         if runtime_policy == "force":
             self._append_run_log(
-                f"[автопроверка] {run_label}: продолжаем несмотря на ошибки по режиму force."
+                f"[проверка] {run_label}: продолжаем несмотря на ошибки по режиму force."
             )
             return True
         if runtime_policy == "strict":
             self._append_run_log(
-                f"[автопроверка] {run_label}: запуск остановлен по режиму strict; ошибок={len(errors)}."
+                f"[проверка] {run_label}: запуск остановлен по режиму strict; ошибок={len(errors)}."
             )
             self._set_status(f"Запуск остановлен: {run_label}")
             return False
@@ -5392,7 +5417,7 @@ class DesktopInputEditor:
         return messagebox.askyesno(
             DIALOG_TITLE,
             (
-                f"Автопроверка перед «{run_label}» нашла проблемы:\n\n"
+                f"Проверка перед «{run_label}» нашла проблемы:\n\n"
                 f"{preview_errors}\n\n"
                 "Продолжить запуск?"
             ),
@@ -5416,10 +5441,10 @@ class DesktopInputEditor:
             if self._auto_check_allows_launch(report_path, run_label):
                 launch_callback(log_file_path)
             else:
-                self._append_run_log(f"[автопроверка] {run_label}: запуск отменён после автопроверки.")
+                self._append_run_log(f"[проверка] {run_label}: запуск отменён после проверки.")
 
         self._run_config_check(
-            title=f"Автопроверка перед «{run_label}»",
+            title=f"Проверка перед «{run_label}»",
             on_success=_after_check,
             log_file_path=log_file_path,
         )

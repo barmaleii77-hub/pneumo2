@@ -1,0 +1,6 @@
+--- a/docs/context/gui_spec_imports/README.md
++++ b/docs/context/gui_spec_imports/README.md
+@@
++- `v38_github_kb_commit_ready/` — import-ready successor knowledge-base commit-ready layer для CODEX/TZ/spec пакета.
++- Слой читается после `foundations/*`, но не выше `17/18`.
++- Слой не объявляет runtime closure и не скрывает producer-side / perf / Windows acceptance gaps.

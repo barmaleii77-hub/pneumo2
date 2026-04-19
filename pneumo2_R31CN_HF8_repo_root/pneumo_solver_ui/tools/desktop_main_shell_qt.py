@@ -14,7 +14,7 @@ from pneumo_solver_ui.desktop_shell.registry import build_desktop_shell_specs
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="desktop_main_shell_qt",
-        description="Главное Windows-окно для управления GUI-окнами PneumoApp.",
+        description="Главное Windows-окно для управления рабочими окнами PneumoApp.",
     )
     parser.add_argument(
         "--open",
@@ -22,12 +22,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         metavar="KEY",
-        help="Открыть GUI-окно по ключу реестра при запуске. Можно указать несколько раз.",
+        help="Открыть рабочее окно по ключу реестра при запуске. Можно указать несколько раз.",
     )
     parser.add_argument(
         "--list-tools",
         action="store_true",
-        help="Вывести доступные ключи GUI-окон и завершить работу.",
+        help="Вывести доступные ключи рабочих окон и завершить работу.",
     )
     parser.add_argument(
         "--legacy-tk-shell",
@@ -71,7 +71,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def format_tool_catalog() -> str:
-    lines = ["GUI-окна рабочего места:"]
+    lines = ["Рабочие окна приложения:"]
     for spec in build_desktop_shell_specs():
         lines.append(
             "\t".join(
@@ -95,7 +95,7 @@ def resolve_startup_tool_keys(keys: Sequence[str]) -> tuple[str, ...]:
         valid_keys = ", ".join(sorted(allowed_keys))
         invalid_keys = ", ".join(invalid)
         raise SystemExit(
-            f"Неизвестный ключ GUI-окна: {invalid_keys}. "
+            f"Неизвестный ключ рабочего окна: {invalid_keys}. "
             f"Доступные ключи: {valid_keys}"
         )
     return normalized

@@ -41,7 +41,7 @@ def _baseline_field_label(field: str) -> str:
         "active_baseline_hash": "Опорный прогон",
         "suite_snapshot_hash": "Снимок набора",
         "inputs_snapshot_hash": "Исходные данные",
-        "ring_source_hash": "Сценарий кольца",
+        "ring_source_hash": "Циклический сценарий",
         "policy_mode": "Режим",
     }
     return labels.get(str(field or "").strip(), str(field or "").strip())
@@ -93,7 +93,7 @@ def _baseline_reason_label(reason: str) -> str:
         "active_baseline_hash_mismatch": "не совпала контрольная сумма",
         "inputs_snapshot_hash_changed": "изменились исходные данные",
         "missing_active_baseline_contract": "активный опорный прогон не найден",
-        "ring_source_hash_changed": "изменился сценарий кольца",
+        "ring_source_hash_changed": "изменился циклический сценарий",
         "suite_snapshot_hash_changed": "изменился набор испытаний",
         "suite_snapshot_not_validated": "снимок набора не проверен",
         "unsupported_active_baseline_schema": "неподдерживаемый формат записи",
@@ -105,9 +105,9 @@ def _baseline_reason_label(reason: str) -> str:
 
 def _workspace_owner_text(raw: str) -> str:
     labels = {
-        "WS-PROJECT": "Обзор проекта",
+        "WS-PROJECT": "Панель проекта",
         "WS-INPUTS": "Исходные данные",
-        "WS-RING": "Сценарии и редактор кольца",
+        "WS-RING": "Редактор циклического сценария",
         "WS-SUITE": "Набор испытаний",
         "WS-BASELINE": "Базовый прогон",
         "WS-OPTIMIZATION": "Оптимизация",
@@ -163,6 +163,19 @@ def _operator_catalog_text(raw: str) -> str:
         ("KPI", "показателями"),
         ("Compare и validation", "Окно сравнения и проверка"),
         ("validation", "проверка"),
+        ("bundle_ready=False", "архив не готов"),
+        ("bundle_ready=True", "архив готов"),
+        ("bundle_ready", "архив готов"),
+        ("legacy workspace surface", "отдельное рабочее окно"),
+        ("Legacy workspace surface", "Отдельное рабочее окно"),
+        ("workspace", "рабочее окно"),
+        ("Workspace", "Рабочее окно"),
+        ("surface", "окно"),
+        ("Surface", "Окно"),
+        ("bundle", "архив диагностики"),
+        ("Bundle", "Архив диагностики"),
+        ("legacy", "отдельное"),
+        ("Legacy", "Отдельное"),
         ("run-ов", "запусков"),
         ("baseline", "опорный прогон"),
         ("contract", "контекст"),
@@ -483,7 +496,7 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
         )
 
     def _build_extra_controls(self, layout: QtWidgets.QVBoxLayout) -> None:
-        self.baseline_center_box = QtWidgets.QGroupBox("Центр опорного прогона: просмотр, принятие, восстановление")
+        self.baseline_center_box = QtWidgets.QGroupBox("Базовый прогон: просмотр, принятие, восстановление")
         center_layout = QtWidgets.QVBoxLayout(self.baseline_center_box)
         center_layout.setSpacing(8)
 
@@ -613,7 +626,7 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
                         f"Активный прогон - {active_hash[:16] or '—'}; выбранная запись - {selected_id or 'нет'}",
                         f"Набор испытаний - {str(active.get('suite_snapshot_hash') or selected.get('suite_snapshot_hash') or '')[:16] or '—'}",
                         f"Исходные данные - {str(active.get('inputs_snapshot_hash') or selected.get('inputs_snapshot_hash') or '')[:16] or '—'}",
-                        f"Сценарий кольца: {str(active.get('ring_source_hash') or selected.get('ring_source_hash') or '')[:16] or '—'}",
+                        f"Циклический сценарий: {str(active.get('ring_source_hash') or selected.get('ring_source_hash') or '')[:16] or '—'}",
                         f"Выбранный прогон: {selected_hash[:16] or '—'}",
                     )
                     if line
@@ -679,7 +692,7 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
             ("Опорный прогон", "active_baseline_hash"),
             ("Снимок набора", "suite_snapshot_hash"),
             ("Исходные данные", "inputs_snapshot_hash"),
-            ("Сценарий кольца", "ring_source_hash"),
+            ("Циклический сценарий", "ring_source_hash"),
             ("Режим", "policy_mode"),
         )
         blocker = QtCore.QSignalBlocker(self.baseline_mismatch_matrix)
@@ -750,7 +763,7 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
         warning = f"\n\nПредупреждение: расходятся поля: {mismatch_fields}" if mismatch_fields else ""
         answer = QtWidgets.QMessageBox.question(
             self,
-            "Центр опорного прогона",
+            "Базовый прогон",
             (
                 f"Подтвердить действие «{_baseline_action_label(action)}» для выбранной строки истории?\n\n"
                 f"Строка истории: {surface.get('selected_history_id') or 'нет'}\n"

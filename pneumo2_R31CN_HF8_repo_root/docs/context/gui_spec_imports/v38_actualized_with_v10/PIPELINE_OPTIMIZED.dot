@@ -1,0 +1,36 @@
+digraph PIPELINE_OPTIMIZED {
+rankdir=LR;
+node [shape=box, fontsize=10];
+SHELL [label="WS-SHELL\nmenu/search/tree/inspector/status"];
+PROJ [label="WS-PROJECT\nproject dashboard"];
+INP [label="WS-INPUTS\nmaster input edit + visual twins"];
+RING [label="WS-RING\nsole scenario source"];
+SUITE [label="WS-SUITE\nvalidated suite snapshot"];
+BASE [label="WS-BASELINE\nactive baseline contract"];
+OPT [label="WS-OPTIMIZATION\nobjective contract + runs"];
+AN [label="WS-ANALYSIS\nselected run + compare contract"];
+AM [label="WS-ANIMATOR\ntruthful graphics consumer"];
+DI [label="WS-DIAGNOSTICS\nevidence manifest + SEND bundle"];
+ARC [label="Global archive\noptional heuristics only"];
+SHELL -> PROJ [label="start"];
+PROJ -> INP [label="next action"];
+INP -> RING [label="saved inputs snapshot"];
+RING -> SUITE [label="canonical export set + lineage"];
+SUITE -> BASE [label="validated_suite_snapshot.json"];
+BASE -> OPT [label="active_baseline_contract.json"];
+ARC -> OPT [label="optional warm-start"];
+OPT -> AN [label="selected_run_contract.json"];
+AN -> AM [label="analysis_context + artifacts"];
+AN -> DI [label="evidence manifest"];
+AM -> DI [label="capture provenance"];
+SHELL -> DI [label="always-visible collect diagnostics"];
+SHELL -> PROJ [label="tree/search/selection sync"];
+SHELL -> INP [label="tree/search/selection sync"];
+SHELL -> RING [label="tree/search/selection sync"];
+SHELL -> SUITE [label="tree/search/selection sync"];
+SHELL -> BASE [label="tree/search/selection sync"];
+SHELL -> OPT [label="tree/search/selection sync"];
+SHELL -> AN [label="tree/search/selection sync"];
+SHELL -> AM [label="tree/search/selection sync"];
+SHELL -> DI [label="tree/search/selection sync"];
+}

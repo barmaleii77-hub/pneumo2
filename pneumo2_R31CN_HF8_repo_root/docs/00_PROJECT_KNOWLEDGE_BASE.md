@@ -63,43 +63,53 @@ Operational note:
 4. [README.md](../README.md)
 5. [docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md](./17_WINDOWS_DESKTOP_CAD_GUI_CANON.md)
 6. [docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](./18_PNEUMOAPP_WINDOWS_GUI_SPEC.md)
-7. [docs/context/gui_spec_imports/v38_github_kb_commit_ready/README.md](./context/gui_spec_imports/v38_github_kb_commit_ready/README.md)
-8. [docs/context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md](./context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md)
-9. [docs/context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml](./context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml)
-10. [docs/context/release_readiness/V38_KB_IMPORT_AUDIT_2026-04-18.md](./context/release_readiness/V38_KB_IMPORT_AUDIT_2026-04-18.md)
-11. [docs/context/release_readiness/GUI_TEXT_SEMANTIC_AUDIT_2026-04-19.md](./context/release_readiness/GUI_TEXT_SEMANTIC_AUDIT_2026-04-19.md)
-12. [docs/context/gui_spec_imports/v37_github_kb_supplement/README.md](./context/gui_spec_imports/v37_github_kb_supplement/README.md)
-13. [docs/context/gui_spec_imports/v33_connector_reconciled/README.md](./context/gui_spec_imports/v33_connector_reconciled/README.md)
-14. [docs/context/gui_spec_imports/v33_connector_reconciled/COMPLETENESS_ASSESSMENT.md](./context/gui_spec_imports/v33_connector_reconciled/COMPLETENESS_ASSESSMENT.md)
-15. [docs/context/gui_spec_imports/v32_connector_reconciled/README.md](./context/gui_spec_imports/v32_connector_reconciled/README.md)
-16. [docs/context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md](./context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md)
-17. [docs/context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md](./context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md)
-18. [docs/context/gui_spec_imports/v32_connector_reconciled/WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md)
-19. [docs/context/gui_spec_imports/v32_connector_reconciled/PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md)
-20. [docs/context/gui_spec_imports/v32_connector_reconciled/COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md)
-21. [docs/context/gui_spec_imports/v32_connector_reconciled/GEOMETRY_REFERENCE_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/GEOMETRY_REFERENCE_EVIDENCE_NOTE.md)
-22. [docs/context/gui_spec_imports/v32_connector_reconciled/MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md)
-23. [docs/context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md)
-24. [docs/context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md](./context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md)
-25. [docs/context/gui_spec_imports/v32_connector_reconciled/ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md)
-26. [docs/context/gui_spec_imports/v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md)
-27. [docs/context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md](./context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md)
-28. [docs/context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md](./context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md)
-29. [docs/context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md](./context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
-30. [docs/context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md](./context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md)
-31. [docs/context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md](./context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md)
-32. [docs/context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md](./context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md)
-33. [docs/gui_chat_prompts/14_PLAN_MODE_PARALLEL_START_PROMPTS.md](./gui_chat_prompts/14_PLAN_MODE_PARALLEL_START_PROMPTS.md)
-34. [docs/context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md](./context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md)
-35. [docs/gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md)
-36. [docs/context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md](./context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md)
-37. [docs/context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md](./context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md)
-38. [docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
-39. [docs/gui_chat_prompts/17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md](./gui_chat_prompts/17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md)
-40. [docs/context/release_readiness/CHAT_WORKTREE_ACCEPTANCE_CLEANUP_2026-04-18.md](./context/release_readiness/CHAT_WORKTREE_ACCEPTANCE_CLEANUP_2026-04-18.md)
-41. [docs/gui_chat_prompts/18_POST_CHAT_WORKTREE_CLEANUP_V38_PLAN_MODE_PROMPTS.md](./gui_chat_prompts/18_POST_CHAT_WORKTREE_CLEANUP_V38_PLAN_MODE_PROMPTS.md)
-42. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
-43. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
+7. [docs/context/gui_spec_imports/v38_actualized_with_v10/README.md](./context/gui_spec_imports/v38_actualized_with_v10/README.md)
+8. [docs/context/gui_spec_imports/v38_actualized_with_v10/TECHNICAL_SPECIFICATION.md](./context/gui_spec_imports/v38_actualized_with_v10/TECHNICAL_SPECIFICATION.md)
+9. [docs/context/gui_spec_imports/v38_actualized_with_v10/GUI_SPEC.yaml](./context/gui_spec_imports/v38_actualized_with_v10/GUI_SPEC.yaml)
+10. [docs/context/gui_spec_imports/v38_actualized_with_v10/LAUNCHER_HIERARCHY_RECONCILIATION_V10.md](./context/gui_spec_imports/v38_actualized_with_v10/LAUNCHER_HIERARCHY_RECONCILIATION_V10.md)
+11. [docs/context/gui_spec_imports/v38_actualized_with_v10/V10_RECONCILIATION_MATRIX.csv](./context/gui_spec_imports/v38_actualized_with_v10/V10_RECONCILIATION_MATRIX.csv)
+12. [docs/context/gui_spec_imports/v38_actualized_with_v10/REQUIREMENTS_MATRIX.csv](./context/gui_spec_imports/v38_actualized_with_v10/REQUIREMENTS_MATRIX.csv)
+13. [docs/context/release_readiness/V38_ACTUALIZED_WITH_V10_KB_IMPORT_AUDIT_2026-04-19.md](./context/release_readiness/V38_ACTUALIZED_WITH_V10_KB_IMPORT_AUDIT_2026-04-19.md)
+14. [docs/context/gui_spec_imports/v38_github_kb_commit_ready/README.md](./context/gui_spec_imports/v38_github_kb_commit_ready/README.md)
+15. [docs/context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md](./context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md)
+16. [docs/context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml](./context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml)
+17. [docs/context/release_readiness/V38_KB_IMPORT_AUDIT_2026-04-18.md](./context/release_readiness/V38_KB_IMPORT_AUDIT_2026-04-18.md)
+18. [docs/context/release_readiness/GUI_TEXT_SEMANTIC_AUDIT_2026-04-19.md](./context/release_readiness/GUI_TEXT_SEMANTIC_AUDIT_2026-04-19.md)
+19. [docs/context/release_readiness/HUMAN_GUI_SIMULATION_AUDIT_V5_2026-04-19.md](./context/release_readiness/HUMAN_GUI_SIMULATION_AUDIT_V5_2026-04-19.md)
+20. [docs/context/release_readiness/HUMAN_GUI_REPORT_ONLY_V6_2026-04-19.md](./context/release_readiness/HUMAN_GUI_REPORT_ONLY_V6_2026-04-19.md)
+21. [docs/context/release_readiness/HUMAN_GUI_REPORT_ONLY_V10_LAUNCHER_HIERARCHY_2026-04-19.md](./context/release_readiness/HUMAN_GUI_REPORT_ONLY_V10_LAUNCHER_HIERARCHY_2026-04-19.md)
+22. [docs/context/gui_spec_imports/v37_github_kb_supplement/README.md](./context/gui_spec_imports/v37_github_kb_supplement/README.md)
+23. [docs/context/gui_spec_imports/v33_connector_reconciled/README.md](./context/gui_spec_imports/v33_connector_reconciled/README.md)
+24. [docs/context/gui_spec_imports/v33_connector_reconciled/COMPLETENESS_ASSESSMENT.md](./context/gui_spec_imports/v33_connector_reconciled/COMPLETENESS_ASSESSMENT.md)
+25. [docs/context/gui_spec_imports/v32_connector_reconciled/README.md](./context/gui_spec_imports/v32_connector_reconciled/README.md)
+26. [docs/context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md](./context/gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md)
+27. [docs/context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md](./context/gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md)
+28. [docs/context/gui_spec_imports/v32_connector_reconciled/WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/WS_INPUTS_HANDOFF_EVIDENCE_NOTE.md)
+29. [docs/context/gui_spec_imports/v32_connector_reconciled/PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/PRODUCER_ANIMATOR_TRUTH_EVIDENCE_NOTE.md)
+30. [docs/context/gui_spec_imports/v32_connector_reconciled/COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/COMPARE_OBJECTIVE_INTEGRITY_EVIDENCE_NOTE.md)
+31. [docs/context/gui_spec_imports/v32_connector_reconciled/GEOMETRY_REFERENCE_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/GEOMETRY_REFERENCE_EVIDENCE_NOTE.md)
+32. [docs/context/gui_spec_imports/v32_connector_reconciled/MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/MNEMO_TRUTH_GRAPHICS_EVIDENCE_NOTE.md)
+33. [docs/context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_RELEASE_EVIDENCE_NOTE.md)
+34. [docs/context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md](./context/gui_spec_imports/v32_connector_reconciled/DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md)
+35. [docs/context/gui_spec_imports/v32_connector_reconciled/ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/ENGINEERING_ANALYSIS_EVIDENCE_NOTE.md)
+36. [docs/context/gui_spec_imports/v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md](./context/gui_spec_imports/v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md)
+37. [docs/context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md](./context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md)
+38. [docs/context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md](./context/release_readiness/SELF_CHECK_WARNINGS_REVIEW_2026-04-17.md)
+39. [docs/context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md](./context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md)
+40. [docs/context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md](./context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md)
+41. [docs/context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md](./context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md)
+42. [docs/context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md](./context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md)
+43. [docs/gui_chat_prompts/14_PLAN_MODE_PARALLEL_START_PROMPTS.md](./gui_chat_prompts/14_PLAN_MODE_PARALLEL_START_PROMPTS.md)
+44. [docs/context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md](./context/release_readiness/CODE_TREE_AUDIT_2026-04-18.md)
+45. [docs/gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/15_CODE_AUDIT_PLAN_MODE_START_PROMPTS.md)
+46. [docs/context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md](./context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md)
+47. [docs/context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md](./context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md)
+48. [docs/gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md](./gui_chat_prompts/16_RECOVERY_PLAN_MODE_START_PROMPTS.md)
+49. [docs/gui_chat_prompts/17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md](./gui_chat_prompts/17_POST_ACCEPTANCE_V38_PLAN_MODE_PROMPTS.md)
+50. [docs/context/release_readiness/CHAT_WORKTREE_ACCEPTANCE_CLEANUP_2026-04-18.md](./context/release_readiness/CHAT_WORKTREE_ACCEPTANCE_CLEANUP_2026-04-18.md)
+51. [docs/gui_chat_prompts/18_POST_CHAT_WORKTREE_CLEANUP_V38_PLAN_MODE_PROMPTS.md](./gui_chat_prompts/18_POST_CHAT_WORKTREE_CLEANUP_V38_PLAN_MODE_PROMPTS.md)
+52. [docs/PROJECT_SOURCES.md](./PROJECT_SOURCES.md)
+53. [AI_INTEGRATION_PLAYBOOK.yaml](../AI_INTEGRATION_PLAYBOOK.yaml)
 
 ### 3. Активные требования и рабочий backlog
 
@@ -171,8 +181,12 @@ Operational note:
 
 - локальный канон в репозитории;
 - локальные digests и snapshots AI-контекста;
-- current imported V38 GUI/TZ/spec knowledge-base layer, with V37 retained as
-  predecessor provenance;
+- current imported V38 actualized with V10 GUI/TZ/spec knowledge-base layer,
+  with previous V38/V10 layers retained as provenance and evidence;
+- human GUI simulation/report-only audits V5/V6 as evidence-first and
+  route-hierarchy clarification layers for launcher hierarchy, first-class
+  `Редактор кольца`, diagnostics route, compare differentiation, truth-state
+  markers and under-proven window internals;
 - connector-reconciled GUI/TZ digest v33, with v32 retained as previous
   workstream/release-gate evidence layer;
 - внешние архивы и Google Drive как контекст и история;
@@ -237,6 +251,17 @@ Operational note:
 
 - [docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md](./17_WINDOWS_DESKTOP_CAD_GUI_CANON.md)
 - [docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md](./18_PNEUMOAPP_WINDOWS_GUI_SPEC.md)
+- [docs/context/gui_spec_imports/v38_actualized_with_v10/README.md](./context/gui_spec_imports/v38_actualized_with_v10/README.md)
+- [docs/context/gui_spec_imports/v38_actualized_with_v10/TECHNICAL_SPECIFICATION.md](./context/gui_spec_imports/v38_actualized_with_v10/TECHNICAL_SPECIFICATION.md)
+- [docs/context/gui_spec_imports/v38_actualized_with_v10/GUI_SPEC.yaml](./context/gui_spec_imports/v38_actualized_with_v10/GUI_SPEC.yaml)
+- [docs/context/gui_spec_imports/v38_actualized_with_v10/WORKSPACE_CONTRACT_MATRIX.csv](./context/gui_spec_imports/v38_actualized_with_v10/WORKSPACE_CONTRACT_MATRIX.csv)
+- [docs/context/gui_spec_imports/v38_actualized_with_v10/PARAMETER_CATALOG.csv](./context/gui_spec_imports/v38_actualized_with_v10/PARAMETER_CATALOG.csv)
+- [docs/context/gui_spec_imports/v38_actualized_with_v10/PARAMETER_VISIBILITY_MATRIX.csv](./context/gui_spec_imports/v38_actualized_with_v10/PARAMETER_VISIBILITY_MATRIX.csv)
+- [docs/context/gui_spec_imports/v38_actualized_with_v10/ACCEPTANCE_MATRIX.csv](./context/gui_spec_imports/v38_actualized_with_v10/ACCEPTANCE_MATRIX.csv)
+- [docs/context/gui_spec_imports/v38_actualized_with_v10/PIPELINE_OPTIMIZED.dot](./context/gui_spec_imports/v38_actualized_with_v10/PIPELINE_OPTIMIZED.dot)
+- [docs/context/gui_spec_imports/v38_actualized_with_v10/LAUNCHER_HIERARCHY_RECONCILIATION_V10.md](./context/gui_spec_imports/v38_actualized_with_v10/LAUNCHER_HIERARCHY_RECONCILIATION_V10.md)
+- [docs/context/gui_spec_imports/v38_actualized_with_v10/V10_RECONCILIATION_MATRIX.csv](./context/gui_spec_imports/v38_actualized_with_v10/V10_RECONCILIATION_MATRIX.csv)
+- [docs/context/release_readiness/V38_ACTUALIZED_WITH_V10_KB_IMPORT_AUDIT_2026-04-19.md](./context/release_readiness/V38_ACTUALIZED_WITH_V10_KB_IMPORT_AUDIT_2026-04-19.md)
 - [docs/context/gui_spec_imports/v38_github_kb_commit_ready/README.md](./context/gui_spec_imports/v38_github_kb_commit_ready/README.md)
 - [docs/context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md](./context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md)
 - [docs/context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml](./context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml)
@@ -303,23 +328,59 @@ Operational note:
 - обязательные графические input surfaces, source markers и время построения для расчётных previews и графиков;
 - refined Windows title-bar/system-menu/Snap Layout behavior, `UI Automation`, `WM_DPICHANGED`, idle CPU, hidden-pane budget и ETW-style instrumentation policy для desktop GUI.
 
-Что добавляет V38 commit-ready KB layer:
+Что добавляет V38 actualized with V10 KB layer:
 
-- current successor imported layer для GUI/TZ/spec и базы знаний после V37;
-- 33-файловый import-ready subtree `v38_github_kb_commit_ready`;
-- 45 requirements, 45 acceptance rows, 61 screens, 704 UI elements,
-  488 parameters, 12 windows и 12 workspaces;
-- V38 `PIPELINE_OPTIMIZED.dot` как текущая проверка user-flow без лишних
-  intermediate navigation steps;
-- локальный audit `V38_KB_IMPORT_AUDIT_2026-04-18.md`, который фиксирует
-  полный read coverage архива, статус import-ready subtree и снятие
-  неоднозначностей в package wrapper;
-- локальный semantic audit `GUI_TEXT_SEMANTIC_AUDIT_2026-04-19.md`, который
-  фиксирует проверку кнопок, надписей и user-facing vocabulary против V38 и
-  `PIPELINE_OPTIMIZED.dot`;
+- текущий активный imported layer для GUI/TZ/spec и базы знаний после
+  `v38_github_kb_commit_ready`;
+- 115-файловый self-contained package
+  `pneumo_codex_tz_spec_connector_reconciled_v38_actualized_with_v10`;
+- V10 findings встроены в V38 как требования `REQ-046` ... `REQ-050`,
+  acceptance/test rows и reconciliation matrix;
+- стартовый shell обязан показывать один доминирующий 8-шаговый маршрут:
+  `Исходные данные -> Редактор кольца / сценариев -> Набор испытаний ->
+  Базовый прогон -> Оптимизация -> Анализ результатов -> Анимация ->
+  Диагностика`;
+- `Редактор кольца` усиливается как доминирующий сценарный центр и
+  единственный editable source-of-truth сценариев;
+- отправка результатов не является отдельным стартовым путём, а живёт внутри
+  диагностики после готового пакета диагностики;
+- встроенное сравнение в анализе является основным compare-route, отдельное
+  окно сравнения остаётся расширенным режимом из анализа;
+- `Desktop Mnemo` и инструменты остаются доступными, но являются
+  secondary/advanced surfaces и не конкурируют с основным маршрутом первых
+  минут;
+- локальный audit
+  `V38_ACTUALIZED_WITH_V10_KB_IMPORT_AUDIT_2026-04-19.md` фиксирует read
+  coverage, приоритет и открытые ограничения;
 - explicit non-runtime boundary: producer-side truth, cylinder packaging,
   browser performance trace/viewport gating and Windows visual/runtime
   acceptance остаются открытыми до named evidence.
+
+Что остаётся от V38 commit-ready KB layer:
+
+- предыдущий `v38_github_kb_commit_ready` сохраняется как predecessor
+  provenance для сравнения требований, acceptance, pipeline и package
+  adoption;
+- 33-файловый import-ready subtree, `V38_KB_IMPORT_AUDIT_2026-04-18.md` и
+  `GUI_TEXT_SEMANTIC_AUDIT_2026-04-19.md` больше не являются самым свежим
+  GUI/TZ/spec слоем, но остаются полезными evidence и audit-документами.
+
+Что добавляет Human GUI report-only V6:
+
+- report-only слой без кода и без готовых исправлений; он уточняет маршрут
+  пользователя, но не заменяет V38 actualized with V10/V5;
+- главный риск: не нехватка кнопок, а слабая иерархия после запуска;
+- один видимый стартовый маршрут пользователя вместо россыпи равных входов;
+- `Редактор кольца` как верхнеуровневый первоклассный вход для сценариев;
+- одно доминирующее действие диагностики: `Собрать диагностику`;
+- убрать дублирование compare-маршрута с первого уровня интерфейса;
+- крупные состояния достоверности для графики, анимации, схемы и результатов;
+- стартовые кнопки должны объяснять, что откроется, когда это нужно и что
+  пользователь сможет сделать внутри;
+- расширенные инженерные и вычислительные настройки оптимизации должны быть
+  скрыты до явного запроса пользователя;
+- окна, отмеченные в V6 как `launchpoint_only`, нельзя считать визуально
+  принятыми без отдельной проверки внутренних экранов.
 
 Что остаётся за V37 predecessor layer:
 

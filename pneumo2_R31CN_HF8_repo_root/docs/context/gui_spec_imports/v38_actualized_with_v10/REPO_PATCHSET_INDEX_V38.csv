@@ -1,0 +1,6 @@
+patch_id,target_repo_path,purpose,status
+PATCH-001,docs/PROJECT_SOURCES.md,включить active successor layer v38_github_kb_commit_ready в read order,ready
+PATCH-002,docs/context/gui_spec_imports/README.md,зафиксировать новый imported layer v38_github_kb_commit_ready,ready
+PATCH-003,docs/context/GUI_SPEC_ARCHIVE_LINEAGE.md,добавить lineage note для V38,ready
+PATCH-004,repo pull request body,готовый текст PR для maintainers,ready
+PATCH-005,post-merge validation,чеклист проверки после merge,ready

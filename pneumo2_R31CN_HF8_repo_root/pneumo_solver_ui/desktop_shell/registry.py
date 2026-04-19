@@ -21,6 +21,9 @@ from .adapters.desktop_results_center_adapter import (
     build_spec as build_desktop_results_center_spec,
 )
 from .adapters.desktop_ring_editor_adapter import build_spec as build_desktop_ring_editor_spec
+from .adapters.desktop_run_setup_center_adapter import (
+    build_spec as build_desktop_run_setup_center_spec,
+)
 from .adapters.test_center_adapter import build_spec as build_test_center_spec
 from .contracts import DesktopShellToolSpec
 
@@ -31,6 +34,7 @@ def build_desktop_shell_specs() -> tuple[DesktopShellToolSpec, ...]:
         build_desktop_geometry_reference_spec(),
         build_desktop_ring_editor_spec(),
         build_test_center_spec(),
+        build_desktop_run_setup_center_spec(),
         build_desktop_optimizer_center_spec(),
         build_desktop_results_center_spec(),
         build_desktop_engineering_analysis_center_spec(),

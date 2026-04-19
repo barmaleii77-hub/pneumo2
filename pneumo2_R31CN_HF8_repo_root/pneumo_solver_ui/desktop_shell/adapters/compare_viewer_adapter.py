@@ -12,7 +12,10 @@ def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="compare_viewer",
         title="Сравнение прогонов",
-        description="Внешнее окно сравнения прогонов, трасс и характерных отличий между вариантами.",
+        description=(
+            "Отдельное окно для подробного сравнения нескольких прогонов. "
+            "Для быстрой проверки текущего результата используйте сводку в анализе результатов."
+        ),
         group="Внешние окна",
         mode="external",
         workflow_stage="analysis",
@@ -21,7 +24,10 @@ def build_spec() -> DesktopShellToolSpec:
         launch_contexts=("results", "analysis"),
         menu_section="Анализ",
         nav_section="Анализ",
-        details="Сравнение результатов расчёта по нескольким прогонам и вариантам настройки.",
+        details=(
+            "Подробное сравнение результатов расчёта по нескольким прогонам и вариантам настройки; "
+            "не заменяет встроенную сводку результатов расчёта."
+        ),
         menu_order=60,
         nav_order=60,
         standalone_module="pneumo_solver_ui.qt_compare_viewer",

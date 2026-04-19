@@ -112,7 +112,7 @@ class ShellWorkspaceContextMenuController:
         has_active_hosted_session = bool(current_key and current_key != HOME_WORKSPACE_KEY)
         has_recently_closed = self.has_recently_closed_sessions()
 
-        current_label = "Обзор"
+        current_label = "Панель проекта"
         if current_key and current_key != HOME_WORKSPACE_KEY:
             current_label = next(
                 (session.spec.title for session in open_sessions if session.key == current_key),
@@ -141,14 +141,14 @@ class ShellWorkspaceContextMenuController:
             state="normal" if has_workflow_sessions else "disabled",
         )
         self.menu.add_separator()
-        self.menu.add_command(label="Перейти к обзору", command=self.select_home)
+        self.menu.add_command(label="Перейти к панели проекта", command=self.select_home)
         self.menu.add_command(
-            label="Следующее окно\tCtrl+Tab",
+            label="Следующая вкладка\tCtrl+Tab",
             command=self.select_next_hosted,
             state="normal" if has_sessions else "disabled",
         )
         self.menu.add_command(
-            label="Предыдущее окно\tCtrl+Shift+Tab",
+            label="Предыдущая вкладка\tCtrl+Shift+Tab",
             command=self.select_previous_hosted,
             state="normal" if has_sessions else "disabled",
         )
@@ -261,7 +261,7 @@ def build_shell_menubar(
     selected_window_var = tk.StringVar(master=root, value=HOME_WORKSPACE_KEY)
 
     file_menu = Menu(menubar, tearoff=False)
-    file_menu.add_command(label="Обзор", command=select_home)
+    file_menu.add_command(label="Панель проекта", command=select_home)
     file_menu.add_separator()
     file_menu.add_command(label="Выход", command=quit_app)
     menubar.add_cascade(label="Файл", menu=file_menu)
@@ -300,7 +300,7 @@ def build_shell_menubar(
     def _current_workspace_title(open_sessions: tuple[HostedToolSession, ...]) -> str:
         current_key = selected_workspace_key()
         if current_key == HOME_WORKSPACE_KEY or not current_key:
-            return "Обзор"
+            return "Панель проекта"
         for session in open_sessions:
             if session.key == current_key:
                 return session.spec.title
@@ -350,7 +350,7 @@ def build_shell_menubar(
         )
         window_menu.add_separator()
         window_menu.add_radiobutton(
-            label="Обзор",
+            label="Панель проекта",
             value=HOME_WORKSPACE_KEY,
             variable=selected_window_var,
             command=select_home,

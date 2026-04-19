@@ -15,7 +15,7 @@ def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="desktop_optimizer_center",
         title="Оптимизация",
-        description="Автоматизированная стадийная оптимизация по кольцевым сценариям с возможностью раскрыть и настроить весь маршрут вручную.",
+        description="Автоматизированная стадийная оптимизация по кольцевым сценариям с возможностью раскрыть и настроить весь порядок работы вручную.",
         group="Встроенные окна",
         mode="hosted",
         workflow_stage="optimization",

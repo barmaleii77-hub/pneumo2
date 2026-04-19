@@ -88,7 +88,7 @@ def test_desktop_input_graphic_panel_uses_project_scheme_with_named_geometry_dim
     panel.refresh(section_title="Геометрия", payload=payload, field_label="Колёсная база", unit_label="м")
     joined = " ".join(_canvas_texts(panel))
     assert "Схема подвески проекта" in joined
-    assert "Контекст:" in joined
+    assert "Показано:" in joined
     assert "База" in joined
     assert "Колея" in joined
     assert "м" in joined
@@ -150,7 +150,7 @@ def test_desktop_input_graphic_panel_shows_static_trim_metrics_and_context() -> 
         field_key="zero_pose_target_stroke_frac",
     )
     joined = " ".join(_canvas_texts(panel))
-    assert "Контекст: Целевое положение по ходу" in joined
+    assert "Показано: Целевое положение по ходу" in joined
     assert "Цель по ходу" in joined
     assert "ЦМ X" in joined
     assert "ЦМ Y" in joined
@@ -180,9 +180,9 @@ def test_desktop_input_graphic_panel_shows_v38_source_marker_and_calculation_set
     assert "state:" not in marker
 
     joined = " ".join(_canvas_texts(panel))
-    assert "Контекст: Интегрирование" in joined
+    assert "Показано: Интегрирование" in joined
     assert "Шаг интегрирования" in joined
-    assert "Автопроверка" in joined
+    assert "Проверка" in joined
     assert "Autoverif" not in joined
 
 

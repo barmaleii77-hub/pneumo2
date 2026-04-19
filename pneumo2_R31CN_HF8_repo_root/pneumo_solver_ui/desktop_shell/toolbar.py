@@ -140,10 +140,10 @@ def build_shell_toolbar(
     frame = ttk.Frame(parent, padding=(10, 8, 10, 6))
     workflow_specs = ordered_workflow_specs(hosted_specs)
 
-    ttk.Button(frame, text="Главная", command=select_home).pack(side="left")
+    ttk.Button(frame, text="Панель проекта", command=select_home).pack(side="left")
     continue_workflow_button = ttk.Button(
         frame,
-        text="Следующее окно",
+        text="Продолжить работу",
         command=continue_workflow,
     )
     continue_workflow_button.pack(side="left", padx=(6, 0))
@@ -192,7 +192,7 @@ def build_shell_toolbar(
         if key:
             open_tool(key)
 
-    ttk.Button(frame, text="Открыть окно", command=_open_selected).pack(side="left")
+    picker.bind("<<ComboboxSelected>>", lambda _event: _open_selected())
     ttk.Separator(frame, orient="vertical").pack(side="left", fill="y", padx=12)
     ttk.Label(frame, text="Окна:").pack(side="left")
 

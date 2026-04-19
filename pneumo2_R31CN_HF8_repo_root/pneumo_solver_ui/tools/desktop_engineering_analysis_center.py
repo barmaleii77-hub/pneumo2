@@ -22,12 +22,12 @@ from pneumo_solver_ui.release_info import get_release
 
 
 ANALYSIS_COMMAND_OPEN_TARGETS: tuple[tuple[str, str], ...] = (
-    ("selected_contract", "Открыть выбранный прогон"),
-    ("run_dir", "Открыть папку прогона"),
-    ("selected_artifact", "Открыть выбранный файл"),
-    ("evidence_manifest", "Открыть материалы диагностики"),
-    ("analysis_context", "Открыть данные для анимации"),
-    ("animator_link", "Открыть связь анализа с аниматором"),
+    ("selected_contract", "Показать выбранный прогон"),
+    ("run_dir", "Показать папку прогона"),
+    ("selected_artifact", "Показать выбранный файл"),
+    ("evidence_manifest", "Показать материалы диагностики"),
+    ("analysis_context", "Проверить подготовку анимации"),
+    ("animator_link", "Проверить связь с аниматором"),
 )
 
 
@@ -180,7 +180,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         self.contract_var = tk.StringVar(master=self, value="Выбранный прогон: не загружен.")
         self.selected_run_var = tk.StringVar(master=self, value="Прогон: не выбран.")
         self.evidence_var = tk.StringVar(master=self, value="Материалы диагностики: не подготовлены.")
-        self.status_var = tk.StringVar(master=self, value="Центр инженерного анализа готов.")
+        self.status_var = tk.StringVar(master=self, value="Инженерный анализ готов.")
         self.candidate_ready_only_var = tk.BooleanVar(master=self, value=False)
         self.candidate_filter_summary_var = tk.StringVar(master=self, value="Кандидаты для анализа: не загружены.")
         self.command_var = tk.StringVar(master=self, value=ANALYSIS_COMMAND_OPEN_TARGETS[0][1])
@@ -203,9 +203,9 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
 
         actions = ttk.Frame(header)
         actions.pack(side="right", anchor="ne")
-        self.btn_refresh = ttk.Button(actions, text="Обновить", command=self.refresh)
+        self.btn_refresh = ttk.Button(actions, text="Обновить данные", command=self.refresh)
         self.btn_refresh.pack(side="left")
-        self.btn_open_selected = ttk.Button(actions, text="Открыть файл", command=self._open_selected)
+        self.btn_open_selected = ttk.Button(actions, text="Показать выбранный файл", command=self._open_selected)
         self.btn_open_selected.pack(side="left", padx=(8, 0))
         self.btn_export_ho007 = ttk.Button(actions, text="Зафиксировать прогон", command=self._export_selected_run_contract_bridge)
         self.btn_export_ho007.pack(side="left", padx=(8, 0))
@@ -213,7 +213,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         self.btn_export_evidence.pack(side="left", padx=(8, 0))
         self.btn_open_evidence_manifest = ttk.Button(
             actions,
-            text="Открыть диагностику",
+            text="Показать диагностику",
             command=self._open_evidence_manifest,
         )
         self.btn_open_evidence_manifest.pack(side="left", padx=(8, 0))
@@ -241,7 +241,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         command_bar = ttk.Frame(artifact_box)
         command_bar.grid(row=0, column=0, sticky="ew", pady=(0, 6))
         command_bar.columnconfigure(1, weight=1)
-        ttk.Label(command_bar, text="Быстро открыть").grid(row=0, column=0, sticky="w")
+        ttk.Label(command_bar, text="Что показать").grid(row=0, column=0, sticky="w")
         self.command_combo = ttk.Combobox(
             command_bar,
             textvariable=self.command_var,
@@ -252,7 +252,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         self.command_combo.grid(row=0, column=1, sticky="ew", padx=(8, 8))
         self.btn_open_command = ttk.Button(
             command_bar,
-            text="Открыть",
+            text="Показать выбранное",
             command=self._run_command_surface_action,
         )
         self.btn_open_command.grid(row=0, column=2, sticky="e")
@@ -400,7 +400,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         evidence_path = snapshot.diagnostics_evidence_manifest_path
         self.evidence_var.set(
             f"Материалы диагностики: {_status_text(snapshot.diagnostics_evidence_manifest_status)} | "
-            f"код: {snapshot.diagnostics_evidence_manifest_hash[:12] or '-'} | "
+            f"метка: {snapshot.diagnostics_evidence_manifest_hash[:12] or '-'} | "
             f"файл: {'найден' if evidence_path and evidence_path.exists() else 'не подготовлен'}"
         )
 
@@ -599,7 +599,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
             iid = self.artifact_tree.insert(
                 tables_iid,
                 "end",
-                text=_operator_title_text(table.get("title") or table.get("key") or "CSV-таблица"),
+                text=_operator_title_text(table.get("title") or table.get("key") or "Таблица данных"),
                 values=(
                     _status_text(str(table.get("status") or "MISSING")),
                     _category_text("analysis_table_preview"),
@@ -975,9 +975,9 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
             return
         try:
             _open_path(path)
-            self.status_var.set(f"Открыто: {path}")
+            self.status_var.set(f"Показано: {path}")
         except Exception as exc:
-            messagebox.showerror("Инженерный анализ", f"Не удалось открыть:\n{path}\n\n{exc!s}")
+            messagebox.showerror("Инженерный анализ", f"Не удалось показать:\n{path}\n\n{exc!s}")
 
     def _command_key_from_label(self, label: str) -> str:
         for key, item_label in ANALYSIS_COMMAND_OPEN_TARGETS:
@@ -1017,9 +1017,9 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
             return
         try:
             _open_path(path)
-            self.status_var.set(f"Открыто: {path}")
+            self.status_var.set(f"Показано: {path}")
         except Exception as exc:
-            messagebox.showerror("Инженерный анализ", f"Не удалось открыть:\n{path}\n\n{exc!s}")
+            messagebox.showerror("Инженерный анализ", f"Не удалось показать:\n{path}\n\n{exc!s}")
 
     def _open_evidence_manifest(self) -> None:
         snapshot = self.snapshot_state or self.runtime.snapshot()
@@ -1037,9 +1037,9 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
             return
         try:
             _open_path(path)
-            self.status_var.set(f"Материалы диагностики открыты: {path}")
+            self.status_var.set(f"Материалы диагностики показаны: {path}")
         except Exception as exc:
-            messagebox.showerror("Инженерный анализ", f"Не удалось открыть материалы диагностики:\n{path}\n\n{exc!s}")
+            messagebox.showerror("Инженерный анализ", f"Не удалось показать материалы диагностики:\n{path}\n\n{exc!s}")
 
     def _on_artifact_select(self, _event: tk.Event | None = None) -> None:
         selected = self.artifact_tree.selection()

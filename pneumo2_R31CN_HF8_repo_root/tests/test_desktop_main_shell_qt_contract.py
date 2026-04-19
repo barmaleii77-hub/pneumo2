@@ -14,6 +14,7 @@ from pneumo_solver_ui.desktop_qt_shell.project_context import (
 )
 from pneumo_solver_ui.desktop_qt_shell.pipeline_surfaces import (
     OPERATOR_FORBIDDEN_LABELS,
+    V38_PIPELINE_SURFACES,
     V38_PIPELINE_WORKSPACE_IDS,
 )
 from pneumo_solver_ui.desktop_qt_shell.runtime_proof import (
@@ -39,6 +40,34 @@ from pneumo_solver_ui.tools import desktop_main_shell_qt as desktop_main_shell_q
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_v38_pipeline_search_aliases_are_operator_language_not_service_jargon() -> None:
+    visible_alias_text = "\n".join(
+        alias
+        for surface in V38_PIPELINE_SURFACES
+        for alias in surface.search_aliases
+    )
+
+    for forbidden in (
+        "project dashboard",
+        "next action",
+        "machine inputs",
+        "geometry",
+        "baseline",
+        "active baseline",
+        "optimization",
+        "analysis",
+        "results",
+        "compare",
+        "validation",
+        "animator",
+        "viewcube",
+        "diagnostics",
+        "send bundle",
+        "self-check",
+    ):
+        assert forbidden not in visible_alias_text
 
 
 def _qt_modules():
@@ -221,7 +250,7 @@ def test_desktop_qt_shell_launcher_exposes_qt_first_cli_and_legacy_fallback() ->
     assert '"--runtime-proof-manual-template"' in src
     assert '"--runtime-proof-validate"' in src
     assert '"--runtime-proof-require-manual-pass"' in src
-    assert "GUI-окна рабочего места:" in src
+    assert "Рабочие окна приложения:" in src
     assert "from pneumo_solver_ui.tools import desktop_main_shell as legacy_shell" in src
     assert "from pneumo_solver_ui.desktop_qt_shell.main_window import main as run_qt_shell_main" in src
     assert "запускаю проверочное Tk-окно" in src
@@ -241,6 +270,9 @@ def test_desktop_qt_shell_launcher_catalog_keeps_runtime_and_migration_metadata(
     assert by_key["desktop_input_editor"].runtime_kind == "tk"
     assert by_key["desktop_input_editor"].migration_status == "managed_external"
     assert by_key["desktop_input_editor"].source_of_truth_role == "master"
+    assert by_key["desktop_run_setup_center"].module == "pneumo_solver_ui.tools.desktop_run_setup_center"
+    assert by_key["desktop_run_setup_center"].runtime_kind == "tk"
+    assert by_key["desktop_run_setup_center"].source_of_truth_role == "master"
 
     assert by_key["desktop_animator"].runtime_kind == "qt"
     assert by_key["desktop_animator"].migration_status == "native"
@@ -272,6 +304,8 @@ def test_desktop_qt_shell_spec_contract_marks_tk_workspaces_as_managed_external(
 
     assert by_key["desktop_input_editor"].effective_runtime_kind == "tk"
     assert by_key["desktop_input_editor"].effective_migration_status == "managed_external"
+    assert by_key["desktop_run_setup_center"].workflow_stage == "calculation"
+    assert by_key["desktop_run_setup_center"].effective_source_of_truth_role == "master"
     assert by_key["desktop_ring_editor"].effective_source_of_truth_role == "master"
     assert by_key["desktop_results_center"].effective_source_of_truth_role == "derived"
     assert by_key["desktop_engineering_analysis_center"].workflow_stage == "analysis"
@@ -304,6 +338,8 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert "QtGui.QFontDatabase.addApplicationFont" in src
     assert '"segoeui.ttf"' in src
     assert 'self.setObjectName("DesktopQtMainShell")' in src
+    assert "PRIMARY_START_ACTIONS = (" in src
+    assert "VISUAL_TRUTH_ROWS = (" in src
     assert 'QtWidgets.QToolBar("Быстрые действия", self)' in src
     assert 'menubar.addMenu("Файл")' in src
     assert 'menubar.addMenu("Правка")' in src
@@ -314,20 +350,52 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert 'menubar.addMenu("Диагностика")' in src
     assert 'menubar.addMenu("Инструменты")' in src
     assert 'menubar.addMenu("Справка")' in src
+    assert 'run_menu.addMenu("Окна по задаче")' in src
+    assert 'run_menu.addMenu("Все окна")' not in src
+    assert '("Справочники и проверки", support_specs)' in src
+    assert '("Детальная проверка результата", result_detail_specs)' in src
+    assert 'analysis_menu.addMenu("Детальная проверка результата")' in src
+    assert 'animation_menu.addMenu("Дополнительная визуализация")' in src
     assert 'self.workspace_combo = QtWidgets.QComboBox(toolbar)' in src
     assert 'self.launch_tool_combo = QtWidgets.QComboBox(toolbar)' in src
+    assert "self.launch_tool_combo.activated.connect(self._on_launch_tool_activated)" in src
+    assert "def _on_launch_tool_activated(self, index: int) -> None:" in src
+    assert 'QtWidgets.QPushButton("Открыть окно", toolbar)' not in src
+    assert "DesktopQtShellOpenLaunchTool" not in src
     assert 'self.command_search_edit = QtWidgets.QLineEdit(toolbar)' in src
     assert 'self.optimization_mode_combo = QtWidgets.QComboBox(toolbar)' in src
-    assert 'self.browser_dock = QtWidgets.QDockWidget("Обзор проекта", self)' in src
+    assert 'self.browser_dock = QtWidgets.QDockWidget("Панель проекта", self)' in src
     assert 'self.inspector_dock = QtWidgets.QDockWidget("Свойства и помощь", self)' in src
     assert 'self.runtime_dock = QtWidgets.QDockWidget("Ход выполнения и внешние окна", self)' in src
     assert 'self.runtime_table.setHeaderLabels(("Окно", "Состояние", "Тип"))' in src
     assert 'self.diagnostics_button.setObjectName("AlwaysVisibleDiagnosticsAction")' in src
     assert 'self.diagnostics_button.setShortcut(QtGui.QKeySequence("F7"))' in src
+    assert 'self.diagnostics_button.setToolTip("F7. Собрать диагностику и подготовить архив.")' in src
+    assert "Открыть диагностику и собрать" not in src
     assert "self.central_stack = QtWidgets.QStackedWidget(central)" in src
     assert 'self.banner_label = QtWidgets.QLabel(' in src
     assert 'self.route_label = QtWidgets.QLabel(' in src
     assert 'self.project_summary_label = QtWidgets.QLabel(self._project_summary_text(), central)' in src
+    assert 'QtWidgets.QGroupBox("Начните здесь", self.overview_page)' in src
+    assert "V10_ROUTE_SURFACE_KEYS = (" in src
+    assert '"1. Исходные данные"' in src
+    assert '"2. Сценарии"' in src
+    assert '"3. Набор испытаний"' in src
+    assert '"4. Базовый прогон"' in src
+    assert '"5. Оптимизация"' in src
+    assert '"6. Анализ"' in src
+    assert '"7. Анимация"' in src
+    assert '"8. Диагностика"' in src
+    assert '"Собрать диагностику"' in src
+    assert "self.start_action_buttons" in src
+    assert 'self.start_action_buttons.setdefault(tool_key, button)' in src
+    assert 'QtWidgets.QGroupBox("Достоверность отображения", self.overview_page)' in src
+    assert '"Результаты"' in src
+    assert '"Графики"' in src
+    assert '"Анимация"' in src
+    assert '"Пневмосхема"' in src
+    assert '"Крупные состояния: расчётно подтверждено, по исходным данным, условно, недоступно."' in src
+    assert "self.visual_truth_labels" in src
     assert 'self.message_strip_label.setObjectName("ShellMessagesStrip")' in src
     assert 'self.status_progress_bar.setObjectName("ShellStatusProgress")' in src
     animator_src = (ROOT / "pneumo_solver_ui" / "desktop_animator" / "app.py").read_text(
@@ -369,6 +437,7 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert "ContractBadge" not in src
     assert "contract_badge" not in src
     assert "_refresh_contract_badge" not in src
+    assert 'self.compare_button = QtWidgets.QPushButton("Открыть сравнение"' not in src
     assert "Служебный центр" not in src
     assert 'return "Инструмент проекта"' in src
     assert 'setObjectName("CalculationStatusBadge")' in src
@@ -401,6 +470,7 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
         "активного управляемого процесса",
         "Открыть резервное главное окно",
         "Резервное главное окно",
+        "Окно восстановления",
         "Контекстный инструмент",
         "проектный контекст",
         "Контекст анимации",
@@ -418,7 +488,8 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
         "dock-панелей",
         "launch controls",
         "Проект: default",
-        "C:\\",
+            "C:\\",
+            "master-copy",
         "Проверочное рабочее место",
         "dt и t_end",
     ]
@@ -452,8 +523,8 @@ def test_desktop_shell_command_search_home_and_project_tree_actions_are_routable
     entries = build_shell_command_search_entries(build_desktop_shell_specs())
     by_label = {entry.label: entry for entry in entries}
 
-    assert by_label["Обзор рабочего места"].action_kind == "home"
-    assert by_label["Обзор рабочего места"].action_value == "home"
+    assert by_label["Панель проекта"].action_kind == "home"
+    assert by_label["Панель проекта"].action_value == "home"
     assert by_label["Показать список рабочих окон"].action_kind == "focus"
     assert by_label["Показать список рабочих окон"].action_value == "project_tree"
     assert by_label["Инженерный анализ"].action_kind == "tool"
@@ -461,19 +532,89 @@ def test_desktop_shell_command_search_home_and_project_tree_actions_are_routable
     assert "HO-007" in by_label["Инженерный анализ"].keywords
     engineering_matches = rank_shell_command_search_entries("Engineering Analysis", entries)
     assert engineering_matches[0].action_value == "desktop_engineering_analysis_center"
-    assert by_label["Показать данные для аниматора"].action_kind == "open_artifact"
-    assert by_label["Показать данные для аниматора"].action_value == "animator.analysis_context"
-    assert by_label["Показать связь анализа и аниматора"].action_value == (
+    assert by_label["Проверить подготовку анимации"].action_kind == "open_artifact"
+    assert by_label["Проверить подготовку анимации"].action_value == "animator.analysis_context"
+    assert "Показать данные для аниматора" not in by_label
+    assert "Показать сведения для аниматора" not in by_label
+    assert by_label["Проверить связь с аниматором"].action_value == (
         "animator.animator_link_contract"
     )
-    assert by_label["Открыть выбранный результат"].action_value == (
+    assert by_label["Показать результаты расчёта"].action_value == (
         "animator.selected_result_artifact_pointer"
     )
-    assert by_label["Открыть файл анимации"].action_value == "animator.selected_npz_path"
-    assert by_label["Открыть сведения об экспорте анимации"].action_kind == "open_artifact"
-    assert by_label["Открыть сведения об экспорте анимации"].action_value == (
+    assert by_label["Загрузить файл анимации"].action_kind == "tool"
+    assert by_label["Загрузить файл анимации"].action_value == "desktop_animator"
+    assert by_label["Показать сохранение анимации"].action_kind == "open_artifact"
+    assert by_label["Показать сохранение анимации"].action_value == (
         "animator.capture_export_manifest"
     )
+    assert "Показать файл анимации" not in by_label
+    assert "Показать выбранный результат" not in by_label
+    assert "Открыть выбранный результат" not in by_label
+    assert "Открыть файл анимации" not in by_label
+    assert "Открыть сведения об экспорте анимации" not in by_label
+    assert "Показать сведения об экспорте анимации" not in by_label
+    assert "Открыть сравнение прогонов" not in by_label
+
+
+def test_desktop_shell_command_search_manual_keywords_are_operator_language() -> None:
+    entries = build_shell_command_search_entries(build_desktop_shell_specs())
+    checked_labels = {
+        "Показать список рабочих окон",
+        "Собрать диагностику",
+        "Показать в аниматоре",
+        "Проверить подготовку анимации",
+        "Проверить связь с аниматором",
+        "Показать результаты расчёта",
+        "Загрузить файл анимации",
+        "Показать сохранение анимации",
+        "Сравнить прогоны",
+    }
+    forbidden = (
+        "project",
+        "browser",
+        "navigator",
+        "diagnostics",
+        "bundle",
+        "health",
+        "self-check",
+        "animation",
+        "viewport",
+        "viewcube",
+        "HO-",
+        "analysis_context",
+        "analysis context",
+        "frozen context",
+        "handoff",
+        "animator_link_contract",
+        "link contract",
+        "analysis to animator",
+        "selected_result_artifact_pointer",
+        "selected pointer",
+        "artifact pointer",
+        "selected_npz_path",
+        "animation npz",
+        "anim_latest",
+        "capture_export_manifest",
+        "capture export manifest",
+        "capture_hash",
+        "animator export",
+        "analysis lineage",
+        "compare",
+        "results",
+        "маршрут",
+    )
+    offenders: list[str] = []
+
+    for entry in entries:
+        if entry.label not in checked_labels:
+            continue
+        keyword_text = " | ".join(entry.keywords)
+        bad = [fragment for fragment in forbidden if fragment.lower() in keyword_text.lower()]
+        if bad:
+            offenders.append(f"{entry.label}: {', '.join(bad)}")
+
+    assert not offenders, "\n".join(offenders)
 
 
 def test_desktop_shell_visible_text_does_not_expose_service_handoff_jargon() -> None:
@@ -563,15 +704,18 @@ def test_desktop_qt_shell_opens_animator_ho008_artifacts_from_command_surface(
         assert window.open_shell_artifact("animator.capture_export_manifest") is True
         assert Path(opened[-1]) == capture_manifest_path.resolve()
 
-        window.command_search_edit.setText("файл анимации")
+        launched: list[str] = []
+        window.open_tool = lambda key: launched.append(key) or True  # type: ignore[method-assign]
+
+        window.command_search_edit.setText("загрузить файл анимации")
         app.processEvents()
         first = window.search_results_list.item(0)
         assert first is not None
-        assert first.data(QtCore.Qt.ItemDataRole.UserRole + 1) == "open_artifact"
+        assert first.data(QtCore.Qt.ItemDataRole.UserRole + 1) == "tool"
         window._activate_search_item(first)
-        assert Path(opened[-1]).name == "anim_latest.npz"
+        assert launched[-1] == "desktop_animator"
 
-        window.command_search_edit.setText("HO-010 capture")
+        window.command_search_edit.setText("сохранение анимации")
         app.processEvents()
         first = window.search_results_list.item(0)
         assert first is not None
@@ -696,6 +840,16 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
         visible_audit = window.operator_visible_audit()
         assert visible_audit["forbidden_label_hits"] == []
         assert set(visible_audit["forbidden_labels"]) >= set(OPERATOR_FORBIDDEN_LABELS)
+        assert set(visible_audit["forbidden_labels"]) >= {
+            "Идентификатор",
+            "идентификатор",
+            "Идентичность запуска",
+            "Артефакт",
+            "артефакт",
+            "Маршрут",
+            "маршрут",
+            "статус миграции",
+        }
         assert visible_audit["menu_titles"] == [
             "Файл",
             "Правка",
@@ -707,21 +861,48 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
             "Инструменты",
             "Справка",
         ]
-        assert "Окно восстановления" in visible_audit["menu_actions"]
+        assert "Помощь по рабочим окнам" in visible_audit["menu_actions"]
+        assert "Окна по задаче" in visible_audit["menu_actions"]
+        assert "Справочники и проверки" in visible_audit["menu_actions"]
+        assert "Детальная проверка результата" in visible_audit["menu_actions"]
+        assert "Дополнительная визуализация" in visible_audit["menu_actions"]
+        assert "Все окна" not in visible_audit["menu_actions"]
+        assert "Окно восстановления" not in visible_audit["menu_actions"]
         assert "Проверочное рабочее место" not in visible_audit["menu_actions"]
-        assert "Открыть окно" in visible_audit["toolbar_buttons"]
+        assert "Открыть окно" not in visible_audit["toolbar_buttons"]
+        assert "1. Исходные данные" in visible_audit["toolbar_buttons"]
+        assert "2. Сценарии" in visible_audit["toolbar_buttons"]
+        assert "7. Анимация" in visible_audit["toolbar_buttons"]
+        assert "8. Диагностика" in visible_audit["toolbar_buttons"]
+        assert "Открыть сравнение" not in visible_audit["toolbar_buttons"]
+        assert "Открыть в аниматоре" not in visible_audit["toolbar_buttons"]
+        assert "Показать в аниматоре" in visible_audit["toolbar_buttons"]
+        assert "Выбор из списка сразу открывает выбранное окно." in visible_audit["auxiliary_visible_texts"]
         assert "Открепить панель" in visible_audit["auxiliary_visible_texts"]
         assert "Закрыть панель" in visible_audit["auxiliary_visible_texts"]
         assert "Прокрутить вкладки влево" in visible_audit["auxiliary_visible_texts"]
         assert "Прокрутить вкладки вправо" in visible_audit["auxiliary_visible_texts"]
-        assert "Главное окно объединяет рабочие окна проекта, быстрый поиск, диагностику и запуск специализированных окон." in visible_audit["direct_visible_texts"]
+        assert "Главное окно показывает первый путь пользователя и оставляет дополнительные окна во втором слое." in visible_audit["direct_visible_texts"]
+        assert "Что делать сначала: исходные данные; сценарии; набор испытаний; базовый прогон; оптимизация; анализ; анимация; диагностика." in visible_audit["direct_visible_texts"]
         assert "Окна, действия, испытания, сценарии, архивы отправки, расчёты, файлы" in visible_audit["direct_visible_texts"]
-        assert "Обзор проекта" in visible_audit["direct_visible_texts"]
+        assert "Панель проекта" in visible_audit["direct_visible_texts"]
+        assert "Начните здесь" in visible_audit["direct_visible_texts"]
+        assert "Достоверность отображения" in visible_audit["direct_visible_texts"]
+        assert "Крупные состояния: расчётно подтверждено, по исходным данным, условно, недоступно." in visible_audit["direct_visible_texts"]
         assert "Окно / шаг" in visible_audit["item_visible_texts"]
-        assert "Поэтапный запуск" in visible_audit["item_visible_texts"]
-        assert "Распределённая координация" in visible_audit["item_visible_texts"]
+        assert "Недоступно до выбранного прогона" in visible_audit["direct_visible_texts"]
+        assert "По исходным данным до расчёта" in visible_audit["direct_visible_texts"]
+        assert "Недоступна до результатов расчёта" in visible_audit["direct_visible_texts"]
+        assert "Локальный запуск" in visible_audit["item_visible_texts"]
+        assert "Параллельный запуск" in visible_audit["item_visible_texts"]
+        assert "Поэтапный запуск" not in visible_audit["item_visible_texts"]
+        assert "Распределённая координация" not in visible_audit["item_visible_texts"]
         assert (
-            "4. Набор испытаний - Проверить включение тестов, этапы, приоритеты, шаг расчёта и длительность."
+            "3. Набор испытаний - Проверить включение тестов, этапы, приоритеты, шаг расчёта и длительность."
+            in visible_audit["item_visible_texts"]
+        )
+        assert (
+            "4. Базовый прогон - Создать или проверить базовый прогон перед оптимизацией."
             in visible_audit["item_visible_texts"]
         )
         runtime_rows_text = "\n".join(visible_audit["runtime_rows"])
@@ -761,6 +942,12 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
             "selected_result_artifact_pointer",
             "capture_export_manifest",
             "dt и t_end",
+            "Идентификатор",
+            "идентификатор",
+            "Идентичность запуска",
+            "Артефакт",
+            "артефакт",
+            "статус миграции",
         ):
             assert fragment not in visible_text
         catalog_labels = {
@@ -812,21 +999,29 @@ def test_desktop_qt_shell_handoff_payload_and_layout_state_are_runtime_checked(
     try:
         app.processEvents()
         window.optimization_mode_combo.setCurrentIndex(1)
-        assert window.open_tool("desktop_input_editor") is True
+        assert window.visual_truth_labels["Анимация"].text() == "Недоступна до результатов расчёта"
+        window.start_action_buttons["desktop_ring_editor"].click()
+        app.processEvents()
+        input_index = window.launch_tool_combo.findData("desktop_input_editor")
+        assert input_index >= 0
+        window.launch_tool_combo.setCurrentIndex(input_index)
+        window.launch_tool_combo.activated.emit(input_index)
+        app.processEvents()
         assert window.open_tool("desktop_animator") is True
 
         manager = _FakeCoexistenceManager.instances[-1]
         assert [session.spec.key for session in manager.opened] == [
+            "desktop_ring_editor",
             "desktop_input_editor",
             "desktop_animator",
         ]
         payload = manager.opened[-1].context_payload
         assert payload["selected_tool_key"] == "desktop_animator"
-        assert payload["active_optimization_mode"] == "Распределённая координация"
+        assert payload["active_optimization_mode"] == "Параллельный запуск"
         assert payload["project_name"] == "Runtime Shell"
         assert payload["workspace_dir"] == str((tmp_path / "workspace").resolve())
         assert payload["repo_root"] == str((tmp_path / "repo").resolve())
-        assert window.runtime_table.topLevelItemCount() == 2
+        assert window.runtime_table.topLevelItemCount() == 3
         assert window.runtime_table.columnCount() == 3
         runtime_rows = [
             " | ".join(
@@ -843,7 +1038,7 @@ def test_desktop_qt_shell_handoff_payload_and_layout_state_are_runtime_checked(
         settings = QtCore.QSettings(str(settings_path), QtCore.QSettings.Format.IniFormat)
         assert settings.value("layout/last_workspace_key") == "desktop_results_center"
         assert settings.value("layout/last_surface_key") == "ws_analysis"
-        assert settings.value("layout/optimization_mode") == "Распределённая координация"
+        assert settings.value("layout/optimization_mode") == "Параллельный запуск"
         assert settings.value("layout/geometry") is not None
         assert settings.value("layout/window_state") is not None
 
@@ -861,7 +1056,7 @@ def test_desktop_qt_shell_handoff_payload_and_layout_state_are_runtime_checked(
     try:
         app.processEvents()
         assert restored._selected_tool_key == "desktop_results_center"
-        assert restored.optimization_mode_combo.currentText() == "Распределённая координация"
+        assert restored.optimization_mode_combo.currentText() == "Параллельный запуск"
     finally:
         restored.close()
         restored.deleteLater()
@@ -1286,7 +1481,7 @@ def test_desktop_qt_shell_coexistence_manager_tracks_managed_external_windows() 
 def test_desktop_qt_shell_launcher_validates_registry_keys_and_formats_catalog() -> None:
     catalog = desktop_main_shell_qt_module.format_tool_catalog()
 
-    assert "GUI-окна рабочего места:" in catalog
+    assert "Рабочие окна приложения:" in catalog
     assert "desktop_input_editor" in catalog
     assert "desktop_animator" in catalog
     assert "master" in catalog

@@ -14,8 +14,8 @@ def create_hosted_test_center(parent: tk.Misc) -> App:
 def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="test_center",
-        title="Набор испытаний и опорный прогон",
-        description="Опорные прогоны, контрольные тесты и первичная проверка результатов из одного понятного места.",
+        title="Набор испытаний",
+        description="Подготовка, проверка и фиксация набора испытаний перед расчётом.",
         group="Встроенные окна",
         mode="hosted",
         workflow_stage="calculation",
@@ -31,8 +31,8 @@ def build_spec() -> DesktopShellToolSpec:
         menu_section="Расчёт",
         nav_section="Расчёт",
         details=(
-            "Окно показывает матрицу испытаний, настройки запуска, проверку набора "
-            "и переход к опорному прогону без скрытых промежуточных маршрутов."
+            "Окно показывает матрицу испытаний, настройки автономной проверки "
+            "и готовность набора перед следующим расчётным шагом."
         ),
         menu_order=30,
         nav_order=30,
@@ -40,16 +40,13 @@ def build_spec() -> DesktopShellToolSpec:
         standalone_module="pneumo_solver_ui.tools.test_center_gui",
         create_hosted=create_hosted_test_center,
         search_aliases=(
-            "опорный прогон и проверки",
             "набор испытаний",
-            "базовый прогон",
-            "опорный прогон",
             "матрица испытаний",
             "снимок набора",
             "контроль набора",
             "зафиксировать набор",
-            "расчетная настройка",
-            "настройка расчёта",
+            "автономная проверка",
+            "проверка испытаний",
         ),
         context_handoff_keys=(
             "validated_suite_snapshot",

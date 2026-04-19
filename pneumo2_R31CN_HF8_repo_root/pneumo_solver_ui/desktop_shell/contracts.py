@@ -104,6 +104,7 @@ class DesktopShellToolSpec:
             "desktop_input_editor": "master",
             "desktop_ring_editor": "master",
             "test_center": "master",
+            "desktop_run_setup_center": "master",
             "desktop_optimizer_center": "master",
             "desktop_results_center": "derived",
             "desktop_engineering_analysis_center": "derived",
@@ -121,7 +122,13 @@ class DesktopShellToolSpec:
         base_aliases: dict[str, tuple[str, ...]] = {
             "desktop_input_editor": ("исходные данные", "настройка", "параметры"),
             "desktop_ring_editor": ("сценарии", "редактор кольца", "дорога"),
-            "test_center": ("набор испытаний", "проверки", "опорный прогон"),
+            "test_center": ("набор испытаний", "проверки", "матрица испытаний"),
+            "desktop_run_setup_center": (
+                "базовый прогон",
+                "опорный прогон",
+                "настройка расчёта",
+                "запуск расчёта",
+            ),
             "desktop_optimizer_center": ("оптимизация", "опорный прогон", "распределённый расчёт"),
             "desktop_results_center": ("анализ", "результаты", "сравнение", "проверка расчёта"),
             "desktop_engineering_analysis_center": (
@@ -134,9 +141,9 @@ class DesktopShellToolSpec:
                 "влияние",
                 "чувствительность",
             ),
-            "desktop_diagnostics_center": ("диагностика", "архив диагностики", "отправка", "самопроверка"),
-            "compare_viewer": ("compare viewer", "сравнение прогонов", "npz"),
-            "desktop_animator": ("animator", "3d", "viewcube"),
+            "desktop_diagnostics_center": ("диагностика", "архив диагностики", "отправка", "проверка"),
+            "compare_viewer": ("compare", "сравнение прогонов", "окно сравнения"),
+            "desktop_animator": ("animator", "аниматор", "трёхмерный вид"),
             "desktop_mnemo": ("mnemo", "мнемосхема", "пневмосхема"),
         }
         merged = {item for item in self.search_aliases if str(item or "").strip()}

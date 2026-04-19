@@ -91,6 +91,18 @@ def _bool_ru(value: object) -> str:
     return str(value)
 
 
+def _producer_owner_ru(value: object) -> str:
+    text = str(value or "").strip()
+    labels = {
+        "producer_export": "экспорт расчёта",
+        "producer": "источник расчёта",
+        "source": "источник данных",
+    }
+    if not text:
+        return "нет данных"
+    return labels.get(text, text.replace("_", " "))
+
+
 def _technical_message_ru(value: object) -> str:
     text = str(value or "").strip()
     if not text:
@@ -126,14 +138,15 @@ def _technical_message_ru(value: object) -> str:
         "Geometry reference evidence is empty or unreadable": "Данные справочника геометрии пустые или не читаются",
         "Geometry Reference evidence": "Данные справочника геометрии",
         "Geometry reference evidence": "Данные справочника геометрии",
+        "producer_export": "экспорт расчёта",
         "producer-owned": "данные поставщика",
         "Producer-owned": "Данные поставщика",
         "warning-only": "только предупреждение",
         "missing inputs": "не хватает входных данных",
         "missing_inputs": "не хватает входных данных",
-        "Results Center": "центр результатов",
-        "Engineering Analysis Center": "центр инженерного анализа",
-        "Reference Center": "центр справочников",
+        "Results Center": "анализ результатов",
+        "Engineering Analysis Center": "инженерный анализ",
+        "Reference Center": "справочник",
         "Open": "Откройте",
         "export evidence manifest": "экспортируйте файл состава данных",
         "evidence manifest": "файл состава данных",
@@ -161,7 +174,7 @@ def _technical_message_ru(value: object) -> str:
         ("Producer-owned warnings remain " + "warning-only"): (
             "Предупреждения источников данных остаются предупреждениями"
         ),
-        "Self-check silent warnings snapshot:": "Тихие предупреждения самопроверки:",
+        "Self-check silent warnings snapshot:": "Тихие предупреждения проверки:",
         "fail=": "ошибки=",
         "warn=": "предупреждения=",
         ("Engineering Analysis / " + "HO-007 open gap:"): "Инженерный анализ: есть незакрытые вопросы:",
@@ -173,7 +186,7 @@ def _technical_message_ru(value: object) -> str:
         "open gap(s)": "открытые вопросы",
         "open gaps": "открытые вопросы",
         "open gap": "открытый вопрос",
-        "selected_run_contract_hash": "идентификатор выбранного расчёта",
+        "selected_run_contract_hash": "метка выбранного расчёта",
         "ready=": "готово=",
         "rc=": "код завершения ",
         "BLOCKED": "заблокировано",
@@ -235,7 +248,7 @@ def _operator_preview_text(value: object) -> str:
         "- missing_evidence:": "- Нет данных:",
         "- status:": "- Состояние:",
         "- source_path:": "- Путь источника:",
-        "- evidence_manifest_hash:": "- Идентификатор состава данных:",
+        "- evidence_manifest_hash:": "- Метка состава данных:",
         "- influence_status:": "- Влияние:",
         "- calibration_status:": "- Калибровка:",
         "- analysis_status:": "- Анализ:",
@@ -244,7 +257,7 @@ def _operator_preview_text(value: object) -> str:
         "- handoff_required_path:": "- Требуемый файл передачи:",
         "- handoff_missing_fields:": "- Не хватает полей передачи:",
         "- available:": "- Доступно:",
-        "- visual_cache_token:": "- Идентификатор визуальной проверки:",
+        "- visual_cache_token:": "- Метка визуальной проверки:",
         "- visual_reload_inputs:": "- Входные данные перезагрузки:",
         "- pointer_sync_ok:": "- Последняя анимация синхронизирована:",
         "- reload_inputs_sync_ok:": "- Входные данные синхронизированы:",
@@ -262,7 +275,7 @@ def _operator_preview_text(value: object) -> str:
         ),
         "Run producer/solver anim_latest export": "выполните экспорт последней анимации из источника/решателя",
         "Reference Center must not fabricate producer geometry evidence": (
-            "центр справочников не должен создавать данные геометрии за источник"
+            "справочник не должен создавать данные геометрии за источник"
         ),
         "Reasons:": "Причины:",
         "Geometry reference evidence reports missing item(s)": "данные справочника геометрии сообщают о нехватке",
@@ -364,7 +377,7 @@ class DesktopDiagnosticsCenter:
         self.root = root
         self._hosted = bool(hosted)
         if not self._hosted:
-            self.root.title(f"Центр диагностики и отправки — {RELEASE}")
+            self.root.title(f"Диагностика и отправка - {RELEASE}")
             self.root.geometry("1040x760")
             self.root.minsize(980, 720)
 
@@ -409,7 +422,7 @@ class DesktopDiagnosticsCenter:
         self.status_var = StringVar(value="Готово. Выберите действие слева или в верхней панели.")
         self.process_title_var = StringVar(value="Текущий процесс: нет активной операции")
         self.process_detail_var = StringVar(
-            value="Прогресс диагностики и сборки архива всегда показывается здесь, независимо от выбранной вкладки."
+            value="Прогресс диагностики и сборки архива всегда показывается здесь."
         )
         self.machine_state_var = StringVar(value="")
         self.context_summary_var = StringVar(
@@ -516,7 +529,7 @@ class DesktopDiagnosticsCenter:
         title_box.pack(side="left", fill="x", expand=True)
         ttk.Label(
             title_box,
-            text="Центр диагностики и отправки",
+            text="Диагностика и отправка",
             font=("Segoe UI", 15, "bold"),
         ).pack(anchor="w")
         ttk.Label(
@@ -533,7 +546,7 @@ class DesktopDiagnosticsCenter:
         ttk.Button(header_actions, text="3. Подготовить отправку", command=lambda: self.notebook.select(self.send_tab)).pack(side="left", padx=(8, 0))
         ttk.Button(
             header_actions,
-            text="Обновить",
+            text="Обновить сводку",
             command=lambda: self._refresh_bundle_views(regenerate_reports=False),
         ).pack(side="left", padx=(12, 0))
 
@@ -633,7 +646,7 @@ class DesktopDiagnosticsCenter:
         options_box.pack(fill="x", **pad)
         ttk.Checkbutton(
             options_box,
-            text="Пропустить быструю проверку старого интерфейса",
+            text="Пропустить быструю проверку окон приложения",
             variable=self.skip_ui_smoke,
         ).pack(anchor="w", padx=10, pady=2)
         ttk.Checkbutton(
@@ -655,20 +668,20 @@ class DesktopDiagnosticsCenter:
         ttk.Spinbox(opt_row, from_=1, to=32, textvariable=self.opt_jobs, width=6).grid(row=0, column=4, sticky="w")
         opt_row.columnconfigure(5, weight=1)
 
-        path_box = ttk.LabelFrame(self.diag_body, text="Пути (если нужно)")
+        path_box = ttk.LabelFrame(self.diag_body, text="Папки для проверки")
         path_box.pack(fill="x", **pad)
 
         osc_row = ttk.Frame(path_box)
         osc_row.pack(fill="x", padx=10, pady=4)
-        ttk.Label(osc_row, text="Папка данных анимации:").pack(side="left")
+        ttk.Label(osc_row, text="Папка файлов анимации:").pack(side="left")
         ttk.Entry(osc_row, textvariable=self.osc_dir).pack(side="left", fill="x", expand=True, padx=6)
-        ttk.Button(osc_row, text="...", width=3, command=self._pick_osc_dir).pack(side="left")
+        ttk.Button(osc_row, text="Выбрать", command=self._pick_osc_dir).pack(side="left")
 
         out_row = ttk.Frame(path_box)
         out_row.pack(fill="x", padx=10, pady=4)
         ttk.Label(out_row, text="Папка результатов:").pack(side="left")
         ttk.Entry(out_row, textvariable=self.out_root).pack(side="left", fill="x", expand=True, padx=6)
-        ttk.Button(out_row, text="...", width=3, command=self._pick_out_root).pack(side="left")
+        ttk.Button(out_row, text="Выбрать", command=self._pick_out_root).pack(side="left")
 
         ctrl = ttk.Frame(self.diag_body)
         ctrl.pack(fill="x", **pad)
@@ -676,7 +689,7 @@ class DesktopDiagnosticsCenter:
         self.btn_run.pack(side="left")
         self.btn_stop = ttk.Button(ctrl, text="Остановить", command=self._stop, state="disabled")
         self.btn_stop.pack(side="left", padx=8)
-        self.btn_open = ttk.Button(ctrl, text="Открыть результат", command=self._open_result, state="disabled")
+        self.btn_open = ttk.Button(ctrl, text="Открыть результат диагностики", command=self._open_result, state="disabled")
         self.btn_open.pack(side="left", padx=8)
         ttk.Button(ctrl, text="Открыть папку результатов", command=self._open_diagnostics_out_root).pack(side="left", padx=8)
 
@@ -778,9 +791,9 @@ class DesktopDiagnosticsCenter:
         ttk.Label(
             frm,
             text=(
-                "Из этого центра можно собрать архив диагностики, просмотреть сводку, проверку и состояние, "
+                "Здесь можно собрать архив диагностики, просмотреть сводку, проверку и состояние, "
                 "а затем подготовить архив к передаче без браузера. Прогресс любой длительной операции "
-                "всегда отображается в блоке «Текущий процесс» сверху."
+                "всегда отображается в блоке «Текущий процесс» сверху, без переключения разделов."
             ),
             wraplength=860,
             justify="left",
@@ -834,7 +847,7 @@ class DesktopDiagnosticsCenter:
         self.process_title_var.set("Текущий процесс: нет активной операции")
         self.process_detail_var.set(
             detail
-            or "Прогресс диагностики и сборки архива всегда показывается здесь, независимо от выбранной вкладки."
+            or "Прогресс диагностики и сборки архива всегда показывается здесь."
         )
         if hasattr(self, "process_progress"):
             self.process_progress.stop()
@@ -1028,17 +1041,13 @@ class DesktopDiagnosticsCenter:
         self._write_center_state_snapshot(self._last_bundle_record, summary_text=summary_text)
 
     def _start_run(self) -> None:
-        try:
-            self.notebook.select(self.diag_tab)
-        except Exception:
-            pass
         self._run()
 
     def _open_bundle_dir(self) -> None:
         self._open_bundle_out_dir()
 
     def _pick_osc_dir(self) -> None:
-        picked = filedialog.askdirectory(title="Выберите папку с данными анимации")
+        picked = filedialog.askdirectory(title="Выберите папку с файлами анимации")
         if picked:
             self.osc_dir.set(picked)
 
@@ -1082,7 +1091,7 @@ class DesktopDiagnosticsCenter:
         self._append("\n=== Запуск диагностики ===\nКоманда запуска сохранена в отчёте прогона.\n\n")
         self._set_process_busy(
             "Выполняется диагностика проекта",
-            "Идёт автономная диагностика. Прогресс показан здесь; вкладку менять не нужно.",
+            "Идёт автономная диагностика. Прогресс показан здесь; можно оставаться в текущем разделе.",
         )
         self.btn_run.configure(state="disabled")
         self.btn_stop.configure(state="normal")
@@ -1377,11 +1386,11 @@ class DesktopDiagnosticsCenter:
 
     def _self_check_silent_warnings_summary_lines(self, bundle) -> list[str]:
         return [
-            "## Снимок тихих предупреждений самопроверки",
+            "## Снимок скрытых предупреждений проверки",
             f"- Состояние: {_status_ru(getattr(bundle, 'self_check_silent_warnings_status', '') or 'MISSING')}",
             f"- Только снимок: {_bool_ru(getattr(bundle, 'self_check_silent_warnings_snapshot_only', True))}",
-            f"- JSON: {getattr(bundle, 'self_check_silent_warnings_json_path', '') or '—'}",
-            f"- Markdown: {getattr(bundle, 'self_check_silent_warnings_md_path', '') or '—'}",
+            f"- Файл подробностей: {getattr(bundle, 'self_check_silent_warnings_json_path', '') or '—'}",
+            f"- Краткий отчёт: {getattr(bundle, 'self_check_silent_warnings_md_path', '') or '—'}",
             f"- Код завершения: {getattr(bundle, 'self_check_silent_warnings_rc', None)}",
             f"- Ошибки: {getattr(bundle, 'self_check_silent_warnings_fail_count', 0)}",
             f"- Предупреждения: {getattr(bundle, 'self_check_silent_warnings_warn_count', 0)}",
@@ -1401,8 +1410,8 @@ class DesktopDiagnosticsCenter:
             f"- Состояние: {_status_ru(status)}",
             f"- Выбранные данные: {_status_ru(context_state)}",
             f"- Связь с анимацией: {_status_ru(getattr(bundle, 'analysis_context_status', '') or '—')}",
-            f"- ID расчёта: {getattr(bundle, 'analysis_evidence_run_id', '') or '—'}",
-            f"- Идентификатор правил расчёта: {getattr(bundle, 'analysis_evidence_run_contract_hash', '') or '—'}",
+            f"- Метка расчёта: {getattr(bundle, 'analysis_evidence_run_id', '') or '—'}",
+            f"- Метка правил расчёта: {getattr(bundle, 'analysis_evidence_run_contract_hash', '') or '—'}",
             f"- Правила сравнения: {getattr(bundle, 'analysis_evidence_compare_contract_id', '') or '—'}",
             f"- Файлы данных: {getattr(bundle, 'analysis_evidence_artifact_count', 0)}",
             f"- Расхождения: {getattr(bundle, 'analysis_evidence_mismatch_count', 0)}",
@@ -1423,18 +1432,18 @@ class DesktopDiagnosticsCenter:
             else:
                 capture_status = "MISSING"
         lines.append(
-            "- Захват для анимации: "
-            f"{_status_ru(capture_status)} | хэш захвата={capture_hash or '—'}"
+            "- Файлы для аниматора: "
+            f"{_status_ru(capture_status)} | проверка={capture_hash or '—'}"
         )
         manifest_hash = str(getattr(bundle, "analysis_evidence_manifest_hash", "") or "")
         if manifest_hash:
-            lines.append(f"- Идентификатор состава данных: {manifest_hash}")
+            lines.append(f"- Метка состава данных: {manifest_hash}")
         action = str(getattr(bundle, "analysis_evidence_action", "") or "")
         if action:
             lines.append(f"- Что сделать: {_technical_message_ru(action)}")
         analysis_context_action = str(getattr(bundle, "analysis_context_action", "") or "")
         if analysis_context_action:
-            lines.append(f"- Что сделать с контекстом анимации: {_technical_message_ru(analysis_context_action)}")
+            lines.append(f"- Что сделать со связью с аниматором: {_technical_message_ru(analysis_context_action)}")
         for warning in warnings[:5]:
             lines.append(f"- Предупреждение: {_technical_message_ru(warning)}")
         return lines
@@ -1487,7 +1496,7 @@ class DesktopDiagnosticsCenter:
         ]
         manifest_hash = str(getattr(bundle, "engineering_analysis_evidence_manifest_hash", "") or "")
         if manifest_hash:
-            lines.append(f"- Идентификатор состава данных: {manifest_hash}")
+            lines.append(f"- Метка состава данных: {manifest_hash}")
         if ready_run_dirs:
             lines.append(f"- Каталог готового расчёта: {ready_run_dirs[0]}")
         if missing_inputs:
@@ -1587,15 +1596,15 @@ class DesktopDiagnosticsCenter:
                 f"{_status_ru(getattr(bundle, 'geometry_reference_packaging_status', '') or 'missing')} / "
                 f"расхождения={_status_ru(getattr(bundle, 'geometry_reference_packaging_mismatch_status', '') or 'missing')}"
             ),
-            f"- Идентификатор правил упаковки: {getattr(bundle, 'geometry_reference_packaging_contract_hash', '') or '—'}",
+            f"- Метка правил упаковки: {getattr(bundle, 'geometry_reference_packaging_contract_hash', '') or '—'}",
             f"- Приёмка геометрии: {_status_ru(getattr(bundle, 'geometry_reference_acceptance_gate', '') or 'MISSING')}",
             (
                 "- Данные источника: "
                 f"{_status_ru(getattr(bundle, 'geometry_reference_producer_artifact_status', '') or 'missing')} / "
-                f"владелец={getattr(bundle, 'geometry_reference_producer_evidence_owner', '') or 'producer_export'}"
+                f"источник={_producer_owner_ru(getattr(bundle, 'geometry_reference_producer_evidence_owner', '') or 'producer_export')}"
             ),
             (
-                "- Справочнику разрешено достраивать геометрию: "
+                "- Автоматически добавлять недостающую геометрию: "
                 f"{_bool_ru(bool(getattr(bundle, 'geometry_reference_consumer_may_fabricate_geometry', False)))}"
             ),
             (
@@ -1680,7 +1689,7 @@ class DesktopDiagnosticsCenter:
                     f"- Код завершения: {self._last_run_record.returncode}",
                     f"- Запущено: {self._last_run_record.started_at or '—'}",
                     f"- Завершено: {self._last_run_record.finished_at or '—'}",
-            f"- Папка последнего запуска: {self._last_run_record.run_dir or '—'}",
+                    f"- Папка последнего запуска: {self._last_run_record.run_dir or '—'}",
                     f"- Путь к архиву: {self._last_run_record.zip_path or '—'}",
                     f"- Файл состояния работы: {self._last_run_record.state_path or '—'}",
                     f"- Файл журнала: {self._last_run_record.log_path or '—'}",
@@ -1704,7 +1713,7 @@ class DesktopDiagnosticsCenter:
             [
                 "",
                 "## Полезные файлы и отчёты",
-                f"- Снимок состояния центра: {path_str(center_state_path)}",
+                f"- Сохранённое состояние диагностики: {path_str(center_state_path)}",
                 f"- Последняя сводка Markdown: {path_str(summary_md_path)}",
                 f"- Последний архив: {bundle.latest_zip_path or '—'}",
                 f"- Ссылка на актуальный архив: {bundle.latest_path_pointer_path or '—'}",
@@ -1719,8 +1728,8 @@ class DesktopDiagnosticsCenter:
                 f"- Разбор замечаний: {bundle.latest_triage_md_path or '—'}",
                 f"- Файл состава данных: {bundle.latest_evidence_manifest_path or '—'}",
                 f"- Подтверждение целостности актуального архива: {bundle.latest_integrity_evidence_sidecar_path or '—'}",
-                f"- Предупреждения самопроверки: {bundle.self_check_silent_warnings_json_path or '—'}",
-                f"- Читаемые предупреждения самопроверки: {bundle.self_check_silent_warnings_md_path or '—'}",
+                f"- Предупреждения проверки: {bundle.self_check_silent_warnings_json_path or '—'}",
+                f"- Читаемые предупреждения проверки: {bundle.self_check_silent_warnings_md_path or '—'}",
                 f"- Данные анализа результатов: {bundle.latest_analysis_evidence_manifest_path or '—'}",
                 (
                     "- Данные инженерного анализа: "
@@ -1810,7 +1819,7 @@ class DesktopDiagnosticsCenter:
             f"нужна проверка пользователя: {_bool_ru(bundle.latest_integrity_no_release_closure_claim)}"
         )
         meta_bits.append(
-            "Снимок тихих предупреждений самопроверки: "
+            "Снимок скрытых предупреждений проверки: "
             f"{_status_ru(bundle.self_check_silent_warnings_status)}; "
             f"ошибок: {bundle.self_check_silent_warnings_fail_count}; "
             f"предупреждений: {bundle.self_check_silent_warnings_warn_count}; только снимок: да"
@@ -1869,7 +1878,7 @@ class DesktopDiagnosticsCenter:
         self.btn_copy.state(["disabled"])
         self._set_process_busy(
             "Собирается архив для отправки",
-            "Идёт сборка диагностического архива. Прогресс показан здесь и не зависит от выбранной вкладки.",
+            "Идёт сборка диагностического архива. Прогресс показан здесь; можно оставаться в текущем разделе.",
         )
 
         def worker() -> None:

@@ -526,13 +526,15 @@ def test_animator_loads_ho008_analysis_context_as_frozen_source(tmp_path: Path) 
     assert meta_refs["selected_npz_path"] == str(npz_path.resolve())
     assert meta_refs["selected_test_id"] == "T01"
     banner = format_analysis_context_banner(snapshot)
-    assert banner.startswith("HO-008: Контекст анализа готов")
+    assert banner.startswith("Связь с анализом: готова")
     assert "прогон run-animation-001" in banner
     assert "цель objective-" in banner
     assert "набор suite-has" in banner
     assert "задача problem-ha" in banner
     assert "run=" not in banner
     assert "context=" not in banner
+    assert "HO-008" not in banner
+    assert "Контекст анализа" not in banner
 
 
 def test_animator_analysis_context_resolves_json_pointer_to_npz(tmp_path: Path) -> None:
@@ -570,8 +572,10 @@ def test_animator_analysis_context_blocks_pointer_hash_mismatch(tmp_path: Path) 
     assert "selected result artifact pointer sha256 mismatch" in snapshot.blocking_states
     assert snapshot.selected_npz_path == npz_path.resolve()
     banner = format_analysis_context_banner(snapshot)
-    assert "HO-008: Контекст анализа заблокирован" in banner
-    assert "хэш выбранного артефакта не совпадает" in banner
+    assert "Связь с анализом: заблокирована" in banner
+    assert "метка результатов расчёта не совпадает" in banner
+    assert "HO-008" not in banner
+    assert "Контекст анализа" not in banner
 
 
 def test_animator_missing_ho008_context_has_russian_degraded_operator_status(tmp_path: Path) -> None:
@@ -583,7 +587,10 @@ def test_animator_missing_ho008_context_has_russian_degraded_operator_status(tmp
 
     assert snapshot.status == "MISSING"
     assert snapshot.ready_for_animator is False
-    assert "HO-008: Контекст анализа отсутствует" in banner
+    assert "Связь с анализом: отсутствует" in banner
     assert "Недоступно:" in status
-    assert "контекст анализа HO-008 отсутствует" in status
+    assert "связь с анализом отсутствует" in status
+    assert "HO-008" not in banner
+    assert "HO-008" not in status
+    assert "контекст анализа" not in status
     assert "DEGRADED" not in status

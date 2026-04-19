@@ -699,7 +699,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.lbl_compare_mismatch.setWordWrap(True)
         self.lbl_compare_mismatch.setVisible(False)
         self.lbl_compare_mismatch.setToolTip(
-            "Current/historical mismatch banner из explicit compare contract."
+            "Предупреждение о расхождении текущего и исторического сравнения."
         )
         self.lbl_compare_mismatch.setStyleSheet("QLabel{padding:6px;border-radius:6px;}")
         lay.addWidget(self.lbl_compare_mismatch)
@@ -713,7 +713,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         route_lay = QtWidgets.QVBoxLayout(page_route)
         route_lay.setContentsMargins(0, 0, 0, 0)
         route_lay.setSpacing(6)
-        route_idx = self.controls_top_tabs.addTab(page_route, "\u041c\u0430\u0440\u0448\u0440\u0443\u0442")
+        route_idx = self.controls_top_tabs.addTab(page_route, "Порядок проверки")
 
         page_help = QtWidgets.QWidget()
         help_lay = QtWidgets.QVBoxLayout(page_help)
@@ -723,8 +723,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.controls_top_tabs.setCurrentIndex(route_idx)
         self.controls_top_tabs.setTabToolTip(
             route_idx,
-            "\u041a\u043e\u043c\u043f\u0430\u043a\u0442\u043d\u044b\u0439 \u043c\u0430\u0440\u0448\u0440\u0443\u0442 "
-            "\u0440\u0430\u0431\u043e\u0442\u044b \u043f\u043e \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044e.",
+            "Краткий порядок работы со сравнением.",
         )
         self.controls_top_tabs.setTabToolTip(
             help_idx,
@@ -732,7 +731,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             "\u0432\u044b\u0432\u043e\u0434\u044b \u0438 \u0434\u0438\u0430\u0433\u043d\u043e\u0441\u0442\u0438\u043a\u0430.",
         )
 
-        gb_assistant = QtWidgets.QGroupBox("\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442 \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f")
+        gb_assistant = QtWidgets.QGroupBox("Сведения о сравнении")
         ga = QtWidgets.QVBoxLayout(gb_assistant)
         ga.setContentsMargins(8, 8, 8, 8)
         ga.setSpacing(6)
@@ -1131,7 +1130,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         route_lay = QtWidgets.QVBoxLayout(page_route)
         route_lay.setContentsMargins(0, 0, 0, 0)
         route_lay.setSpacing(6)
-        self.controls_top_tabs.addTab(page_route, "Маршрут")
+        self.controls_top_tabs.addTab(page_route, "Порядок проверки")
 
         page_help = QtWidgets.QWidget()
         help_lay = QtWidgets.QVBoxLayout(page_help)
@@ -1139,7 +1138,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         help_lay.setSpacing(6)
         self.controls_top_tabs.addTab(page_help, "Подсказки")
 
-        gb_assistant = QtWidgets.QGroupBox("Контекст сравнения")
+        gb_assistant = QtWidgets.QGroupBox("Сведения о сравнении")
         ga = QtWidgets.QVBoxLayout(gb_assistant)
         ga.setContentsMargins(8, 8, 8, 8)
         ga.setSpacing(6)
@@ -2554,9 +2553,9 @@ class CompareViewer(QtWidgets.QMainWindow):
 
 
     def _build_compare_contract_dock(self) -> None:
-        dock = QtWidgets.QDockWidget("Compare contract", self)
+        dock = QtWidgets.QDockWidget("Правила сравнения", self)
         dock.setObjectName("dock_compare_contract")
-        dock.setWindowTitle("Compare contract")
+        dock.setWindowTitle("Правила сравнения")
         dock.setAllowedAreas(QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea)
         dock.setMinimumWidth(280)
 
@@ -2568,25 +2567,25 @@ class CompareViewer(QtWidgets.QMainWindow):
         source_row = QtWidgets.QHBoxLayout()
         source_row.setContentsMargins(0, 0, 0, 0)
         source_row.setSpacing(6)
-        self.lbl_compare_current_context_source = QtWidgets.QLabel("Текущий контекст: нет данных")
+        self.lbl_compare_current_context_source = QtWidgets.QLabel("Текущее сравнение: нет данных")
         self.lbl_compare_current_context_source.setObjectName("compareCurrentContextSource")
         self.lbl_compare_current_context_source.setWordWrap(True)
         self.lbl_compare_current_context_source.setToolTip(
-            "Текущий контекст только для чтения; используется для проверки исторических расхождений."
+            "Сведения текущего сравнения используются только для проверки расхождений."
         )
         source_row.addWidget(self.lbl_compare_current_context_source, 1)
         self.btn_open_compare_current_context_sidecar = QtWidgets.QToolButton()
         self.btn_open_compare_current_context_sidecar.setObjectName(
             "btnOpenCompareCurrentContextSidecar"
         )
-        self.btn_open_compare_current_context_sidecar.setToolTip("Открыть JSON текущего контекста")
+        self.btn_open_compare_current_context_sidecar.setToolTip("Показать сведения текущего сравнения")
         try:
             icon = self.style().standardIcon(
                 QtWidgets.QStyle.StandardPixmap.SP_DialogOpenButton
             )
             self.btn_open_compare_current_context_sidecar.setIcon(icon)
         except Exception:
-            self.btn_open_compare_current_context_sidecar.setText("Open")
+            self.btn_open_compare_current_context_sidecar.setText("Показать")
         self.btn_open_compare_current_context_sidecar.setEnabled(False)
         self.btn_open_compare_current_context_sidecar.clicked.connect(
             self._open_compare_current_context_sidecar
@@ -2597,8 +2596,10 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.txt_compare_contract = QtWidgets.QPlainTextEdit()
         self.txt_compare_contract.setObjectName("compareContractSummary")
         self.txt_compare_contract.setReadOnly(True)
-        self.txt_compare_contract.setPlainText("Compare contract: -")
-        self.txt_compare_contract.setToolTip("Explicit compare contract summary loaded from NPZ/session refs.")
+        self.txt_compare_contract.setPlainText("Правила сравнения: -")
+        self.txt_compare_contract.setToolTip(
+            "Сводка правил сравнения, загруженная из выбранных файлов результата."
+        )
         lay.addWidget(self.txt_compare_contract, 1)
 
         dock.setWidget(content)
@@ -2655,21 +2656,21 @@ class CompareViewer(QtWidgets.QMainWindow):
         if label is not None:
             try:
                 if display_path:
-                    state = "sidecar готов" if status == "ready" else "sidecar не найден"
-                    label.setText(f"Текущий контекст: {state} ({Path(display_path).name}) | refs={ref_count}")
+                    state = "файл найден" if status == "ready" else "файл не найден"
+                    label.setText(f"Текущее сравнение: {state} ({Path(display_path).name}) | ссылок: {ref_count}")
                     label.setToolTip(display_path)
                 elif ref_count:
-                    label.setText(f"Текущий контекст: только refs из сессии | refs={ref_count}")
-                    label.setToolTip("Refs текущего контекста восстановлены из сессии сравнения и доступны только для чтения.")
+                    label.setText(f"Текущее сравнение: сведения из сохранённого сравнения | ссылок: {ref_count}")
+                    label.setToolTip("Сведения текущего сравнения восстановлены из сохранённого сравнения и доступны только для чтения.")
                 else:
-                    label.setText("Текущий контекст: нет данных")
-                    label.setToolTip("Нет sidecar JSON или payload сессии для текущего контекста.")
+                    label.setText("Текущее сравнение: нет данных")
+                    label.setToolTip("Сведения текущего сравнения пока не загружены.")
             except Exception:
                 pass
         if button is not None:
             try:
                 button.setEnabled(bool(path_exists))
-                button.setToolTip(display_path if path_exists else "JSON текущего контекста недоступен.")
+                button.setToolTip(display_path if path_exists else "Сведения текущего сравнения недоступны.")
             except Exception:
                 pass
 
@@ -3328,28 +3329,28 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         hint = base
         if focus_mode == "all":
-            hint = f"{hint} Current anchor: {current_anchor}."
+            hint = f"{hint} Текущий якорь: {current_anchor}."
             current_dock = self._workspace_current_dock_label()
             if current_dock:
-                hint = f"{hint} Current overview dock: {current_dock}."
+                hint = f"{hint} Текущее окно обзора: {current_dock}."
             if target_label:
-                hint = f"{hint} Exact target right now: {target_label}."
+                hint = f"{hint} Точная цель сейчас: {target_label}."
             if target_label and target_focus:
-                hint = f"{hint} Use this when you want context before jumping to {target_label}. If you are already in Overview, clicking it again follows that target."
+                hint = f"{hint} Используйте это для ориентации перед переходом к {target_label}. Если обзор уже открыт, повторный выбор ведёт к этой цели."
             return hint
 
         if focus_mode == "heatmaps" and mode in {"one_to_all", "all_to_one"}:
-            hint = f"{hint} Current anchor: {current_anchor}."
+            hint = f"{hint} Текущий якорь: {current_anchor}."
         elif focus_mode == "multivariate" and mode == "all_to_all":
-            hint = f"{hint} Current anchor: {current_anchor}."
+            hint = f"{hint} Текущий якорь: {current_anchor}."
         elif focus_mode == "qa" and (trust_flag or qa_count > 0 or target_focus == "qa"):
-            hint = f"{hint} Current anchor: {current_anchor}."
+            hint = f"{hint} Текущий якорь: {current_anchor}."
 
         if focus_mode == target_focus and target_dock:
-            hint = f"{hint} Best dock inside this focus: {target_dock}."
-            hint = f"{hint} Recommended right now because {reason}."
+            hint = f"{hint} Лучшее окно в этом фокусе: {target_dock}."
+            hint = f"{hint} Рекомендуется сейчас: {reason}."
         elif focus_mode == "qa" and (trust_flag or qa_count > 0):
-            hint = f"{hint} Recommended when trust warnings or QA issues need confirmation."
+            hint = f"{hint} Рекомендуется, когда нужно подтвердить предупреждения достоверности или замечания проверки."
         return hint
 
     def _workspace_analysis_mode_hint_text(
@@ -3627,53 +3628,53 @@ class CompareViewer(QtWidgets.QMainWindow):
             or {}
         )
         target_dock = str(follow_target.get("dock_label") or "").strip()
-        target_label = self._workspace_route_label(follow_target, separator=": ", fallback="the suggested dock")
+        target_label = self._workspace_route_label(follow_target, separator=": ", fallback="предложенное окно")
         current_dock = self._workspace_current_dock_label()
         if current_dock and target_dock and current_dock != target_dock:
-            target_ref = f"the route {target_label}"
+            target_ref = f"переход {target_label}"
         else:
-            target_ref = target_label or "the suggested dock"
+            target_ref = target_label or "предложенное окно"
         if trust_flag:
-            return f"trust banner is active, so {target_ref} should check the evidence before pattern hunting"
+            return f"активно предупреждение о достоверности, поэтому {target_ref} должен сначала проверить данные"
         if qa_count > 0:
-            return f"QA found {qa_count} issue(s), so {target_ref} should validate suspicious regions first"
+            return f"проверка нашла замечания: {qa_count}, поэтому {target_ref} должен сначала проверить подозрительные зоны"
         if no_signals_selected and source_rows > 0 and mode in {"one_to_all", "all_to_one"}:
-            return f"event channels are muted, so {target_ref} should restore causal timing support"
+            return f"каналы событий не выбраны, поэтому {target_ref} должен вернуть временную опору по событиям"
         story_conf = str(story.get("confidence") or "").strip()
         repair_lane = str(story.get("repair_lane") or "").strip()
         repair_hint = str(story.get("repair_hint") or "").strip()
         if repair_lane == "qa":
             return (
-                f"the weakest link is event / evidence support, so {target_ref} should repair it"
+                f"самое слабое звено - поддержка событиями и проверкой, поэтому {target_ref} должен закрыть этот пробел"
                 f"{': ' + repair_hint if repair_hint else ''}"
             )
         if repair_lane == "heatmaps":
             return (
-                f"the weakest link is time-local alignment, so {target_ref} should repair it"
+                f"самое слабое звено - локальное согласование по времени, поэтому {target_ref} должен закрыть этот пробел"
                 f"{': ' + repair_hint if repair_hint else ''}"
             )
         if repair_lane == "multivariate":
             return (
-                f"the weakest link is field structure, so {target_ref} should repair it"
+                f"самое слабое звено - структура поля, поэтому {target_ref} должен закрыть этот пробел"
                 f"{': ' + repair_hint if repair_hint else ''}"
             )
         if story_conf == "partial":
             if mode in {"one_to_all", "all_to_one"}:
-                return f"the causal story is only partially aligned, so {target_ref} should repair the missing link"
+                return f"причинная версия согласована частично, поэтому {target_ref} должен закрыть недостающее звено"
             if mode == "all_to_all":
-                return f"the corridor is only partially aligned, so {target_ref} should localize the missing link in time"
+                return f"связь согласована частично, поэтому {target_ref} должен локализовать недостающее звено по времени"
         if story_conf == "tentative":
             if mode in {"one_to_all", "all_to_one"}:
-                return f"the causal story is still tentative, so {target_ref} should stabilize the time-local explanation"
+                return f"причинная версия ещё предварительная, поэтому {target_ref} должен стабилизировать локальное объяснение по времени"
             if mode == "all_to_all":
-                return f"the field story is still tentative, so {target_ref} should strengthen the structure before drill-down"
+                return f"версия поля ещё предварительная, поэтому {target_ref} должен укрепить структуру перед детализацией"
         if mode == "one_to_all":
-            return f"{target_ref} is the fastest way to trace one driver fanning out across many responses"
+            return f"{target_ref} быстрее всего показывает, как один фактор расходится по нескольким откликам"
         if mode == "all_to_one":
-            return f"{target_ref} keeps one target waveform aligned with many competing drivers"
+            return f"{target_ref} удерживает один целевой сигнал и сравнивает конкурирующие факторы"
         if mode == "all_to_all":
-            return f"{target_ref} is best for melting-cloud and pebbles-on-sand structure scouting"
-        return "full workspace gives the broadest context"
+            return f"{target_ref} лучше всего подходит для поиска общей структуры и событийных кластеров"
+        return "полный обзор даёт самый широкий контекст"
 
     def _workspace_should_follow_analysis_focus(self, previous_analysis_mode: str, current_focus_mode: str) -> bool:
         current_focus = str(current_focus_mode or "all")
@@ -3824,15 +3825,15 @@ class CompareViewer(QtWidgets.QMainWindow):
 
         notes: List[str] = []
         if trust_visible:
-            notes.append("trust banner active")
+            notes.append("активно предупреждение о достоверности")
         if qa_issues > 0:
-            notes.append(f"QA issues: {qa_issues}")
+            notes.append(f"замечаний проверки: {qa_issues}")
         if bool(events.get("no_signals_selected", False)):
-            notes.append("events muted")
+            notes.append("события не выбраны")
         elif event_name:
-            notes.append(f"event anchor: {event_name}")
+            notes.append(f"якорь события: {event_name}")
         elif events_rows > 0:
-            notes.append(f"event rows: {events_rows}")
+            notes.append(f"строк событий: {events_rows}")
 
         infl_lens = self._workspace_influence_lens_summary()
         mv_lens = self._workspace_multivar_lens_summary()
@@ -3908,17 +3909,17 @@ class CompareViewer(QtWidgets.QMainWindow):
             follow_headline = str(repair_summary.get("headline") or "Weakest link")
             follow_detail = str(repair_summary.get("detail") or focus_reason)
             try:
-                follow_button.setText(f"Follow weakest link -> {follow_route_label}")
+                follow_button.setText(f"Показать слабое место -> {follow_route_label}")
                 follow_button.setEnabled(bool(runs))
-                extra = f" Current dock: {current_dock_label}." if current_dock_label else ""
+                extra = f" Текущая панель: {current_dock_label}." if current_dock_label else ""
                 follow_button.setToolTip(f"{follow_headline}. {follow_detail}{extra}")
             except Exception:
                 pass
         follow_action = getattr(self, "act_view_focus_hint", None)
         if isinstance(follow_action, QtGui.QAction):
             try:
-                follow_action.setText(f"Follow Weakest Link ({follow_route_label})")
-                extra = f" Current dock: {current_dock_label}." if current_dock_label else ""
+                follow_action.setText(f"Показать слабое место ({follow_route_label})")
+                extra = f" Текущая панель: {current_dock_label}." if current_dock_label else ""
                 follow_action.setStatusTip(f"{str(repair_summary.get('headline') or 'Weakest link')}. {str(repair_summary.get('detail') or focus_reason)}{extra}")
                 follow_action.setToolTip(f"{str(repair_summary.get('headline') or 'Weakest link')}. {str(repair_summary.get('detail') or focus_reason)}{extra}")
                 follow_action.setEnabled(bool(runs))
@@ -3935,48 +3936,48 @@ class CompareViewer(QtWidgets.QMainWindow):
             fallback=str(recommended_focus_label or "Overview"),
         )
 
-        title = "Compare overview"
+        title = "Обзор сравнения"
         body = (
-            f"Reference run: {ref}. Heatmaps explain time-local differences, "
-            "QA/Events validate anomalies and Multivariate gets stronger as you add more runs and signals."
+            f"Эталонный прогон: {ref}. Теплокарты объясняют локальные отличия во времени, "
+            "проверка и события подтверждают аномалии, а многомерный обзор становится полезнее при добавлении прогонов и сигналов."
         )
         tone = "accent"
 
         if not runs:
-            title = "Load compare bundle"
+            title = "Загрузите набор для сравнения"
             body = (
-                "Open 2+ NPZ runs. Then pick a shared table and a few signals to unlock "
-                "Heatmaps, QA and Multivariate views."
+                "Загрузите 2+ файла результата. Затем выберите общую таблицу и несколько сигналов, "
+                "чтобы включить теплокарты, проверку и многомерный обзор."
             )
             tone = "neutral"
         elif len(runs) < 2:
-            title = "Add one more run"
+            title = "Добавьте ещё один прогон"
             body = (
-                f"Only {len(runs)} run is selected. Add a peer run to make Delta, Influence and "
-                "cross-run QA comparisons informative."
+                f"Сейчас выбран только {len(runs)} прогон. Добавьте сопоставимый прогон, чтобы Δ(t), влияние "
+                "и проверка между прогонами стали информативными."
             )
             tone = "neutral"
         elif not sigs:
-            title = "Select signals"
+            title = "Выберите сигналы"
             body = (
-                f"Table {table} is ready. Pick 2-6 signals on the left. Heatmaps work well for quick contrasts, "
-                "while Multivariate becomes most useful with 3+ signals."
+                f"Таблица {table} готова. Выберите слева 2-6 сигналов. Теплокарты удобны для быстрых контрастов, "
+                "а многомерный обзор лучше работает при 3+ сигналах."
             )
             tone = "accent"
         elif analysis_mode == "one_to_all":
             top_feat = str((getattr(self, "_insight_infl", {}) or {}).get("feature") or "")
             top_sig = str((getattr(self, "_insight_infl", {}) or {}).get("signal") or "")
-            title = "1 -> all driver sweep"
+            title = "Один фактор -> несколько откликов"
             if len(runs) < 3:
                 body = (
-                    "For one-driver-to-many-response analysis, keep 3+ runs selected so Influence(t) can rank "
-                    "one meta parameter against many signals."
+                    "Для анализа влияния одного фактора на несколько откликов выберите 3+ прогона, "
+                    "чтобы влияние(t) могло ранжировать один параметр относительно многих сигналов."
                 )
                 tone = "neutral"
             elif len(sigs) < 2:
                 body = (
-                    f"Reference run: {ref}. Add more signals in table {table} so one parameter can fan out across "
-                    "multiple responses in Delta / Influence heatmaps."
+                    f"Эталонный прогон: {ref}. Добавьте сигналы в таблице {table}, чтобы один параметр можно было проверить "
+                    "по нескольким откликам на теплокартах Δ(t) и влияния."
                 )
                 tone = "accent"
             elif infl_lens.get("fanout_feature"):
@@ -3984,38 +3985,38 @@ class CompareViewer(QtWidgets.QMainWindow):
                     f"{sig} {corr:+.2f}" for sig, corr in (infl_lens.get("fanout_examples", []) or [])[:3]
                 )
                 body = (
-                    f"Primary fan-out candidate is {infl_lens.get('fanout_feature')}: it already reaches "
+                    f"Основной кандидат влияния: {infl_lens.get('fanout_feature')}; он уже затрагивает "
                     f"{int(infl_lens.get('fanout_count', 0) or 0)}/{int(infl_lens.get('signal_count', 0) or 0)} signals "
-                    f"at t={float(infl_lens.get('time_s', 0.0) or 0.0):.3f}s."
+                    f"при t={float(infl_lens.get('time_s', 0.0) or 0.0):.3f} с."
                 )
                 if examples:
-                    body = f"{body} Start with {examples}, then validate the hotspot in QA / Events."
+                    body = f"{body} Начните с {examples}, затем подтвердите пик в проверке и событиях."
                 tone = "ok" if not trust_visible and qa_issues == 0 else "warn"
             elif top_feat and top_sig:
                 body = (
-                    f"Current strongest candidate is {top_feat} -> {top_sig}. Stay in Heatmaps / Influence to see "
-                    "how one meta driver spreads across many signals and time zones."
+                    f"Текущий сильнейший кандидат: {top_feat} -> {top_sig}. Оставайтесь в теплокартах и влиянии, "
+                    "чтобы увидеть, как один параметр расходится по сигналам и зонам времени."
                 )
                 tone = "ok" if not trust_visible and qa_issues == 0 else "warn"
             else:
                 body = (
-                    f"Use Influence(t) and Influence(t) Heatmap to broadcast one parameter across {len(sigs)} signals. "
-                    "Then confirm hot spots with QA / Events."
+                    f"Используйте влияние(t) и теплокарту влияния, чтобы проверить один параметр по {len(sigs)} сигналам. "
+                    "Затем подтвердите пики проверкой и событиями."
                 )
                 tone = "accent"
         elif analysis_mode == "all_to_one":
             target_sig = str(sigs[0] if sigs else "")
-            title = "all -> 1 target explanation"
+            title = "Несколько факторов -> одна цель"
             if len(runs) < 3:
                 body = (
-                    "Explaining one target signal from many drivers works best with 3+ runs. Add more runs, then keep "
-                    "the target waveform stable while moving the playhead."
+                    "Объяснение одного целевого сигнала через несколько факторов лучше работает при 3+ прогонах. "
+                    "Добавьте прогоны, затем удерживайте целевой график при перемещении по времени."
                 )
                 tone = "neutral"
             elif len(sigs) > 2:
                 body = (
-                    f"{len(sigs)} signals are selected. Narrow to 1-2 target signals so Heatmaps and Influence rank "
-                    "many meta drivers against one response, not a mixed bundle."
+                    f"Выбрано сигналов: {len(sigs)}. Сузьте цель до 1-2 сигналов, чтобы теплокарты и влияние "
+                    "ранжировали факторы относительно одного отклика, а не смешанного набора."
                 )
                 tone = "accent"
             elif infl_lens.get("target_signal") and infl_lens.get("target_examples"):
@@ -4023,171 +4024,171 @@ class CompareViewer(QtWidgets.QMainWindow):
                     f"{feat} {corr:+.2f}" for feat, corr in (infl_lens.get("target_examples", []) or [])[:3]
                 )
                 body = (
-                    f"Treat {infl_lens.get('target_signal')} as the outcome. Right now the clearest drivers are "
-                    f"{examples} at t={float(infl_lens.get('time_s', 0.0) or 0.0):.3f}s."
+                    f"Считайте {infl_lens.get('target_signal')} целевым откликом. Сейчас самые ясные факторы: "
+                    f"{examples} при t={float(infl_lens.get('time_s', 0.0) or 0.0):.3f} с."
                 )
                 if events_rows > 0:
-                    body = f"{body} Use Events to see whether local triggers reinforce that explanation."
+                    body = f"{body} Используйте события, чтобы проверить, усиливают ли локальные триггеры это объяснение."
                 tone = "ok" if len(sigs) == 1 and not trust_visible and qa_issues == 0 else "accent"
             else:
                 body = (
-                    f"Treat {target_sig or 'the current waveform'} as the outcome. Use Delta, Influence and Events to "
-                    "explain one response from many parameters and local event triggers."
+                    f"Считайте {target_sig or 'текущий график'} целевым откликом. Используйте Δ(t), влияние и события, "
+                    "чтобы объяснить один отклик через параметры и локальные триггеры."
                 )
                 tone = "ok" if len(sigs) == 1 and not trust_visible else "accent"
         elif analysis_mode == "all_to_all":
-            title = "all -> all structure scouting"
+            title = "Поиск связей всех со всеми"
             if mv_lens and int(mv_lens.get("checked_dim_count", 0) or 0) < 3:
                 body = (
-                    f"Cloud is under-described: only {int(mv_lens.get('checked_dim_count', 0) or 0)} checked dimensions are active. "
-                    "Check at least 3-4 fields in Multivariate so SPLOM, Parallel and 3D can separate regimes instead of flattening them."
+                    f"Облако описано недостаточно: активных размерностей {int(mv_lens.get('checked_dim_count', 0) or 0)}. "
+                    "Выберите минимум 3-4 поля в многомерном обзоре, чтобы графики разделяли режимы, а не сплющивали их."
                 )
                 tone = "accent"
             elif mv_lens and int(mv_lens.get("keep_pct", 100) or 100) <= 15 and int(mv_lens.get("runs", 0) or 0) >= 4:
                 body = (
-                    f"Melting cloud is very thin at {int(mv_lens.get('keep_pct', 100) or 100)}%. "
-                    f"If you are scouting rare outliers keep sparse-first; if you want regime cores, raise keep% or switch to {('dense-first' if str(mv_lens.get('keep_mode') or '') == 'sparse-first' else 'sparse-first')}."
+                    f"Облако слишком тонкое при {int(mv_lens.get('keep_pct', 100) or 100)}%. "
+                    f"Для редких выбросов оставьте режим sparse-first; для ядер режимов увеличьте процент или переключите на {('dense-first' if str(mv_lens.get('keep_mode') or '') == 'sparse-first' else 'sparse-first')}."
                 )
                 tone = "warn"
             elif mv_lens and bool(mv_lens.get("pebbles", False)) and not str(mv_lens.get("peb_signal", "") or "").strip():
                 body = (
-                    "Cloud geometry is ready, but pebbles have no discrete signal yet. Pick an event signal in Multivariate so the sand/grain overlay can show where structure changes are event-driven."
+                    "Геометрия облака готова, но для событий не выбран дискретный сигнал. Выберите сигнал событий в многомерном обзоре, чтобы увидеть, где структура меняется из-за переключений."
                 )
                 tone = "accent"
             elif len(runs) >= 3 and len(sigs) >= 3:
                 body = (
-                    f"{len(runs)} runs and {len(sigs)} signals are ready for SPLOM, Parallel and 3D melting cloud. "
-                    "Use pebbles-on-sand overlays to see where event structure separates clusters."
+                    f"Готово для SPLOM, Parallel и 3D-облака: прогонов {len(runs)}, сигналов {len(sigs)}. "
+                    "Используйте слой событий, чтобы увидеть, где события разделяют кластеры."
                 )
                 if mv_lens:
                     body = (
-                        f"{body} Current 3D lens is {mv_lens.get('x') or '—'}/{mv_lens.get('y') or '—'}/{mv_lens.get('z') or '—'} "
-                        f"with keep={int(mv_lens.get('keep_pct', 100) or 100)}% in {mv_lens.get('keep_mode') or 'sparse-first'} mode."
+                        f"{body} Текущая 3D-ось: {mv_lens.get('x') or '—'}/{mv_lens.get('y') or '—'}/{mv_lens.get('z') or '—'} "
+                        f"с keep={int(mv_lens.get('keep_pct', 100) or 100)}% в режиме {mv_lens.get('keep_mode') or 'sparse-first'}."
                     )
                 tone = "ok" if not trust_visible and qa_issues == 0 else "warn"
             else:
                 body = (
-                    f"Build density for all-to-all analysis: keep 3+ runs and 3+ signals in table {table}. "
-                    "That is where clouds, sparse outliers and pebbles become visually useful."
+                    f"Уплотните анализ всех со всеми: оставьте 3+ прогона и 3+ сигнала в таблице {table}. "
+                    "Так облака, редкие выбросы и события становятся визуально полезными."
                 )
                 tone = "accent"
         elif mode == "heatmaps":
-            title = "Heatmap comparison"
+            title = "Сравнение по теплокартам"
             body = (
-                f"Use Delta and Influence heatmaps to localize where {len(runs)} runs diverge across "
-                f"{len(sigs)} selected signals in table {table}. Review QA or Events when a hotspot needs explanation."
+                f"Используйте теплокарты Δ(t) и влияния, чтобы локализовать расхождение {len(runs)} прогонов "
+                f"по {len(sigs)} выбранным сигналам в таблице {table}. Если пик требует объяснения, проверьте качество и события."
             )
             tone = "accent"
         elif mode == "multivariate":
-            title = "Multivariate scouting"
+            title = "Многомерный обзор"
             if mv_lens:
                 body = (
-                    f"Checked fields: {int(mv_lens.get('checked_dim_count', 0) or 0)} out of {int(mv_lens.get('field_count', 0) or 0)}. "
+                    f"Выбранные поля: {int(mv_lens.get('checked_dim_count', 0) or 0)} из {int(mv_lens.get('field_count', 0) or 0)}. "
                     f"3D = {mv_lens.get('x') or '—'}/{mv_lens.get('y') or '—'}/{mv_lens.get('z') or '—'}, "
                     f"keep={int(mv_lens.get('keep_pct', 100) or 100)}% ({mv_lens.get('keep_mode') or 'sparse-first'}). "
-                    "Use brushing to pull clusters or sparse outliers back into the main compare plots."
+                    "Выделяйте кластеры или редкие выбросы и возвращайте их в основные графики сравнения."
                 )
                 if bool(mv_lens.get("pebbles", False)) and str(mv_lens.get("peb_signal", "") or "").strip():
-                    body = f"{body} Pebbles are anchored to {mv_lens.get('peb_signal')}."
+                    body = f"{body} События привязаны к {mv_lens.get('peb_signal')}."
                 tone = "ok" if (not trust_visible and qa_issues == 0 and int(mv_lens.get('checked_dim_count', 0) or 0) >= 3) else "warn"
             else:
                 body = (
-                    f"{len(runs)} runs and {len(sigs)} signals are ready for SPLOM, Parallel and 3D cloud analysis. "
-                    "Use brushing to pull outliers back into the main compare plots."
+                    f"Готово для SPLOM, Parallel и 3D-облака: прогонов {len(runs)}, сигналов {len(sigs)}. "
+                    "Выделяйте выбросы и возвращайте их в основные графики сравнения."
                 )
                 tone = "ok" if (not trust_visible and qa_issues == 0) else "warn"
         elif mode == "qa":
-            title = "QA drill-down"
+            title = "Проверка и разбор"
             if qa_issues > 0:
                 body = (
-                    f"QA found {qa_issues} issue(s). Double-click a QA or Events row to move the playhead, "
-                    "keep the reference run stable and verify the local waveform."
+                    f"Проверка нашла замечания: {qa_issues}. Двойной клик по строке проверки или события переводит время, "
+                    "после этого удержите эталонный прогон и проверьте локальный график."
                 )
                 tone = "warn" if not trust_visible and qa_issues < 10 else "alert"
             else:
                 body = (
-                    f"QA and Events are ready for drill-down on {len(runs)} runs. Use this layout to validate "
-                    "suspicious regions before trusting the prettier charts."
+                    f"Проверка и события готовы к разбору по {len(runs)} прогонам. Используйте этот вид, чтобы проверить "
+                    "подозрительные зоны перед доверием красивым графикам."
                 )
                 tone = "accent"
         elif trust_visible:
-            title = "Trust attention"
+            title = "Нужно проверить достоверность"
             body = (
-                "The trust banner reports data-quality caveats. Review QA and Events first, then return "
-                "to Heatmaps or Multivariate once the suspect runs are understood."
+                "Есть предупреждение о качестве данных. Сначала проверьте качество и события, затем вернитесь "
+                "к теплокартам или многомерному обзору, когда подозрительные прогоны понятны."
             )
             tone = "alert" if qa_issues > 0 else "warn"
         elif qa_issues > 0:
-            title = "QA findings detected"
+            title = "Найдены замечания проверки"
             body = (
-                f"QA found {qa_issues} issue(s). Start with QA / Events, then use Heatmaps to see whether "
-                "the problem is local or systemic across runs."
+                f"Проверка нашла замечания: {qa_issues}. Начните с проверки и событий, затем используйте теплокарты, "
+                "чтобы понять, проблема локальная или системная по прогонам."
             )
             tone = "warn" if qa_issues < 10 else "alert"
         elif len(runs) >= 3 and len(sigs) >= 3:
-            title = "Ready for multivariate"
+            title = "Готово к многомерному обзору"
             body = (
-                f"{len(runs)} runs and {len(sigs)} signals are selected in table {table}. "
-                "Multivariate view should now separate clusters, sparse clouds and outliers clearly."
+                f"В таблице {table} выбрано прогонов {len(runs)}, сигналов {len(sigs)}. "
+                "Многомерный обзор должен уже разделять кластеры, редкие облака и выбросы."
             )
             tone = "ok"
 
         if (not runs) or len(runs) < 2 or (not sigs):
             if analysis_mode == "one_to_all":
                 body = (
-                    f"{body} Setup for 1 -> all: aim for 3+ runs, keep one candidate driver in mind and select 2+ signals "
-                    "so Influence(t) can show how one parameter fans out into many responses."
+                    f"{body} Для режима один фактор -> несколько откликов: стремитесь к 3+ прогонам, держите в голове один кандидат влияния и выберите 2+ сигнала, "
+                    "чтобы влияние(t) показало, как один параметр расходится по откликам."
                 )
             elif analysis_mode == "all_to_one":
                 body = (
-                    f"{body} Setup for all -> 1: aim for 3+ runs and narrow the target to 1-2 signals, then explain one waveform "
-                    "through many drivers and local event markers."
+                    f"{body} Для режима несколько факторов -> одна цель: стремитесь к 3+ прогонам и сузьте цель до 1-2 сигналов, "
+                    "затем объясняйте один график через факторы и локальные события."
                 )
             else:
                 body = (
-                    f"{body} Setup for all -> all: aim for 3+ runs and 3+ signals so melting clouds, sparse outliers and "
-                    "pebbles-on-sand overlays become visually informative."
+                    f"{body} Для режима все со всеми: стремитесь к 3+ прогонам и 3+ сигналам, чтобы облака, редкие выбросы "
+                    "и слой событий стали визуально полезными."
                 )
             if follow_route_label:
-                body = f"{body} First working route after setup: {follow_route_label}."
+                body = f"{body} Первый рабочий переход после подготовки: {follow_route_label}."
 
         if runs:
             if bool(events.get("no_signals_selected", False)):
-                body = f"{body} Events are currently muted: pick one or more event channels to add local trigger evidence."
+                body = f"{body} События сейчас не выбраны: выберите один или несколько каналов событий, чтобы добавить локальные триггеры."
             elif event_focus:
                 if analysis_mode == "one_to_all":
-                    body = f"{body} Event anchor: {event_focus}. Check whether the current fan-out starts near that trigger."
+                    body = f"{body} Якорь события: {event_focus}. Проверьте, начинается ли текущее влияние рядом с этим триггером."
                 elif analysis_mode == "all_to_one":
-                    body = f"{body} Event anchor: {event_focus}. Use it to test whether the target change is trigger-driven or only parameter-driven."
+                    body = f"{body} Якорь события: {event_focus}. Проверьте, изменение цели вызвано триггером или только параметрами."
                 else:
-                    body = f"{body} Event anchor: {event_focus}. Compare it against cloud clusters and pebbles to see whether structure is event-driven."
+                    body = f"{body} Якорь события: {event_focus}. Сравните его с кластерами, чтобы понять, вызвана ли структура событиями."
             if story_label:
-                title = f"Causal read ({story_confidence_title or 'Story'}): {story_label}" if story_confidence_title else f"Causal read: {story_label}"
-                body = f"{body} Current causal story: {story_label}."
+                title = f"Причинная версия ({story_confidence_title or 'версия'}): {story_label}" if story_confidence_title else f"Причинная версия: {story_label}"
+                body = f"{body} Текущая причинная версия: {story_label}."
                 if story_confidence:
-                    body = f"{body} Story confidence: {story_confidence}."
+                    body = f"{body} Уверенность версии: {story_confidence}."
                 if str(causal_story.get('confidence_detail') or '').strip():
                     body = f"{body} {str(causal_story.get('confidence_detail') or '').strip()}"
                 if str(causal_story.get('repair_hint') or '').strip():
-                    body = f"{body} Main gap: {str(causal_story.get('repair_hint') or '').strip()}"
+                    body = f"{body} Главный пробел: {str(causal_story.get('repair_hint') or '').strip()}"
                 if str(repair_summary.get("headline") or "").strip():
                     body = f"{body} {str(repair_summary.get('headline') or '').strip()}."
             if peak_bridge:
                 body = (
-                    f"{body} Peak bridge: {str(peak_bridge.get('headline') or '').strip()}. "
+                    f"{body} Связка по пикам: {str(peak_bridge.get('headline') or '').strip()}. "
                     f"{str(peak_bridge.get('detail') or '').strip()}"
                 )
             if dist_bridge:
                 body = (
-                    f"{body} Run-metrics bridge: {str(dist_bridge.get('headline') or '').strip()}. "
+                    f"{body} Связка по метрикам прогонов: {str(dist_bridge.get('headline') or '').strip()}. "
                     f"{str(dist_bridge.get('detail') or '').strip()}"
                 )
-            body = f"{body} Recommended route: {follow_route_label} because {focus_reason}."
+            body = f"{body} Рекомендуемый переход: {follow_route_label}; причина: {focus_reason}."
 
         if notes:
-            body = f"{body} Status: {', '.join(notes)}."
+            body = f"{body} Состояние: {', '.join(notes)}."
         if ref and ref != "auto":
-            body = f"{body} Ref: {ref}."
+            body = f"{body} Эталон: {ref}."
 
         title_map = {
             "Compare overview": "\u041e\u0431\u0437\u043e\u0440 \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f",
@@ -4246,6 +4247,130 @@ class CompareViewer(QtWidgets.QMainWindow):
         except Exception:
             return ""
 
+    def _operator_insight_text(self, value: object) -> str:
+        text = str(value or "")
+        replacements = (
+            ("Analysis lens", "Режим анализа"),
+            ("Recommended focus", "Рекомендуемый фокус"),
+            ("Causal story", "Причинная версия"),
+            ("Weakest link", "Слабое место"),
+            ("Driver fan-out", "Влияние драйвера"),
+            ("Target drivers", "Драйверы цели"),
+            ("Coupling field", "Поле связей"),
+            ("Cloud / pebbles", "Облако и события"),
+            ("Run spread", "Разброс прогонов"),
+            ("Peak |Δ| field", "Пики |Δ|"),
+            ("Delta hotspot", "Локальный максимум Δ"),
+            ("Top meta driver", "Главный параметр влияния"),
+            ("Event context", "События"),
+            ("Quality / next step", "Качество и следующий шаг"),
+            ("Heuristic next move", "Следующее действие"),
+            ("all -> all structure", "связи всех со всеми"),
+            ("1 -> all driver sweep", "один драйвер влияет на несколько откликов"),
+            ("all -> 1 target explanation", "объяснение одного целевого сигнала"),
+            ("Use multivariate clouds, melting density and pebbles to scout clusters, sparse outliers and cross-coupled regimes.", "Используйте многомерное облако, плотность и события, чтобы найти кластеры, редкие выбросы и связанные режимы."),
+            ("Hold one candidate driver or hotspot fixed, then inspect how it fans out across many signals via Influence(t) and heatmaps.", "Зафиксируйте один предполагаемый драйвер или пик и проверьте, как он расходится по сигналам через влияние(t) и теплокарты."),
+            ("as the outcome and rank many drivers against one response with local event support.", "как целевой отклик и ранжируйте драйверы с учётом локальных событий."),
+            ("Take this route now. Why now:", "Сейчас удобнее идти сюда. Причина:"),
+            ("Confidence:", "Уверенность:"),
+            ("Repair hint:", "Что проверить:"),
+            ("reaches", "затрагивает"),
+            ("signals at |corr|≥", "сигналов при |корреляции|≥"),
+            ("Strongest fan-out:", "Сильнее всего:"),
+            ("Target signal", "Целевой сигнал"),
+            ("is ranked against", "сопоставляется с"),
+            ("meta drivers at", "параметрами влияния при"),
+            ("Top drivers:", "Сильнейшие драйверы:"),
+            ("Strong links:", "Сильные связи:"),
+            ("Dominant corridor:", "Ведущая связь:"),
+            ("strong links in play", "сильных связей"),
+            ("preserving sparse contours and outliers", "сохраняются редкие контуры и выбросы"),
+            ("preserving dense regime cores", "сохраняются плотные ядра режимов"),
+            ("Pebbles pin event structure from", "События фиксируют структуру по сигналу"),
+            ("Pebbles are on, but pick a discrete signal so event grains can separate clusters.", "События включены; выберите дискретный сигнал, чтобы они разделяли кластеры."),
+            ("Pebbles are off, so the view is showing only cloud geometry.", "События выключены, показана только геометрия облака."),
+            ("Need more runs for cloud scouting", "Нужно больше прогонов для облака"),
+            ("Need 3 checked dimensions", "Нужны 3 выбранные размерности"),
+            ("Cloud is very thin", "Облако слишком разрежено"),
+            ("Melting cloud ready", "Облако готово"),
+            ("Fields=", "Полей="),
+            ("checked=", "выбрано="),
+            ("Keep=", "Оставить="),
+            ("sparse-first means", "редкие точки важнее:"),
+            ("dense-first means", "плотные ядра важнее:"),
+            ("Current view only.", "Только текущий вид."),
+            ("Whole-run metrics.", "Метрики всего прогона."),
+            ("Build multivariate field", "Соберите многомерное поле"),
+            ("Select 2+ runs and 1+ signals so the window can derive run-level fields for SPLOM, 3D melting cloud and pebbles-on-sand overlays.", "Выберите 2+ прогона и 1+ сигнал, чтобы построить матрицу графиков, 3D-облако и слой событий."),
+            ("Run spread ready", "Разброс прогонов готов"),
+            (" via ", " по метрике "),
+            ("top=", "верх="),
+            ("median=", "медиана="),
+            ("ref=", "эталон="),
+            ("Window:", "Окно:"),
+            ("Values cross both sides of the reference, so the run spread is currently split.", "Значения лежат по обе стороны эталона, поэтому разброс сейчас разделён."),
+            ("One run", "Один прогон"),
+            ("is currently pulling the scalar ranking away from the median.", "сейчас уводит скалярный рейтинг от медианы."),
+            ("Peak |Δ| field ready", "Поле пиков |Δ| готово"),
+            ("Hotspot", "Пик"),
+            ("Signal competition=", "конкуренция сигналов="),
+            ("run competition=", "конкуренция прогонов="),
+            ("Run ", "Прогон "),
+            ("shows the strongest divergence.", "показывает наибольшее расхождение."),
+            ("Peak ", "Пик "),
+            (" mode.", " режиме."),
+            ("Waiting for heatmap refresh", "Ждём обновления теплокарты"),
+            ("Heatmaps are enabled, but no stable hotspot summary is cached yet.", "Теплокарты включены, но устойчивой сводки пика ещё нет."),
+            ("Keep 2+ runs and 1+ signals selected.", "Оставьте выбранными 2+ прогона и 1+ сигнал."),
+            ("Need comparison context", "Нужен набор для сравнения"),
+            ("Select at least 2 runs and a signal to surface the strongest time-local delta zone.", "Выберите минимум 2 прогона и сигнал, чтобы показать сильнейшую локальную зону Δ."),
+            ("corr=", "корреляция="),
+            ("Runs=", "прогонов="),
+            ("meta shown=", "параметров показано="),
+            ("Need influence refresh", "Нужно обновить влияние"),
+            ("Influence(t) becomes meaningful with 3+ runs. Move the playhead or keep the current selection stable to rank meta drivers.", "Влияние(t) становится полезным при 3+ прогонах. Передвиньте кадр или удерживайте выбор, чтобы ранжировать параметры влияния."),
+            ("Need 3+ runs", "Нужно 3+ прогона"),
+            ("Meta-to-signal heuristics rank which numeric meta parameters explain the current signal shape best.", "Эвристика оценивает, какие числовые параметры лучше всего объясняют форму текущего сигнала."),
+            ("Event filter is muted", "Фильтр событий пуст"),
+            ("No event signals are selected right now. Pick one or more event channels so local triggers can support the current explanation.", "Сейчас не выбран ни один сигнал событий. Выберите один или несколько каналов, чтобы локальные триггеры подтвердили объяснение."),
+            ("Visible event context", "Видимые события"),
+            ("Baseline=", "Базовый прогон="),
+            ("visible rows=", "видимых строк="),
+            ("First visible anchor:", "Первый видимый якорь:"),
+            ("Dominant visible event is", "Ведущее видимое событие:"),
+            ("row(s)", "строк"),
+            ("Trigger gate:", "Триггер драйвера:"),
+            ("Use this trigger gate to test whether one driver fans out into several responses.", "Используйте этот триггер, чтобы проверить, расходится ли один драйвер по нескольким откликам."),
+            ("Target-side trigger:", "Триггер цели:"),
+            ("Use this local event context to confirm or reject the current target-driver explanation.", "Используйте локальные события, чтобы подтвердить или отвергнуть объяснение целевого сигнала."),
+            ("Pebble anchor:", "Якорь событий:"),
+            ("Compare these grains with cloud clusters to see whether separation is event-driven.", "Сравните события с кластерами облака, чтобы понять, вызвано ли разделение событиями."),
+            ("No visible events after filtering", "После фильтра событий не видно"),
+            ("The baseline run has event rows, but none are currently visible. Revisit the event filter or the current reference run.", "В базовом прогоне есть события, но сейчас они скрыты. Проверьте фильтр событий или выбранный эталон."),
+            ("Load a compare set", "Загрузите набор для сравнения"),
+            ("Open 2+ NPZ runs to unlock heatmaps, QA and multivariate clustering.", "Загрузите 2+ файла результата, чтобы включить теплокарты, проверку и многомерную группировку."),
+            ("Trust attention required", "Нужно проверить достоверность"),
+            ("Trust banner is active.", "Активно предупреждение о достоверности."),
+            ("QA issues=", "замечаний проверки="),
+            ("events rows=", "строк событий="),
+            ("Next:", "Далее:"),
+            ("Event anchor:", "Якорь события:"),
+            ("QA flagged", "Проверка нашла"),
+            ("issue(s)", "замечаний"),
+            ("Next: inspect", "Далее: проверьте"),
+            ("then return to Heatmaps for root-cause localization.", "затем вернитесь к теплокартам для локализации причины."),
+            ("Ready for all-to-all scouting", "Готово к поиску связей всех со всеми"),
+            ("Ready for target explanation", "Готово к объяснению целевого сигнала"),
+            ("Ready for driver sweep", "Готово к проверке драйвера"),
+            ("Build comparison density", "Уплотните сравнение"),
+            ("target signals=", "целевых сигналов="),
+            ("response signals=", "сигналов отклика="),
+            ("Add a few more signals to strengthen multivariate separation.", "Добавьте ещё несколько сигналов, чтобы усилить многомерное разделение."),
+        )
+        for source, target in replacements:
+            text = text.replace(source, target)
+        return text
+
     def _workspace_insight_card_html(self, title: str, headline: str, detail: str, *, tone: str = "neutral") -> str:
         tone_map = {
             "ok": ("#edf8f2", "#94c8af", "#245746", "#174034"),
@@ -4255,9 +4380,9 @@ class CompareViewer(QtWidgets.QMainWindow):
             "neutral": ("#f8f1e5", "#d6c8af", "#6b624f", "#403a30"),
         }
         bg, border, accent, text = tone_map.get(str(tone), tone_map["neutral"])
-        title_html = self._insight_html_escape(title)
-        headline_html = self._insight_html_escape(headline)
-        detail_html = self._insight_html_escape(detail).replace("\n", "<br/>")
+        title_html = self._insight_html_escape(self._operator_insight_text(title))
+        headline_html = self._insight_html_escape(self._operator_insight_text(headline))
+        detail_html = self._insight_html_escape(self._operator_insight_text(detail)).replace("\n", "<br/>")
         return (
             f"<div style='margin:0 0 8px 0; padding:10px 12px; "
             f"background:{bg}; border:1px solid {border}; border-left:4px solid {accent}; border-radius:10px;'>"
@@ -4712,28 +4837,28 @@ class CompareViewer(QtWidgets.QMainWindow):
         if mode == "one_to_all":
             if str(infl.get("fanout_feature") or "").strip() and signal_competition < 2 and story_conf == "partial" and repair_surface in {"delta", "influence_heatmap"}:
                 return {}
-            headline = "Coarse-gate the fan-out first"
+            headline = "Сначала проверьте поле откликов"
             detail = (
-                f"Peak |Δ| is dominated by {hotspot_signal or 'one response'} in {hotspot_run or 'one run'}"
-                f"{f' @ {hotspot_time:.3f}s' if np.isfinite(hotspot_time) else ''}"
+                f"Пик |Δ| сейчас у сигнала {hotspot_signal or 'одного отклика'} в прогоне {hotspot_run or 'одном прогоне'}"
+                f"{f' на {hotspot_time:.3f} с' if np.isfinite(hotspot_time) else ''}"
                 f"{f' (|Δ|={hotspot_peak:.6g})' if np.isfinite(hotspot_peak) else ''}. "
-                "Use the aggregate surface to decide which response lane deserves the next time-local heatmap pass."
+                "Используйте общую теплокарту, чтобы выбрать отклик для следующей локальной проверки по времени."
             )
             if signal_competition >= 2:
-                detail = f"{detail} Around {signal_competition} responses stay within the same peak band, so the fan-out is still crowded."
+                detail = f"{detail} Около {signal_competition} откликов остаются в той же зоне пиков, поэтому влияние ещё не разделено."
                 tone = "warn"
         else:
             if not target_signal or (hotspot_signal and hotspot_signal == target_signal):
                 return {}
-            headline = "Check whether another response steals the global peak"
+            headline = "Проверьте, не перехватывает ли пик другой отклик"
             detail = (
-                f"The target is {target_signal}, but Peak |Δ| is currently led by {hotspot_signal or 'another response'}"
-                f"{f' in {hotspot_run}' if hotspot_run else ''}"
-                f"{f' @ {hotspot_time:.3f}s' if np.isfinite(hotspot_time) else ''}. "
-                "Use the aggregate surface to see whether the target is truly primary or just one member of a broader split."
+                f"Цель: {target_signal}, но пик |Δ| сейчас у {hotspot_signal or 'другого отклика'}"
+                f"{f' в прогоне {hotspot_run}' if hotspot_run else ''}"
+                f"{f' на {hotspot_time:.3f} с' if np.isfinite(hotspot_time) else ''}. "
+                "Проверьте общую теплокарту: цель действительно главная или только часть более широкого расхождения."
             )
             if run_competition >= 2:
-                detail = f"{detail} The peak also spans multiple runs, so this is not just a single-run outlier."
+                detail = f"{detail} Пик захватывает несколько прогонов, значит это не одиночный выброс."
             tone = "warn"
         return {
             "focus": "heatmaps",
@@ -4803,25 +4928,25 @@ class CompareViewer(QtWidgets.QMainWindow):
             if len(sig_list) > 2:
                 return {}
             if outlier_driven:
-                headline = "Check whether the target is outlier-driven"
+                headline = "Проверьте, не тянет ли цель отдельный выброс"
                 detail = (
-                    f"{outlier_run or top_run or 'One run'} is pulling {signal_name or 'the target'} "
-                    f"to {outlier_value:.6g} while the median stays near {median_value:.6g} in {metric_label}. "
-                    f"Use this ranking before trusting a single lead driver."
+                    f"{outlier_run or top_run or 'Один прогон'} тянет {signal_name or 'целевой сигнал'} "
+                    f"к {outlier_value:.6g}, пока медиана остаётся около {median_value:.6g} по метрике {metric_label}. "
+                    "Проверьте этот рейтинг, прежде чем доверять одному ведущему фактору."
                 )
                 tone = "warn"
             elif mixed_sign and "delta" in metric_key:
-                headline = "Check whether the target splits around the reference"
+                headline = "Проверьте, не делится ли цель вокруг эталона"
                 detail = (
-                    f"{signal_name or 'The target'} crosses both sides of the reference"
-                    f"{f' {ref_label}' if ref_label else ''} in {metric_label}. "
-                    "Use the scalar ranking to see whether this is a clean cohort split or just a noisy frame."
+                    f"{signal_name or 'Целевой сигнал'} лежит по обе стороны от эталона"
+                    f"{f' {ref_label}' if ref_label else ''} по метрике {metric_label}. "
+                    "Используйте скалярный рейтинг, чтобы понять: это чистое разделение групп или шумный кадр."
                 )
             elif wide_spread or not list(infl.get("target_examples") or []):
-                headline = "Quantify target spread first"
+                headline = "Сначала оцените разброс цели"
                 detail = (
-                    f"Use {metric_label} for {signal_name or 'the target'} to see whether the response is broad, skewed or ref-biased"
-                    f"{f' ({time_desc})' if time_desc else ''} before ranking many drivers."
+                    f"Используйте {metric_label} для {signal_name or 'целевого сигнала'}, чтобы увидеть, широкий ли отклик, смещённый ли он или тянется к эталону"
+                    f"{f' ({time_desc})' if time_desc else ''}, прежде чем ранжировать факторы."
                 )
             else:
                 return {}
@@ -4829,27 +4954,27 @@ class CompareViewer(QtWidgets.QMainWindow):
             if len(sig_list) > 2 and list(infl.get("fanout_examples") or []) and not (outlier_driven or wide_spread):
                 return {}
             if outlier_driven:
-                headline = "Check whether one response is run-dominated"
+                headline = "Проверьте, не доминирует ли один прогон"
                 detail = (
-                    f"{signal_name or 'This response'} is being amplified mainly by {outlier_run or top_run or 'one run'} "
-                    f"({outlier_value:.6g} in {metric_label}). Use Run metrics to see whether the fan-out is broad enough"
-                    " across runs to justify a one-driver sweep."
+                    f"{signal_name or 'Этот отклик'} усиливается в основном прогоном {outlier_run or top_run or 'один прогон'} "
+                    f"({outlier_value:.6g} по метрике {metric_label}). Проверьте метрики прогонов: достаточно ли влияние широко "
+                    "распределено по прогонам."
                 )
                 tone = "warn"
             elif wide_spread or not str(infl.get("fanout_feature") or "").strip():
-                headline = "Quantify response spread first"
+                headline = "Сначала оцените разброс отклика"
                 detail = (
-                    f"Use {metric_label} for {signal_name or 'the current response'} to check whether the run spread is broad, split or reference-biased"
-                    f"{f' ({time_desc})' if time_desc else ''} before sweeping one driver across many outputs."
+                    f"Используйте {metric_label} для {signal_name or 'текущего отклика'}, чтобы проверить, широкий ли разброс, разделённый ли он или смещён к эталону"
+                    f"{f' ({time_desc})' if time_desc else ''}, прежде чем проверять один фактор по нескольким выходам."
                 )
             else:
                 return {}
 
         return {
             "focus": "heatmaps",
-            "focus_label": "Heatmaps",
+            "focus_label": "Теплокарты",
             "dock_attr": "dock_run_metrics",
-            "dock_label": "Run metrics",
+            "dock_label": "Метрики прогонов",
             "signal": signal_name,
             "metric_label": metric_label,
             "headline": headline,
@@ -4873,12 +4998,12 @@ class CompareViewer(QtWidgets.QMainWindow):
     ) -> Dict[str, str]:
         if trust_visible or qa_issues > 0:
             detail = (
-                f"Pause exploration and validate the suspect zone in QA / Events first. "
-                f"Then return to {self._workspace_analysis_label()} only after the anomaly is understood."
+                "Приостановите исследование и сначала проверьте подозрительную зону через проверку и события. "
+                f"Возвращайтесь к {self._workspace_analysis_label()} только после понимания аномалии."
             )
             if qa_issues > 0:
-                detail = f"{detail} Current QA issues: {qa_issues}."
-            return {"headline": "Validate anomalies first", "detail": detail, "tone": "warn" if qa_issues < 10 else "alert"}
+                detail = f"{detail} Текущих замечаний проверки: {qa_issues}."
+            return {"headline": "Сначала проверьте аномалии", "detail": detail, "tone": "warn" if qa_issues < 10 else "alert"}
 
         story = dict(causal_story or {})
         story_conf = str(story.get("confidence") or "").strip()
@@ -4888,10 +5013,10 @@ class CompareViewer(QtWidgets.QMainWindow):
         repair_hint = str(story.get("repair_hint") or "").strip()
         surface_label = {
             "delta": "Δ(t)",
-            "influence_heatmap": "Influence(t) Heatmap",
-            "events": "Events",
-            "qa": "QA",
-            "multivariate": "Multivariate",
+            "influence_heatmap": "Теплокарта влияния(t)",
+            "events": "События",
+            "qa": "Проверка",
+            "multivariate": "Многомерный обзор",
         }.get(repair_surface, "")
         current_dock_label = str(self._workspace_current_dock_label() or "").strip()
 
@@ -4899,9 +5024,9 @@ class CompareViewer(QtWidgets.QMainWindow):
             target = str(target_label or "").strip()
             if not target:
                 return detail
-            route = f"Open {target}"
+            route = f"Откройте {target}"
             if current_dock_label and current_dock_label != target:
-                route = f"From {current_dock_label}, open {target}"
+                route = f"Из {current_dock_label} откройте {target}"
             clean_detail = str(detail or "").strip()
             if not clean_detail:
                 return route
@@ -4919,7 +5044,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                 str(peak_bridge.get("dock_label") or "Peak |Δ|"),
             )
             return {
-                "headline": str(peak_bridge.get("headline") or "Coarse-gate the response field first"),
+                "headline": str(peak_bridge.get("headline") or "Сначала проверьте поле откликов"),
                 "detail": detail,
                 "tone": str(peak_bridge.get("tone") or "accent"),
             }
@@ -5232,45 +5357,45 @@ class CompareViewer(QtWidgets.QMainWindow):
                 if np.isfinite(heat_time):
                     detail = f"{detail} @ {heat_time:.3f}s"
                 if np.isfinite(heat_peak):
-                    detail = f"{detail} with peak {heat_peak:.3g}"
+                    detail = f"{detail} с пиком {heat_peak:.3g}"
                 detail = f"{detail}."
                 if response_in_fanout:
                     align_score += 1
-                    detail = f"{detail} The hotspot signal is already inside the top fan-out responses."
+                    detail = f"{detail} Сигнал пика уже входит в ведущие отклики влияния."
                 if fanout_multi:
                     align_score += 1
                 if event_sig:
                     if np.isfinite(event_time) and np.isfinite(heat_time):
-                        detail = f"{detail} Event anchor {event_sig} sits at {event_time:.3f}s, so check whether it gates that spread."
+                        detail = f"{detail} Событие {event_sig} находится на {event_time:.3f} с; проверьте, ограничивает ли оно этот разброс."
                         if event_aligned:
                             align_score += 1
                     else:
-                        detail = f"{detail} Event anchor {event_sig} can be used as the gate for this spread."
+                        detail = f"{detail} Событие {event_sig} можно использовать как фильтр для этого разброса."
                 confidence = "aligned" if align_score >= 3 else ("partial" if align_score >= 2 else "tentative")
                 confidence_detail = {
-                    "aligned": "Driver ranking, hotspot response and event timing all point in the same direction.",
-                    "partial": "Two parts of the chain agree, but one link still needs a closer check.",
-                    "tentative": "The chain is plausible, but it is still resting on incomplete agreement.",
+                    "aligned": "Рейтинг факторов, пик отклика и время события указывают в одну сторону.",
+                    "partial": "Две части цепочки согласованы, но одно звено требует проверки.",
+                    "tentative": "Цепочка правдоподобна, но согласование пока неполное.",
                 }[confidence]
                 if confidence == "aligned":
-                    repair_hint = "Sweep a few nearby frames and confirm that the same response set stays inside the fan-out."
+                    repair_hint = "Проверьте несколько соседних кадров и подтвердите, что тот же набор откликов остаётся в зоне влияния."
                     repair_lane = "heatmaps"
                     repair_surface = "influence_heatmap"
                 elif confidence == "partial":
                     if not response_in_fanout:
-                        repair_hint = "The hotspot response is outside the top fan-out set, so re-check the local frame or response selection."
+                        repair_hint = "Отклик пика вне ведущего набора влияния; перепроверьте локальный кадр или выбор откликов."
                         repair_lane = "heatmaps"
                         repair_surface = "delta"
                     elif event_sig and not event_aligned:
-                        repair_hint = "The fan-out is visible, but event timing is not yet locking the spread; inspect nearby Events and Delta frames."
+                        repair_hint = "Влияние видно, но событие пока не фиксирует разброс по времени; проверьте ближайшие события и кадры Δ(t)."
                         repair_lane = "qa"
                         repair_surface = "events"
                     else:
-                        repair_hint = "One link in the spread is still weak, so keep the driver fixed and verify the local gate."
+                        repair_hint = "Одно звено разброса ещё слабое; удержите фактор и проверьте локальный фильтр."
                         repair_lane = "heatmaps"
                         repair_surface = "delta"
                 else:
-                    repair_hint = "Hold one driver steady and step through time until the hotspot response and event gate begin to agree."
+                    repair_hint = "Удержите один фактор и двигайтесь по времени, пока отклик пика и событие не начнут совпадать."
                     repair_lane = "heatmaps"
                     repair_surface = "delta"
                 return {
@@ -5320,29 +5445,29 @@ class CompareViewer(QtWidgets.QMainWindow):
                         detail = f"{detail} Event anchor {event_sig} is the local trigger check."
                 confidence = "aligned" if align_score >= 3 else ("partial" if align_score >= 2 else "tentative")
                 confidence_detail = {
-                    "aligned": "Driver ranking, target hotspot and local trigger all reinforce the same target explanation.",
-                    "partial": "The target explanation is promising, but one part of the chain is still weakly aligned.",
-                    "tentative": "The target explanation exists, but the supporting pieces have not fully locked together yet.",
+                    "aligned": "Рейтинг факторов, пик цели и локальный триггер подтверждают одно объяснение.",
+                    "partial": "Объяснение цели выглядит перспективно, но одно звено цепочки ещё слабое.",
+                    "tentative": "Объяснение цели есть, но подтверждающие элементы ещё не сошлись.",
                 }[confidence]
                 if confidence == "aligned":
-                    repair_hint = "Move a few frames around the target and confirm that the same lead driver keeps winning."
+                    repair_hint = "Проверьте несколько соседних кадров и убедитесь, что тот же ведущий фактор остаётся первым."
                     repair_lane = "heatmaps"
                     repair_surface = "influence_heatmap"
                 elif confidence == "partial":
                     if not target_match and heat_sig:
-                        repair_hint = "The heat hotspot is still off-target, so move Delta onto the target waveform before trusting the chain."
+                        repair_hint = "Пик теплокарты пока не на цели: перед доверием цепочке переведите Δ(t) на целевой сигнал."
                         repair_lane = "heatmaps"
                         repair_surface = "delta"
                     elif event_sig and not event_aligned:
-                        repair_hint = "Driver and target agree, but event timing is still drifting; inspect Events around the current frame."
+                        repair_hint = "Фактор и цель согласованы, но время события ещё плавает; проверьте события около текущего кадра."
                         repair_lane = "qa"
                         repair_surface = "events"
                     else:
-                        repair_hint = "The target chain is close, but one local confirmation is still missing."
+                        repair_hint = "Цепочка цели почти согласована, но одного локального подтверждения ещё не хватает."
                         repair_lane = "heatmaps"
                         repair_surface = "delta"
                 else:
-                    repair_hint = "Narrow the target, hold the playhead steady and wait until hotspot, driver and event timing start to lock together."
+                    repair_hint = "Сузьте цель, удержите время и дождитесь согласования пика, фактора и события."
                     repair_lane = "heatmaps"
                     repair_surface = "delta"
                 return {
@@ -5369,44 +5494,44 @@ class CompareViewer(QtWidgets.QMainWindow):
                 and np.isfinite(event_time)
                 and (_time_close(event_time, heat_time) or _time_close(event_time, infl_time))
             )
-            detail = f"Field story: dominant corridor is {corridor_feat} -> {corridor_sig}{infl_time_txt}."
+            detail = f"Версия поля: ведущая связь {corridor_feat} -> {corridor_sig}{infl_time_txt}."
             if heat_sig:
-                detail = f"{detail} Current hotspot is {heat_sig}{f' in {heat_run}' if heat_run else ''}"
+                detail = f"{detail} Текущий пик: {heat_sig}{f' в прогоне {heat_run}' if heat_run else ''}"
                 if np.isfinite(heat_time):
-                    detail = f"{detail} @ {heat_time:.3f}s"
-                detail = f"{detail}, so use it as the time gate for this corridor."
+                    detail = f"{detail} на {heat_time:.3f} с"
+                detail = f"{detail}; используйте его как временной фильтр для этой связи."
                 if corridor_matches_hotspot:
                     align_score += 1
             if event_sig:
                 peb_signal = str(events.get("top_signal") or events.get("sample_signal") or "")
-                detail = f"{detail} Event anchor {peb_signal} can act as the pebble check for whether the corridor is trigger-driven."
+                detail = f"{detail} Событие {peb_signal} помогает проверить, вызвана ли связь дискретным триггером."
                 if event_aligned:
                     align_score += 1
             confidence = "aligned" if align_score >= 3 else ("partial" if align_score >= 2 else "tentative")
             confidence_detail = {
-                "aligned": "Corridor, hotspot gate and event anchor are mutually consistent.",
-                "partial": "The field story has two supporting anchors, but one layer is still weaker than the others.",
-                "tentative": "The corridor exists, but the time/event anchoring is still thin.",
+                "aligned": "Связь, пик и событие взаимно согласованы.",
+                "partial": "У версии поля есть две опоры, но один слой ещё слабее остальных.",
+                "tentative": "Связь видна, но привязка по времени и событиям ещё тонкая.",
             }[confidence]
             if confidence == "aligned":
-                repair_hint = "Probe each cloud cluster and confirm that the same corridor survives inside the local structure."
+                repair_hint = "Проверьте каждый кластер и убедитесь, что та же связь сохраняется внутри локальной структуры."
                 repair_lane = "multivariate"
                 repair_surface = "multivariate"
             elif confidence == "partial":
                 if not corridor_matches_hotspot and heat_sig:
-                    repair_hint = "The dominant corridor and Delta hotspot disagree on the active response, so localize the split in Heatmaps."
+                    repair_hint = "Ведущая связь и пик Δ(t) указывают на разные отклики; локализуйте расхождение в теплокартах."
                     repair_lane = "heatmaps"
                     repair_surface = "delta"
                 elif event_sig and not event_aligned:
-                    repair_hint = "The corridor is visible, but event timing is not anchoring it yet; compare against pebbles or nearby Events."
+                    repair_hint = "Связь видна, но событие пока не закрепляет её по времени; сравните с ближайшими событиями."
                     repair_lane = "multivariate"
                     repair_surface = "multivariate"
                 else:
-                    repair_hint = "One field anchor is still weaker than the others, so keep cross-checking time-local heatmaps against the cloud."
+                    repair_hint = "Одна опора поля ещё слабее остальных; продолжайте сверять локальные теплокарты с облаком."
                     repair_lane = "heatmaps"
                     repair_surface = "delta"
             else:
-                repair_hint = "Add stronger time or event anchoring before trusting the cloud corridor as a real field pattern."
+                repair_hint = "Добавьте более сильную привязку по времени или событию, прежде чем доверять связи в облаке."
                 repair_lane = "multivariate"
                 repair_surface = "multivariate"
             return {
@@ -5421,12 +5546,12 @@ class CompareViewer(QtWidgets.QMainWindow):
             }
 
         return {
-            "headline": "Causal story is still thin",
-            "detail": "Keep Heatmaps, Influence and Events stable for a moment so the window can propose a stronger influence chain.",
+            "headline": "Причинная версия пока слабая",
+            "detail": "Удержите теплокарты, влияние и события стабильными на несколько секунд, чтобы окно предложило более сильную цепочку влияния.",
             "tone": "neutral",
             "confidence": "tentative",
-            "confidence_detail": "There is not enough agreement yet between the available evidence layers.",
-            "repair_hint": "Stabilize one frame and one target or corridor before asking the window for a stronger causal story.",
+            "confidence_detail": "Доступные слои проверки пока недостаточно согласованы.",
+            "repair_hint": "Стабилизируйте один кадр и одну цель или связь перед поиском более сильной причинной версии.",
             "repair_lane": "multivariate" if analysis_mode == "all_to_all" else "heatmaps",
             "repair_surface": "multivariate" if analysis_mode == "all_to_all" else "delta",
         }
@@ -5623,11 +5748,11 @@ class CompareViewer(QtWidgets.QMainWindow):
         if qa.get("top_signal") and qa.get("top_run"):
             try:
                 qa_focus = (
-                    f"Top suspect: {qa.get('top_signal')} in {qa.get('top_run')} "
-                    f"@ {float(qa.get('top_time_s', 0.0) or 0.0):.3f}s."
+                    f"Главная зона внимания: {qa.get('top_signal')} в прогоне {qa.get('top_run')} "
+                    f"на {float(qa.get('top_time_s', 0.0) or 0.0):.3f} с."
                 )
             except Exception:
-                qa_focus = f"Top suspect: {qa.get('top_signal')} in {qa.get('top_run')}."
+                qa_focus = f"Главная зона внимания: {qa.get('top_signal')} в прогоне {qa.get('top_run')}."
 
         events_focus = ""
         if events.get("top_signal") or events.get("sample_signal"):
@@ -5635,7 +5760,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                 events_name = str(events.get("top_signal") or events.get("sample_signal") or "")
                 events_time = float(events.get("sample_time_s", 0.0) or 0.0)
                 if events_name and np.isfinite(events_time):
-                    events_focus = f"{events_name} @ {events_time:.3f}s"
+                    events_focus = f"{events_name} на {events_time:.3f} с"
                 else:
                     events_focus = events_name
             except Exception:
@@ -5820,17 +5945,17 @@ class CompareViewer(QtWidgets.QMainWindow):
             )
         elif analysis_mode == "all_to_all" and infl_lens.get("top_pair_feature"):
             detail = (
-                f"Strong links: {int(infl_lens.get('strong_links', 0) or 0)}/"
+                f"Сильных связей: {int(infl_lens.get('strong_links', 0) or 0)}/"
                 f"{int(infl_lens.get('total_links', 0) or 0)} "
-                f"({100.0 * float(infl_lens.get('density', 0.0) or 0.0):.0f}% dense) at "
-                f"t={float(infl_lens.get('time_s', 0.0) or 0.0):.3f}s. "
-                f"Dominant corridor: {infl_lens.get('top_pair_feature')} -> {infl_lens.get('top_pair_signal')} "
+                f"(плотность {100.0 * float(infl_lens.get('density', 0.0) or 0.0):.0f}%) при "
+                f"t={float(infl_lens.get('time_s', 0.0) or 0.0):.3f} с. "
+                f"Ведущая связь: {infl_lens.get('top_pair_feature')} -> {infl_lens.get('top_pair_signal')} "
                 f"({float(infl_lens.get('top_pair_corr', 0.0) or 0.0):+.2f})."
             )
             cards.append(
                 self._workspace_insight_card_html(
                     "Coupling field",
-                    f"{int(infl_lens.get('strong_links', 0) or 0)} strong links in play",
+                    f"{int(infl_lens.get('strong_links', 0) or 0)} сильных связей",
                     detail,
                     tone="ok" if float(infl_lens.get("density", 0.0) or 0.0) >= 0.25 else "accent",
                 )
@@ -5840,18 +5965,18 @@ class CompareViewer(QtWidgets.QMainWindow):
             if mv_lens:
                 keep_mode = str(mv_lens.get("keep_mode") or "sparse-first")
                 keep_focus = (
-                    "preserving sparse contours and outliers"
+                    "сохраняются редкие контуры и выбросы"
                     if keep_mode == "sparse-first"
-                    else "preserving dense regime cores"
+                    else "сохраняются плотные ядра режимов"
                 )
                 peb_signal = str(mv_lens.get("peb_signal") or "")
                 pebbles = bool(mv_lens.get("pebbles", False))
                 if pebbles and peb_signal:
-                    pebbles_text = f"Pebbles pin event structure from {peb_signal} ({mv_lens.get('peb_mode', 'occurred')})."
+                    pebbles_text = f"События фиксируют структуру по сигналу {peb_signal} ({mv_lens.get('peb_mode', 'occurred')})."
                 elif pebbles:
-                    pebbles_text = "Pebbles are on, but pick a discrete signal so event grains can separate clusters."
+                    pebbles_text = "События включены; выберите дискретный сигнал, чтобы они разделяли кластеры."
                 else:
-                    pebbles_text = "Pebbles are off, so the view is showing only cloud geometry."
+                    pebbles_text = "События выключены, показана только геометрия облака."
                 dims_preview = ", ".join([str(x) for x in mv_lens.get("checked_dims", [])[:4]])
                 if int(mv_lens.get("runs", 0) or 0) < 3:
                     mv_headline = "Need more runs for cloud scouting"
@@ -5866,12 +5991,12 @@ class CompareViewer(QtWidgets.QMainWindow):
                     mv_headline = "Melting cloud ready"
                     mv_tone = "ok"
                 mv_detail = (
-                    f"Fields={int(mv_lens.get('field_count', 0) or 0)}, checked={int(mv_lens.get('checked_dim_count', 0) or 0)}"
-                    f" ({dims_preview or 'auto'}). Keep={int(mv_lens.get('keep_pct', 100) or 100)}% -> ~"
-                    f"{int(mv_lens.get('approx_cloud_points', 0) or 0)}/{int(mv_lens.get('runs', 0) or 0)} points, "
-                    f"{keep_mode} means {keep_focus}. 3D={mv_lens.get('x') or '—'}/{mv_lens.get('y') or '—'}/{mv_lens.get('z') or '—'}; "
-                    f"color={mv_lens.get('color3d') or '—'}; metric={mv_lens.get('metric') or 'RMS'}. "
-                    f"{'Current view only.' if mv_lens.get('use_view') else 'Whole-run metrics.'} {pebbles_text}"
+                    f"Полей={int(mv_lens.get('field_count', 0) or 0)}, выбрано={int(mv_lens.get('checked_dim_count', 0) or 0)}"
+                    f" ({dims_preview or 'авто'}). Оставить={int(mv_lens.get('keep_pct', 100) or 100)}% -> примерно "
+                    f"{int(mv_lens.get('approx_cloud_points', 0) or 0)}/{int(mv_lens.get('runs', 0) or 0)} точек, "
+                    f"{keep_mode}: {keep_focus}. 3D={mv_lens.get('x') or '—'}/{mv_lens.get('y') or '—'}/{mv_lens.get('z') or '—'}; "
+                    f"цвет={mv_lens.get('color3d') or '—'}; метрика={mv_lens.get('metric') or 'RMS'}. "
+                    f"{'Только текущий вид.' if mv_lens.get('use_view') else 'Метрики всего прогона.'} {pebbles_text}"
                 )
                 cards.append(
                     self._workspace_insight_card_html(
@@ -5923,20 +6048,20 @@ class CompareViewer(QtWidgets.QMainWindow):
             )
 
         if analysis_mode in {"one_to_all", "all_to_one"} and peak_lens:
-            peak_headline = str(peak_bridge.get("headline") or "Peak |Δ| field ready").strip()
+            peak_headline = str(peak_bridge.get("headline") or "Поле пиков |Δ| готово").strip()
             peak_tone = str(peak_bridge.get("tone") or ("ok" if not peak_lens.get("bridge_ready", False) else "accent")).strip()
-            peak_signal = str(peak_lens.get("hotspot_signal") or peak_lens.get("dominant_signal") or "signal").strip()
-            peak_run = str(peak_lens.get("hotspot_run") or peak_lens.get("dominant_run") or "run").strip()
+            peak_signal = str(peak_lens.get("hotspot_signal") or peak_lens.get("dominant_signal") or "сигнал").strip()
+            peak_run = str(peak_lens.get("hotspot_run") or peak_lens.get("dominant_run") or "прогон").strip()
             peak_value = float(peak_lens.get("hotspot_peak", 0.0) or 0.0)
             peak_time = float(peak_lens.get("hotspot_time", float("nan")) or float("nan"))
             peak_unit = str(peak_lens.get("hotspot_unit") or "").strip()
             peak_unit_txt = f" [{peak_unit}]" if peak_unit else ""
             peak_detail = (
-                f"Hotspot {peak_signal} in {peak_run}"
-                f"{f' @ {peak_time:.3f}s' if np.isfinite(peak_time) else ''}"
+                f"Пик {peak_signal} в прогоне {peak_run}"
+                f"{f' на {peak_time:.3f} с' if np.isfinite(peak_time) else ''}"
                 f" = {peak_value:.6g}{peak_unit_txt}. "
-                f"Signal competition={int(peak_lens.get('signal_competition', 0) or 0)}, "
-                f"run competition={int(peak_lens.get('run_competition', 0) or 0)}."
+                f"конкуренция сигналов={int(peak_lens.get('signal_competition', 0) or 0)}, "
+                f"конкуренция прогонов={int(peak_lens.get('run_competition', 0) or 0)}."
             )
             if peak_bridge:
                 peak_detail = f"{peak_detail} {str(peak_bridge.get('detail') or '').strip()}"
@@ -5953,9 +6078,9 @@ class CompareViewer(QtWidgets.QMainWindow):
             cards.append(
                 self._workspace_insight_card_html(
                     "Delta hotspot",
-                    f"{heat.get('signal')} @ {float(heat.get('time_s', 0.0) or 0.0):.3f}s",
-                    f"Run {heat.get('run')} shows the strongest divergence. "
-                    f"Peak {float(heat.get('peak', 0.0) or 0.0):.3g} in {heat.get('metric', 'heatmap')} mode.",
+                    f"{heat.get('signal')} на {float(heat.get('time_s', 0.0) or 0.0):.3f} с",
+                    f"Прогон {heat.get('run')} показывает наибольшее расхождение. "
+                    f"Пик {float(heat.get('peak', 0.0) or 0.0):.3g} в режиме {heat.get('metric', 'heatmap')}.",
                     tone="accent",
                 )
             )
@@ -5963,9 +6088,9 @@ class CompareViewer(QtWidgets.QMainWindow):
             cards.append(
                 self._workspace_insight_card_html(
                     "Delta hotspot",
-                    "Waiting for heatmap refresh",
-                    "Heatmaps are enabled, but no stable hotspot summary is cached yet. "
-                    "Keep 2+ runs and 1+ signals selected.",
+                    "Ждём обновления теплокарты",
+                    "Теплокарты включены, но устойчивой сводки пика ещё нет. "
+                    "Оставьте выбранными 2+ прогона и 1+ сигнал.",
                     tone="neutral",
                 )
             )
@@ -5973,8 +6098,8 @@ class CompareViewer(QtWidgets.QMainWindow):
             cards.append(
                 self._workspace_insight_card_html(
                     "Delta hotspot",
-                    "Need comparison context",
-                    "Select at least 2 runs and a signal to surface the strongest time-local delta zone.",
+                    "Нужен набор для сравнения",
+                    "Выберите минимум 2 прогона и сигнал, чтобы показать сильнейшую локальную зону Δ.",
                     tone="neutral",
                 )
             )
@@ -5985,8 +6110,8 @@ class CompareViewer(QtWidgets.QMainWindow):
                 self._workspace_insight_card_html(
                     "Top meta driver",
                     f"{infl.get('feature')} -> {infl.get('signal')}",
-                    f"corr={corr:+.2f} at t={float(infl.get('time_s', 0.0) or 0.0):.3f}s. "
-                    f"Runs={int(infl.get('runs', 0) or 0)}, meta shown={int(infl.get('meta_count', 0) or 0)}.",
+                    f"корреляция={corr:+.2f} при t={float(infl.get('time_s', 0.0) or 0.0):.3f} с. "
+                    f"прогонов={int(infl.get('runs', 0) or 0)}, параметров показано={int(infl.get('meta_count', 0) or 0)}.",
                     tone="ok" if abs(corr) >= 0.7 else "accent",
                 )
             )
@@ -5994,8 +6119,8 @@ class CompareViewer(QtWidgets.QMainWindow):
             cards.append(
                 self._workspace_insight_card_html(
                     "Top meta driver",
-                    "Need influence refresh",
-                    "Influence(t) becomes meaningful with 3+ runs. Move the playhead or keep the current selection stable to rank meta drivers.",
+                    "Нужно обновить влияние",
+                    "Влияние(t) становится полезным при 3+ прогонах. Передвиньте время или удержите текущий выбор, чтобы ранжировать параметры влияния.",
                     tone="neutral",
                 )
             )
@@ -6003,8 +6128,8 @@ class CompareViewer(QtWidgets.QMainWindow):
             cards.append(
                 self._workspace_insight_card_html(
                     "Top meta driver",
-                    "Need 3+ runs",
-                    "Meta-to-signal heuristics rank which numeric meta parameters explain the current signal shape best.",
+                    "Нужно 3+ прогона",
+                    "Оценка показывает, какие числовые параметры лучше всего объясняют форму текущего сигнала.",
                     tone="neutral",
                 )
             )
@@ -6013,33 +6138,33 @@ class CompareViewer(QtWidgets.QMainWindow):
             cards.append(
                 self._workspace_insight_card_html(
                     "Event context",
-                    "Event filter is muted",
-                    "No event signals are selected right now. Pick one or more event channels so local triggers can support the current explanation.",
+                    "Фильтр событий пуст",
+                    "Сейчас не выбран ни один сигнал событий. Выберите один или несколько каналов, чтобы локальные триггеры подтвердили объяснение.",
                     tone="accent",
                 )
             )
         elif events_rows > 0:
-            event_headline = "Visible event context"
+            event_headline = "Видимые события"
             event_detail = (
-                f"Baseline={events.get('baseline') or '—'}, visible rows={int(events.get('rows', events_rows) or events_rows)}"
+                f"Базовый прогон={events.get('baseline') or '—'}, видимых строк={int(events.get('rows', events_rows) or events_rows)}"
                 f"/{int(events.get('source_rows', events_rows) or events_rows)}."
             )
             if events_focus:
-                event_detail = f"{event_detail} First visible anchor: {events_focus}."
+                event_detail = f"{event_detail} Первый видимый якорь: {events_focus}."
             if events.get("top_signal"):
                 event_detail = (
-                    f"{event_detail} Dominant visible event is {events.get('top_signal')} "
-                    f"({int(events.get('top_count', 0) or 0)} row(s))."
+                    f"{event_detail} Ведущее видимое событие: {events.get('top_signal')} "
+                    f"({int(events.get('top_count', 0) or 0)} строк)."
                 )
             if analysis_mode == "one_to_all":
-                event_headline = f"Trigger gate: {events.get('top_signal') or events.get('sample_signal') or 'events'}"
-                event_detail = f"{event_detail} Use this trigger gate to test whether one driver fans out into several responses."
+                event_headline = f"Триггер влияния: {events.get('top_signal') or events.get('sample_signal') or 'события'}"
+                event_detail = f"{event_detail} Используйте этот триггер, чтобы проверить, расходится ли один фактор по нескольким откликам."
             elif analysis_mode == "all_to_one":
-                event_headline = f"Target-side trigger: {events.get('top_signal') or events.get('sample_signal') or 'events'}"
-                event_detail = f"{event_detail} Use this local event context to confirm or reject the current target-driver explanation."
+                event_headline = f"Триггер цели: {events.get('top_signal') or events.get('sample_signal') or 'события'}"
+                event_detail = f"{event_detail} Используйте локальные события, чтобы подтвердить или отвергнуть объяснение целевого сигнала."
             elif analysis_mode == "all_to_all":
-                event_headline = f"Pebble anchor: {events.get('top_signal') or events.get('sample_signal') or 'events'}"
-                event_detail = f"{event_detail} Compare these grains with cloud clusters to see whether separation is event-driven."
+                event_headline = f"Якорь события: {events.get('top_signal') or events.get('sample_signal') or 'события'}"
+                event_detail = f"{event_detail} Сравните эти события с кластерами, чтобы понять, вызвано ли разделение событиями."
             cards.append(
                 self._workspace_insight_card_html(
                     "Event context",
@@ -6052,75 +6177,75 @@ class CompareViewer(QtWidgets.QMainWindow):
             cards.append(
                 self._workspace_insight_card_html(
                     "Event context",
-                    "No visible events after filtering",
-                    "The baseline run has event rows, but none are currently visible. Revisit the event filter or the current reference run.",
+                    "После фильтра событий не видно",
+                    "В базовом прогоне есть события, но сейчас они скрыты. Проверьте фильтр событий или выбранный эталон.",
                     tone="accent",
                 )
             )
 
         if not runs:
-            quality_headline = "Load a compare set"
-            quality_detail = "Open 2+ NPZ runs to unlock heatmaps, QA and multivariate clustering."
+            quality_headline = "Загрузите набор для сравнения"
+            quality_detail = "Загрузите 2+ файла результата, чтобы включить теплокарты, проверку и многомерную группировку."
             quality_tone = "neutral"
         elif trust_visible:
-            quality_headline = "Trust attention required"
+            quality_headline = "Нужно проверить достоверность"
             quality_detail = (
-                f"Trust banner is active. QA issues={qa_issues} (err={qa_err}, warn={qa_warn}), events rows={events_rows}. "
-                f"Next: {follow_route_label}."
+                f"Активно предупреждение о достоверности. Замечаний проверки={qa_issues} (ошибок={qa_err}, предупреждений={qa_warn}), строк событий={events_rows}. "
+                f"Далее: {follow_route_label}."
             )
             if qa_focus:
                 quality_detail = f"{quality_detail} {qa_focus}"
             if events_focus:
-                quality_detail = f"{quality_detail} Event anchor: {events_focus}."
+                quality_detail = f"{quality_detail} Якорь события: {events_focus}."
             quality_tone = "alert" if qa_err > 0 else "warn"
         elif qa_issues > 0:
-            quality_headline = f"QA flagged {qa_issues} issue(s)"
+            quality_headline = f"Проверка нашла замечания: {qa_issues}"
             quality_detail = (
-                f"err={qa_err}, warn={qa_warn}, events rows={events_rows}. "
-                f"Next: inspect {follow_route_label}, then return to Heatmaps for root-cause localization."
+                f"ошибок={qa_err}, предупреждений={qa_warn}, строк событий={events_rows}. "
+                f"Далее: проверьте {follow_route_label}, затем вернитесь к теплокартам для локализации причины."
             )
             if qa_focus:
                 quality_detail = f"{quality_detail} {qa_focus}"
             if events_focus:
-                quality_detail = f"{quality_detail} Event anchor: {events_focus}."
+                quality_detail = f"{quality_detail} Якорь события: {events_focus}."
             quality_tone = "warn" if qa_err == 0 else "alert"
         elif analysis_mode == "all_to_all" and len(runs) >= 3 and len(sigs) >= 3:
-            quality_headline = "Ready for all-to-all scouting"
+            quality_headline = "Готово к поиску связей всех со всеми"
             quality_detail = (
-                f"Table {table}, runs={len(runs)}, signals={len(sigs)}, events rows={events_rows}. "
-                f"Next: {follow_route_label} for clusters and sparse outliers, then Heatmaps for time localization."
+                f"Таблица {table}, прогонов={len(runs)}, сигналов={len(sigs)}, строк событий={events_rows}. "
+                f"Далее: {follow_route_label} для кластеров и редких выбросов, затем теплокарты для локализации по времени."
             )
             quality_tone = "ok"
         elif analysis_mode == "all_to_one" and len(runs) >= 3 and 1 <= len(sigs) <= 2:
-            quality_headline = "Ready for target explanation"
+            quality_headline = "Готово к объяснению целевого сигнала"
             quality_detail = (
-                f"Table {table}, runs={len(runs)}, target signals={len(sigs)}, events rows={events_rows}. "
-                f"Next: {follow_route_label} to rank many drivers against the current target, then cross-check Delta / Events around the active frame."
+                f"Таблица {table}, прогонов={len(runs)}, целевых сигналов={len(sigs)}, строк событий={events_rows}. "
+                f"Далее: {follow_route_label}, чтобы ранжировать факторы для текущей цели; затем сверка Δ(t) и событий около активного кадра."
             )
             quality_tone = "ok"
         elif analysis_mode == "one_to_all" and len(runs) >= 3 and len(sigs) >= 2:
-            quality_headline = "Ready for driver sweep"
+            quality_headline = "Готово к проверке влияющего фактора"
             quality_detail = (
-                f"Table {table}, runs={len(runs)}, response signals={len(sigs)}, events rows={events_rows}. "
-                f"Next: {follow_route_label} to trace one candidate driver across many responses, then use QA / Events for local trigger checks."
+                f"Таблица {table}, прогонов={len(runs)}, сигналов отклика={len(sigs)}, строк событий={events_rows}. "
+                f"Далее: {follow_route_label}, чтобы проследить один кандидат влияния по нескольким откликам; затем проверка и события для локальных триггеров."
             )
             quality_tone = "ok"
         else:
-            quality_headline = "Build comparison density"
+            quality_headline = "Уплотните сравнение"
             if analysis_mode == "all_to_one":
                 quality_detail = (
-                    f"Table {table}, runs={len(runs)}, signals={len(sigs)}, events rows={events_rows}. "
-                    "Keep 3+ runs and narrow the target to 1-2 signals so one waveform can be explained cleanly."
+                    f"Таблица {table}, прогонов={len(runs)}, сигналов={len(sigs)}, строк событий={events_rows}. "
+                    "Оставьте 3+ прогона и сузьте цель до 1-2 сигналов, чтобы один график объяснялся чисто."
                 )
             elif analysis_mode == "one_to_all":
                 quality_detail = (
-                    f"Table {table}, runs={len(runs)}, signals={len(sigs)}, events rows={events_rows}. "
-                    "Keep 3+ runs and at least 2 response signals so one driver can fan out across visible responses."
+                    f"Таблица {table}, прогонов={len(runs)}, сигналов={len(sigs)}, строк событий={events_rows}. "
+                    "Оставьте 3+ прогона и минимум 2 сигнала отклика, чтобы увидеть влияние одного фактора."
                 )
             else:
                 quality_detail = (
-                    f"Table {table}, runs={len(runs)}, signals={len(sigs)}, events rows={events_rows}. "
-                    "Add a few more signals to strengthen multivariate separation."
+                    f"Таблица {table}, прогонов={len(runs)}, сигналов={len(sigs)}, строк событий={events_rows}. "
+                    "Добавьте ещё несколько сигналов, чтобы усилить многомерное разделение."
                 )
             quality_tone = "accent"
 
@@ -6496,7 +6621,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             quality_text = f"{quality_text} | \u0421\u043b\u0430\u0431\u043e\u0435 \u043c\u0435\u0441\u0442\u043e {weakest_status}"
         contract_hash = str(getattr(self, 'compare_contract_hash', '') or '')
         if contract_hash:
-            quality_text = f"{quality_text} | Compare {contract_hash[:10]}"
+            quality_text = f"{quality_text} | Правила {contract_hash[:10]}"
         layout_text = (
             f"\u0424\u043e\u043a\u0443\u0441 {self._workspace_focus_label(follow_target=follow_target)} | "
             f"\u0410\u043d\u0430\u043b\u0438\u0437 {self._workspace_analysis_label()} | "
@@ -7005,7 +7130,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.menu_view_docks = docks_menu
         dock_specs = (
             ("\u041f\u0443\u043b\u044c\u0442", getattr(self, "dock_controls", None)),
-            ("Compare contract", getattr(self, "dock_compare_contract", None)),
+            ("Правила сравнения", getattr(self, "dock_compare_contract", None)),
             ("\u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u0430 \u0394(t)", getattr(self, "dock_heatmap", None)),
             ("\u041f\u0438\u043a\u0438 |\u0394|", getattr(self, "dock_peak_heatmap", None)),
             ("\u0425\u043e\u0434 \u043a\u043b\u0430\u043f\u0430\u043d\u043e\u0432", getattr(self, "dock_open_timeline", None)),
@@ -7075,8 +7200,8 @@ class CompareViewer(QtWidgets.QMainWindow):
     # ---------------- Δ(t) Heatmap (3D cube → ImageView) ----------------
     def _heatmap_default_note(self) -> str:
         return (
-            "Rows = Signals (в порядке выбора), Cols = Runs (в порядке выбора).\n"
-            "Наведи мышь на ячейку: покажу полные подписи."
+            "Строки = сигналы в порядке выбора, столбцы = прогоны в порядке выбора.\n"
+            "Наведите мышь на ячейку: будет показана полная подпись."
         )
 
     def _heatmap_status_text(
@@ -7092,34 +7217,34 @@ class CompareViewer(QtWidgets.QMainWindow):
         hotspot_time: float,
         hotspot_peak: float,
     ) -> str:
-        mode_txt = f"Δ vs {ref_label}" if str(mode) == "delta" else "value"
+        mode_txt = f"Δ относительно {ref_label}" if str(mode) == "delta" else "значение"
         line1 = (
-            f"Rows=Signals | Cols=Runs | metric={metric} | mode={mode_txt} | "
-            f"runs={int(runs_count)} | signals={int(sigs_count)}"
+            f"Строки=сигналы | столбцы=прогоны | метрика={metric} | режим={mode_txt} | "
+            f"прогонов={int(runs_count)} | сигналов={int(sigs_count)}"
         )
         if hotspot_signal and hotspot_run and np.isfinite(float(hotspot_time)) and np.isfinite(float(hotspot_peak)):
             line2 = (
-                f"Hotspot: {hotspot_signal} in {hotspot_run} @ {float(hotspot_time):.4f}s "
-                f"(peak {float(hotspot_peak):.3g})"
+                f"Пик: {hotspot_signal} в прогоне {hotspot_run} на {float(hotspot_time):.4f} с "
+                f"(значение {float(hotspot_peak):.3g})"
             )
         else:
-            line2 = "Hotspot: move through time to find the strongest local divergence."
+            line2 = "Пик: передвиньте время, чтобы найти сильнейшее локальное расхождение."
 
         analysis_mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
         if analysis_mode == "one_to_all":
-            hint = "Use the hotspot as a gate, then check Influence(t) to see whether one driver fans out across nearby signals."
+            hint = "Используйте пик как фильтр, затем проверьте влияние(t), расходится ли один фактор по соседним сигналам."
         elif analysis_mode == "all_to_one":
             target_sig = self._workspace_analysis_target_signal([str(hotspot_signal)]) if str(hotspot_signal or "").strip() else ""
             hint = (
-                f"Treat {target_sig or hotspot_signal or 'the hotspot signal'} as the target and test which drivers still explain it around this time."
+                f"Считайте {target_sig or hotspot_signal or 'сигнал пика'} целью и проверьте, какие факторы объясняют её около этого времени."
             )
         else:
-            hint = "Use the hotspot as a time-local gate, then compare it against cloud clusters and the dominant influence corridor."
-        line3 = f"Heuristic: {hint}"
+            hint = "Используйте пик как локальный фильтр по времени, затем сравните его с кластерами и ведущей связью влияния."
+        line3 = f"Подсказка: {hint}"
         return "\n".join([line1, line2, line3])
 
     def _build_heatmap_dock(self):
-        dock = QtWidgets.QDockWidget("Δ(t) Heatmap", self)
+        dock = QtWidgets.QDockWidget("Теплокарта Δ(t)", self)
         dock.setObjectName("dock_deltat_heatmap")
         dock.setAllowedAreas(
             QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea | QtCore.Qt.BottomDockWidgetArea
@@ -7130,31 +7255,31 @@ class CompareViewer(QtWidgets.QMainWindow):
         lay.setContentsMargins(8, 8, 8, 8)
         lay.setSpacing(6)
 
-        self.chk_heatmap = QtWidgets.QCheckBox("Enable Δ(t) heatmap (3D cube → ImageView)")
+        self.chk_heatmap = QtWidgets.QCheckBox("Включить теплокарту Δ(t)")
         self.chk_heatmap.setChecked(bool(getattr(self, "heat_enabled", True)))
         self.chk_heatmap.setToolTip(
-            "Показывает матрицу (signals × runs) во времени.\n"
-            "Строки = выбранные Signals, столбцы = выбранные Runs."
+            "Показывает матрицу сигналов и прогонов во времени.\n"
+            "Строки = выбранные сигналы, столбцы = выбранные прогоны."
         )
         self.chk_heatmap.stateChanged.connect(self._rebuild_heatmap)
         lay.addWidget(self.chk_heatmap)
 
         row = QtWidgets.QHBoxLayout()
-        row.addWidget(QtWidgets.QLabel("Metric"))
+        row.addWidget(QtWidgets.QLabel("Метрика"))
         self.combo_heat_metric = QtWidgets.QComboBox()
         self.combo_heat_metric.addItems(["signed Δ", "|Δ|", "|Δ| / amp(ref)"])
         self.combo_heat_metric.setCurrentText(str(getattr(self, "heat_metric", "signed Δ")))
         self.combo_heat_metric.setToolTip(
             "signed Δ: со знаком (полезно для направления)\n"
             "|Δ|: модуль (быстро видны зоны различий)\n"
-            "|Δ| / amp(ref): относительный модуль (нормировка по reference)"
+            "|Δ| / amp(ref): относительный модуль (нормировка по эталону)"
         )
         self.combo_heat_metric.currentIndexChanged.connect(self._rebuild_heatmap)
         row.addWidget(self.combo_heat_metric, stretch=1)
         lay.addLayout(row)
 
         row2 = QtWidgets.QHBoxLayout()
-        row2.addWidget(QtWidgets.QLabel("Max signals"))
+        row2.addWidget(QtWidgets.QLabel("Сигналов не более"))
         self.spin_heat_sigs = QtWidgets.QSpinBox()
         self.spin_heat_sigs.setRange(2, 30)
         self.spin_heat_sigs.setSingleStep(1)
@@ -7163,7 +7288,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.spin_heat_sigs.valueChanged.connect(self._rebuild_heatmap)
         row2.addWidget(self.spin_heat_sigs)
 
-        row2.addWidget(QtWidgets.QLabel("LOD time pts"))
+        row2.addWidget(QtWidgets.QLabel("Точек времени"))
         self.spin_heat_tpts = QtWidgets.QSpinBox()
         self.spin_heat_tpts.setRange(200, 12000)
         self.spin_heat_tpts.setSingleStep(200)
@@ -7183,7 +7308,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.lbl_heat_readout.setWordWrap(True)
 
         if pg is None or build_deltat_cube is None:
-            lay.addWidget(QtWidgets.QLabel("Heatmap unavailable: pyqtgraph / build_deltat_cube not found"))
+            lay.addWidget(QtWidgets.QLabel("Теплокарта недоступна: не найдены pyqtgraph или build_deltat_cube"))
         else:
             try:
                 # PlotItem -> axes; ImageView handles 3D cube with internal timeline
@@ -7529,9 +7654,9 @@ class CompareViewer(QtWidgets.QMainWindow):
 
     def _peak_heat_default_note(self) -> str:
         return (
-            "Peak |Δ| heatmap: rows = Signals, cols = Runs. "
-            "Each cell stores the strongest absolute deviation from the reference run over time. "
-            "Click a cell to focus run/signal and jump to the peak time."
+            "Теплокарта пиков |Δ|: строки = сигналы, столбцы = прогоны. "
+            "Каждая ячейка хранит наибольшее абсолютное отклонение от эталонного прогона по времени. "
+            "Нажмите ячейку, чтобы выбрать прогон и сигнал и перейти к моменту пика."
         )
 
     def _peak_heat_color(self, value: float, vmax: float, *, is_ref: bool = False) -> QtGui.QColor:
@@ -7559,27 +7684,27 @@ class CompareViewer(QtWidgets.QMainWindow):
     ) -> Tuple[str, str]:
         unit_txt = f" [{hotspot_unit}]" if str(hotspot_unit or "").strip() else ""
         line1 = (
-            f"Peak |Δ| vs ref={ref_label or '—'} | table={table_name or '—'} | "
-            f"runs={int(runs_count)} | signals={int(sigs_count)}"
+            f"Пики |Δ| относительно {ref_label or '—'} | таблица: {table_name or '—'} | "
+            f"прогонов: {int(runs_count)} | сигналов: {int(sigs_count)}"
         )
         if hotspot_signal and hotspot_run and np.isfinite(float(hotspot_value)):
             line2 = (
-                f"Hotspot: {hotspot_signal} in {hotspot_run} @ {float(hotspot_time):.3f}s = "
+                f"Максимум: {hotspot_signal} в прогоне {hotspot_run} на {float(hotspot_time):.3f} с = "
                 f"{float(hotspot_value):.6g}{unit_txt}"
             )
         else:
-            line2 = "No finite peak cells in the current compare context."
+            line2 = "Нет конечных значений пиков для текущего сравнения."
         mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
         if mode == "one_to_all":
-            hint = "Use this surface to spot which response lights up hardest before opening Δ(t) or Influence(t)."
+            hint = "Оцените, какой отклик выделяется сильнее всего, перед просмотром Δ(t) или влияния(t)."
         elif mode == "all_to_one":
-            hint = "Use this surface to check whether the target split is broad or concentrated in a few extreme runs."
+            hint = "Проверьте, различие распределено широко или сосредоточено в нескольких крайних прогонах."
         else:
-            hint = "Use this surface as a coarse gate before time-local Δ(t) slices and all-to-all cloud structure."
-        return line1, f"{line2}\nHeuristic: {hint}"
+            hint = "Используйте теплокарту как быстрый фильтр перед локальными срезами Δ(t) и облаком сравнения."
+        return line1, f"{line2}\nПодсказка: {hint}"
 
     def _build_peak_heatmap_dock(self) -> None:
-        dock = QtWidgets.QDockWidget("Peak |Δ| heatmap", self)
+        dock = QtWidgets.QDockWidget("Пики |Δ|", self)
         dock.setObjectName("dock_peak_heatmap")
         dock.setAllowedAreas(
             QtCore.Qt.LeftDockWidgetArea | QtCore.Qt.RightDockWidgetArea | QtCore.Qt.BottomDockWidgetArea
@@ -7663,15 +7788,15 @@ class CompareViewer(QtWidgets.QMainWindow):
             return
         runs = self._ordered_runs_for_reference(self._selected_runs())
         if len(runs) < 2:
-            self._clear_peak_heatmap_view("Peak |Δ| heatmap: выберите минимум два прогона.")
+            self._clear_peak_heatmap_view("Теплокарта пиков |Δ|: выберите минимум два прогона.")
             return
         sigs = list(self._selected_signals())
         if not sigs:
-            self._clear_peak_heatmap_view("Peak |Δ| heatmap: выберите хотя бы один сигнал.")
+            self._clear_peak_heatmap_view("Теплокарта пиков |Δ|: выберите хотя бы один сигнал.")
             return
         table_name = str(getattr(self, "current_table", "") or "").strip()
         if not table_name:
-            self._clear_peak_heatmap_view("Peak |Δ| heatmap: выберите общую таблицу.")
+            self._clear_peak_heatmap_view("Теплокарта пиков |Δ|: выберите общую таблицу.")
             return
 
         ref_run = runs[0]
@@ -7725,7 +7850,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         non_ref_vals = values[:, 1:] if values.shape[1] > 1 else np.asarray([], dtype=float)
         finite_non_ref = non_ref_vals[np.isfinite(non_ref_vals)]
         if finite_non_ref.size <= 0:
-            self._clear_peak_heatmap_view("Peak |Δ| heatmap: нет конечных отклонений относительно reference.")
+            self._clear_peak_heatmap_view("Теплокарта пиков |Δ|: нет конечных отклонений относительно эталона.")
             return
 
         vmax = float(np.nanpercentile(finite_non_ref, 98))
@@ -7763,18 +7888,18 @@ class CompareViewer(QtWidgets.QMainWindow):
                     item.setBackground(self._peak_heat_color(value, vmax, is_ref=(col == 0)))
                     if np.isfinite(value):
                         tooltip = (
-                            f"sig: {sig}\n"
-                            f"run: {run_label}\n"
-                            f"ref: {ref_run.label}\n"
-                            f"peak |Δ|: {value:.6g}{unit_txt}\n"
-                            f"signed Δ @ peak: {signed_delta:.6g}{unit_txt}\n"
-                            f"t_peak: {time_s:.6f} s\n"
-                            f"table: {table_name}"
+                            f"сигнал: {sig}\n"
+                            f"прогон: {run_label}\n"
+                            f"эталон: {ref_run.label}\n"
+                            f"пик |Δ|: {value:.6g}{unit_txt}\n"
+                            f"Δ со знаком в пике: {signed_delta:.6g}{unit_txt}\n"
+                            f"время пика: {time_s:.6f} с\n"
+                            f"таблица: {table_name}"
                         )
                     else:
                         tooltip = (
-                            f"sig: {sig}\nrun: {run_label}\nref: {ref_run.label}\n"
-                            f"No finite peak |Δ| in table {table_name}."
+                            f"сигнал: {sig}\nпрогон: {run_label}\nэталон: {ref_run.label}\n"
+                            f"В таблице {table_name} нет конечного пика |Δ|."
                         )
                     item.setToolTip(tooltip)
                     item.setData(
@@ -7798,7 +7923,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                 pass
             tbl.setEnabled(True)
         except Exception:
-            self._clear_peak_heatmap_view("Peak |Δ| heatmap: не удалось собрать таблицу.")
+            self._clear_peak_heatmap_view("Теплокарта пиков |Δ|: не удалось собрать таблицу.")
             return
 
         hotspot_vals = np.asarray(values[:, 1:], dtype=float)
@@ -8613,7 +8738,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         lay.addWidget(self.chk_inflheat)
 
         row = QtWidgets.QHBoxLayout()
-        row.addWidget(QtWidgets.QLabel("Max meta"))
+        row.addWidget(QtWidgets.QLabel("Параметров не более"))
         self.spin_inflheat_feat = QtWidgets.QSpinBox()
         self.spin_inflheat_feat.setRange(4, 80)
         self.spin_inflheat_feat.setSingleStep(1)
@@ -8622,7 +8747,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.spin_inflheat_feat.valueChanged.connect(self._schedule_inflheat_rebuild)
         row.addWidget(self.spin_inflheat_feat)
 
-        row.addWidget(QtWidgets.QLabel("Max signals"))
+        row.addWidget(QtWidgets.QLabel("Сигналов не более"))
         self.spin_inflheat_sigs = QtWidgets.QSpinBox()
         self.spin_inflheat_sigs.setRange(2, 30)
         self.spin_inflheat_sigs.setSingleStep(1)
@@ -8633,7 +8758,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         lay.addLayout(row)
 
         row2 = QtWidgets.QHBoxLayout()
-        row2.addWidget(QtWidgets.QLabel("Frames"))
+        row2.addWidget(QtWidgets.QLabel("Кадров"))
         self.spin_inflheat_frames = QtWidgets.QSpinBox()
         self.spin_inflheat_frames.setRange(20, 300)
         self.spin_inflheat_frames.setSingleStep(10)
@@ -8642,7 +8767,7 @@ class CompareViewer(QtWidgets.QMainWindow):
         self.spin_inflheat_frames.valueChanged.connect(self._schedule_inflheat_rebuild)
         row2.addWidget(self.spin_inflheat_frames)
 
-        row2.addWidget(QtWidgets.QLabel("LOD time pts"))
+        row2.addWidget(QtWidgets.QLabel("Точек времени"))
         self.spin_inflheat_tpts = QtWidgets.QSpinBox()
         self.spin_inflheat_tpts.setRange(200, 12000)
         self.spin_inflheat_tpts.setSingleStep(200)
@@ -8920,8 +9045,9 @@ class CompareViewer(QtWidgets.QMainWindow):
         strong_mask = finite & (abs_frame >= strong_thr)
 
         line1 = (
-            f"X=Signals | Y=Meta | t={t0:.4f}s | runs={runs_count} | sigs={len(sigs)} | meta={len(feats)} | "
-            f"mode={'Δ vs ' + ref_label if mode == 'delta' and ref_label else mode}"
+            f"X=сигналы | Y=параметры | t={t0:.4f} с | прогонов={runs_count} | "
+            f"сигналов={len(sigs)} | параметров={len(feats)} | "
+            f"режим={'Δ относительно ' + ref_label if mode == 'delta' and ref_label else mode}"
         )
 
         if analysis_mode == "one_to_all":
@@ -8946,18 +9072,19 @@ class CompareViewer(QtWidgets.QMainWindow):
                 if finite[fan_idx, int(j)]:
                     examples.append(f"{sigs[int(j)]} {float(frame[fan_idx, int(j)]):+.2f}")
             line2 = (
-                f"Frame fan-out: {feats[fan_idx]} -> {int(row_counts[fan_idx])}/{len(sigs)} signals at |corr|≥{strong_thr:.2f}"
-                + (f" | top: {', '.join(examples)}" if examples else "")
+                f"Разброс кадра: {feats[fan_idx]} -> {int(row_counts[fan_idx])}/{len(sigs)} "
+                f"сигналов при |корреляции|≥{strong_thr:.2f}"
+                + (f" | главные: {', '.join(examples)}" if examples else "")
             )
-            line3 = "Heuristic: sweep nearby frames to see whether one driver stays broad or collapses to a local hotspot."
+            line3 = "Подсказка: проверьте соседние кадры, чтобы понять, остаётся ли влияние широким или сжимается в локальный пик."
         elif analysis_mode == "all_to_one":
             target_sig = self._workspace_analysis_target_signal(sigs)
             target_idx = sigs.index(target_sig) if target_sig in sigs else int(np.argmax(np.nan_to_num(np.nanmean(np.where(finite, abs_frame, np.nan), axis=0), nan=-1.0)))
             col = frame[:, target_idx]
             col_rank = np.nan_to_num(np.abs(col), nan=-1.0, posinf=-1.0, neginf=-1.0)
             feat_idx = int(np.argmax(col_rank))
-            line2 = f"Target: {sigs[target_idx]} | lead driver at this frame: {feats[feat_idx]} ({float(frame[feat_idx, target_idx]):+.2f})"
-            line3 = "Heuristic: keep the target fixed and watch whether the driver ranking swaps as time moves."
+            line2 = f"Цель: {sigs[target_idx]} | ведущий фактор в этом кадре: {feats[feat_idx]} ({float(frame[feat_idx, target_idx]):+.2f})"
+            line3 = "Подсказка: удерживайте цель и смотрите, меняется ли порядок факторов при движении по времени."
         else:
             k_top = int(np.argmax(abs_rank))
             i_top, j_top = int(k_top // frame.shape[1]), int(k_top % frame.shape[1])
@@ -8965,10 +9092,10 @@ class CompareViewer(QtWidgets.QMainWindow):
             total_links = int(finite.sum())
             density = (100.0 * float(strong_links) / float(total_links)) if total_links else 0.0
             line2 = (
-                f"Frame corridor: {feats[i_top]} -> {sigs[j_top]} ({float(frame[i_top, j_top]):+.2f}) | "
-                f"strong links {strong_links}/{total_links} ({density:.0f}% dense)"
+                f"Связь кадра: {feats[i_top]} -> {sigs[j_top]} ({float(frame[i_top, j_top]):+.2f}) | "
+                f"сильных связей {strong_links}/{total_links} (плотность {density:.0f}%)"
             )
-            line3 = "Heuristic: use this frame as a gate, then compare it against cloud clusters and the dominant scatter corridor."
+            line3 = "Подсказка: используйте кадр как фильтр, затем сравните его с кластерами и ведущей связью на диаграмме."
 
         try:
             self.lbl_inflheat_note.setText("\n".join([line1, line2, line3]))
@@ -9622,24 +9749,24 @@ class CompareViewer(QtWidgets.QMainWindow):
     def _current_metrics_time_window(self) -> Tuple[Optional[float], Optional[float], str]:
         use_view = bool(getattr(self, "chk_dist_use_view", None) and self.chk_dist_use_view.isChecked())
         if not use_view:
-            return None, None, "whole-run"
+            return None, None, "весь прогон"
         if not getattr(self, "plots", None):
-            return None, None, "whole-run (view unavailable)"
+            return None, None, "весь прогон (видимый диапазон недоступен)"
         try:
             xr = self.plots[0].getViewBox().viewRange()[0]
             if not isinstance(xr, (list, tuple)) or len(xr) < 2:
-                return None, None, "whole-run (view unavailable)"
+                return None, None, "весь прогон (видимый диапазон недоступен)"
             t0 = float(xr[0])
             t1 = float(xr[1])
             if not (np.isfinite(t0) and np.isfinite(t1)):
-                return None, None, "whole-run (view unavailable)"
+                return None, None, "весь прогон (видимый диапазон недоступен)"
             lo = min(t0, t1)
             hi = max(t0, t1)
             if hi <= lo:
-                return None, None, "whole-run (view unavailable)"
-            return lo, hi, f"view {lo:.3f}..{hi:.3f}s"
+                return None, None, "весь прогон (видимый диапазон недоступен)"
+            return lo, hi, f"видимый диапазон {lo:.3f}..{hi:.3f} с"
         except Exception:
-            return None, None, "whole-run (view unavailable)"
+            return None, None, "весь прогон (видимый диапазон недоступен)"
 
     def _run_metrics_status_text(
         self,
@@ -9659,25 +9786,25 @@ class CompareViewer(QtWidgets.QMainWindow):
     ) -> Tuple[str, str]:
         unit_txt = f" [{unit}]" if str(unit or "").strip() else ""
         line1 = (
-            f"Signal={signal_name or '—'} | metric={metric_label}{unit_txt} | "
-            f"table={table_name or '—'} | ref={ref_label or '—'} | runs={int(rows_count)}"
+            f"Сигнал={signal_name or '—'} | метрика={metric_label}{unit_txt} | "
+            f"таблица={table_name or '—'} | эталон={ref_label or '—'} | прогонов={int(rows_count)}"
         )
         if top_run and np.isfinite(float(top_value)):
             line2 = (
-                f"Top run: {top_run} = {float(top_value):.6g}{unit_txt} | "
-                f"{time_desc} | mean={float(mean_value):.6g} | median={float(median_value):.6g} | std={float(std_value):.6g}"
+                f"Лидер: {top_run} = {float(top_value):.6g}{unit_txt} | "
+                f"{time_desc} | среднее={float(mean_value):.6g} | медиана={float(median_value):.6g} | отклонение={float(std_value):.6g}"
             )
         else:
-            line2 = f"{time_desc} | no finite values"
+            line2 = f"{time_desc} | нет конечных значений"
 
         analysis_mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
         if analysis_mode == "one_to_all":
-            hint = "Use this ranking to see which runs amplify the chosen response most before sweeping one driver across many outputs."
+            hint = "Посмотрите, какие прогоны сильнее всего усиливают выбранный отклик, перед проверкой влияния по нескольким выходам."
         elif analysis_mode == "all_to_one":
-            hint = "Use this spread check to see whether the target response is stable, split or outlier-driven before trusting one lead driver."
+            hint = "Проверьте, устойчив ли целевой отклик или его тянут выбросы, прежде чем доверять одному ведущему фактору."
         else:
-            hint = "Use this scalar slice as a fast bridge between waveform detail and all-to-all cloud structure."
-        return line1, f"{line2}\nHeuristic: {hint}"
+            hint = "Используйте этот срез как быстрый мост между деталями сигналов и общей структурой сравнения."
+        return line1, f"{line2}\nПодсказка: {hint}"
 
     def _clear_run_metrics_view(self, note: str = "") -> None:
         self._dist_cache = None
@@ -11838,29 +11965,29 @@ class CompareViewer(QtWidgets.QMainWindow):
     ) -> str:
         dims_preview = ", ".join([str(x) for x in dims[:4]])
         line1 = (
-            f"Runs: {int(runs_count)} | Signals: {int(sigs_count)} | Fields: {int(field_count)} | "
-            f"Metric: {metric} | Δ-mode: {bool(delta_mode)}"
+            f"Прогонов: {int(runs_count)} | сигналов: {int(sigs_count)} | полей: {int(field_count)} | "
+            f"метрика: {metric} | режим Δ: {bool(delta_mode)}"
         )
         line2 = (
-            f"Dims: {dims_preview or 'auto'} | 3D: {xcol or '—'}/{ycol or '—'}/{zcol or '—'} | "
-            f"Keep {int(keep_pct)}% ({keep_mode}) | "
-            f"{'View-window metrics' if use_view else 'Whole-run metrics'}"
+            f"Размерности: {dims_preview or 'авто'} | 3D: {xcol or '—'}/{ycol or '—'}/{zcol or '—'} | "
+            f"Оставить {int(keep_pct)}% ({keep_mode}) | "
+            f"{'метрики видимого окна' if use_view else 'метрики всего прогона'}"
         )
         if pebbles:
-            peb_txt = f"Pebbles: {peb_signal} ({peb_mode})" if str(peb_signal or '').strip() else "Pebbles: choose event signal"
+            peb_txt = f"События: {peb_signal} ({peb_mode})" if str(peb_signal or '').strip() else "События: выберите сигнал"
         else:
-            peb_txt = "Pebbles: off"
+            peb_txt = "События: выключены"
         if len(dims) < 3:
-            hint = "add 1-2 dims before scouting regimes"
+            hint = "добавьте 1-2 размерности перед поиском режимов"
         elif int(keep_pct) <= 15 and int(runs_count) >= 4:
-            hint = "very thin cloud: good for outliers, weak for regime cores"
+            hint = "облако слишком тонкое: хорошо видно выбросы, но хуже ядра режимов"
         elif pebbles and (not str(peb_signal or '').strip()):
-            hint = "pick a pebble signal to test event-driven separation"
+            hint = "выберите сигнал событий, чтобы проверить разделение по событиям"
         elif pebbles and str(peb_signal or '').strip():
-            hint = "compare cloud geometry with pebble-triggered grains"
+            hint = "сравните геометрию облака с точками, привязанными к событиям"
         else:
-            hint = "brush clusters back into compare plots"
-        line3 = f"{peb_txt} | Heuristic: {hint}"
+            hint = "выделите кластеры и верните их в графики сравнения"
+        line3 = f"{peb_txt} | Подсказка: {hint}"
         return "\n".join([line1, line2, line3])
 
 
@@ -12848,30 +12975,30 @@ class CompareViewer(QtWidgets.QMainWindow):
         top_severity: float = float("nan"),
     ) -> str:
         line1 = (
-            f"QA: issues={int(issues_count)} (err={int(err_count)}, warn={int(warn_count)}) | "
-            f"table={table or '—'} | runs={int(runs_count)} | sigs={int(sigs_count)} | sens={sensitivity}"
+            f"Проверка: замечаний={int(issues_count)} (ошибок={int(err_count)}, предупреждений={int(warn_count)}) | "
+            f"таблица={table or '—'} | прогонов={int(runs_count)} | сигналов={int(sigs_count)} | чувствительность={sensitivity}"
         )
         if int(issues_count) <= 0:
-            line2 = "Top suspect: none"
+            line2 = "Главная зона внимания: нет"
         elif top_run and top_sig and np.isfinite(float(top_time_s)):
-            sev_txt = f" | sev={float(top_severity):g}" if np.isfinite(float(top_severity)) else ""
-            line2 = f"Top suspect: {top_sig} in {top_run} @ {float(top_time_s):.4f}s{sev_txt}"
+            sev_txt = f" | серьёзность={float(top_severity):g}" if np.isfinite(float(top_severity)) else ""
+            line2 = f"Главная зона внимания: {top_sig} в прогоне {top_run} на {float(top_time_s):.4f} с{sev_txt}"
         else:
-            line2 = "Top suspect: see the brightest QA cell or first table row"
+            line2 = "Главная зона внимания: смотрите самую яркую ячейку проверки или первую строку таблицы"
 
         analysis_mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
         if int(issues_count) <= 0:
             if analysis_mode == "all_to_all":
-                hint = "No obvious QA blockers: compare cloud clusters with heatmap hotspots instead of debugging data quality first."
+                hint = "Явных блокеров нет: сравните кластеры с пиками теплокарты, не начиная с отладки качества данных."
             else:
-                hint = "No obvious QA blockers: move on to heatmaps / influence and test the current explanation."
+                hint = "Явных блокеров нет: переходите к теплокартам и влиянию, чтобы проверить текущее объяснение."
         elif analysis_mode == "one_to_all":
-            hint = "Use QA as a guardrail: if the hotspot is artefactual, do not trust fan-out conclusions yet."
+            hint = "Используйте проверку как ограничитель: если пик вызван дефектом данных, выводам о влиянии доверять рано."
         elif analysis_mode == "all_to_one":
-            hint = "Validate the target waveform here before accepting any lead driver from Influence(t)."
+            hint = "Проверьте целевой сигнал здесь, прежде чем принимать ведущий фактор из влияния(t)."
         else:
-            hint = "Treat QA as the veto layer before trusting cluster separation or corridor structure."
-        return "\n".join([line1, line2, f"Heuristic: {hint}"])
+            hint = "Считайте проверку veto-слоем перед доверием к кластерам или ведущей связи."
+        return "\n".join([line1, line2, f"Подсказка: {hint}"])
 
     def _events_status_text(
         self,
@@ -12886,35 +13013,35 @@ class CompareViewer(QtWidgets.QMainWindow):
     ) -> str:
         pick = [str(x) for x in (selected_signals or []) if str(x).strip()]
         line1 = (
-            f"Events: {int(rows_count)} | baseline={baseline_label or '—'} | "
-            f"filters={len(pick) if have_filter_items else 0}"
+            f"События: {int(rows_count)} | базовый прогон={baseline_label or '—'} | "
+            f"фильтров={len(pick) if have_filter_items else 0}"
         )
         if no_signals_selected:
-            line2 = "Focus: no event signals selected"
+            line2 = "Фокус: сигналы событий не выбраны"
         elif sample_signal and np.isfinite(float(sample_time_s)):
-            line2 = f"Focus: {sample_signal} @ {float(sample_time_s):.4f}s"
+            line2 = f"Фокус: {sample_signal} на {float(sample_time_s):.4f} с"
         elif sample_signal:
-            line2 = f"Focus: {sample_signal}"
+            line2 = f"Фокус: {sample_signal}"
         elif rows_count > 0:
-            line2 = "Focus: earliest visible event"
+            line2 = "Фокус: первое видимое событие"
         else:
-            line2 = "Focus: no visible events"
+            line2 = "Фокус: видимых событий нет"
 
         analysis_mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
         if no_signals_selected:
-            hint = "Pick one or more event signals to turn the table into an explanatory filter, not just a log."
+            hint = "Выберите один или несколько сигналов событий, чтобы таблица стала объясняющим фильтром, а не просто журналом."
         elif analysis_mode == "one_to_all":
-            hint = "Check whether one discrete trigger propagates into several nearby response hotspots."
+            hint = "Проверьте, расходится ли один дискретный триггер в несколько соседних пиков отклика."
         elif analysis_mode == "all_to_one":
-            hint = "Use nearby events to confirm or reject the current target-driver explanation."
+            hint = "Используйте ближайшие события, чтобы подтвердить или отвергнуть объяснение целевого сигнала."
         else:
-            hint = "Compare these event grains with cloud clusters and pebbles to see whether structure is event-driven."
-        return "\n".join([line1, line2, f"Heuristic: {hint}"])
+            hint = "Сравните события с кластерами, чтобы понять, вызвана ли структура дискретными переключениями."
+        return "\n".join([line1, line2, f"Подсказка: {hint}"])
 
 
     def _build_events_dock(self):
         """Dock: discrete events table for baseline run (first selected)."""
-        self.dock_events = QtWidgets.QDockWidget("Events", self)
+        self.dock_events = QtWidgets.QDockWidget("События", self)
         self.dock_events.setObjectName("dock_events")
 
         w = QtWidgets.QWidget()
@@ -12923,13 +13050,13 @@ class CompareViewer(QtWidgets.QMainWindow):
         lay.setSpacing(6)
 
         lbl = QtWidgets.QLabel(
-            "Discrete events = переключения дискретных сигналов (0/1/2...). "
-            "Показываем их для baseline (reference run). Двойной клик → playhead в момент события."
+            "Дискретные события = переключения сигналов (0/1/2...). "
+            "Показываем их для базового прогона. Двойной клик переводит время к моменту события."
         )
         lbl.setWordWrap(True)
         lay.addWidget(lbl)
 
-        self.lbl_events_info = QtWidgets.QLabel("Events: none")
+        self.lbl_events_info = QtWidgets.QLabel("События: нет")
         self.lbl_events_info.setWordWrap(True)
         lay.addWidget(self.lbl_events_info)
 
@@ -14930,32 +15057,32 @@ class CompareViewer(QtWidgets.QMainWindow):
         top_signal: str,
         top_corr: float,
     ) -> str:
-        mode_txt = f"Δ vs {ref_label}" if use_delta else "value"
+        mode_txt = f"Δ относительно {ref_label}" if use_delta else "значение"
         line1 = (
-            f"t={float(t0):.4f}s | runs={int(runs_count)} | sigs={int(sigs_count)} | "
-            f"meta(all)={int(feat_all_count)} shown={int(feat_sel_count)} | mode={mode_txt}"
+            f"t={float(t0):.4f} с | прогонов={int(runs_count)} | сигналов={int(sigs_count)} | "
+            f"параметров всего={int(feat_all_count)} показано={int(feat_sel_count)} | режим={mode_txt}"
         )
         analysis_mode = str(getattr(self, "_workspace_analysis_mode", "all_to_all") or "all_to_all")
         target_signal = self._workspace_analysis_target_signal([str(top_signal)]) if str(top_signal or "").strip() else ""
         if analysis_mode == "one_to_all":
             line2 = (
-                f"Driver candidate: {top_feature or '—'} | strongest visible response: {top_signal or '—'} "
+                f"Кандидат влияния: {top_feature or '—'} | сильнейший видимый отклик: {top_signal or '—'} "
                 f"({float(top_corr):+.2f})"
             )
-            hint = "Sweep nearby times to see whether one driver keeps fanning out across multiple signals."
+            hint = "Проверьте соседние моменты времени: сохраняется ли влияние по нескольким сигналам."
         elif analysis_mode == "all_to_one":
             line2 = (
-                f"Target: {target_signal or top_signal or '—'} | lead driver: {top_feature or '—'} "
+                f"Цель: {target_signal or top_signal or '—'} | ведущий фактор: {top_feature or '—'} "
                 f"({float(top_corr):+.2f})"
             )
-            hint = "Keep one target stable and cross-check the lead driver with Events / Delta."
+            hint = "Удерживайте одну цель и сверяйте ведущий фактор с событиями и Δ(t)."
         else:
             line2 = (
-                f"Dominant corridor: {top_feature or '—'} -> {top_signal or '—'} "
+                f"Ведущая связь: {top_feature or '—'} -> {top_signal or '—'} "
                 f"({float(top_corr):+.2f})"
             )
-            hint = "Compare this corridor against the current cloud/clusters before trusting the coupling."
-        line3 = f"Heuristic: {hint} Click a cell to open the scatter below."
+            hint = "Сравните эту связь с текущими кластерами, прежде чем доверять зависимости."
+        line3 = f"Подсказка: {hint} Нажмите ячейку, чтобы открыть диаграмму ниже."
         return "\n".join([line1, line2, line3])
 
     def _clear_influence_view(self, note: str = "") -> None:
@@ -15857,7 +15984,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                         if format_compare_contract_summary is not None:
                             txtw.setPlainText(format_compare_contract_summary(existing_contract))
                         else:
-                            txtw.setPlainText(f"compare_contract_hash={self.compare_contract_hash[:16]}")
+                            txtw.setPlainText(f"Хэш правил сравнения={self.compare_contract_hash[:16]}")
                     except Exception:
                         pass
                 if banner is not None:
@@ -15882,7 +16009,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             self.compare_contract_hash = ""
             if txtw is not None:
                 try:
-                    txtw.setPlainText("Compare contract: -")
+                    txtw.setPlainText("Правила сравнения: -")
                 except Exception:
                     pass
             if banner is not None:
@@ -15922,7 +16049,7 @@ class CompareViewer(QtWidgets.QMainWindow):
                 if format_compare_contract_summary is not None:
                     txtw.setPlainText(format_compare_contract_summary(self.compare_contract))
                 else:
-                    txtw.setPlainText(f"compare_contract_hash={self.compare_contract_hash[:16]}")
+                    txtw.setPlainText(f"Хэш правил сравнения={self.compare_contract_hash[:16]}")
         except Exception:
             pass
         try:
@@ -17921,12 +18048,16 @@ class CompareViewer(QtWidgets.QMainWindow):
 
     def _load_compare_session_path(self, path: str | Path) -> bool:
         if load_compare_session_file is None:
-            QtWidgets.QMessageBox.warning(self, "Compare session", "compare_session helper is unavailable.")
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Сохранённое сравнение",
+                "Модуль работы с сохранёнными сравнениями недоступен.",
+            )
             return False
         try:
             sess = load_compare_session_file(path)
         except Exception as exc:
-            QtWidgets.QMessageBox.warning(self, "Open compare session failed", str(exc))
+            QtWidgets.QMessageBox.warning(self, "Не удалось открыть сравнение", str(exc))
             return False
         self._loaded_compare_session_path = str(_absolute_fs_path(Path(path)))
         self._startup_compare_session = sess
@@ -17939,8 +18070,8 @@ class CompareViewer(QtWidgets.QMainWindow):
         if paths and loaded <= 0:
             QtWidgets.QMessageBox.warning(
                 self,
-                "Open compare session",
-                "Session opened, but referenced NPZ files were not loaded.",
+                "Открытие сравнения",
+                "Сравнение открыто, но связанные файлы результатов не загрузились.",
             )
         self._apply_restore_after_load()
         self._apply_compare_session_controls(sess)
@@ -17957,29 +18088,37 @@ class CompareViewer(QtWidgets.QMainWindow):
     def _open_session_dialog(self) -> None:
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self,
-            "Open Compare Session",
+            "Открыть сохранённое сравнение",
             str(_absolute_fs_path(Path.cwd())),
-            "Compare sessions (*.json);;JSON files (*.json)",
+            "Сохранённые сравнения (*.json);;Файлы данных (*.json)",
         )
         if path:
             self._load_compare_session_path(path)
 
     def _save_session_dialog(self) -> None:
         if save_compare_session_file is None:
-            QtWidgets.QMessageBox.warning(self, "Compare session", "compare_session helper is unavailable.")
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Сохранённое сравнение",
+                "Модуль работы с сохранёнными сравнениями недоступен.",
+            )
             return
-        default = str(_absolute_fs_path(Path.cwd() / "compare_session.json"))
+        default = str(_absolute_fs_path(Path.cwd() / "сравнение.json"))
         path, _ = QtWidgets.QFileDialog.getSaveFileName(
             self,
-            "Save Compare Session",
+            "Сохранить сравнение",
             default,
-            "Compare sessions (*.json);;JSON files (*.json)",
+            "Сохранённые сравнения (*.json);;Файлы данных (*.json)",
         )
         if not path:
             return
         sess = self._current_compare_session()
         if sess is None:
-            QtWidgets.QMessageBox.warning(self, "Save Compare Session", "Could not build compare session.")
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Сохранить сравнение",
+                "Не удалось подготовить данные для сохранения сравнения.",
+            )
             return
         try:
             save_compare_session_file(sess, path)
@@ -17988,12 +18127,12 @@ class CompareViewer(QtWidgets.QMainWindow):
             if getattr(self, '_settings', None) is not None:
                 self._settings.setValue('last_session', self._loaded_compare_session_path)
         except Exception as exc:
-            QtWidgets.QMessageBox.warning(self, "Save Compare Session failed", str(exc))
+            QtWidgets.QMessageBox.warning(self, "Не удалось сохранить сравнение", str(exc))
 
     def _open_dialog(self):
         dlg = QtWidgets.QFileDialog(self)
         dlg.setFileMode(QtWidgets.QFileDialog.ExistingFiles)
-        dlg.setNameFilter("NPZ files (*.npz)")
+        dlg.setNameFilter("Файлы результатов (*.npz)")
         if dlg.exec():
             files = [Path(s) for s in dlg.selectedFiles()]
             loaded = self._load_paths(files, replace=True)
@@ -18011,16 +18150,16 @@ class CompareViewer(QtWidgets.QMainWindow):
                         loaded_labels += ", ..."
                     QtWidgets.QMessageBox.warning(
                         self,
-                        "Open NPZ warnings",
-                        f"Загружено {loaded} NPZ, но часть файлов открыть не удалось.\n"
+                        "Предупреждение при загрузке результатов",
+                        f"Загружено файлов: {loaded}, но часть файлов открыть не удалось.\n"
                         f"Открыты: {loaded_labels}\n\n{details}{tail}",
                     )
             elif self._last_load_errors:
                 details = "\n".join(self._last_load_errors[:6])
                 QtWidgets.QMessageBox.warning(
                     self,
-                    "Open NPZ failed",
-                    "Не удалось загрузить выбранные NPZ.\nТекущая сессия оставлена без изменений.\n\n"
+                    "Не удалось загрузить результаты",
+                    "Не удалось загрузить выбранные файлы результата.\nТекущее сравнение оставлено без изменений.\n\n"
                     + details,
                 )
 
@@ -18177,7 +18316,7 @@ def _compare_session_npz_paths(sess: Optional['CompareSession']) -> List[Path]:
 def parse_args(argv: List[str]) -> argparse.Namespace:
     ap = argparse.ArgumentParser()
     ap.add_argument("--session", help="Path to a saved CompareSession JSON")
-    ap.add_argument("--current-context", help="Путь к JSON текущего контекста только для чтения")
+    ap.add_argument("--current-context", help="Путь к файлу со сведениями текущего сравнения")
     ap.add_argument("npz", nargs="*", help="Paths to *.npz or a CompareSession *.json")
     return ap.parse_args(argv)
 

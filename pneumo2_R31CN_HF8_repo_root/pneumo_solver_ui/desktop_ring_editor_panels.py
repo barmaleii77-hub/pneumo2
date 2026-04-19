@@ -231,7 +231,7 @@ class SegmentListPanel(ttk.LabelFrame):
 
 class PreviewPanel(ttk.LabelFrame):
     def __init__(self, parent: tk.Misc) -> None:
-        super().__init__(parent, text="Развёрнутый предпросмотр кольца", padding=8)
+        super().__init__(parent, text="Предпросмотр циклического сценария", padding=8)
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
 
@@ -240,12 +240,12 @@ class PreviewPanel(ttk.LabelFrame):
         for col in range(4):
             metrics.columnconfigure(col, weight=1)
 
-        self.length_var = tk.StringVar(value="Длина кольца примерно 0.0 м")
+        self.length_var = tk.StringVar(value="Длина цикла примерно 0.0 м")
         self.time_var = tk.StringVar(value="Длительность круга 0.0 с")
         self.speed_var = tk.StringVar(value="Скорость 0.0→0.0 км/ч")
         self.seam_var = tk.StringVar(value="Шов 0.0 мм")
-        self.amp_var = tk.StringVar(value="Профиль всего кольца: амплитуда (A) левого/правого следа, мм 0.0 / 0.0")
-        self.p2p_var = tk.StringVar(value="Профиль всего кольца: полный размах левого/правого следа, мм 0.0 / 0.0")
+        self.amp_var = tk.StringVar(value="Профиль всего цикла: амплитуда (A) левого/правого следа, мм 0.0 / 0.0")
+        self.p2p_var = tk.StringVar(value="Профиль всего цикла: полный размах левого/правого следа, мм 0.0 / 0.0")
         ttk.Label(metrics, textvariable=self.length_var).grid(row=0, column=0, sticky="w")
         ttk.Label(metrics, textvariable=self.time_var).grid(row=0, column=1, sticky="w")
         ttk.Label(metrics, textvariable=self.speed_var).grid(row=0, column=2, sticky="w")
@@ -267,7 +267,7 @@ class PreviewPanel(ttk.LabelFrame):
         self._diagnostics = diagnostics
         self._selected_index = int(selected_index)
         metrics = diagnostics.metrics
-        self.length_var.set(f"Длина кольца примерно {float(metrics.get('ring_length_m', 0.0) or 0.0):.2f} м")
+        self.length_var.set(f"Длина цикла примерно {float(metrics.get('ring_length_m', 0.0) or 0.0):.2f} м")
         self.time_var.set(
             f"Круг {float(metrics.get('lap_time_s', 0.0) or 0.0):.2f} с, всего {float(metrics.get('total_time_s', 0.0) or 0.0):.2f} с"
         )
@@ -279,11 +279,11 @@ class PreviewPanel(ttk.LabelFrame):
             f"{_closure_policy_label(metrics.get('closure_policy', ''))}"
         )
         self.amp_var.set(
-            "Профиль всего кольца: амплитуда (A) левого/правого следа, мм "
+            "Профиль всего цикла: амплитуда (A) левого/правого следа, мм "
             f"{float(metrics.get('ring_amp_left_mm', 0.0) or 0.0):.1f} / {float(metrics.get('ring_amp_right_mm', 0.0) or 0.0):.1f}"
         )
         self.p2p_var.set(
-            "Профиль всего кольца: полный размах левого/правого следа, мм "
+            "Профиль всего цикла: полный размах левого/правого следа, мм "
             f"{float(metrics.get('ring_p2p_left_mm', 0.0) or 0.0):.1f} / {float(metrics.get('ring_p2p_right_mm', 0.0) or 0.0):.1f}"
         )
         local_summary = self._local_segment_summary(diagnostics, selected_index)
@@ -294,12 +294,12 @@ class PreviewPanel(ttk.LabelFrame):
             )
         elif diagnostics.warnings:
             self.footer_var.set(
-                "Предпросмотр собран. Есть предупреждения: проверьте диагностику перед генерацией артефактов."
+            "Предпросмотр собран. Есть предупреждения: проверьте диагностику перед генерацией файлов."
                 + (f"\n{local_summary}" if local_summary else "")
             )
         else:
             self.footer_var.set(
-                "Предпросмотр собран по каноническим правилам кольцевого сценария."
+                "Предпросмотр собран по каноническим правилам циклического сценария."
                 + (f"\n{local_summary}" if local_summary else "")
             )
         self._redraw()
@@ -429,7 +429,7 @@ class MotionPanel(ttk.Frame):
         super().__init__(parent, padding=8)
         self.columnconfigure(0, weight=1)
 
-        general = ttk.LabelFrame(self, text="Общие параметры кольца", padding=8)
+        general = ttk.LabelFrame(self, text="Общие параметры сценария", padding=8)
         general.grid(row=0, column=0, sticky="ew")
         for col in (1, 3, 5, 7):
             general.columnconfigure(col, weight=1)
@@ -452,7 +452,7 @@ class MotionPanel(ttk.Frame):
             _add_entry(general, row=1, column=2, label="Колёсная база, м", variable=self.wheelbase_var),
             _add_entry(general, row=1, column=4, label="Колея, м", variable=self.track_var),
         ]
-        ttk.Label(general, text="Замыкание кольца").grid(row=1, column=6, sticky="w", padx=(0, 6), pady=3)
+        ttk.Label(general, text="Замыкание цикла").grid(row=1, column=6, sticky="w", padx=(0, 6), pady=3)
         self.closure_combo = ttk.Combobox(
             general,
             textvariable=self.closure_policy_var,
@@ -708,8 +708,8 @@ class RoadPanel(ttk.Frame):
         preview_box.columnconfigure(0, weight=1)
         preview_box.rowconfigure(2, weight=1)
 
-        self.profile_title_var = tk.StringVar(value="Профиль дороги появится после сборки кольца без ошибок.")
-        self.profile_stats_var = tk.StringVar(value="Линии Л/П покажут общий профиль кольца и выбранный сегмент.")
+        self.profile_title_var = tk.StringVar(value="Профиль дороги появится после сборки циклического сценария без ошибок.")
+        self.profile_stats_var = tk.StringVar(value="Линии Л/П покажут общий профиль цикла и выбранный сегмент.")
         self.profile_hint_var = tk.StringVar(
             value="Сверху будет весь круг, снизу — локальный профиль выбранного сегмента. Высота всегда в мм."
         )
@@ -773,7 +773,7 @@ class RoadPanel(ttk.Frame):
             right_p2p = _format_float_or_dash(row.get("R_p2p_mm"), digits=1)
             length_m = _format_float_or_dash(row.get("length_m"), digits=2)
             self.profile_stats_var.set(
-                "Профиль кольца L/R: "
+                "Профиль цикла L/R: "
                 f"A {float(diagnostics.metrics.get('ring_amp_left_mm', 0.0) or 0.0):.1f}/"
                 f"{float(diagnostics.metrics.get('ring_amp_right_mm', 0.0) or 0.0):.1f} мм, "
                 f"p-p {float(diagnostics.metrics.get('ring_p2p_left_mm', 0.0) or 0.0):.1f}/"
@@ -788,7 +788,7 @@ class RoadPanel(ttk.Frame):
                 self.profile_hint_var.set("Профиль дороги временно недоступен для текущей конфигурации.")
         else:
             self.profile_hint_var.set(
-                "Сверху показан весь круг с подсветкой выбранного сегмента, снизу — увеличенный локальный профиль. "
+                "Сверху показан весь цикл с подсветкой выбранного сегмента, снизу — увеличенный локальный профиль. "
                 "Синий — левый след, оранжевый — правый след, шкала по высоте всегда в мм."
             )
         self._redraw_profile()
@@ -860,7 +860,7 @@ class RoadPanel(ttk.Frame):
             right_values=[float(value) for value in diagnostics.road_profile.right_mm],
             top=whole_top,
             height=region_height,
-            title="Профиль кольца",
+            title="Профиль цикла",
             selected_row=self._selected_row(diagnostics, self._selected_index),
         )
         local_x, local_left, local_right = self._slice_profile_for_selected_segment(diagnostics)
@@ -1283,7 +1283,7 @@ class ExportPanel(ttk.Frame):
 
         self.output_dir_var = tk.StringVar()
         self.tag_var = tk.StringVar(value="ring")
-        self.last_export_var = tk.StringVar(value="Артефакты ещё не генерировались.")
+        self.last_export_var = tk.StringVar(value="Файлы сценария ещё не генерировались.")
 
         ttk.Label(top, text="Каталог выгрузки").grid(row=0, column=0, sticky="w", padx=(0, 6), pady=3)
         ttk.Entry(top, textvariable=self.output_dir_var).grid(row=0, column=1, sticky="ew", pady=3)
@@ -1327,7 +1327,7 @@ class ExportPanel(ttk.Frame):
         ttk.Button(opt_actions, text="Открыть каталог оптимизации", command=on_open_opt_workspace).grid(row=0, column=0, sticky="ew", padx=(0, 4))
         ttk.Button(opt_actions, text="Открыть последний набор", command=on_open_opt_suite).grid(row=0, column=1, sticky="ew")
 
-        artifact_box = ttk.LabelFrame(self, text="Последние артефакты", padding=8)
+        artifact_box = ttk.LabelFrame(self, text="Последние файлы", padding=8)
         artifact_box.grid(row=3, column=0, sticky="ew", pady=(8, 0))
         artifact_box.columnconfigure((0, 1, 2, 3, 4, 5), weight=1)
         ttk.Button(artifact_box, text="Открыть последний сценарий", command=on_open_last_spec).grid(row=0, column=0, sticky="ew", padx=(0, 4))

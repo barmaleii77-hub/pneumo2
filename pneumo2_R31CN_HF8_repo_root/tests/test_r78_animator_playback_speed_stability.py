@@ -295,7 +295,7 @@ def test_load_npz_accepts_str_path_and_normalizes_to_path_object(monkeypatch) ->
     assert normalized["path"].name == "dense_validation_bundle.npz"
     assert win.cockpit.bundle is not None
     assert win._update_frame_calls
-    assert win._status_text == "Загружено вне HO-008 контекста: dense_validation_bundle.npz | режим графики: Недоступно"
+    assert win._status_text == "Загружено без связи с анализом: dense_validation_bundle.npz | режим графики: Недоступно"
 
 
 def test_runtime_validation_budget_is_latched_while_playing_to_prevent_visual_flap() -> None:

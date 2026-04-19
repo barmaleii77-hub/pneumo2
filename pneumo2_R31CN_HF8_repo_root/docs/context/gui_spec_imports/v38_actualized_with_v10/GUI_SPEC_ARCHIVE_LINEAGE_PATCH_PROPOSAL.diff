@@ -1,0 +1,4 @@
+--- a/docs/context/GUI_SPEC_ARCHIVE_LINEAGE.md
++++ b/docs/context/GUI_SPEC_ARCHIVE_LINEAGE.md
+@@
++- `v38_github_kb_commit_ready` — successor consolidated commit-ready layer after `v37_github_kb_supplement`; imported layer for repo knowledge base, not runtime-closure proof.

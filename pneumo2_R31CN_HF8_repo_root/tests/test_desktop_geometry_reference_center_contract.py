@@ -262,6 +262,12 @@ def test_desktop_geometry_reference_center_uses_split_workspace_with_sidebar() -
         errors="replace",
     )
 
+    assert "Справочник геометрии и компонентов" in src
+    assert "Справочник готов" in src
+    assert "Справочник обновлён" in src
+    assert "Справочный центр" not in src
+    assert "центр показывает" not in src
+    assert "центр только показывает" not in src
     assert 'workspace = ttk.Panedwindow(outer, orient="horizontal")' in src
     assert 'source = ttk.LabelFrame(sidebar, text="Источник", padding=10)' in src
     assert 'quick = ttk.LabelFrame(sidebar, text="Переходы", padding=8)' in src
@@ -1192,6 +1198,8 @@ def test_desktop_geometry_reference_center_keeps_tabbed_desktop_workspace_contra
     assert "self.artifact_path_var" in tool_src
     assert "self.artifact_freshness_var" in tool_src
     assert "self.evidence_export_summary_var" in tool_src
+    assert 'text="Обновить справочники"' in tool_src
+    assert 'text="Обновить"' not in tool_src
     assert 'text="Базовый файл:"' in tool_src
     assert 'text="Файл анимации:"' in tool_src
     assert 'text="Выбрать файл..."' in tool_src
@@ -1199,6 +1207,7 @@ def test_desktop_geometry_reference_center_keeps_tabbed_desktop_workspace_contra
     assert "Актуальность файла анимации: последний файл ещё не проверен." in tool_src
     assert 'text="Подготовить данные для отправки"' in tool_src
     assert "Подготовить данные справочника для диагностики и отправки." in tool_src
+    assert "Справочник передаёт краткую сводку по данным" in tool_src
     assert "не собирает архив отправки" in tool_src
     assert "def _browse_artifact_path(self) -> None:" in tool_src
     assert "def _use_latest_artifact(self) -> None:" in tool_src

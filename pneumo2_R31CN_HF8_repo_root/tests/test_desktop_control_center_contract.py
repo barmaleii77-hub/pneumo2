@@ -23,6 +23,15 @@ def test_desktop_control_center_targets_core_desktop_tools_without_mnemo() -> No
     assert "include_mnemo=False" in src
     assert "desktop_mnemo" not in src_lower
     assert "pneumo_solver_ui.desktop_mnemo" not in src
+    assert "Идентификатор процесса" not in src
+    assert "Метка процесса" not in src
+    assert "pid" not in src
+    assert "Запуск инженерных окон" in src
+    assert "Центр запуска инженерных окон" not in src
+    assert "Центр запуска готов" not in src
+    assert 'text="Открыть окно"' in src
+    assert 'text="Открыть это окно"' in src
+    assert "web-интерфейс" not in src
 
 
 def test_launcher_catalog_keeps_shared_desktop_tool_list_and_optional_mnemo() -> None:

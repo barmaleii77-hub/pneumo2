@@ -417,7 +417,7 @@ def _short_hash(value: Any, *, length: int = 10) -> str:
 
 def format_analysis_context_banner(snapshot: AnimatorAnalysisContextSnapshot | None) -> str:
     if snapshot is None:
-        return "HO-008: Контекст анализа не загружен"
+        return "Связь с анализом: не загружена"
     return _format_operator_analysis_context_banner(
         exists=bool(snapshot.exists),
         status=snapshot.status,

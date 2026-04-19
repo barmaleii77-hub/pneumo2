@@ -348,9 +348,9 @@ def build_baseline_workspace_summary(
         else "История последних прогонов пока не собрана."
     )
     suggested_next = (
-        _operator_result_text(_safe_text(results_snapshot.suggested_next_step, fallback="Откройте центр опорного прогона и выполните расчёт."))
+        _operator_result_text(_safe_text(results_snapshot.suggested_next_step, fallback="Откройте базовый прогон и выполните расчёт."))
         if results_snapshot is not None
-        else "Откройте центр опорного прогона и выполните расчёт."
+        else "Откройте базовый прогон и выполните расчёт."
     )
     suggested_detail = (
         _operator_result_text(_safe_text(results_snapshot.suggested_next_detail, fallback="После опорного прогона переходите в оптимизацию только из согласованного контекста."))
@@ -377,16 +377,16 @@ def build_baseline_workspace_summary(
         WorkspaceSummaryFact(
             "Снимок набора и активный опорный прогон",
             f"Набор испытаний {ho005_state}. Опорный прогон {active_state}.",
-            _safe_text(banner_state.get("banner"), fallback="Центр опорного прогона ждёт просмотра, принятия или восстановления."),
+            _safe_text(banner_state.get("banner"), fallback="Базовый прогон ждёт просмотра, принятия или восстановления."),
         ),
         WorkspaceSummaryFact(
             "Активный опорный прогон",
             baseline_label,
             (
-                f"Идентификатор прогона - {active_hash[:12]}. "
+                f"Метка прогона - {active_hash[:12]}. "
                 f"Оптимизатор может использовать его: {_yes_no(optimizer_can_consume)}."
                 if active_hash
-                else f"Идентификатор прогона пока отсутствует. Оптимизатор может использовать его: {_yes_no(optimizer_can_consume)}."
+                else f"Метка прогона пока отсутствует. Оптимизатор может использовать его: {_yes_no(optimizer_can_consume)}."
             ),
         ),
         WorkspaceSummaryFact(
@@ -479,7 +479,7 @@ def build_input_workspace_summary(
                 ),
                 WorkspaceSummaryFact(
                     "Следующий шаг",
-                    "Откройте центр исходных данных",
+                    "Откройте исходные данные отдельным окном",
                     "После восстановления можно вернуться в рабочий шаг исходных данных и продолжить работу в главном окне.",
                 ),
             ),
@@ -575,9 +575,9 @@ def build_input_workspace_summary(
         WorkspaceSummaryFact(
             "Следующий шаг",
             (
-                "Переходите к сценариям и редактору кольца"
+                "Переходите к редактору циклического сценария"
                 if warn_count == 0
-                else "Сначала разберите предупреждения в исходных данных или откройте центр исходных данных"
+                else "Сначала разберите предупреждения в исходных данных или откройте исходные данные отдельным окном"
             ),
             "После стабилизации исходных данных переходите в сценарии, затем в набор испытаний и опорный прогон.",
         ),
@@ -644,10 +644,10 @@ def build_optimization_workspace_summary(
             "Происхождение опорного прогона",
             f"Состояние опорного прогона - {_state_text(contract.active_baseline_state, fallback='не найдено')}.",
             (
-                f"Идентификатор прогона - {str(contract.active_baseline_hash or '')[:12]}. "
+                f"Метка прогона - {str(contract.active_baseline_hash or '')[:12]}. "
                 f"Оптимизатор может использовать его: {_yes_no(contract.optimizer_baseline_can_consume)}."
                 if str(contract.active_baseline_hash or "")
-                else f"Идентификатор прогона пока отсутствует. Оптимизатор может использовать его: {_yes_no(contract.optimizer_baseline_can_consume)}."
+                else f"Метка прогона пока отсутствует. Оптимизатор может использовать его: {_yes_no(contract.optimizer_baseline_can_consume)}."
             ),
         ),
         WorkspaceSummaryFact(
@@ -693,12 +693,12 @@ def build_results_workspace_summary(
     if snapshot is None:
         return WorkspaceSummaryState(
             headline="Сводка результатов пока недоступна",
-            detail="Не удалось прочитать последние файлы результатов. Откройте центр результатов или диагностику и обновите данные.",
+            detail="Не удалось прочитать последние файлы результатов. Откройте анализ результатов или диагностику и обновите данные.",
             facts=(
                 WorkspaceSummaryFact(
                     "Состояние",
                     "нет свежего снимка",
-            "Сводка результатов собирается из отправленных файлов, автопроверок и диагностики.",
+        "Сводка результатов собирается из отправленных файлов, проверок и диагностики.",
                 ),
             ),
         )
@@ -740,7 +740,7 @@ def build_results_workspace_summary(
         ),
         WorkspaceSummaryFact(
             "Следующий шаг",
-            _operator_result_text(_safe_text(snapshot.suggested_next_step, fallback="Откройте центр результатов или окно сравнения.")),
+            _operator_result_text(_safe_text(snapshot.suggested_next_step, fallback="Откройте анализ результатов или окно сравнения.")),
             _operator_result_text(snapshot.suggested_next_detail),
         ),
     )

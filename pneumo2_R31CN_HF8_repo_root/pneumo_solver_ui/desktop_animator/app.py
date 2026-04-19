@@ -2830,7 +2830,7 @@ class PointerWatcher(QtCore.QObject):
 
     def start(self):
         self._timer.start()
-        self.status.emit(f"Слежение за anim_latest: {self.pointer_path}")
+        self.status.emit(f"Автообновление последнего файла анимации включено: {self.pointer_path}")
 
     def stop(self):
         self._timer.stop()
@@ -2855,7 +2855,7 @@ class PointerWatcher(QtCore.QObject):
             if npz_path is None:
                 return
             if not npz_path.exists():
-                self.status.emit(f"NPZ-файл не найден: {npz_path}")
+                self.status.emit(f"Файл анимации не найден: {npz_path}")
                 return
             npz_sig = self._file_sig(npz_path)
             cached_road_sig = self._file_sig(self._last_road_path)
@@ -2884,10 +2884,10 @@ class PointerWatcher(QtCore.QObject):
 
             reasons: List[str] = []
             if pointer_changed:
-                reasons.append("pointer")
+                reasons.append("последний файл")
             if self._last_deps_token:
-                reasons.append("deps")
-            reason_text = "+".join(reasons) if reasons else "init"
+                reasons.append("данные")
+            reason_text = " + ".join(reasons) if reasons else "первичная загрузка"
 
             self._last_deps_token = deps_token
             self._last_npz = str(npz_path)
@@ -2897,7 +2897,7 @@ class PointerWatcher(QtCore.QObject):
             self.status.emit(f"Перезагрузка ({reason_text}): {npz_path.name}")
             self.npz_changed.emit(npz_path)
         except Exception as e:
-            self.status.emit(f"Ошибка слежения за anim_latest: {e}")
+            self.status.emit(f"Ошибка автообновления последнего файла анимации: {e}")
 
 
 @dataclass
@@ -26505,11 +26505,11 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
         tb.setMovable(False)
 
-        act_open = QtGui.QAction("Открыть NPZ", self)
+        act_open = QtGui.QAction("Загрузить файл анимации", self)
         act_open.triggered.connect(self._open_dialog)
         tb.addAction(act_open)
 
-        self.act_follow = QtGui.QAction("Следить за anim_latest", self)
+        self.act_follow = QtGui.QAction("Автообновлять файл анимации", self)
         self.act_follow.setCheckable(True)
         self.act_follow.setChecked(False)
         self.act_follow.triggered.connect(self._toggle_follow)
@@ -26947,20 +26947,25 @@ class MainWindow(QtWidgets.QMainWindow):
             return None
 
     def _open_dialog(self):
-        fn, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Открыть NPZ", str(Path.cwd()), "NPZ files (*.npz)")
+        fn, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            "Загрузить файл анимации",
+            str(Path.cwd()),
+            "Файлы анимации (*.npz)",
+        )
         if fn:
             self.load_npz(Path(fn))
 
     def _toggle_follow(self, checked: bool):
         if self.pointer_watcher is None:
-            self._status("Слежение недоступно: нет пути к anim_latest.json")
+            self._status("Автообновление недоступно: нет файла с последней анимацией")
             self.act_follow.setChecked(False)
             return
         if checked:
             self.pointer_watcher.start()
         else:
             self.pointer_watcher.stop()
-            self._status("Слежение за anim_latest остановлено")
+            self._status("Автообновление файла анимации остановлено")
 
     def _set_speed(self, v: float):
         new_speed = float(v)
@@ -27710,14 +27715,18 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         message = str(error_text or "unknown bundle load error")
         self._status(_format_load_failed_status(message))
-        QtWidgets.QMessageBox.warning(self, "Не удалось загрузить NPZ", message)
+        QtWidgets.QMessageBox.warning(self, "Не удалось загрузить файл анимации", message)
 
     def _on_bundle_load_finished(self, request_id: int, payload_obj: object) -> None:
         if int(request_id) != int(getattr(self, "_bundle_load_latest_request_id", 0)):
             return
         if not isinstance(payload_obj, _PreparedBundleLoad):
-            self._status(_format_load_failed_status("invalid loader payload"))
-            QtWidgets.QMessageBox.warning(self, "Не удалось загрузить NPZ", "Invalid loader payload")
+            self._status(_format_load_failed_status("некорректные данные загрузчика"))
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Не удалось загрузить файл анимации",
+                "Некорректные данные загрузчика",
+            )
             return
         self._apply_loaded_bundle(payload_obj)
 
@@ -27729,7 +27738,7 @@ class MainWindow(QtWidgets.QMainWindow):
             try:
                 prepared = _prepare_loaded_bundle(resolved_path)
             except Exception as e:
-                QtWidgets.QMessageBox.warning(self, "Не удалось загрузить NPZ", f"{e}")
+                QtWidgets.QMessageBox.warning(self, "Не удалось загрузить файл анимации", f"{e}")
                 return
             self._apply_loaded_bundle(prepared)
             return
@@ -27832,7 +27841,7 @@ def run_app(
     if win.bundle is None:
         if analysis_snapshot is not None and not bool(analysis_snapshot.ready_for_animator):
             win._surface_startup_degraded_status(
-                f"HO-008 {analysis_snapshot.status}",
+                analysis_snapshot.status,
                 detail="; ".join(str(x) for x in tuple(analysis_snapshot.blocking_states or ())[:3]),
             )
         elif pointer_load_reason:
@@ -27868,17 +27877,17 @@ def _parse_args(argv: Optional[list[str]] = None):
     ap.add_argument(
         "--pointer",
         default=_os.environ.get("PNEUMO_ANIM_POINTER", str(_default_pointer_path())),
-        help="Путь к JSON-указателю anim_latest.json.",
+        help="Путь к файлу с указанием последней анимации.",
     )
     ap.add_argument(
         "--analysis-context",
         default=_os.environ.get("PNEUMO_ANALYSIS_CONTEXT_PATH", ""),
-        help="Путь к frozen HO-008 analysis_context.json для выбранного прогона.",
+        help="Путь к файлу связи с выбранным результатом анализа.",
     )
     ap.add_argument(
         "--no-follow",
         action="store_true",
-        help="Не следить за указателем anim_latest.",
+        help="Не обновлять файл анимации автоматически.",
     )
     ap.add_argument(
         "--theme",

@@ -337,7 +337,7 @@ class App:
                 script = repo / "pneumo_solver_ui" / "tools" / "send_results_gui.py"
                 subprocess.Popen([py, str(script)], cwd=str(repo))
             except Exception as e:
-                messagebox.showwarning("Подготовка отправки", f"Не удалось открыть центр подготовки отправки: {e}")
+                messagebox.showwarning("Подготовка отправки", f"Не удалось открыть подготовку отправки: {e}")
 
     def run(self) -> None:
         if self._owns_root:

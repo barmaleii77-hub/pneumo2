@@ -19,12 +19,12 @@ TRUTH_STATE_OPERATOR_LABELS: dict[str, str] = {
 }
 
 HO008_STATUS_OPERATOR_LABELS: dict[str, str] = {
-    "READY": "Контекст анализа готов",
-    "BLOCKED": "Контекст анализа заблокирован",
-    "MISSING": "Контекст анализа отсутствует",
-    "INVALID": "Контекст анализа повреждён",
-    "DEGRADED": "Контекст анализа неполный",
-    "UNKNOWN": "Состояние контекста анализа неизвестно",
+    "READY": "готова",
+    "BLOCKED": "заблокирована",
+    "MISSING": "отсутствует",
+    "INVALID": "повреждена",
+    "DEGRADED": "неполная",
+    "UNKNOWN": "неизвестно",
 }
 
 HIDDEN_ELEMENT_OPERATOR_LABELS: dict[str, str] = {
@@ -41,29 +41,33 @@ HIDDEN_ELEMENT_OPERATOR_LABELS: dict[str, str] = {
 }
 
 _REASON_LABELS: tuple[tuple[str, str], ...] = (
-    ("no --npz and follow mode is off", "не выбран артефакт анимации"),
-    ("pointer json does not contain", "указатель не содержит путь к NPZ"),
-    ("pointer json is not an object", "указатель имеет неверный формат"),
-    ("pointer json could not be read", "указатель не читается"),
-    ("pointer target is missing", "цель указателя не найдена"),
-    ("pointer missing", "указатель anim_latest не найден"),
-    ("npz missing", "NPZ-файл не найден"),
+    ("no --npz and follow mode is off", "не выбран файл анимации"),
+    ("pointer json does not contain", "файл последней анимации не содержит путь к данным"),
+    ("pointer json is not an object", "файл последней анимации имеет неверный формат"),
+    ("pointer json could not be read", "файл последней анимации не читается"),
+    ("pointer target is missing", "файл анимации из последней записи не найден"),
+    ("pointer missing", "файл последней анимации не найден"),
+    ("npz missing", "файл анимации не найден"),
     ("no loadable NPZ", "нет загружаемой анимационной выгрузки"),
     ("truth_absent", "достоверные данные отсутствуют"),
-    ("missing analysis context", "файл контекста анализа не найден"),
-    ("analysis context hash mismatch", "хэш контекста анализа не совпадает"),
-    ("selected result artifact pointer sha256 mismatch", "хэш выбранного артефакта не совпадает"),
-    ("selected result artifact pointer missing", "указанный артефакт результата не найден"),
-    ("selected result artifact is not animator-loadable", "выбранный артефакт не является NPZ для анимации"),
-    ("missing selected result artifact pointer", "нет указателя на выбранный артефакт"),
-    ("missing selected result artifact pointer path", "нет пути к выбранному артефакту"),
-    ("missing animator link contract", "нет контракта перехода в аниматор"),
-    ("animator link contract schema mismatch", "схема контракта перехода не совпадает"),
-    ("animator link contract handoff_id mismatch", "идентификатор перехода HO-008 не совпадает"),
-    ("HO-008 BLOCKED", "контекст анализа HO-008 заблокирован"),
-    ("HO-008 INVALID", "контекст анализа HO-008 повреждён"),
-    ("HO-008 MISSING", "контекст анализа HO-008 отсутствует"),
-    ("HO-008 DEGRADED", "контекст анализа HO-008 неполный"),
+    ("missing analysis context", "файл связи с анализом не найден"),
+    ("analysis context hash mismatch", "метка связи с анализом не совпадает"),
+    ("selected result artifact pointer sha256 mismatch", "метка результатов расчёта не совпадает"),
+    ("selected result artifact pointer missing", "результаты расчёта не найдены"),
+    ("selected result artifact is not animator-loadable", "результаты расчёта нельзя загрузить в аниматор"),
+    ("missing selected result artifact pointer", "нет ссылки на результаты расчёта"),
+    ("missing selected result artifact pointer path", "нет пути к результатам расчёта"),
+    ("missing animator link contract", "нет данных для перехода в аниматор"),
+    ("animator link contract schema mismatch", "формат перехода в аниматор не совпадает"),
+    ("animator link contract handoff_id mismatch", "проверка перехода в аниматор не совпадает"),
+    ("HO-008 BLOCKED", "связь с анализом заблокирована"),
+    ("HO-008 INVALID", "связь с анализом повреждена"),
+    ("HO-008 MISSING", "связь с анализом отсутствует"),
+    ("HO-008 DEGRADED", "связь с анализом неполная"),
+    ("BLOCKED", "связь с анализом заблокирована"),
+    ("INVALID", "связь с анализом повреждена"),
+    ("MISSING", "связь с анализом отсутствует"),
+    ("DEGRADED", "связь с анализом неполная"),
 )
 
 
@@ -93,7 +97,7 @@ def truth_state_label(state: Any) -> str:
 
 def ho008_status_label(status: Any) -> str:
     key = _text(status).upper() or "UNKNOWN"
-    return HO008_STATUS_OPERATOR_LABELS.get(key, f"Контекст анализа: {key}")
+    return HO008_STATUS_OPERATOR_LABELS.get(key, f"состояние {key}")
 
 
 def operator_reason_label(reason: Any) -> str:
@@ -133,10 +137,10 @@ def format_analysis_context_banner(
     warnings: Sequence[Any] = (),
 ) -> str:
     if not exists:
-        return "HO-008: Контекст анализа отсутствует | analysis_context.json не найден"
+        return "Связь с анализом: отсутствует | файл связи не найден"
     data = dict(lineage or {})
     parts = [
-        f"HO-008: {ho008_status_label(status)}",
+        f"Связь с анализом: {ho008_status_label(status)}",
         f"прогон {_text(data.get('run_id')) or '-'}",
         f"тест {_text(data.get('selected_test_id')) or '-'}",
         f"сегмент {_text(data.get('selected_segment_id')) or '-'}",
@@ -149,7 +153,7 @@ def format_analysis_context_banner(
     elif warnings:
         parts.append("предупреждение: " + operator_reasons_join(warnings, limit=2))
     if _text(analysis_context_hash):
-        parts.append(f"хэш контекста {_short(analysis_context_hash, length=12)}")
+        parts.append(f"метка связи {_short(analysis_context_hash, length=12)}")
     return " | ".join(parts)
 
 
@@ -183,7 +187,7 @@ def format_cylinder_limit_line(count: int) -> str:
 
 
 def format_loaded_status(path: Any, *, context_ready: bool, truth_state: Any = "") -> str:
-    source = "из контекста анализа HO-008" if bool(context_ready) else "вне HO-008 контекста"
+    source = "по результатам расчёта" if bool(context_ready) else "без связи с анализом"
     truth = f" | режим графики: {truth_state_label(truth_state)}" if _text(truth_state) else ""
     return f"Загружено {source}: {_name(path)}{truth}"
 
@@ -197,7 +201,7 @@ def format_queued_reload_status(path: Any) -> str:
 
 
 def format_load_failed_status(message: Any) -> str:
-    return f"Не удалось загрузить NPZ: {_text(message) or 'неизвестная ошибка'}"
+    return f"Не удалось загрузить файл анимации: {_text(message) or 'неизвестная ошибка'}"
 
 
 def format_validation_warning_status(
@@ -210,7 +214,7 @@ def format_validation_warning_status(
     return (
         "Предупреждение валидации: "
         f"резервных путей={int(fallback_count)} "
-        f"самопроверок={int(self_check_count)} "
+        f"проверок={int(self_check_count)} "
         f"задач по пружинам={int(spring_todo_count)} | {_name(path)}"
     )
 
@@ -222,5 +226,5 @@ def format_playback_status(*, t_s: float, speed_mps: float, file_name: Any, cade
 
 def format_direct_context_banner(path: Any = "") -> str:
     name = _name(path)
-    suffix = f" | артефакт {name}" if name != "-" else ""
-    return f"HO-008: Контекст анализа не загружен | прямая выгрузка вне HO-008{suffix}"
+    suffix = f" | файл {name}" if name != "-" else ""
+    return f"Связь с анализом: не загружена | файл открыт напрямую{suffix}"

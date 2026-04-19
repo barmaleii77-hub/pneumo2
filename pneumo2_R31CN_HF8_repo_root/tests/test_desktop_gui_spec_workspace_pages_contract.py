@@ -17,6 +17,7 @@ from pneumo_solver_ui.desktop_spec_shell.workspace_pages import (
     InputWorkspacePage,
     OptimizationWorkspacePage,
     ResultsWorkspacePage,
+    _operator_catalog_text,
 )
 from pneumo_solver_ui.desktop_spec_shell.workspace_runtime import (
     build_baseline_workspace_summary,
@@ -65,6 +66,34 @@ def _suite_snapshot() -> dict[str, object]:
         created_at_utc="2026-04-17T00:00:00Z",
         context_label="baseline-ui",
     )
+
+
+def test_gui_spec_imported_catalog_text_is_sanitized_before_display() -> None:
+    raw = (
+        "Compare и validation; bundle_ready=False; legacy workspace surface; "
+        "objective contract; baseline source; run-ов; KPI"
+    )
+    sanitized = _operator_catalog_text(raw)
+
+    assert sanitized == (
+        "Окно сравнения и проверка; архив не готов; отдельное рабочее окно; "
+        "цели расчёта; источник опорного прогона; запусков; показателями"
+    )
+    for forbidden in (
+        "Compare и validation",
+        "validation",
+        "bundle",
+        "legacy",
+        "workspace",
+        "surface",
+        "contract",
+        "baseline source",
+        "run-ов",
+        "KPI",
+        "False",
+        "True",
+    ):
+        assert forbidden not in sanitized
 
 
 def test_gui_spec_workspace_runtime_builders_cover_route_critical_surfaces() -> None:
@@ -171,7 +200,7 @@ def test_gui_spec_main_window_visible_text_hides_internal_service_terms() -> Non
         r"(?-i:контроль:|сверка:|выбрано:|строк:|включено:|режим:|Режим:|"
         r"Открыто:|Открыто окно:|Сводка окна:|Подсказка:|Обязательное условие:|"
         r"Почему это важно:|Где виден результат:|пояснение:|Ограничение:|"
-        r"Опорный прогон:|Идентификатор прогона:|Состояние опорного прогона:|"
+        r"Опорный прогон:|Идентификатор прогона:|Метка прогона:|Состояние опорного прогона:|"
         r"Набор испытаний:|Исходные данные:|Сценарий:|Доступен оптимизатору:|"
         r"Источник данных:|"
         r"базовых параметров:|перебираемых:|расширенных диапазонов:|служебных параметров|"
@@ -345,7 +374,7 @@ def test_hosted_baseline_workspace_page_requires_explicit_action_before_restore(
     try:
         app.processEvents()
 
-        assert page.baseline_center_box.title() == "Центр опорного прогона: просмотр, принятие, восстановление"
+        assert page.baseline_center_box.title() == "Базовый прогон: просмотр, принятие, восстановление"
         assert page.review_button.text() == "Просмотреть"
         assert page.adopt_button.text() == "Принять"
         assert page.restore_button.text() == "Восстановить"
@@ -367,7 +396,7 @@ def test_hosted_baseline_workspace_page_requires_explicit_action_before_restore(
         assert matrix_status["Опорный прогон"] == "расходится"
         assert matrix_status["Снимок набора"] == "совпадает"
         assert matrix_status["Исходные данные"] == "совпадает"
-        assert matrix_status["Сценарий кольца"] == "совпадает"
+        assert matrix_status["Циклический сценарий"] == "совпадает"
         assert matrix_status["Режим"] == "совпадает"
 
         page.handle_command("baseline.review")
@@ -473,7 +502,7 @@ def test_hosted_baseline_workspace_page_warns_before_restore_with_context_mismat
         }
         assert matrix_status["Снимок набора"] == "расходится"
         assert matrix_status["Исходные данные"] == "расходится"
-        assert matrix_status["Сценарий кольца"] == "совпадает"
+        assert matrix_status["Циклический сценарий"] == "совпадает"
         assert matrix_status["Режим"] == "расходится"
 
         blocked_restore = page.apply_baseline_action("restore")

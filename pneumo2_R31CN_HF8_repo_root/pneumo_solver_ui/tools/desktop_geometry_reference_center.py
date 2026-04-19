@@ -41,7 +41,7 @@ class DesktopGeometryReferenceCenter:
         self._hosted = bool(hosted or not self._owns_root)
         self.root = host if host is not None else tk.Tk()
         if self._owns_root:
-            self.root.title(f"Справочный центр геометрии и компонентов ({RELEASE})")
+            self.root.title(f"Справочник геометрии и компонентов ({RELEASE})")
             self.root.geometry("1540x980")
             self.root.minsize(1260, 820)
 
@@ -54,7 +54,7 @@ class DesktopGeometryReferenceCenter:
         self.artifact_path_var = tk.StringVar(master=self.root, value="")
         self.status_var = tk.StringVar(
             master=self.root,
-            value="Справочный центр готов: геометрия, цилиндры, пружины и инженерные подсказки собраны в одном окне.",
+            value="Справочник готов: геометрия, цилиндры, пружины и инженерные подсказки собраны в одном окне.",
         )
         self.context_summary_var = tk.StringVar(
             master=self.root,
@@ -127,7 +127,7 @@ class DesktopGeometryReferenceCenter:
         title_box.pack(side="left", fill="x", expand=True)
         ttk.Label(
             title_box,
-            text="Справочный центр геометрии и компонентов",
+            text="Справочник геометрии и компонентов",
             font=("Segoe UI", 16, "bold"),
         ).pack(anchor="w")
         ttk.Label(
@@ -144,7 +144,7 @@ class DesktopGeometryReferenceCenter:
         ttk.Button(header_actions, text="Пружины", command=lambda: self.notebook.select(2)).pack(side="left", padx=(8, 0))
         ttk.Button(header_actions, text="Параметры", command=lambda: self.notebook.select(3)).pack(side="left", padx=(8, 0))
         ttk.Button(header_actions, text="Паспорта", command=lambda: self.notebook.select(4)).pack(side="left", padx=(8, 0))
-        ttk.Button(header_actions, text="Обновить", command=self.refresh_all).pack(side="left", padx=(12, 0))
+        ttk.Button(header_actions, text="Обновить справочники", command=self.refresh_all).pack(side="left", padx=(12, 0))
 
         workspace = ttk.Panedwindow(outer, orient="horizontal")
         workspace.pack(fill="both", expand=True)
@@ -190,7 +190,7 @@ class DesktopGeometryReferenceCenter:
         self._attach_tooltip(
             export_btn,
             "Подготовить данные справочника для диагностики и отправки. "
-            "Справочный центр передаёт краткую сводку по данным и не собирает архив отправки.",
+            "Справочник передаёт краткую сводку по данным и не собирает архив отправки.",
         )
         source.pack(fill="x", expand=False)
 
@@ -263,7 +263,7 @@ class DesktopGeometryReferenceCenter:
             headline="Подвеска, ширина дороги и подтверждение геометрии",
             body=(
                 "Эта вкладка показывает справочные данные по подвеске и компонентам. "
-                "Ширина дороги вынесена явно: если она не задана напрямую, центр показывает расчёт из колеи и ширины колеса. "
+                "Ширина дороги вынесена явно: если она не задана напрямую, окно показывает расчёт из колеи и ширины колеса. "
                 "Подтверждение геометрии показывает состояние входных данных; без расчётного кадра оно честно остаётся неготовым."
             ),
         ).pack(side="left", padx=(6, 0))
@@ -894,7 +894,7 @@ class DesktopGeometryReferenceCenter:
         current_path = self.runtime.resolve_base_path(self.base_path_var.get())
         initial_dir = current_path.parent if current_path.parent.exists() else current_path
         path = filedialog.askopenfilename(
-            title="Выбрать базовый файл для справочного центра",
+            title="Выбрать базовый файл для справочника",
             initialdir=str(initial_dir),
             filetypes=[("Файлы данных", "*.json"), ("Все файлы", "*.*")],
         )
@@ -1089,7 +1089,7 @@ class DesktopGeometryReferenceCenter:
         self._refresh_parameter_guide()
         self._refresh_passport_tab()
         self.status_var.set(
-            "Справочный центр обновлён. Источник: "
+            "Справочник обновлён. Источник: "
             + self.runtime.describe_base_source(self._base_path())
             + "; файл анимации: "
             + (self._artifact_path() or "последний")
@@ -1225,7 +1225,7 @@ class DesktopGeometryReferenceCenter:
         gap_map = diagnostics_handoff.get("producer_truth_gap_map")
         self.producer_gap_summary_var.set(
             self._gap_map_status_text(gap_map)
-            + "; создание геометрии в этом окне запрещено; центр только показывает справочные данные."
+            + "; создание геометрии в этом окне запрещено; справочник только показывает данные."
         )
         self._clear_tree(self.producer_gap_tree)
         if isinstance(gap_map, dict):

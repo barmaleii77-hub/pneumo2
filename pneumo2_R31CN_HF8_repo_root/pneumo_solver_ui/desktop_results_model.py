@@ -110,7 +110,7 @@ class DesktopResultsSnapshot:
     suggested_next_action_key: str = ""
     suggested_next_artifact_key: str = ""
     result_context_state: str = "UNKNOWN"
-    result_context_banner: str = "Данные результата: выбранный результат пока не определён."
+    result_context_banner: str = "Результаты расчёта пока не определены."
     result_context_detail: str = ""
     result_context_action: str = ""
     result_context_fields: tuple[DesktopResultsContextField, ...] = ()
@@ -173,13 +173,13 @@ def format_recent_runs_summary(snapshot: DesktopResultsSnapshot) -> str:
 def format_result_context_summary(snapshot: DesktopResultsSnapshot) -> str:
     state = str(snapshot.result_context_state or "UNKNOWN").upper()
     labels = {
-        "CURRENT": "текущий",
-        "HISTORICAL": "исторический",
-        "STALE": "устарел",
+        "CURRENT": "актуальны",
+        "HISTORICAL": "исторические",
+        "STALE": "устарели",
         "MISSING": "нет данных",
-        "UNKNOWN": "не определён",
+        "UNKNOWN": "не определены",
     }
-    return f"Данные результата: {labels.get(state, state.lower())}"
+    return f"Результаты расчёта: {labels.get(state, state.lower())}"
 
 
 __all__ = [

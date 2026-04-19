@@ -124,11 +124,12 @@ def test_describe_latest_run_summary_exposes_cache_export_and_log_state() -> Non
     assert "файл анимации: да" in summary["runtime_line"]
     assert "CSV: да" not in summary["runtime_line"]
     assert "NPZ: да" not in summary["runtime_line"]
-    assert "самопроверка механики: в норме" in summary["health_line"]
+    assert "проверка механики: в норме" in summary["health_line"]
     assert "таблиц результатов: 2" in summary["artifact_state_line"]
     assert "файл анимации: есть" in summary["artifact_state_line"]
     assert "журнал запуска: есть" in summary["artifact_state_line"]
-    assert "C:/cache/desktop_run_setup/single_run/abc123" in summary["cache_line"]
+    assert "Папка готового результата: C:/cache/desktop_run_setup/single_run/abc123" in summary["cache_line"]
+    assert "Папка повторного использования" not in summary["cache_line"]
     assert "C:/tmp/run_001.log" in summary["log_line"]
     assert "C:/tmp/run_001" in summary["artifact_line"]
 
@@ -183,7 +184,7 @@ def test_describe_latest_selfcheck_summary_exposes_status_and_log_state() -> Non
         is_stale=True,
     )
 
-    assert "Последняя самопроверка" in summary["headline"]
+    assert "Последняя проверка" in summary["headline"]
     assert "Статус: ошибка" in summary["status_line"]
     assert "устарел для текущих настроек" in summary["freshness_line"]
     assert "режим: быстрый" in summary["status_line"]
@@ -236,7 +237,7 @@ def test_describe_selfcheck_gate_status_produces_launch_friendly_line() -> None:
     assert "ещё не запускалась" in missing
     assert "отчёт найден, но не читается" in broken
     assert "без привязки к текущей конфигурации" in legacy
-    assert "Последняя самопроверка: норма" in ok
+    assert "Последняя проверка: норма" in ok
     assert "актуален для текущих настроек" in ok
     assert "устарел для текущих настроек" in stale
     assert "предупреждений: 1" in ok
@@ -275,13 +276,13 @@ def test_describe_run_launch_route_explains_default_and_prechecked_paths() -> No
         is_stale=True,
     )
 
-    assert "сначала делает свежую самопроверку" in auto
+    assert "сначала делает свежую проверку" in auto
     assert "Проверить и запустить" in auto
-    assert "использует сохранённую самопроверку (норма" in stored_ok
+    assert "использует сохранённую проверку (норма" in stored_ok
     assert "без повторной проверки" in stored_ok
     assert "устарел для текущих настроек" in strict_stale
     assert "строгий режим остановит запуск" in strict_stale
-    assert "сначала обновит самопроверку" in strict_stale
+    assert "сначала обновит проверку" in strict_stale
 
 
 def test_describe_run_launch_outlook_predicts_operator_visible_gate() -> None:
@@ -328,9 +329,9 @@ def test_describe_run_launch_outlook_predicts_operator_visible_gate() -> None:
         is_stale=False,
     )
 
-    assert "сначала выполнит свежую самопроверку" in auto
+    assert "сначала выполнит свежую проверку" in auto
     assert "режим с подтверждением запросит решение оператора" in auto
-    assert "пойдёт сразу по актуальной сохранённой самопроверке" in stored_ok
+    assert "пойдёт сразу по актуальной сохранённой проверке" in stored_ok
     assert "предупреждений: 1" in stored_ok
     assert "будет остановлен" in strict_stale
     assert "устарела для текущих настроек" in strict_stale
@@ -381,7 +382,7 @@ def test_describe_run_launch_recommendation_guides_button_choice() -> None:
     assert "можно нажимать «Запустить расчёт»" in auto
     assert "Проверить и запустить" in auto
     assert "можно запускать обычной кнопкой" in stored_ok
-    assert "актуальная самопроверка" in stored_ok
+    assert "актуальная проверка" in stored_ok
     assert "используйте «Проверить и запустить»" in strict_missing
     assert "строгий режим" in strict_missing
     assert "лучше использовать «Проверить и запустить»" in force_failed
@@ -496,9 +497,9 @@ def test_describe_plain_launch_availability_marks_strict_blockers() -> None:
     )
 
     assert auto["enabled"] is True
-    assert "свежая самопроверка" in str(auto["detail"])
+    assert "свежая проверка" in str(auto["detail"])
     assert strict_missing["enabled"] is False
-    assert "строгий режим требует новую самопроверку" in str(strict_missing["detail"])
+    assert "строгий режим требует новую проверку" in str(strict_missing["detail"])
     assert balanced_stale["enabled"] is True
     assert "не подходит текущей конфигурации" in str(balanced_stale["detail"])
     assert force_failed["enabled"] is True

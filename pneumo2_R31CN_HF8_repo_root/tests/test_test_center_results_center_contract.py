@@ -62,6 +62,12 @@ def test_desktop_results_center_uses_split_workspace_and_scrollable_summary_pane
     assert 'right_pane = ttk.Panedwindow(right_column, orient="vertical")' in src
     assert "summary_host = ScrollableFrame(right_pane)" in src
     assert 'ttk.Sizegrip(footer).pack(side="right")' in src
+    assert 'text="Обновить результаты"' in src
+    assert 'text="Обновить"' not in src
+    assert '"open_send_center": "открыта отправка результатов"' in src
+    assert 'success_message="Открыта отправка результатов."' in src
+    assert "открыт центр отправки" not in src
+    assert "Открыт центр отправки" not in src
 
 
 def test_desktop_results_center_refreshes_analysis_evidence_before_opening_send_center() -> None:
@@ -242,7 +248,7 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert snapshot.triage_info_count == 3
     assert snapshot.validation_errors == ()
     assert snapshot.validation_warnings == ("warn-a", "warn-b")
-    assert snapshot.triage_red_flags == ("Desktop Mnemo recent: Большой перепад давлений",)
+    assert snapshot.triage_red_flags == ("Недавнее событие мнемосхемы: Большой перепад давлений",)
     assert snapshot.optimizer_scope_gate == "FAIL"
     assert snapshot.optimizer_scope_gate_reason == ""
     assert snapshot.optimizer_scope_release_risk is True
@@ -282,14 +288,14 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert snapshot.latest_diagnostics_run_dir == diagnostics_run.resolve()
     assert snapshot.anim_summary_lines == ("token=tok-123",)
     assert snapshot.operator_recommendations[0] == (
-        "Сначала откройте Desktop Animator и проверьте красные флаги мнемосхемы перед отправкой."
+        "Сначала откройте аниматор и проверьте красные флаги мнемосхемы перед отправкой."
     )
     assert snapshot.mnemo_current_mode == "Регуляторный коридор"
     assert snapshot.mnemo_recent_titles == ("Большой перепад давлений",)
     assert snapshot.suggested_next_step == (
-        "Сначала откройте Desktop Animator и проверьте красные флаги мнемосхемы перед отправкой."
+        "Сначала откройте аниматор и проверьте красные флаги мнемосхемы перед отправкой."
     )
-    assert snapshot.suggested_next_detail == "Desktop Mnemo recent: Большой перепад давлений"
+    assert snapshot.suggested_next_detail == "Недавнее событие мнемосхемы: Большой перепад давлений"
     assert snapshot.suggested_next_action_key == "open_animator_follow"
     assert snapshot.suggested_next_artifact_key == "latest_pointer"
 
@@ -297,7 +303,7 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert "Последний архив отправки" in titles
     assert "Отчёт проверки" in titles
     assert "Последний файл анимации" in titles
-    assert "Запись экспорта анимации" in titles
+    assert "Запись сохранения анимации" in titles
     assert "Журнал событий мнемосхемы" in titles
 
     validation_artifact = next(
@@ -314,8 +320,8 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert capture_artifact is not None
     assert capture_artifact.key == "capture_export_manifest"
     capture_preview = runtime.artifact_preview_lines(capture_artifact)
-    assert "Тип: экспорт анимации" in capture_preview
-    assert "Идентификатор захвата: capture-hash-010" in capture_preview
+    assert "Тип: сохранение анимации" in capture_preview
+    assert "Метка записи: capture-hash-010" in capture_preview
     assert "Данные анализа: готово" in capture_preview
     assert not any("handoff_id=" in line or "schema=" in line for line in capture_preview)
     session_artifacts = runtime.session_artifacts(
@@ -335,8 +341,8 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert "Архив текущего прогона" in session_titles
     assert "Данные проверки текущего прогона" in session_titles
     assert "Данные разбора замечаний текущего прогона" in session_titles
-    assert "Данные аниматора текущего прогона" in session_titles
-    assert "Запись экспорта текущего прогона" in session_titles
+    assert "Анимация текущего прогона" in session_titles
+    assert "Запись сохранения анимации текущего прогона" in session_titles
     assert "session_send_bundle_zip" in session_keys
     assert "session_validation_json" in session_keys
     assert "session_capture_export_manifest" in session_keys
@@ -414,7 +420,7 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert "FAIL" not in format_optimizer_gate_summary(snapshot)
     assert "критичных: 1" in format_triage_summary(snapshot)
     assert "anim_latest.npz" in format_npz_summary(snapshot)
-    assert format_result_context_summary(snapshot).startswith("Данные результата:")
+    assert format_result_context_summary(snapshot).startswith("Результаты расчёта:")
 
     manifest_payload = runtime.build_diagnostics_evidence_manifest(snapshot)
     assert manifest_payload["result_context"]["state"] == "CURRENT"
@@ -494,7 +500,7 @@ def test_desktop_results_runtime_surfaces_stale_selected_result_context(tmp_path
     assert context_fields["run_contract_hash"].status == "STALE"
     assert context_fields["run_contract_hash"].selected_value == "run-hash-historical"
     assert context_fields["scenario_lineage_hash"].current_value == "ring-current"
-    assert format_result_context_summary(snapshot) == "Данные результата: устарел"
+    assert format_result_context_summary(snapshot) == "Результаты расчёта: устарели"
 
 
 def test_desktop_results_runtime_surfaces_latest_optimizer_selected_run_contract(
@@ -873,7 +879,7 @@ def test_desktop_results_runtime_exports_diagnostics_evidence_manifest_input(tmp
     assert payload["result_context"]["selected"]["capture_hash"] == "capture-777"
     assert payload["result_context"]["selected"]["truth_mode_hash"] == "truth-777"
     assert fields["analysis_context_status"].title == "Состояние данных анализа"
-    assert fields["animator_link_contract_hash"].title == "Идентификатор связи с аниматором"
+    assert fields["animator_link_contract_hash"].title == "Метка данных анимации"
     assert fields["selected_npz_path"].selected_value == str(latest_npz)
     assert payload["result_context"]["state"] == "CURRENT"
     assert payload["mismatch_summary"]["state"] == "CURRENT"
@@ -904,7 +910,7 @@ def test_desktop_results_runtime_exports_diagnostics_evidence_manifest_input(tmp
     assert compare_artifact is not None
     assert compare_artifact.path == compare_sidecar_path
     assert compare_artifact.category == "evidence"
-    assert compare_artifact.detail == "Материалы для передачи выбранного результата в окно сравнения."
+    assert compare_artifact.detail == "Материалы для открытия результатов расчёта в окне сравнения."
     compare_preview = runtime.artifact_preview_lines(compare_artifact)
     assert "Тип: данные сравнения" in compare_preview
     assert "Состояние данных: текущий" in compare_preview
@@ -1033,7 +1039,7 @@ def test_desktop_results_runtime_launch_compare_viewer_writes_current_context_si
         validation_overview_rows=(),
         recent_artifacts=(),
         result_context_state="STALE",
-        result_context_banner="Текущая постановка отличается от выбранного результата.",
+        result_context_banner="Текущая постановка отличается от результатов расчёта.",
         result_context_detail="objective_contract_hash",
         result_context_action="Открыть окно сравнения",
         result_context_fields=(
@@ -1047,7 +1053,7 @@ def test_desktop_results_runtime_launch_compare_viewer_writes_current_context_si
             ),
             DesktopResultsContextField(
                 key="objective_contract_hash",
-                title="Идентификатор целевого профиля",
+                title="Метка целевого профиля",
                 current_value="obj-current",
                 selected_value="obj-history",
                 status="STALE",
@@ -1136,8 +1142,8 @@ def test_desktop_results_runtime_previews_selected_result_artifacts(tmp_path: Pa
     pointer_preview = runtime.artifact_preview_lines(pointer_artifact)
     mnemo_preview = runtime.artifact_preview_lines(mnemo_artifact)
 
-    assert "Метка визуального кэша: tok-preview" in pointer_preview
-    assert "Входные данные перезагрузки: ['npz', 'road_csv']" in pointer_preview
+    assert "Метка готовых данных анимации: tok-preview" in pointer_preview
+    assert "Состав данных анимации: ['npz', 'road_csv']" in pointer_preview
     assert "Режим: Регуляторный коридор" in mnemo_preview
     assert "Недавнее событие: Большой перепад давлений" in mnemo_preview
 
@@ -1163,8 +1169,8 @@ def test_desktop_results_runtime_previews_selected_result_artifacts(tmp_path: Pa
     triage_preview = runtime.artifact_preview_lines(triage_artifact)
 
     assert "Замечания: критичных: 0; предупреждений: 1; справочных: 0" in triage_preview
-    assert "Красный флаг: Pointer drift" in triage_preview
-    assert "Следующий шаг: Открыть окно сравнения следующим шагом" in triage_preview
+    assert "Красный флаг: Расхождение данных сопровождения" in triage_preview
+    assert "Рекомендация: Открыть окно сравнения следующим шагом" in triage_preview
     assert not any("severity_counts=" in line or "red_flag:" in line or "next:" in line for line in triage_preview)
 
 
@@ -1200,16 +1206,28 @@ def test_test_center_gui_embeds_validation_results_center_modules() -> None:
     assert "build_scrolled_text" in center_src
     assert "def refresh(self) -> None:" in center_src
     assert "Обзор проверок" in center_src
-    assert "Следующий шаг:" in center_src
+    assert "Рекомендация:" in center_src
+    assert "Следующий шаг:" not in center_src
+    assert "Данные результата:" not in center_src
+    assert "Пояснение:" not in center_src
     assert "Материалы последнего прогона" in center_src
     assert "def set_session_handoff(" in center_src
     assert "Показать рекомендованный раздел" in center_src
     assert "Открыть последний архив" in center_src
     assert "Открыть текущую проверку" in center_src
     assert "Открыть текущий разбор замечаний" in center_src
-    assert "Открыть текущее сравнение" in center_src
-    assert "Открыть текущую визуализацию" in center_src
+    assert "Сравнить в отдельном окне" in center_src
+    assert "Сравнить текущий прогон в отдельном окне" in center_src
+    assert 'text="Сравнение"' not in center_src
+    assert "Открыть текущее сравнение" not in center_src
+    assert "Аниматор по результату" in center_src
+    assert "Открыть текущую анимацию" in center_src
+    assert "Открыть текущую визуализацию" not in center_src
+    assert 'text="Сопровождение"' not in center_src
     assert "Открыть последний ZIP" not in center_src
+    assert "идентификатор:" not in center_src
+    assert '"hash=": "идентификатор "' not in center_src
+    assert "Артефакт" not in center_src
     assert "Validation & Results" not in center_src
     assert "Suggested next step launched." not in center_src
     assert "Контекст аниматора:" not in center_src
@@ -1236,7 +1254,8 @@ def test_test_center_gui_embeds_validation_results_center_modules() -> None:
     assert "self.overview_tree.bind(\"<<TreeviewSelect>>\", self._on_overview_select)" in center_src
     assert "self.overview_tree.bind(\"<Double-1>\", self._on_overview_open)" in center_src
     assert "self.tree.bind(\"<Double-1>\", self._on_open_selected)" in center_src
-    assert "Выполнить следующий шаг" in center_src
+    assert "Выполнить рекомендацию" in center_src
+    assert "Выполнить следующий шаг" not in center_src
     assert "Выполнить действие по проверке" in center_src
     assert "artifact_preview_lines" in center_src
     assert "Предпросмотр:" in center_src
@@ -1281,6 +1300,16 @@ def test_test_center_gui_embeds_validation_results_center_modules() -> None:
     assert "Сводная HTML-страница" not in runtime_src
     assert "JSON-файл:" not in runtime_src
     assert "Предпросмотр JSON" not in runtime_src
+    assert "Сначала откройте Desktop Animator" not in runtime_src
+    assert "Откройте Compare Viewer следующим шагом" not in runtime_src
+    assert "Метка визуального кэша" not in runtime_src
+    assert "Входные данные перезагрузки" not in runtime_src
+    assert "Данные для аниматора" not in runtime_src
+    assert "Данные аниматора текущего прогона" not in runtime_src
+    assert "Диагностика визуализации" not in runtime_src
+    assert "Запись экспорта текущего прогона" not in runtime_src
+    assert "Идентификатор" not in runtime_src
+    assert "идентификатор" not in runtime_src
     assert "def compare_viewer_path(" in runtime_src
     assert "def animator_target_paths(" in runtime_src
     assert "def compare_viewer_args(" in runtime_src

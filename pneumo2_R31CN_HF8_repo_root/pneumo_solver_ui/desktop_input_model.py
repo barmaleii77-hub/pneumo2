@@ -492,8 +492,8 @@ DESKTOP_INPUT_SECTIONS: tuple[DesktopInputSection, ...] = (
         fields=(
             DesktopInputFieldSpec("макс_шаг_интегрирования_с", "Максимальный шаг интегрирования", "мс", "Ограничение шага интегратора.", min_value=0.01, max_value=10.0, step=0.01, ui_scale=1000.0, digits=2),
             DesktopInputFieldSpec("макс_число_внутренних_шагов_на_dt", "Макс. внутренних шагов на dt", "шагов", "Защита от зависания интегратора на одном шаге dt.", control="int", min_value=1000, max_value=1000000, step=1000, digits=0),
-            DesktopInputFieldSpec("autoverif_enable", "Включить автопроверку", "", "Проверять физические и численные ограничения после расчёта.", control="bool"),
-            DesktopInputFieldSpec("mechanics_selfcheck", "Включить самопроверку механики", "", "Проверять кинематику и механические ограничения.", control="bool"),
+            DesktopInputFieldSpec("autoverif_enable", "Включить проверку после расчёта", "", "Проверять физические и численные ограничения после расчёта.", control="bool"),
+            DesktopInputFieldSpec("mechanics_selfcheck", "Включить проверку механики", "", "Проверять кинематику и механические ограничения.", control="bool"),
         ),
     ),
 )
@@ -1073,9 +1073,9 @@ def _desktop_field_search_aliases(spec: DesktopInputFieldSpec) -> tuple[str, ...
     if key == "макс_шаг_интегрирования_с":
         aliases.append("шаг интегрирования")
     if key == "autoverif_enable":
-        aliases.append("автопроверка")
+        aliases.extend(("проверка после расчёта", "проверка ограничений"))
     if key == "mechanics_selfcheck":
-        aliases.append("самопроверка механики")
+        aliases.append("проверка механики")
     if key == "механика_кинематика":
         aliases.append("кинематика подвески")
     if key == "использовать_паспорт_компонентов":

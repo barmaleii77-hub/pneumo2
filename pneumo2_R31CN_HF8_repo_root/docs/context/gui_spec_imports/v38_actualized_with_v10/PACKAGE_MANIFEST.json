@@ -1,0 +1,578 @@
+{
+  "package_id": "pneumo_codex_tz_spec_connector_reconciled_v38_actualized_with_v10",
+  "package_date": "2026-04-19",
+  "package_type": "self_contained_spec_and_repo_kb_update",
+  "predecessor": "pneumo_codex_tz_spec_connector_reconciled_v38_github_kb_commit_ready",
+  "files": [
+    {
+      "path": "ACCEPTANCE_MATRIX.csv",
+      "sha256": "390256e4b5e8296577d9792579207519caed60a96c1853098a6fdeb3f7b477a5",
+      "size_bytes": 38712
+    },
+    {
+      "path": "ACTIVE_CANON_SUCCESSOR_MATRIX.csv",
+      "sha256": "1e807f87d0542b97dc2923a5b315f6a982d86d383199581c376c1bc0e8eb1b53",
+      "size_bytes": 418
+    },
+    {
+      "path": "CANON_ACTIVATION_CHECKLIST.csv",
+      "sha256": "edcb517bc51147905c1b2c8d1f9084b8a8f03bc7ce3fed4583b813f6204dd994",
+      "size_bytes": 365
+    },
+    {
+      "path": "CHANGELOG_V38.md",
+      "sha256": "2d516f06f2873017db8330f06dd8418e5f605669a260a5b2eff422f1b93811c0",
+      "size_bytes": 699
+    },
+    {
+      "path": "CONFLICTS_AND_ASSUMPTIONS.csv",
+      "sha256": "d3bab163fdb5235b14216c649fe4c50b11ba46f8007f9cebff6450756f277ad9",
+      "size_bytes": 5649
+    },
+    {
+      "path": "CONNECTOR_USAGE_STATUS.md",
+      "sha256": "7295e1d22b66317519140e70484c6b3c4d997ac1c58b49bb4404916f3e1db9f2",
+      "size_bytes": 413
+    },
+    {
+      "path": "CROSS_REFERENCE_INDEX.csv",
+      "sha256": "0167c2cdee3816ca510961eab880c635b514e425effe6fadd9f9ee9c78854b7b",
+      "size_bytes": 25969
+    },
+    {
+      "path": "DISCOVERED_BACKLOG_SOURCES.csv",
+      "sha256": "00e0f82068becc529b627ec6466479b740c9bd79f059ccf0cfab1d4085ca19b3",
+      "size_bytes": 7607
+    },
+    {
+      "path": "EXEC_SUMMARY.json",
+      "sha256": "4e03f71df4331ae81d014b417ed36a4df3c4f5d57aab9d7a9a3f003c5eadcf3f",
+      "size_bytes": 619
+    },
+    {
+      "path": "GITHUB_WRITE_STATUS.md",
+      "sha256": "9247c71fe86d5035bddd9235bebd55da66439d4c161957671ced3d00e5b2fb83",
+      "size_bytes": 272
+    },
+    {
+      "path": "GUI_SPEC.yaml",
+      "sha256": "4465eb1812b78a770fa8b9b238790ab4310e915bd1125f439c9a1092618878a5",
+      "size_bytes": 18597
+    },
+    {
+      "path": "GUI_SPEC_ARCHIVE_LINEAGE_APPENDIX_V38.md",
+      "sha256": "fffdb430cc4feee52700d67d450aad833113b061360b8e60b4d481d39a171357",
+      "size_bytes": 301
+    },
+    {
+      "path": "GUI_SPEC_ARCHIVE_LINEAGE_PATCH_PROPOSAL.diff",
+      "sha256": "4935c4a492cf95c1352ea60d1bbb5faf52fcfbf80e06e65fc6e16f0db3e6ad87",
+      "size_bytes": 276
+    },
+    {
+      "path": "GUI_SPEC_IMPORTS_README_PATCH_PROPOSAL.diff",
+      "sha256": "47559728c5615c9fdeb2ad074c0daa66eb1c57486b5216a21d5ef935ecf185c1",
+      "size_bytes": 434
+    },
+    {
+      "path": "IMPORT_TREE_MAP.csv",
+      "sha256": "1cdcbd2c9a876a449f6ef77d57af63a879e75547834c3eb2f41d1a207cb11ae4",
+      "size_bytes": 3357
+    },
+    {
+      "path": "LAUNCHER_HIERARCHY_RECONCILIATION_V10.md",
+      "sha256": "5b1c270afec22b478c26b06662f440f472eca7bf4dac8d3e4f947fc09c098848",
+      "size_bytes": 1286
+    },
+    {
+      "path": "PACKAGE_INDEX.csv",
+      "sha256": "29c057a25c364d8c58e2116ac070c4356f228fc4cae43dc872865ba3a39ec99d",
+      "size_bytes": 7369
+    },
+    {
+      "path": "PACKAGE_INTEGRITY_POLICY.md",
+      "sha256": "b48fde9a3502df202415bbdb2958a840e36d49f78955d6258f42ead00065ce8c",
+      "size_bytes": 365
+    },
+    {
+      "path": "PACKAGE_NON_RUNTIME_CLOSURE_NOTICE.md",
+      "sha256": "3375fc2f6b21bb28634f7bdc93c44b9142040ccf0bb8952d769e418ae8a5b4b7",
+      "size_bytes": 330
+    },
+    {
+      "path": "PACKAGE_SELFCHECK_REPORT.json",
+      "sha256": "6cd477bb1da2d344b7d779b6c85279af561af573067420c6638de2396ebd91a4",
+      "size_bytes": 715
+    },
+    {
+      "path": "PARAMETER_CATALOG.csv",
+      "sha256": "0f1b8b63d40974046593d05db8ea85bccd584c7471879f1f7b94a98e4a02035c",
+      "size_bytes": 300772
+    },
+    {
+      "path": "PARAMETER_GROUPS.csv",
+      "sha256": "5d073d4d2765e7b1cf3a5103e01687b17425a7a152fa51d896995742f07b034c",
+      "size_bytes": 1539
+    },
+    {
+      "path": "PARAMETER_PIPELINE_MATRIX.csv",
+      "sha256": "5dd77387ac8ae1ee08d6c70fb1623cc241fa499c32051c8879b65d80b2615e1a",
+      "size_bytes": 713250
+    },
+    {
+      "path": "PARAMETER_RELATIONS.csv",
+      "sha256": "80276a3ae0f3cd180265c5f1738b3a6e271fe5e6f6b64663004d39154b225e77",
+      "size_bytes": 4396
+    },
+    {
+      "path": "PARAMETER_VISIBILITY_MATRIX.csv",
+      "sha256": "adc146dcc4be0575676b603d32d6b0a299aa41b2fac17e33ca4bb9c6067b3374",
+      "size_bytes": 78296
+    },
+    {
+      "path": "PIPELINE_CURRENT.dot",
+      "sha256": "0635caaf78ce4262a71a0a3325235596d738e3a42ed64778fae388478adbee58",
+      "size_bytes": 1176
+    },
+    {
+      "path": "PIPELINE_OPTIMIZED.dot",
+      "sha256": "dd078f6840bef706e31af7791a61ca4297d13f8ab937d9152cd7300b2cbff60d",
+      "size_bytes": 1690
+    },
+    {
+      "path": "POST_MERGE_VALIDATION.md",
+      "sha256": "0c85addfc55764a60c619eb55e6b076bd56ddcd77695935d0ecf9facd1cb5ac8",
+      "size_bytes": 647
+    },
+    {
+      "path": "PREDECESSOR_NOTES_V36.md",
+      "sha256": "459ef89a78d4181ce86509542869ce00f51b86c0e56a3c5135a75c1d53cfb6ca",
+      "size_bytes": 329
+    },
+    {
+      "path": "PROJECT_SOURCES_PATCH_PROPOSAL.diff",
+      "sha256": "e6e07e611f31cb348d530eac47fcc42a23aa79c4436e4c61f6cf37f41b93ceaf",
+      "size_bytes": 1738
+    },
+    {
+      "path": "README.md",
+      "sha256": "2997134c8d8688044c4e808b80d1a92e513f9e1a7b4256e878503ac0c9e68ff3",
+      "size_bytes": 1784
+    },
+    {
+      "path": "README_PROVENANCE.md",
+      "sha256": "5835bf1aa06c3038faf26be1138cc275bef3fd46f6f045420a1a66de54a9159d",
+      "size_bytes": 1442
+    },
+    {
+      "path": "REPO_ADOPTION_PLAN.md",
+      "sha256": "2d4c23bb3ce4f28b028c0a03e962f0d6eb54ea5440d292f2ebb4faadc6f1a4ad",
+      "size_bytes": 1087
+    },
+    {
+      "path": "REPO_APPLY_ORDER.md",
+      "sha256": "be32d60b5be18441fb1495d2980a1d3a5c31fec62d47fdfbc78d2a16eaefb87e",
+      "size_bytes": 400
+    },
+    {
+      "path": "REPO_CANON_ALIGNMENT_MATRIX.csv",
+      "sha256": "b94d37aedf9e274f79fe3d03df24a2da29e86d08890089e10bb91f593db16fa9",
+      "size_bytes": 362
+    },
+    {
+      "path": "REPO_CANON_READ_ORDER_AFTER_PATCH.md",
+      "sha256": "3fe00fc375f7f35410695cf10510774546858b5253f6771446f9ddb5547acad9",
+      "size_bytes": 494
+    },
+    {
+      "path": "REPO_COMMIT_SEQUENCE.md",
+      "sha256": "04e5e4cb01f97e289a14663719b76339be865354b30543e8cc26d37af0b1b630",
+      "size_bytes": 541
+    },
+    {
+      "path": "REPO_GITHUB_KB_SUPPLEMENT_SUMMARY.md",
+      "sha256": "910b64603cf428819e1f1851a4e16f44e192437d10fc931336483ada68d3d96a",
+      "size_bytes": 1462
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/ACCEPTANCE_MATRIX.csv",
+      "sha256": "390256e4b5e8296577d9792579207519caed60a96c1853098a6fdeb3f7b477a5",
+      "size_bytes": 38712
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/ACTIVE_CANON_SUCCESSOR_MATRIX.csv",
+      "sha256": "1e807f87d0542b97dc2923a5b315f6a982d86d383199581c376c1bc0e8eb1b53",
+      "size_bytes": 418
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/CONFLICTS_AND_ASSUMPTIONS.csv",
+      "sha256": "d3bab163fdb5235b14216c649fe4c50b11ba46f8007f9cebff6450756f277ad9",
+      "size_bytes": 5649
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/CROSS_REFERENCE_INDEX.csv",
+      "sha256": "0167c2cdee3816ca510961eab880c635b514e425effe6fadd9f9ee9c78854b7b",
+      "size_bytes": 25969
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/DISCOVERED_BACKLOG_SOURCES.csv",
+      "sha256": "00e0f82068becc529b627ec6466479b740c9bd79f059ccf0cfab1d4085ca19b3",
+      "size_bytes": 7607
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml",
+      "sha256": "4465eb1812b78a770fa8b9b238790ab4310e915bd1125f439c9a1092618878a5",
+      "size_bytes": 18597
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC_ARCHIVE_LINEAGE_APPENDIX_V38.md",
+      "sha256": "98297c00034c66260b69265d26995b7a82222de571c6306954318a0e0b8464a3",
+      "size_bytes": 570
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/LAUNCHER_HIERARCHY_RECONCILIATION_V10.md",
+      "sha256": "5b1c270afec22b478c26b06662f440f472eca7bf4dac8d3e4f947fc09c098848",
+      "size_bytes": 1286
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/NON_RUNTIME_CLOSURE_NOTICE.md",
+      "sha256": "3375fc2f6b21bb28634f7bdc93c44b9142040ccf0bb8952d769e418ae8a5b4b7",
+      "size_bytes": 330
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/PARAMETER_CATALOG.csv",
+      "sha256": "0f1b8b63d40974046593d05db8ea85bccd584c7471879f1f7b94a98e4a02035c",
+      "size_bytes": 300772
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/PARAMETER_GROUPS.csv",
+      "sha256": "5d073d4d2765e7b1cf3a5103e01687b17425a7a152fa51d896995742f07b034c",
+      "size_bytes": 1539
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/PARAMETER_PIPELINE_MATRIX.csv",
+      "sha256": "5dd77387ac8ae1ee08d6c70fb1623cc241fa499c32051c8879b65d80b2615e1a",
+      "size_bytes": 713250
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/PARAMETER_RELATIONS.csv",
+      "sha256": "80276a3ae0f3cd180265c5f1738b3a6e271fe5e6f6b64663004d39154b225e77",
+      "size_bytes": 4396
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/PARAMETER_VISIBILITY_MATRIX.csv",
+      "sha256": "adc146dcc4be0575676b603d32d6b0a299aa41b2fac17e33ca4bb9c6067b3374",
+      "size_bytes": 78296
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/PIPELINE_CURRENT.dot",
+      "sha256": "0635caaf78ce4262a71a0a3325235596d738e3a42ed64778fae388478adbee58",
+      "size_bytes": 1176
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/PIPELINE_OPTIMIZED.dot",
+      "sha256": "dd078f6840bef706e31af7791a61ca4297d13f8ab937d9152cd7300b2cbff60d",
+      "size_bytes": 1690
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/PREDECESSOR_NOTES_V36.md",
+      "sha256": "c56c08a7c2ec800de187cf4e67db93a61f68c91f7c28a71eb7404b2f9b9e5dd6",
+      "size_bytes": 329
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/README.md",
+      "sha256": "2997134c8d8688044c4e808b80d1a92e513f9e1a7b4256e878503ac0c9e68ff3",
+      "size_bytes": 1784
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/README_PROVENANCE.md",
+      "sha256": "5835bf1aa06c3038faf26be1138cc275bef3fd46f6f045420a1a66de54a9159d",
+      "size_bytes": 1442
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/REMOTE_REPO_CANON_EVIDENCE_V38.md",
+      "sha256": "c65da59f6a24cc5f73700dd0d7ea6418134627e3999ed8614567df85f3b946eb",
+      "size_bytes": 1220
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/REPO_CANON_ALIGNMENT_MATRIX.csv",
+      "sha256": "b94d37aedf9e274f79fe3d03df24a2da29e86d08890089e10bb91f593db16fa9",
+      "size_bytes": 362
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/REPO_GITHUB_KB_SUPPLEMENT.md",
+      "sha256": "8684810fcca0542b22e68e0cb57e5a65d0ba953bd6f0d6be704197a140a88863",
+      "size_bytes": 208
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/REPO_GITHUB_KB_SUPPLEMENT_SUMMARY.md",
+      "sha256": "910b64603cf428819e1f1851a4e16f44e192437d10fc931336483ada68d3d96a",
+      "size_bytes": 1462
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/REPO_KB_MAINTAINER_CHECKLIST.md",
+      "sha256": "5d2fc937073cd633773828aae29cb9480bb49bb579cac344164bf54f29d2aa92",
+      "size_bytes": 1078
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/REPO_OPEN_GAPS_TO_KEEP_OPEN.csv",
+      "sha256": "2f0c27fdc3d3ca13c8427e5ff4810dfc63ddc21f8887ba5f1eedef75cd0ba11f",
+      "size_bytes": 380
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/REQUIREMENTS_MATRIX.csv",
+      "sha256": "f9161b27fda1d2eed675560d427f2465303c726ebe4698dc3bf27fa22b11d48f",
+      "size_bytes": 42553
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/SCREEN_CATALOG.csv",
+      "sha256": "51b90f125d3cee0c6756b756b945d36878dbc125e3dd33c7b0ec0a93cf4dd25a",
+      "size_bytes": 45397
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/STRUCTURE_LINT_REPORT.md",
+      "sha256": "ae01e8f05ed89c1567c79cd423caa8d6d1ec6a6bd9b898add2a9cfa45f9de126",
+      "size_bytes": 1278
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md",
+      "sha256": "a683e18bfeab4ab9b85acbe025ed303b0adbdad44705c860be4c3d23a67c5290",
+      "size_bytes": 23326
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/TERMINOLOGY_GLOSSARY.csv",
+      "sha256": "8948a994fd4038c8a5ba14ae24827ea576513cb99d66a467b211358225f1c2b9",
+      "size_bytes": 10019
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/TEST_CATALOG.csv",
+      "sha256": "4360d03f4a0f63531a3272b6abf5b448121ba99715aeac393a1c382a49f259d9",
+      "size_bytes": 21275
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/UI_ELEMENT_CATALOG.csv",
+      "sha256": "8ffe2a538407c56b2ac8f10f81bfc9a272d8a9990adab0d63c72d0994505c88d",
+      "size_bytes": 444093
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/V10_ACTUALIZATION_REPORT.md",
+      "sha256": "da8656d02e55701184187a4f71252d73d4850d875e80261e230ff0681061a7d1",
+      "size_bytes": 1510
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/V10_RECONCILIATION_MATRIX.csv",
+      "sha256": "88364586be8949646d89b2f059045b7f3fe5082c1611830bb99fe78041540a44",
+      "size_bytes": 1411
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/WINDOW_CATALOG.csv",
+      "sha256": "6827d4787d0acc0dc4cb335b57cc80c55435d207e9ced6319f43f9aebe4b2a05",
+      "size_bytes": 4608
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/WISHLIST_TODO_RECONCILIATION.csv",
+      "sha256": "07623cfc8c30e928c72702eb76c6a26b72bc1b0bed9f46df785c5a1c80f589f6",
+      "size_bytes": 4232
+    },
+    {
+      "path": "REPO_IMPORT_READY/docs/context/gui_spec_imports/v38_github_kb_commit_ready/WORKSPACE_CONTRACT_MATRIX.csv",
+      "sha256": "ae34658f03c1138ff0c06825c7c2088d21a0ae8b02d0b73ef3e7859f415d7357",
+      "size_bytes": 4147
+    },
+    {
+      "path": "REPO_KB_MAINTAINER_CHECKLIST.md",
+      "sha256": "5d2fc937073cd633773828aae29cb9480bb49bb579cac344164bf54f29d2aa92",
+      "size_bytes": 1078
+    },
+    {
+      "path": "REPO_KB_PATCHSET_INDEX.csv",
+      "sha256": "41659527d5c7d0c898ac36f5042772c559f2cba9d37c5759a65646eb86504b15",
+      "size_bytes": 576
+    },
+    {
+      "path": "REPO_OPEN_GAPS_TO_KEEP_OPEN.csv",
+      "sha256": "2f0c27fdc3d3ca13c8427e5ff4810dfc63ddc21f8887ba5f1eedef75cd0ba11f",
+      "size_bytes": 380
+    },
+    {
+      "path": "REPO_PATCHSET_INDEX_V38.csv",
+      "sha256": "41659527d5c7d0c898ac36f5042772c559f2cba9d37c5759a65646eb86504b15",
+      "size_bytes": 576
+    },
+    {
+      "path": "REPO_PULL_REQUEST_BODY.md",
+      "sha256": "c3a01e5c0526544e26215879473f6bc06733e93751e862773f762e37fdf0b013",
+      "size_bytes": 622
+    },
+    {
+      "path": "REQUIREMENTS_MATRIX.csv",
+      "sha256": "f9161b27fda1d2eed675560d427f2465303c726ebe4698dc3bf27fa22b11d48f",
+      "size_bytes": 42553
+    },
+    {
+      "path": "ROLLBACK_PLAN.md",
+      "sha256": "b80cde596eedff2c4e3f6a9a25ae6febf6dff18fce6f6ab8e8c1a0bb6625f5cd",
+      "size_bytes": 352
+    },
+    {
+      "path": "SCREEN_CATALOG.csv",
+      "sha256": "51b90f125d3cee0c6756b756b945d36878dbc125e3dd33c7b0ec0a93cf4dd25a",
+      "size_bytes": 45397
+    },
+    {
+      "path": "SOURCE_CONTEXT/REMOTE_REPO_CANON_EVIDENCE_V37.md",
+      "sha256": "b9d2b8387763d1600e06231597aee263ca968b6b4ce50e066c6e9fc42167accb",
+      "size_bytes": 1220
+    },
+    {
+      "path": "SOURCE_CONTEXT/REPO_CANON_URLS_V37.csv",
+      "sha256": "be815f340975bea445c3b993c7cb7b47f95d3c8e6d5d64e14df1ef1cc420d28e",
+      "size_bytes": 571
+    },
+    {
+      "path": "SOURCE_CONTEXT/REPO_CANON_URLS_V38.csv",
+      "sha256": "78352d4707e14e0b3eafe2c231af0a5c9434b02ac3f5513200f2862185fb5db8",
+      "size_bytes": 74
+    },
+    {
+      "path": "SOURCE_CONTEXT/REPO_CANON_VERIFIED_EXTRACTS_V37.md",
+      "sha256": "1e4fc10db6d6054ebad475cfa7d712edcffc0049b1c767452975f0f29bc7a450",
+      "size_bytes": 1917
+    },
+    {
+      "path": "SOURCE_CONTEXT/REPO_CANON_VERIFIED_EXTRACTS_V38.md",
+      "sha256": "70e7368a824186825da13f8b5864aabd18ee4ce2b12a4a12fff14379385fbba0",
+      "size_bytes": 410
+    },
+    {
+      "path": "SOURCE_CONTEXT/deep-research-report (5).md",
+      "sha256": "9cc1f35d3c19631c28a2cdd2d07f8c25949ee8fc72f293a1a2679ce6ea501dd7",
+      "size_bytes": 61507
+    },
+    {
+      "path": "SOURCE_CONTEXT/prompt_for_codex_tz_spec_recipient_neutral_CANONICAL_2026-04-16_CONNECTOR_RECONCILED.md",
+      "sha256": "e0c9465ff2e209b1c1d06b6c5788652a15f5efa1282ff796b69f3a06b3ac097c",
+      "size_bytes": 48876
+    },
+    {
+      "path": "SOURCE_CONTEXT/v10_launcher_shell_report_only/ACTIONS_TO_MOVE_INSIDE_OTHER_WINDOWS_V10.csv",
+      "sha256": "90d393f23154a1c92b0b4410502792dddf8b4c59cdb75783ac9c0f246aa9964d",
+      "size_bytes": 2244
+    },
+    {
+      "path": "SOURCE_CONTEXT/v10_launcher_shell_report_only/EXEC_SUMMARY.md",
+      "sha256": "dfba2ec59da224ea5d75a87af4a06e8124269048d11a3f9a179c774f3d7f0b63",
+      "size_bytes": 1948
+    },
+    {
+      "path": "SOURCE_CONTEXT/v10_launcher_shell_report_only/GOOD_BAD_FIX_MATRIX_V10.csv",
+      "sha256": "0aa7ca3edcbf5342807a6edf81b35af788e63fe496054af1f44da5dcb1cd5538",
+      "size_bytes": 3497
+    },
+    {
+      "path": "SOURCE_CONTEXT/v10_launcher_shell_report_only/HOW_TO_FIX_V10.md",
+      "sha256": "a4816be6b19e368ba4ed0be3623ab9c81eaccd339eaf588e931d9c5e7139c26c",
+      "size_bytes": 1545
+    },
+    {
+      "path": "SOURCE_CONTEXT/v10_launcher_shell_report_only/ISSUE_REGISTER_V10.csv",
+      "sha256": "b448efc9bc130abdb71dbb5ae3ac87f278ede50e3d79dc1225116d2c42a663ae",
+      "size_bytes": 1548
+    },
+    {
+      "path": "SOURCE_CONTEXT/v10_launcher_shell_report_only/LAUNCHER_SHELL_HIERARCHY_V10.md",
+      "sha256": "e1a3176f567881e11b6d2c48427850d9482a2342d7aa29888b41f21b2b6b50f5",
+      "size_bytes": 2315
+    },
+    {
+      "path": "SOURCE_CONTEXT/v10_launcher_shell_report_only/LIMITS_AND_NOT_OPENED_V10.md",
+      "sha256": "c499c894a12faa2bc90179d7e721e2770d95233488eefc678d50dee27f960a49",
+      "size_bytes": 829
+    },
+    {
+      "path": "SOURCE_CONTEXT/v10_launcher_shell_report_only/TOP_LEVEL_WINDOW_DECISION_MATRIX_V10.csv",
+      "sha256": "614c29a8e31d9cf71b12f451904812f5c923d85d856fba8b4d4c033620c8b49d",
+      "size_bytes": 6355
+    },
+    {
+      "path": "SOURCE_CONTEXT/v10_launcher_shell_report_only/USER_FIRST_15_MINUTES_V10.md",
+      "sha256": "54c45f2d4fba5daf7564196118d1d38b77aa2442e6a2cb2bd5701aae22ef913d",
+      "size_bytes": 1563
+    },
+    {
+      "path": "SOURCE_CONTEXT/v10_launcher_shell_report_only/WHAT_IS_BAD_V10.md",
+      "sha256": "701648b0561f426fb26911e91874e2fcd4e8848ad18d56aff852ab1aa3fdde35",
+      "size_bytes": 1085
+    },
+    {
+      "path": "SOURCE_CONTEXT/v10_launcher_shell_report_only/WHAT_IS_GOOD_V10.md",
+      "sha256": "c2edda9788424e8a9a9e2389d5e9c9ebd355c6387dbc94f219b0d198baa01b13",
+      "size_bytes": 880
+    },
+    {
+      "path": "SOURCE_CONTEXT/Прогрев контекста проекта.txt",
+      "sha256": "3828d31dbced8fe4d3f7cf88c187ba3b6970b400360ee566efc8369d24ffda9e",
+      "size_bytes": 7557
+    },
+    {
+      "path": "SOURCE_CONTEXT/Проектный релиз.txt",
+      "sha256": "dcf5b54651dc28e02332e7b6ff918588bde80d8b9365c97c7b8d61dd400178bb",
+      "size_bytes": 4293
+    },
+    {
+      "path": "SOURCE_CONTEXT/Разработка софта для подвески.txt",
+      "sha256": "674dd6ff18f3e33b916350f8df9d9855e9754544d39086a84d4ed8b340f66d62",
+      "size_bytes": 5787
+    },
+    {
+      "path": "STRUCTURE_LINT_REPORT.md",
+      "sha256": "ae01e8f05ed89c1567c79cd423caa8d6d1ec6a6bd9b898add2a9cfa45f9de126",
+      "size_bytes": 1278
+    },
+    {
+      "path": "TECHNICAL_SPECIFICATION.md",
+      "sha256": "a683e18bfeab4ab9b85acbe025ed303b0adbdad44705c860be4c3d23a67c5290",
+      "size_bytes": 23326
+    },
+    {
+      "path": "TERMINOLOGY_GLOSSARY.csv",
+      "sha256": "8948a994fd4038c8a5ba14ae24827ea576513cb99d66a467b211358225f1c2b9",
+      "size_bytes": 10019
+    },
+    {
+      "path": "TEST_CATALOG.csv",
+      "sha256": "4360d03f4a0f63531a3272b6abf5b448121ba99715aeac393a1c382a49f259d9",
+      "size_bytes": 21275
+    },
+    {
+      "path": "UI_ELEMENT_CATALOG.csv",
+      "sha256": "8ffe2a538407c56b2ac8f10f81bfc9a272d8a9990adab0d63c72d0994505c88d",
+      "size_bytes": 444093
+    },
+    {
+      "path": "V10_ACTUALIZATION_REPORT.md",
+      "sha256": "da8656d02e55701184187a4f71252d73d4850d875e80261e230ff0681061a7d1",
+      "size_bytes": 1510
+    },
+    {
+      "path": "V10_RECONCILIATION_MATRIX.csv",
+      "sha256": "88364586be8949646d89b2f059045b7f3fe5082c1611830bb99fe78041540a44",
+      "size_bytes": 1411
+    },
+    {
+      "path": "WINDOW_CATALOG.csv",
+      "sha256": "6827d4787d0acc0dc4cb335b57cc80c55435d207e9ced6319f43f9aebe4b2a05",
+      "size_bytes": 4608
+    },
+    {
+      "path": "WISHLIST_TODO_RECONCILIATION.csv",
+      "sha256": "07623cfc8c30e928c72702eb76c6a26b72bc1b0bed9f46df785c5a1c80f589f6",
+      "size_bytes": 4232
+    },
+    {
+      "path": "WORKSPACE_CONTRACT_MATRIX.csv",
+      "sha256": "ae34658f03c1138ff0c06825c7c2088d21a0ae8b02d0b73ef3e7859f415d7357",
+      "size_bytes": 4147
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+Сделал следующий шаг — **R31CE**. 🔧📦
+
+На этот раз я закрыл не косметику, а реальный разрыв в оптимизационном UI:
+
+## Что исправлено
+
+### Инженерная страница оптимизации снова умеет **стадийный pipeline**
+`03_Optimization.py` раньше жила только через distributed coordinator.
+Теперь она честно поддерживает **оба** пути запуска:
+
+- `opt_stage_runner_v1.py` — staged pipeline
+- `tools/dist_opt_coordinator.py` — distributed Dask / Ray / BoTorch path
+
+### На странице возвращены **stage-critical настройки**
+Прямо в UI добавлены и объяснены:
+
+- `opt_use_staged`
+- `ui_opt_minutes`
+- `ui_jobs`
+- `ui_seed_candidates`
+- `ui_seed_conditions`
+- `ui_flush_every`
+- `ui_progress_every_sec`
+- `opt_autoupdate_baseline`
+- `warmstart_mode`
+- `surrogate_samples`
+- `surrogate_top_k`
+- `stop_pen_stage1`
+- `stop_pen_stage2`
+- `sort_tests_by_cost`
+- `influence_eps_rel`
+- `adaptive_influence_eps`
+- `stage_policy_mode`
+
+То есть инженерная страница оптимизации больше не теряет staged-логику, которая уже была в основном UI.
+
+### Появилась **live stage observability** прямо на странице
+Во время staged run страница теперь показывает:
+
+- текущую стадию
+- live row counts по stage CSV
+- `sp.json`
+- текущую seed/promotion policy
+- focus/explore budget
+- underfill / gate reason preview
+
+Это как раз закрывает дыру “стадийность есть в пайплайне, но не видна пользователю на экране”.
+
+### Подтянул runtime hardening и сюда
+Страница теперь запускает оптимизацию через:
+
+- `console_python_executable(...)`
+- `build_optimization_run_dir(...)`
+- `staged_progress_path(...)`
+- `PNEUMO_WORKSPACE_DIR`
+
+То есть она больше не обходит старые Windows runtime/path fixes и не тащит регрессии обратно.
+
+### Заодно синхронизировал release markers
+Обновлены:
+
+- `VERSION.txt`
+- `BUILD_INFO_LATEST.txt`
+- `release_tag.json`
+- `pneumo_solver_ui/release_info.py`
+
+## Проверка
+
+- `py_compile` — PASS
+- `compileall` — PASS
+- targeted `pytest` — **22 passed**
+- `unzip -t` full ZIP — PASS
+- `unzip -t` patch ZIP — PASS
+
+## Артефакты
+
+Главное:
+- [Full source release ZIP — R31CE](sandbox:/mnt/data/r31ce_release/PneumoApp_v6_80_R176_R31CE_2026-04-01.zip)
+- [SHA256 — full release](sandbox:/mnt/data/r31ce_release/PneumoApp_v6_80_R176_R31CE_2026-04-01.zip.sha256)
+
+Патч:
+- [Patch ZIP — R31CE](sandbox:/mnt/data/r31ce_release/PneumoApp_R31CE_optimization_page_stage_runner_patch_20260401.zip)
+- [SHA256 — patch ZIP](sandbox:/mnt/data/r31ce_release/PneumoApp_R31CE_optimization_page_stage_runner_patch_20260401.zip.sha256)
+
+Разбор:
+- [Release summary](sandbox:/mnt/data/r31ce_release/R31CE_release_summary.md)
+- [Unified diff](sandbox:/mnt/data/r31ce_release/R31CE_optimization_page_stage_runner.diff)
+- [Changed files list](sandbox:/mnt/data/r31ce_release/R31CE_changed_files.txt)
+- [Pytest log](sandbox:/mnt/data/r31ce_release/R31CE_targeted_pytest_log.txt)
+
+Ключевые изменённые файлы:
+- [03_Optimization.py](sandbox:/mnt/data/work_r31ce/PneumoApp_v6_80_R176_R31CE_2026-04-01/pneumo_solver_ui/pages/03_Optimization.py)
+- [release_info.py](sandbox:/mnt/data/work_r31ce/PneumoApp_v6_80_R176_R31CE_2026-04-01/pneumo_solver_ui/release_info.py)
+- [new regression test](sandbox:/mnt/data/work_r31ce/PneumoApp_v6_80_R176_R31CE_2026-04-01/tests/test_r31ce_optimization_page_stage_runner_contract.py)
+
+Этот релиз уже нормальный: **staged optimization возвращена на инженерную страницу**, UI снова объясняет пользователю, что реально происходит по стадиям, и запуск больше не обходит runtime hardening.

@@ -5,7 +5,11 @@ from pathlib import Path
 
 from pneumo_solver_ui.desktop_shell.launcher_catalog import build_desktop_launch_catalog
 from pneumo_solver_ui.desktop_spec_shell.catalogs import legacy_key_aliases
-from pneumo_solver_ui.desktop_spec_shell.help_registry import build_help_registry, _payload_text
+from pneumo_solver_ui.desktop_spec_shell.help_registry import (
+    build_help_registry,
+    _operator_text,
+    _payload_text,
+)
 from pneumo_solver_ui.desktop_spec_shell.overview_state import build_overview_snapshot
 from pneumo_solver_ui.desktop_spec_shell.registry import (
     SHELL_WORKSPACE_CODE,
@@ -22,9 +26,9 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_gui_spec_shell_workspace_order_matches_canonical_route() -> None:
     workspaces = build_shell_workspaces()
     assert [workspace.title for workspace in workspaces] == [
-        "Обзор",
+        "Панель проекта",
         "Исходные данные",
-        "Сценарии и редактор кольца",
+        "Редактор циклического сценария",
         "Набор испытаний",
         "Базовый прогон",
         "Оптимизация",
@@ -60,31 +64,97 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
 
     assert commands["diagnostics.collect_bundle"].kind == "hosted_action"
     assert commands["diagnostics.collect_bundle"].automation_id == "DG-BTN-COLLECT"
+    assert workspaces["diagnostics"].summary.startswith("Проверка, архив диагностики")
+    assert commands["tools.autotest.open"].title == "Открыть проверки"
+    assert commands["tools.autotest.open"].route_label == "Окна -> Инструменты -> Проверки"
+    assert commands["input.editor.open"].title == "Открыть исходные данные отдельным окном"
+    assert commands["input.editor.open"].route_label == "Окна -> Исходные данные -> Редактор исходных данных"
+    assert commands["optimization.center.open"].title == "Открыть оптимизацию отдельным окном"
+    assert commands["optimization.center.open"].route_label == "Окна -> Оптимизация -> Настройка и запуск"
+    assert commands["results.center.open"].title == "Открыть анализ результатов"
+    assert commands["results.center.open"].route_label == "Окна -> Анализ результатов -> Графики и проверка"
     assert commands["baseline.center.open"].kind == "open_workspace"
     assert commands["baseline.center.open"].target_workspace_id == "baseline_run"
     assert commands["baseline.center.open"].automation_id == "BL-BTN-RUN"
+    assert commands["baseline.run_setup.open"].kind == "launch_module"
+    assert commands["baseline.run_setup.open"].module == "pneumo_solver_ui.tools.desktop_run_setup_center"
+    assert commands["baseline.run_setup.open"].title == "Настроить и запустить базовый прогон"
+    assert commands["baseline.run_setup.open"].route_label == "Окна -> Базовый прогон -> Настройка и запуск"
     assert commands["baseline.review"].kind == "hosted_action"
     assert commands["baseline.review"].automation_id == "BL-BTN-REVIEW"
     assert commands["baseline.adopt"].kind == "hosted_action"
     assert commands["baseline.adopt"].automation_id == "BL-BTN-ADOPT"
     assert commands["baseline.restore"].kind == "hosted_action"
     assert commands["baseline.restore"].automation_id == "BL-BTN-RESTORE"
-    assert commands["baseline.legacy_launch.open"].module == "pneumo_solver_ui.tools.test_center_gui"
+    assert "baseline.legacy_launch.open" not in commands
+    assert commands["test.center.open"].title == "Проверить набор испытаний"
+    assert commands["test.center.open"].route_label == "Окна -> Набор испытаний -> Проверка набора"
     assert commands["optimization.center.open"].automation_id == "OP-BTN-LAUNCH"
     assert commands["input.editor.open"].launch_surface == "legacy_bridge"
     assert commands["ring.editor.open"].launch_surface == "legacy_bridge"
     assert commands["test.center.open"].launch_surface == "legacy_bridge"
-    assert commands["baseline.legacy_launch.open"].launch_surface == "legacy_bridge"
     assert commands["baseline.center.open"].launch_surface == "workspace"
     assert commands["optimization.center.open"].launch_surface == "legacy_bridge"
     assert commands["results.center.open"].launch_surface == "legacy_bridge"
     assert commands["diagnostics.legacy_center.open"].launch_surface == "legacy_bridge"
     assert commands["diagnostics.legacy_center.open"].module == "pneumo_solver_ui.tools.desktop_diagnostics_center"
+    assert workspaces["baseline_run"].quick_action_ids[0] == "baseline.run_setup.open"
     assert "baseline.review" in workspaces["baseline_run"].quick_action_ids
     assert "baseline.adopt" in workspaces["baseline_run"].quick_action_ids
     assert "baseline.restore" in workspaces["baseline_run"].quick_action_ids
-    assert "baseline.legacy_launch.open" in workspaces["baseline_run"].quick_action_ids
+    assert "baseline.center.open" not in workspaces["baseline_run"].quick_action_ids
+    assert "baseline.legacy_launch.open" not in workspaces["baseline_run"].quick_action_ids
     assert "workspace.baseline_run.open" in workspaces["optimization"].quick_action_ids
+    visible_registry_text = "\n".join(
+        [
+            *(
+                "\n".join(
+                    (
+                        workspace.title,
+                        workspace.summary,
+                        workspace.next_step,
+                        workspace.details,
+                        " ".join(workspace.search_aliases),
+                    )
+                )
+                for workspace in workspaces.values()
+            ),
+            *(
+                "\n".join(
+                    (
+                        command.title,
+                        command.summary,
+                        command.route_label,
+                        " ".join(command.search_aliases),
+                    )
+                )
+                for command in commands.values()
+            ),
+        ]
+    )
+    for forbidden in (
+        "Самопровер",
+        "самопровер",
+        "Автопровер",
+        "автопровер",
+        "Compare Viewer",
+        "compare viewer",
+        "Desktop Animator",
+        "Desktop Mnemo",
+        "Animator и Mnemo",
+        "Animator, Mnemo",
+        "NPZ",
+        "npz",
+        "Открыть центр",
+        "Центр исходных данных",
+        "Центр оптимизации",
+        "Центр результатов",
+        "Центр проверок",
+        "Центр графиков",
+        "отдельный центр",
+        "геометрический центр",
+    ):
+        assert forbidden not in visible_registry_text
 
 
 def test_gui_spec_shell_launch_module_commands_do_not_claim_native_workspace_surface() -> None:
@@ -200,6 +270,34 @@ def test_gui_spec_shell_help_registry_covers_every_workspace_with_catalog_text()
         assert forbidden not in visible_help_text
 
 
+def test_gui_spec_shell_help_text_sanitizes_imported_service_phrases() -> None:
+    raw = (
+        "Compare и validation; bundle_ready=False; legacy workspace surface; "
+        "objective contract; baseline source; run-ов; KPI"
+    )
+    sanitized = _operator_text(raw)
+
+    assert sanitized == (
+        "Окно сравнения и проверка; архив не готов; отдельное рабочее окно; "
+        "цели расчёта; источник опорного прогона; запусков; показателями"
+    )
+    for forbidden in (
+        "Compare и validation",
+        "validation",
+        "bundle",
+        "legacy",
+        "workspace",
+        "surface",
+        "contract",
+        "baseline source",
+        "run-ов",
+        "KPI",
+        "False",
+        "True",
+    ):
+        assert forbidden not in sanitized
+
+
 def test_gui_spec_shell_legacy_mojibake_keys_are_generated_for_compatibility() -> None:
     aliases = legacy_key_aliases("название")
     assert aliases[0] == "название"
@@ -289,14 +387,16 @@ def test_gui_spec_shell_main_window_uses_hosted_hubs_and_single_dispatcher() -> 
     assert src.count("def run_command(") == 1
     for expected in (
         "PneumoApp - Главное окно приложения",
-        "Сейчас открыт рабочий шаг «Обзор»",
+        "Сейчас открыт рабочий шаг «Панель проекта»",
         "Быстрый поиск окон и действий",
         "Окна",
         "Цели и ограничения: основные показатели расчёта",
         "Обязательное условие. Происхождение опорного прогона должно быть видимо",
         "Краткая сводка.",
-        "Открыть рабочее место с вкладками",
-        "Открыть центр диагностики",
+        "Открыть рабочие окна во вкладках",
+        "Сравнить прогоны",
+        "Показать анимацию",
+        "Открыть диагностику отдельным окном",
         "О главном окне приложения",
         "Фокус перенесён в панель свойств и справки",
         "Действие пока недоступно в окне",
@@ -306,12 +406,12 @@ def test_gui_spec_shell_main_window_uses_hosted_hubs_and_single_dispatcher() -> 
         assert expected in src
     for forbidden in (
         "PneumoApp Desktop Shell",
-        "Рабочее пространство: Обзор",
+        "Рабочее пространство: Панель проекта",
         "Рабочие пространства",
         "PneumoApp - главное окно",
-        "Раздел: Обзор",
+        "Раздел: Панель проекта",
         "Сейчас открыт раздел",
-        "Открыто: Обзор",
+        "Открыто: Панель проекта",
         "Открыт раздел",
         "Поиск команд, окон и разделов",
         "Фокус региона:",
@@ -327,8 +427,11 @@ def test_gui_spec_shell_main_window_uses_hosted_hubs_and_single_dispatcher() -> 
         "Важно: происхождение опорного прогона",
         "Открыть старое главное окно",
         "Открыть прежний центр диагностики",
+        "Открыть центр диагностики",
         "Открыть резервное окно приложения",
         "Открыть резервный центр диагностики",
+        "Открыть сравнение",
+        "Открыть анимацию",
         "Действие пока недоступно для раздела",
         "Разделы ->",
         "legacy Tk shell",

@@ -141,11 +141,11 @@ def test_desktop_ring_editor_is_registered_as_standalone_hosted_tool() -> None:
     assert "scenarios.handoff_ho004" in spec.capability_ids
     assert "suite.source_ring_export" in spec.capability_ids
     assert "calculation" in spec.launch_contexts
-    assert "канонического кольца" in spec.description
+    assert "циклического сценария" in spec.description
     assert "передача готового набора" in spec.description
     assert "без промежуточного шага" in spec.details
-    assert "исходное кольцо" in spec.details
-    assert "передает согласованный набор" in spec.details
+    assert "сегменты, дорожные профили и манёвры" in spec.details
+    assert "передаёт согласованный набор" in spec.details
     assert {"исходный сценарий", "выгрузка сценария", "снимок набора", "набор испытаний и сценарии"} <= set(
         spec.effective_search_aliases
     )
@@ -262,8 +262,8 @@ def test_desktop_ring_editor_modules_keep_panelized_architecture() -> None:
     assert "ExportPanel" in tool_src
     assert "PreviewPanel" in tool_src
     assert "def on_host_close(self) -> None:" in tool_src
-    assert "Редактор кольцевых сценариев" in tool_src
-    assert "Пресет кольца" in tool_src
+    assert "Редактор циклического сценария" in tool_src
+    assert "Пресет сценария" in tool_src
     assert "Применить" in tool_src
     assert "Вставить сегмент" in tool_src
     assert "def _install_window_bindings" in tool_src
@@ -293,7 +293,7 @@ def test_desktop_ring_editor_modules_keep_panelized_architecture() -> None:
     assert "Исходный сценарий:" in tool_src
     assert "Файлы выгрузки:" in tool_src
     assert "Набор испытаний:" in tool_src
-    assert "Длина кольца:" in tool_src
+    assert "Длина цикла:" in tool_src
     assert "Шов после обработки:" in tool_src
     assert "Контроль исходного сценария" in tool_src
     assert "Контроль выгрузки" in tool_src
@@ -319,7 +319,7 @@ def test_desktop_ring_editor_modules_keep_panelized_architecture() -> None:
     assert "class DiagnosticsPanel" in panels_src
     assert "class ExportPanel" in panels_src
     assert "Сегменты" in panels_src
-    assert "Развёрнутый предпросмотр кольца" in panels_src
+    assert "Предпросмотр циклического сценария" in panels_src
     assert "Параметры дороги" in panels_src
     assert "Передача в оптимизацию" in panels_src
     assert "Исходные данные для сценариев" in panels_src
@@ -329,7 +329,7 @@ def test_desktop_ring_editor_modules_keep_panelized_architecture() -> None:
     assert "Строки набора оптимизации" in panels_src
     assert "Открыть каталог оптимизации" in panels_src
     assert "Открыть последний набор" in panels_src
-    assert "Последние артефакты" in panels_src
+    assert "Последние файлы" in panels_src
     assert "Открыть описание выгрузки" in panels_src
     assert "Открыть исходный сценарий" in panels_src
     assert "Загрузить сценарий" in panels_src
@@ -349,9 +349,9 @@ def test_desktop_ring_editor_modules_keep_panelized_architecture() -> None:
     assert "Стартовая скорость:" in panels_src
     assert "Длина сегмента:" in panels_src
     assert "Изменение скорости:" in panels_src
-    assert "Длина кольца примерно" in panels_src
-    assert "Профиль всего кольца: амплитуда (A) левого/правого следа, мм" in panels_src
-    assert "Профиль всего кольца: полный размах левого/правого следа, мм" in panels_src
+    assert "Длина цикла примерно" in panels_src
+    assert "Профиль всего цикла: амплитуда (A) левого/правого следа, мм" in panels_src
+    assert "Профиль всего цикла: полный размах левого/правого следа, мм" in panels_src
     assert "Шов замыкания слева/справа" in panels_src
     assert "не геометрическое кольцо" in panels_src
     assert "проверка стыка" in panels_src
@@ -385,6 +385,9 @@ def test_desktop_ring_editor_modules_keep_panelized_architecture() -> None:
         "seam-preview",
         "seam-warning",
         "downstream",
+        "Артефакты",
+        "артефактов",
+        "Последние артефакты",
     ]
     for fragment in forbidden_visible_ring_fragments:
         assert fragment not in panels_src
@@ -571,9 +574,9 @@ def test_desktop_ring_road_panel_renders_whole_and_local_profile() -> None:
         root.update_idletasks()
 
         assert diagnostics.road_profile is not None
-        assert "Профиль кольца" in str(panel.profile_stats_var.get() or "")
+        assert "Профиль цикла" in str(panel.profile_stats_var.get() or "")
         canvas_text = " ".join(_canvas_texts(panel.profile_canvas))
-        assert "Профиль кольца" in canvas_text
+        assert "Профиль цикла" in canvas_text
         assert "Выбранный сегмент" in canvas_text
         assert "Левый след" in canvas_text
         assert "Правый след" in canvas_text

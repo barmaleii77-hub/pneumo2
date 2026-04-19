@@ -19,15 +19,84 @@ from .navigation import (
 WORKFLOW_KEYS: tuple[str, ...] = PRIMARY_WORKFLOW_KEYS
 
 WORKFLOW_HINTS: dict[str, str] = {
-    "desktop_input_editor": "Подготовьте исходные данные, геометрию, пневматику и параметры расчета.",
-    "desktop_ring_editor": "Соберите сценарии кольца и проверьте, что дорога готова к расчётному набору.",
+    "desktop_input_editor": "Подготовьте исходные данные, геометрию, пневматику и параметры расчёта.",
+    "desktop_ring_editor": "Соберите циклический сценарий и проверьте, что дорога готова к расчётному набору.",
     "test_center": "Проверьте конфигурацию и соберите основной порядок проверок из одного места.",
+    "desktop_run_setup_center": "Создайте или проверьте базовый прогон перед оптимизацией.",
     "desktop_optimizer_center": "Настройте цель, ограничения и режим оптимизации перед длительным прогоном.",
     "desktop_results_center": "Проверьте результаты, замечания и переходы к сравнению, анализу и визуализации.",
+    "desktop_animator": "Загрузите результаты расчёта в аниматор после анализа.",
+    "desktop_diagnostics_center": "Соберите диагностику и подготовьте материалы после проверки результата.",
     "autotest_gui": "Запускайте автотест напрямую, когда нужен отдельный контур прогона без лишних экранов.",
     "full_diagnostics_gui": "Соберите подробную диагностику перед разбором проблем или отправкой архива.",
     "send_results_gui": "Сформируйте итоговый архив и подготовьте результаты к отправке в отдельном окне.",
 }
+
+V10_FIRST_PATH_TEXT = (
+    "Что делать сначала: исходные данные; сценарии; набор испытаний; базовый прогон; "
+    "оптимизация; анализ; анимация; диагностика."
+)
+
+DIAGNOSTICS_KEYS: tuple[str, ...] = (
+    "desktop_diagnostics_center",
+    "full_diagnostics_gui",
+    "send_results_gui",
+)
+
+CARD_HINTS: dict[str, str] = {
+    "desktop_diagnostics_center": (
+        "Основной порядок проверки состояния проекта и подготовки архива диагностики. "
+        "Начинайте отсюда, если нужно разобраться с ошибкой или передать материалы."
+    ),
+    "full_diagnostics_gui": (
+        "Расширенная проверка для технического разбора. Обычно начинайте с основного порядка диагностики."
+    ),
+    "send_results_gui": (
+        "Дополнительное окно для подготовки материалов к отправке после диагностики и проверки результатов."
+    ),
+    "compare_viewer": (
+        "Расширенный режим из анализа результатов. Используйте его, когда встроенного сравнения уже мало."
+    ),
+    "desktop_mnemo": (
+        "Дополнительная инженерная поверхность после анализа: показывает пневматическое состояние и связи компонентов."
+    ),
+    "desktop_animator": (
+        "Шаг просмотра результатов расчёта после анализа: движение, геометрия и временной ход."
+    ),
+}
+
+ACTION_BUTTON_TEXTS: dict[str, str] = {
+    "desktop_input_editor": "Ввести исходные данные",
+    "desktop_ring_editor": "Собрать сценарий",
+    "test_center": "Проверить набор испытаний",
+    "desktop_run_setup_center": "Создать базовый прогон",
+    "desktop_optimizer_center": "Настроить оптимизацию",
+    "desktop_results_center": "Разобрать результаты",
+    "desktop_geometry_reference_center": "Проверить справочники",
+    "desktop_engineering_analysis_center": "Открыть инженерный анализ",
+    "desktop_diagnostics_center": "Собрать диагностику",
+    "full_diagnostics_gui": "Запустить расширенную проверку",
+    "send_results_gui": "Подготовить отправку",
+    "autotest_gui": "Запустить автотесты",
+    "compare_viewer": "Подробное сравнение",
+    "desktop_mnemo": "Показать пневмосхему",
+    "desktop_animator": "Загрузить анимацию",
+}
+
+
+def _action_button_text(spec: DesktopShellToolSpec) -> str:
+    return ACTION_BUTTON_TEXTS.get(spec.key, f"Перейти: {spec.title}")
+
+
+def _unique_specs(specs: tuple[DesktopShellToolSpec, ...]) -> tuple[DesktopShellToolSpec, ...]:
+    seen: set[str] = set()
+    result: list[DesktopShellToolSpec] = []
+    for spec in specs:
+        if spec.key in seen:
+            continue
+        seen.add(spec.key)
+        result.append(spec)
+    return tuple(result)
 
 
 @dataclass
@@ -81,7 +150,9 @@ class ShellHomeViewController:
                 "Открыто в рабочей области" if key in open_keys else "Готов к переходу"
             )
         for key, button in self.workflow_buttons.items():
-            button.configure(text="Показать окно" if key in open_keys else "Открыть окно")
+            spec = next((item for item in self.workflow_specs if item.key == key), None)
+            if spec is not None:
+                button.configure(text=_action_button_text(spec))
 
         if not sessions:
             self.session_summary_var.set(
@@ -170,13 +241,18 @@ def build_shell_home_view(
     ttk.Label(
         parent,
         text=(
-            "Классическое главное окно для рабочих окон проекта. "
-            "Часть окон открывается внутри приложения, а специализированные окна запускаются отдельно, "
-            "без дублирования их логики."
+            "Классическое главное окно показывает один порядок первого запуска. "
+            "Дополнительные окна доступны ниже и не спорят с основным путём."
         ),
         wraplength=1100,
         justify="left",
     ).pack(anchor="w", pady=(6, 14))
+    ttk.Label(
+        parent,
+        text=V10_FIRST_PATH_TEXT,
+        wraplength=1100,
+        justify="left",
+    ).pack(anchor="w", pady=(0, 14))
 
     for child in tuple(parent.pack_slaves()):
         if isinstance(child, ttk.Label):
@@ -188,8 +264,15 @@ def build_shell_home_view(
     summary.columnconfigure(2, weight=1)
 
     main_specs = tuple(spec for spec in hosted_specs if spec.entry_kind == "main")
-    tool_specs = tuple(spec for spec in hosted_specs if spec.entry_kind != "main")
-    workflow_specs = ordered_workflow_specs(main_specs)
+    tool_specs = tuple(spec for spec in hosted_specs if spec.entry_kind == "tool")
+    contextual_specs = tuple(spec for spec in hosted_specs if spec.entry_kind == "contextual")
+    diagnostics_specs = tuple(spec for spec in tool_specs if spec.key in DIAGNOSTICS_KEYS)
+    support_specs = tuple(spec for spec in tool_specs if spec.key not in DIAGNOSTICS_KEYS) + contextual_specs
+    animator_specs = tuple(spec for spec in external_specs if spec.key == "desktop_animator")
+    external_secondary_specs = tuple(spec for spec in external_specs if spec.key != "desktop_animator")
+    workflow_specs = ordered_workflow_specs(
+        _unique_specs((*main_specs, *animator_specs, *diagnostics_specs))
+    )
     (
         workflow_summary_var,
         continue_workflow_button,
@@ -253,8 +336,48 @@ def build_shell_home_view(
     cards.columnconfigure(0, weight=1)
     cards.columnconfigure(1, weight=1)
 
-    _build_group_box(cards, 0, "Справочники, анализ и диагностика", tool_specs, open_tool)
-    _build_group_box(cards, 1, "Анализ и визуализация", external_specs, open_tool)
+    _build_group_box(
+        cards,
+        0,
+        0,
+        "Диагностика и отправка",
+        diagnostics_specs,
+        open_tool,
+        intro="Один понятный порядок работы: собрать диагностику и подготовить материалы без поиска по разным окнам.",
+        columnspan=2,
+        primary_key="desktop_diagnostics_center",
+        primary_button_text="Собрать диагностику",
+        secondary_title="Дополнительные действия после диагностики",
+    )
+    _build_group_box(
+        cards,
+        1,
+        0,
+        "Справочники, проверка и анализ",
+        support_specs,
+        open_tool,
+        intro="Окна поддержки основного порядка работы: справочники, дополнительные проверки и инженерный разбор.",
+    )
+    _build_group_box(
+        cards,
+        1,
+        1,
+        "Анимация результата",
+        animator_specs,
+        open_tool,
+        intro="Отдельный просмотр движения и геометрии после анализа результата.",
+        primary_key="desktop_animator",
+        primary_button_text="Загрузить анимацию",
+    )
+    _build_group_box(
+        cards,
+        2,
+        1,
+        "Расширенное сравнение и пневмосхема",
+        external_secondary_specs,
+        open_tool,
+        intro="Второй слой для подробного разбора после анализа: сравнение на отдельном экране и пневматическая схема.",
+    )
     controller.refresh()
     return controller
 
@@ -303,7 +426,7 @@ def _build_workflow_box(
         ).pack(anchor="w", pady=(0, 6))
         button = ttk.Button(
             card,
-            text="Открыть окно",
+            text=_action_button_text(spec),
             command=lambda key=spec.key: open_tool(key),
         )
         button.pack(anchor="w")
@@ -387,13 +510,28 @@ def _build_recently_closed_box(
 
 def _build_group_box(
     parent: ttk.Frame,
+    row: int,
     column: int,
     title: str,
     specs: tuple[DesktopShellToolSpec, ...],
     open_tool: Callable[[str], None],
+    *,
+    intro: str = "",
+    columnspan: int = 1,
+    primary_key: str = "",
+    primary_button_text: str = "",
+    secondary_title: str = "",
 ) -> None:
     box = ttk.LabelFrame(parent, text=title, padding=12)
-    box.grid(row=0, column=column, sticky="nsew", padx=6, pady=6)
+    box.grid(row=row, column=column, columnspan=columnspan, sticky="nsew", padx=6, pady=6)
+
+    if intro:
+        ttk.Label(
+            box,
+            text=intro,
+            wraplength=960 if columnspan > 1 else 460,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 10))
 
     if not specs:
         ttk.Label(
@@ -404,18 +542,54 @@ def _build_group_box(
         ).pack(anchor="w")
         return
 
-    for spec in specs:
-        card = ttk.Frame(box, padding=(0, 0, 0, 8))
-        card.pack(fill="x", expand=False)
-        ttk.Label(card, text=spec.title, font=("Segoe UI", 10, "bold")).pack(anchor="w")
+    primary_specs = tuple(spec for spec in specs if primary_key and spec.key == primary_key)
+    secondary_specs = tuple(spec for spec in specs if not primary_key or spec.key != primary_key)
+
+    for spec in primary_specs:
+        _build_tool_card(
+            box,
+            spec,
+            open_tool,
+            columnspan=columnspan,
+            button_text=primary_button_text or _action_button_text(spec),
+        )
+
+    if secondary_specs and secondary_title:
         ttk.Label(
-            card,
-            text=spec.description,
-            wraplength=460,
-            justify="left",
-        ).pack(anchor="w", pady=(2, 6))
-        ttk.Button(
-            card,
-            text="Открыть",
-            command=lambda key=spec.key: open_tool(key),
-        ).pack(anchor="w")
+            box,
+            text=secondary_title,
+            font=("Segoe UI", 9, "bold"),
+        ).pack(anchor="w", pady=(4, 6))
+
+    for spec in secondary_specs:
+        _build_tool_card(
+            box,
+            spec,
+            open_tool,
+            columnspan=columnspan,
+            button_text=_action_button_text(spec),
+        )
+
+
+def _build_tool_card(
+    parent: ttk.Frame,
+    spec: DesktopShellToolSpec,
+    open_tool: Callable[[str], None],
+    *,
+    columnspan: int,
+    button_text: str,
+) -> None:
+    card = ttk.Frame(parent, padding=(0, 0, 0, 8))
+    card.pack(fill="x", expand=False)
+    ttk.Label(card, text=spec.title, font=("Segoe UI", 10, "bold")).pack(anchor="w")
+    ttk.Label(
+        card,
+        text=CARD_HINTS.get(spec.key, spec.description),
+        wraplength=960 if columnspan > 1 else 460,
+        justify="left",
+    ).pack(anchor="w", pady=(2, 6))
+    ttk.Button(
+        card,
+        text=button_text,
+        command=lambda key=spec.key: open_tool(key),
+    ).pack(anchor="w")

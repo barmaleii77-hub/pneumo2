@@ -51,17 +51,38 @@ def test_compare_viewer_view_menu_exposes_workspace_presets_and_dock_families(mo
         assert viewer.dock_controls.widget().__class__.__name__ == "QScrollArea"
         assert viewer.dock_compare_contract.objectName() == "dock_compare_contract"
         assert viewer.txt_compare_contract.objectName() == "compareContractSummary"
+        tab_texts = [
+            viewer.controls_top_tabs.tabText(i)
+            for i in range(viewer.controls_top_tabs.count())
+        ]
+        assert "Порядок проверки" in tab_texts
+        assert "Маршрут" not in tab_texts
+        assert "Краткий порядок работы со сравнением." in viewer.controls_top_tabs.tabToolTip(0)
+        assert "маршрут" not in viewer.controls_top_tabs.tabToolTip(0).lower()
+        assert viewer.lbl_compare_current_context_source.text() == "Текущее сравнение: нет данных"
+        assert "Текущий контекст" not in viewer.lbl_compare_current_context_source.text()
+        assert (
+            viewer.btn_open_compare_current_context_sidecar.toolTip()
+            == "Сведения текущего сравнения недоступны."
+        )
 
         insights_plain = viewer.txt_workspace_insights.toPlainText()
-        assert "Delta hotspot" in insights_plain
-        assert "Need comparison context" in insights_plain
-        assert "Top meta driver" in insights_plain
-        assert "Load a compare set" in insights_plain
+        assert "Локальный максимум Δ" in insights_plain
+        assert "Нужен набор для сравнения" in insights_plain
+        assert "Главный параметр влияния" in insights_plain
+        assert "Загрузите набор для сравнения" in insights_plain
+        for forbidden_text in (
+            "Delta hotspot",
+            "Need comparison context",
+            "Top meta driver",
+            "Load a compare set",
+        ):
+            assert forbidden_text not in insights_plain
 
         dock_action_texts = [action.text() for action in viewer.menu_view_docks.actions()]
         assert dock_action_texts[:7] == [
             "\u041f\u0443\u043b\u044c\u0442",
-            "Compare contract",
+            "Правила сравнения",
             "\u0422\u0435\u043f\u043b\u043e\u043a\u0430\u0440\u0442\u0430 \u0394(t)",
             "\u041f\u0438\u043a\u0438 |\u0394|",
             "\u0425\u043e\u0434 \u043a\u043b\u0430\u043f\u0430\u043d\u043e\u0432",

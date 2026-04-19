@@ -64,7 +64,7 @@ try:
 except Exception:
     RELEASE = os.environ.get("PNEUMO_RELEASE", "UNIFIED_v6_67") or "UNIFIED_v6_67"
 
-EDITOR_DIALOG_TITLE = "Редактор кольцевых сценариев"
+EDITOR_DIALOG_TITLE = "Редактор циклического сценария"
 
 
 TURN_DIRECTION_TO_UI = {
@@ -139,7 +139,7 @@ class DesktopRingScenarioEditor:
         self._hosted = bool(hosted or not self._owns_root)
         self.root = host if host is not None else tk.Tk()
         if self._owns_root:
-            self.root.title(f"Редактор кольцевых сценариев ({RELEASE})")
+            self.root.title(f"Редактор циклического сценария ({RELEASE})")
             self.root.geometry("1560x980")
             self.root.minsize(1320, 820)
 
@@ -154,7 +154,7 @@ class DesktopRingScenarioEditor:
 
         self.ring_preset_var = tk.StringVar(value=RING_PRESET_DEFAULT)
         self.segment_preset_var = tk.StringVar(value=SEGMENT_PRESET_DEFAULT)
-        self.status_var = tk.StringVar(value="Готово. Можно редактировать кольцевой сценарий.")
+        self.status_var = tk.StringVar(value="Готово. Можно редактировать циклический сценарий.")
         self._latest_inputs_handoff_state: dict[str, object] = {}
 
         self._build_ui()
@@ -164,7 +164,7 @@ class DesktopRingScenarioEditor:
 
     def _window_title_text(self) -> str:
         dirty = " *" if self.state.dirty else ""
-        return f"Редактор кольцевых сценариев{dirty} ({RELEASE})"
+        return f"Редактор циклического сценария{dirty} ({RELEASE})"
 
     def _update_window_title(self) -> None:
         if self._owns_root:
@@ -240,12 +240,12 @@ class DesktopRingScenarioEditor:
         header = ttk.Frame(outer)
         header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
         header.columnconfigure(0, weight=1)
-        ttk.Label(header, text="Редактор кольцевых сценариев", font=("Segoe UI", 15, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(header, text="Редактор циклического сценария", font=("Segoe UI", 15, "bold")).grid(row=0, column=0, sticky="w")
         ttk.Label(
             header,
             text=(
-                "Отдельное окно для настройки кольцевого сценария: сегменты, профиль дороги, события, "
-                "диагностика, предпросмотр кольца и подготовка файлов сценария. "
+                "Отдельное окно для настройки циклического сценария: сегменты, профиль дороги, события, "
+                "диагностика, предварительный просмотр и подготовка файлов сценария. "
                 "Быстрые действия: Ctrl+S сохранить, Ctrl+O загрузить, F5 пересчитать диагностику."
             ),
             wraplength=1200,
@@ -256,7 +256,7 @@ class DesktopRingScenarioEditor:
         actions.grid(row=0, column=1, rowspan=2, sticky="e")
         actions.columnconfigure(1, weight=1)
         actions.columnconfigure(4, weight=1)
-        ttk.Label(actions, text="Пресет кольца").grid(row=0, column=0, sticky="w")
+        ttk.Label(actions, text="Пресет сценария").grid(row=0, column=0, sticky="w")
         ttk.Combobox(
             actions,
             textvariable=self.ring_preset_var,
@@ -781,7 +781,7 @@ class DesktopRingScenarioEditor:
                 closure_left_mm = 1000.0 * float(meta.get("closure_correction_left_max_m", 0.0) or 0.0)
                 closure_right_mm = 1000.0 * float(meta.get("closure_correction_right_max_m", 0.0) or 0.0)
                 meta_lines = (
-                    f"\nДлина кольца: {float(meta.get('ring_length_m', 0.0) or 0.0):.2f} м"
+                    f"\nДлина цикла: {float(meta.get('ring_length_m', 0.0) or 0.0):.2f} м"
                     f"\nДлительность круга: {float(meta.get('lap_time_s', 0.0) or 0.0):.2f} с"
                     f"\nЧисло отсчётов: {int(meta.get('n_samples', 0) or 0)}"
                     f"\nРежим замыкания: {CLOSURE_POLICY_TO_UI.get(str(meta.get('closure_policy', '')), 'не задан')}"
@@ -831,7 +831,7 @@ class DesktopRingScenarioEditor:
         elif self.state.export.last_error:
             self.export_panel.last_export_var.set(f"Последняя ошибка экспорта: {self.state.export.last_error}")
         else:
-            self.export_panel.last_export_var.set("Артефакты ещё не генерировались.")
+            self.export_panel.last_export_var.set("Файлы сценария ещё не генерировались.")
 
     def _reset_defaults(self) -> None:
         if not self._confirm_discard_dirty("сбросить сценарий к исходному виду"):
@@ -840,21 +840,21 @@ class DesktopRingScenarioEditor:
         self.state.ensure_selection()
         self._selected_event_index = None
         self.state.spec_path = ""
-        self._mark_dirty("Сценарий сброшен к исходному кольцу.")
+        self._mark_dirty("Сценарий сброшен к исходному виду.")
         self._refresh_from_state()
 
     def _apply_ring_preset(self) -> None:
         self._apply_form_to_state()
         preset_name = str(self.ring_preset_var.get() or RING_PRESET_DEFAULT)
-        if not self._confirm_discard_dirty(f"применить пресет кольца «{preset_name}»"):
+        if not self._confirm_discard_dirty(f"применить пресет сценария «{preset_name}»"):
             return
         try:
             apply_ring_preset(self.state, preset_name)
         except Exception as exc:
-            messagebox.showerror(EDITOR_DIALOG_TITLE, f"Не удалось применить пресет кольца:\n{exc}")
+            messagebox.showerror(EDITOR_DIALOG_TITLE, f"Не удалось применить пресет сценария:\n{exc}")
             return
         self._selected_event_index = None
-        self._mark_dirty(f"Применён пресет кольца: {preset_name}")
+        self._mark_dirty(f"Применён пресет сценария: {preset_name}")
         self._refresh_from_state()
 
     def _apply_segment_preset(self) -> None:
@@ -1058,7 +1058,7 @@ class DesktopRingScenarioEditor:
         if force_dialog or not path:
             default_path = self._default_spec_save_path()
             path = filedialog.asksaveasfilename(
-                title="Сохранить сценарий кольца",
+                title="Сохранить циклический сценарий",
                 defaultextension=".json",
                 initialfile=default_path.name,
                 initialdir=str(default_path.parent),
@@ -1083,7 +1083,7 @@ class DesktopRingScenarioEditor:
             return
         initial_dir = self.state.export.output_dir or str(self.repo_root)
         path = filedialog.askopenfilename(
-            title="Открыть сценарий кольца",
+            title="Открыть циклический сценарий",
             initialdir=initial_dir,
             filetypes=[("JSON", "*.json"), ("All files", "*.*")],
         )
