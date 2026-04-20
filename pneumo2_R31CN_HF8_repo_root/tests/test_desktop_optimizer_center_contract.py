@@ -143,7 +143,7 @@ def test_desktop_optimizer_contract_tab_links_blocked_ho006_to_baseline_center()
     )
 
     assert '"Активный опорный прогон"' in src
-    assert "Окно оптимизации показывает честную область текущего запуска" in src
+    assert "Здесь выбираются параметры, которые можно менять в оптимизации" in src
     assert "Центр оптимизации" not in src
     assert "optimizer_baseline_can_consume" in src
     assert 'text="Открыть базовый прогон"' in src
@@ -1226,7 +1226,7 @@ def test_desktop_optimizer_center_keeps_tabbed_modular_architecture() -> None:
     assert "def _materialize_selected_run_for_analysis(self, selected_from: str) -> str:" in tool_src
     assert "def _refresh_after_run_selection(self, status_text: str = \"\") -> None:" in tool_src
     assert "Паспорт выбранного запуска будет создан автоматически" in tool_src
-    assert "Настройки запуска" in tool_src
+    assert "Параметры оптимизации" in tool_src
     assert "self.runtime.bind_selected_run_dir(self._selected_run_dir)" in tool_src
     assert "self.runtime.save_run_pointer(" in tool_src
     assert "def open_selected_results(self) -> None:" in tool_src
@@ -1300,7 +1300,7 @@ def test_desktop_optimizer_center_keeps_tabbed_modular_architecture() -> None:
     assert "class DesktopOptimizerHandoffTab" in handoff_tab_src
     assert "class DesktopOptimizerPackagingTab" in packaging_tab_src
     assert 'text="Расхождение выбранного прогона с текущим запуском"' in contract_tab_src
-    assert 'text="Применить настройки запуска"' in contract_tab_src
+    assert 'text="Применить параметры оптимизации"' in contract_tab_src
     assert 'text="Быстрые переходы"' in dashboard_tab_src
     assert 'text="Состояние рабочей области"' in dashboard_tab_src
     assert 'text="Готовность к запуску"' in dashboard_tab_src

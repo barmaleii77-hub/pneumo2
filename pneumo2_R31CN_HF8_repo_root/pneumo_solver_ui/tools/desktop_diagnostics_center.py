@@ -305,7 +305,7 @@ def _operator_log_text(value: object) -> str:
         return ""
     replacements = {
         "Run dir:": "Папка запуска:",
-        "Zip:": "Архив диагностики:",
+        "Zip:": "Архив для отправки:",
         "Traceback": "Сведения об ошибке",
         "Error:": "Ошибка:",
         "ERROR:": "Ошибка:",
@@ -320,9 +320,9 @@ def _operator_log_text(value: object) -> str:
         "running": "выполняется",
         "returncode": "код завершения",
         "rc=": "код завершения ",
-        "latest_send_bundle": "актуальный архив диагностики",
-        "send bundle": "архив диагностики",
-        "send-bundle": "архив диагностики",
+        "latest_send_bundle": "актуальный архив для отправки",
+        "send bundle": "архив для отправки",
+        "send-bundle": "архив для отправки",
     }
     result = text
     for old, new in replacements.items():
@@ -377,7 +377,7 @@ class DesktopDiagnosticsCenter:
         self.root = root
         self._hosted = bool(hosted)
         if not self._hosted:
-            self.root.title(f"Диагностика и отправка - {RELEASE}")
+            self.root.title(f"Проверка проекта и отправка - {RELEASE}")
             self.root.geometry("1040x760")
             self.root.minsize(980, 720)
 
@@ -422,11 +422,11 @@ class DesktopDiagnosticsCenter:
         self.status_var = StringVar(value="Готово. Выберите действие слева или в верхней панели.")
         self.process_title_var = StringVar(value="Текущий процесс: нет активной операции")
         self.process_detail_var = StringVar(
-            value="Прогресс диагностики и сборки архива всегда показывается здесь."
+            value="Прогресс проверки проекта и сборки архива всегда показывается здесь."
         )
         self.machine_state_var = StringVar(value="")
         self.context_summary_var = StringVar(
-            value="Порядок работы: проверить проект, собрать архив диагностики и подготовить отправку."
+            value="Порядок работы: проверить проект, собрать архив для отправки и подготовить передачу."
         )
         self.send_title_var = StringVar(value="Архив для отправки в чат ещё не готов.")
         self.send_path_var = StringVar(value="(ещё не готово)")
@@ -529,7 +529,7 @@ class DesktopDiagnosticsCenter:
         title_box.pack(side="left", fill="x", expand=True)
         ttk.Label(
             title_box,
-            text="Диагностика и отправка",
+            text="Проверка проекта и отправка",
             font=("Segoe UI", 15, "bold"),
         ).pack(anchor="w")
         ttk.Label(
@@ -588,12 +588,12 @@ class DesktopDiagnosticsCenter:
         quick_box.pack(fill="x", pady=(8, 0))
         ttk.Button(
             quick_box,
-            text="1. Запустить диагностику",
+            text="1. Проверить проект",
             command=self._start_run,
         ).pack(fill="x")
         ttk.Button(
             quick_box,
-            text="2. Собрать архив диагностики",
+            text="2. Собрать архив для отправки",
             command=lambda: self._start_bundle_build(auto_copy_on_ready=False),
         ).pack(fill="x", pady=(6, 0))
         ttk.Button(
@@ -685,19 +685,19 @@ class DesktopDiagnosticsCenter:
 
         ctrl = ttk.Frame(self.diag_body)
         ctrl.pack(fill="x", **pad)
-        self.btn_run = ttk.Button(ctrl, text="Запустить диагностику", command=self._run)
+        self.btn_run = ttk.Button(ctrl, text="Проверить проект", command=self._run)
         self.btn_run.pack(side="left")
         self.btn_stop = ttk.Button(ctrl, text="Остановить", command=self._stop, state="disabled")
         self.btn_stop.pack(side="left", padx=8)
-        self.btn_open = ttk.Button(ctrl, text="Открыть результат диагностики", command=self._open_result, state="disabled")
+        self.btn_open = ttk.Button(ctrl, text="Открыть отчёт проверки", command=self._open_result, state="disabled")
         self.btn_open.pack(side="left", padx=8)
         ttk.Button(ctrl, text="Открыть папку результатов", command=self._open_diagnostics_out_root).pack(side="left", padx=8)
 
-        log_box = ttk.LabelFrame(self.diag_body, text="Журнал диагностики")
+        log_box = ttk.LabelFrame(self.diag_body, text="Журнал проверки проекта")
         log_box.pack(fill="both", expand=True, **pad)
         log_body, self.txt = build_scrolled_text(log_box, wrap="word", height=16)
         log_body.pack(fill="both", expand=True)
-        self._append("Готово. Здесь запускается автономная диагностика и формируется подробный отчёт.\n")
+        self._append("Готово. Здесь запускается проверка проекта и формируется подробный отчёт.\n")
 
     def _build_bundle_tab(self) -> None:
         top = ttk.Frame(self.bundle_body)
@@ -791,7 +791,7 @@ class DesktopDiagnosticsCenter:
         ttk.Label(
             frm,
             text=(
-                "Здесь можно собрать архив диагностики, просмотреть сводку, проверку и состояние, "
+                "Здесь можно собрать архив для отправки, просмотреть сводку, проверку и состояние, "
                 "а затем подготовить архив к передаче без браузера. Прогресс любой длительной операции "
                 "всегда отображается в блоке «Текущий процесс» сверху, без переключения разделов."
             ),
@@ -847,7 +847,7 @@ class DesktopDiagnosticsCenter:
         self.process_title_var.set("Текущий процесс: нет активной операции")
         self.process_detail_var.set(
             detail
-            or "Прогресс диагностики и сборки архива всегда показывается здесь."
+            or "Прогресс проверки проекта и сборки архива всегда показывается здесь."
         )
         if hasattr(self, "process_progress"):
             self.process_progress.stop()
@@ -1052,7 +1052,7 @@ class DesktopDiagnosticsCenter:
             self.osc_dir.set(picked)
 
     def _pick_out_root(self) -> None:
-        picked = filedialog.askdirectory(title="Выберите папку для результатов диагностики")
+        picked = filedialog.askdirectory(title="Выберите папку для отчётов проверки")
         if picked:
             self.out_root.set(picked)
 
@@ -1088,10 +1088,10 @@ class DesktopDiagnosticsCenter:
         request = self._build_request()
         cmd = self._build_cmd()
         self._current_run_lines = []
-        self._append("\n=== Запуск диагностики ===\nКоманда запуска сохранена в отчёте прогона.\n\n")
+        self._append("\n=== Проверка проекта ===\nКоманда запуска сохранена в отчёте прогона.\n\n")
         self._set_process_busy(
-            "Выполняется диагностика проекта",
-            "Идёт автономная диагностика. Прогресс показан здесь; можно оставаться в текущем разделе.",
+            "Выполняется проверка проекта",
+            "Идёт проверка проекта. Прогресс показан здесь; можно оставаться в текущем разделе.",
         )
         self.btn_run.configure(state="disabled")
         self.btn_stop.configure(state="normal")
@@ -1205,16 +1205,16 @@ class DesktopDiagnosticsCenter:
                     self.btn_stop.configure(state="disabled")
                     self.btn_open.configure(state="normal" if (last_zip or last_run_dir) else "disabled")
                     self._set_process_done(
-                        "Диагностика завершена" if rc == 0 else "Диагностика завершилась с ошибкой",
+                        "Проверка проекта завершена" if rc == 0 else "Проверка проекта завершилась с ошибкой",
                         (
-                            "Диагностика завершена успешно. Результат можно открыть кнопкой на вкладке проверки."
+                            "Проверка проекта завершена успешно. Отчёт можно открыть кнопкой на вкладке проверки."
                             if rc == 0
-                            else f"Диагностика завершилась с ошибкой. Код завершения {rc}. Результат можно открыть кнопкой на вкладке проверки."
+                            else f"Проверка проекта завершилась с ошибкой. Код завершения {rc}. Отчёт можно открыть кнопкой на вкладке проверки."
                         ),
                     )
                     self._refresh_bundle_views(regenerate_reports=False)
 
-                    msg = "Диагностика завершена успешно." if rc == 0 else f"Диагностика завершилась с ошибкой. Код завершения {rc}."
+                    msg = "Проверка проекта завершена успешно." if rc == 0 else f"Проверка проекта завершилась с ошибкой. Код завершения {rc}."
                     if last_zip:
                         msg += f"\n\nАрхив: {last_zip}"
                     if last_run_dir:
@@ -1222,9 +1222,9 @@ class DesktopDiagnosticsCenter:
                     if self._last_run_record and self._last_run_record.state_path:
                         msg += f"\n\nФайл состояния работы: {self._last_run_record.state_path}"
                     if rc == 0:
-                        messagebox.showinfo("Диагностика", msg)
+                        messagebox.showinfo("Проверка проекта", msg)
                     else:
-                        messagebox.showwarning("Диагностика", msg)
+                        messagebox.showwarning("Проверка проекта", msg)
 
                 self.root.after(0, done_ui)
             except Exception as exc:
@@ -1254,11 +1254,11 @@ class DesktopDiagnosticsCenter:
                     self.btn_stop.configure(state="disabled")
                     self.btn_open.configure(state="disabled")
                     self._set_process_done(
-                        "Ошибка запуска диагностики",
-                        f"Диагностика не запустилась: {_technical_message_ru(exc)}",
+                        "Ошибка запуска проверки проекта",
+                        f"Проверка проекта не запустилась: {_technical_message_ru(exc)}",
                     )
                     self._refresh_bundle_views(regenerate_reports=False)
-                    messagebox.showerror("Диагностика", f"Не удалось запустить диагностику:\n{_technical_message_ru(exc)}")
+                    messagebox.showerror("Проверка проекта", f"Не удалось запустить проверку проекта:\n{_technical_message_ru(exc)}")
 
                 self.root.after(0, err_ui)
 
@@ -1289,7 +1289,7 @@ class DesktopDiagnosticsCenter:
         try:
             self._proc.terminate()
             self._append("\n[Окно] Запрошена остановка процесса...\n")
-            self._set_process_busy("Останавливаю диагностику", "Команда остановки отправлена. Жду завершения процесса.")
+            self._set_process_busy("Останавливаю проверку проекта", "Команда остановки отправлена. Жду завершения процесса.")
         except Exception:
             pass
 
@@ -1713,7 +1713,7 @@ class DesktopDiagnosticsCenter:
             [
                 "",
                 "## Полезные файлы и отчёты",
-                f"- Сохранённое состояние диагностики: {path_str(center_state_path)}",
+                f"- Сохранённое состояние проверки: {path_str(center_state_path)}",
                 f"- Последняя сводка Markdown: {path_str(summary_md_path)}",
                 f"- Последний архив: {bundle.latest_zip_path or '—'}",
                 f"- Ссылка на актуальный архив: {bundle.latest_path_pointer_path or '—'}",
@@ -1872,13 +1872,13 @@ class DesktopDiagnosticsCenter:
         self._bundle_auto_copy_on_ready = bool(auto_copy_on_ready)
         if auto_copy_on_ready:
             self._clipboard_attempted = False
-        self.send_title_var.set("Собираю диагностический архив…")
+        self.send_title_var.set("Собираю архив для отправки...")
         self.send_path_var.set("(ещё не готово)")
         self.send_meta_var.set("")
         self.btn_copy.state(["disabled"])
         self._set_process_busy(
             "Собирается архив для отправки",
-            "Идёт сборка диагностического архива. Прогресс показан здесь; можно оставаться в текущем разделе.",
+            "Идёт сборка архива для отправки. Прогресс показан здесь; можно оставаться в текущем разделе.",
         )
 
         def worker() -> None:

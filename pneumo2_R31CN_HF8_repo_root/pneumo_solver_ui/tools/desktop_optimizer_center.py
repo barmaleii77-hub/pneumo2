@@ -223,7 +223,7 @@ class DesktopOptimizerCenter:
             value="Опорный прогон. Источник и политика автообновления будут показаны после первого обновления."
         )
         self.contract_summary_var = tk.StringVar(
-            value="Настройки запуска. Цели и жёсткое ограничение будут показаны после первого обновления."
+            value="Параметры оптимизации, диапазоны поиска, цели и ограничения будут показаны после первого обновления."
         )
         self.launch_button_text_var = tk.StringVar(value="Запустить оптимизацию")
         self._poll_after_id: str | None = None
@@ -315,7 +315,7 @@ class DesktopOptimizerCenter:
             wraplength=300,
         ).pack(anchor="w")
 
-        contract_frame = ttk.LabelFrame(sidebar, text="Настройки запуска", padding=8)
+        contract_frame = ttk.LabelFrame(sidebar, text="Параметры оптимизации", padding=8)
         contract_frame.pack(fill="x", pady=(8, 0))
         ttk.Label(
             contract_frame,
@@ -327,7 +327,7 @@ class DesktopOptimizerCenter:
         nav_frame = ttk.LabelFrame(sidebar, text="Переходы", padding=8)
         nav_frame.pack(fill="x", pady=(8, 0))
         ttk.Button(nav_frame, text="Открыть базовый прогон", command=self.open_baseline_center).pack(fill="x")
-        ttk.Button(nav_frame, text="Опорный прогон и настройки", command=self.show_contract_tab).pack(fill="x", pady=(6, 0))
+        ttk.Button(nav_frame, text="Параметры оптимизации", command=self.show_contract_tab).pack(fill="x", pady=(6, 0))
         ttk.Button(nav_frame, text="Выполнение оптимизации", command=self.show_runtime_tab).pack(fill="x", pady=(6, 0))
         ttk.Button(nav_frame, text="История", command=self.show_history_tab).pack(fill="x", pady=(6, 0))
         ttk.Button(nav_frame, text="Готовые прогоны", command=self.show_finished_tab).pack(fill="x", pady=(6, 0))
@@ -344,7 +344,7 @@ class DesktopOptimizerCenter:
         self.handoff_tab = DesktopOptimizerHandoffTab(self.notebook, self)
         self.packaging_tab = DesktopOptimizerPackagingTab(self.notebook, self)
         self.notebook.add(self.dashboard_tab, text="Опорный прогон и запуск")
-        self.notebook.add(self.contract_tab, text="Опорный прогон и настройки")
+        self.notebook.add(self.contract_tab, text="Параметры оптимизации")
         self.notebook.add(self.runtime_tab, text="Выполнение")
         self.notebook.add(self.history_tab, text="История")
         self.notebook.add(self.finished_tab, text="Готовые прогоны")
@@ -761,7 +761,7 @@ class DesktopOptimizerCenter:
                     f"активно {int(getattr(snapshot, 'enabled_suite_total', 0) or 0)}"
                 ),
                 (
-                    "Параметры поиска - "
+                    "Параметры оптимизации - "
                     f"{int(getattr(snapshot, 'search_param_count', 0) or 0)}"
                 ),
                 "Рабочая зона: опорный прогон, выполнение оптимизации, история, передача в анализ и выпуск открываются справа во вкладках.",
@@ -840,7 +840,7 @@ class DesktopOptimizerCenter:
             mode_label = "Расширенный: Распределённая координация"
         return "\n".join(
             [
-                f"Настройки запуска - {mode_label}",
+                f"Параметры оптимизации и запуск - {mode_label}",
                 f"Цели оптимизации - {objective_stack}",
                 f"Жёсткий критерий - {hard_gate}",
                 (
@@ -1866,7 +1866,7 @@ class DesktopOptimizerCenter:
         self._sync_widget_state()
         readiness = self.runtime.launch_readiness_summary()
         action = str(readiness.get("next_action") or "Runtime").strip()
-        if action in {"Contract", "Contract drift", "Настройки запуска"}:
+        if action in {"Contract", "Contract drift", "Параметры оптимизации"}:
             self.show_contract_tab()
         elif action in {"History", "История"}:
             self.show_history_tab()
@@ -1879,9 +1879,9 @@ class DesktopOptimizerCenter:
         else:
             self.show_runtime_tab()
         action_labels = {
-            "Contract": "настройкам запуска",
-            "Contract drift": "сверке настроек",
-            "Настройки запуска": "настройкам запуска",
+            "Contract": "параметрам оптимизации",
+            "Contract drift": "сверке параметров оптимизации",
+            "Параметры оптимизации": "параметрам оптимизации",
             "History": "истории",
             "Finished Jobs": "готовым прогонам",
             "Handoff": "передаче",

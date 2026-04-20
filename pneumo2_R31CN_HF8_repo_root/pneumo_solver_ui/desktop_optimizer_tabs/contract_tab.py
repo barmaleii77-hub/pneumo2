@@ -85,20 +85,20 @@ class DesktopOptimizerContractTab(ttk.Frame):
 
         ttk.Label(
             body,
-            text="Опорный прогон и настройки запуска",
+            text="Параметры оптимизации и диапазоны поиска",
             font=("Segoe UI", 14, "bold"),
         ).grid(row=0, column=0, sticky="w")
         ttk.Label(
             body,
             text=(
-                "Окно оптимизации показывает честную область текущего запуска: "
-                "источник опорного прогона, цели оптимизации, жёсткие проверки, модель, базу, диапазоны, набор и контроль задачи."
+                "Здесь выбираются параметры, которые можно менять в оптимизации, и диапазоны поиска для них. "
+                "Допустимые значения в исходных данных нужны для проверки ввода и не заменяют этот список."
             ),
             wraplength=980,
             justify="left",
         ).grid(row=1, column=0, sticky="ew", pady=(6, 10))
 
-        self.summary_panel = KeyValueGridPanel(body, text="Снимок области и пространства поиска")
+        self.summary_panel = KeyValueGridPanel(body, text="Снимок параметров оптимизации")
         self.summary_panel.grid(row=2, column=0, sticky="ew")
 
         self.paths_panel = KeyValueGridPanel(body, text="Подготовленные файлы")
@@ -163,7 +163,7 @@ class DesktopOptimizerContractTab(ttk.Frame):
         selection_frame.grid(row=7, column=0, sticky="ew", pady=(10, 0))
         ttk.Button(
             selection_frame,
-            text="Применить настройки запуска",
+            text="Применить параметры оптимизации",
             command=controller.apply_selected_run_contract,
         ).pack(side="left")
         ttk.Button(
@@ -270,11 +270,11 @@ class DesktopOptimizerContractTab(ttk.Frame):
                     "включено" if bool(self.controller.var("opt_autoupdate_baseline").get()) else "выключено",
                 ),
                 (
-                    "Область поиска",
-                    f"Базовых параметров {int(getattr(snapshot, 'base_param_count', 0) or 0)}. "
-                    f"Проектных параметров {int(getattr(snapshot, 'search_param_count', 0) or 0)}. "
-                    f"Технических настроек скрыто {int(getattr(snapshot, 'removed_runtime_knob_count', 0) or 0)}. "
-                    f"Расширенных диапазонов {int(getattr(snapshot, 'widened_range_count', 0) or 0)}.",
+                    "Параметры оптимизации",
+                    f"Всего исходных параметров {int(getattr(snapshot, 'base_param_count', 0) or 0)}. "
+                    f"Выбрано для оптимизации {int(getattr(snapshot, 'search_param_count', 0) or 0)}. "
+                    f"Скрыто расчётных настроек {int(getattr(snapshot, 'removed_runtime_knob_count', 0) or 0)}. "
+                    f"Расширенных диапазонов поиска {int(getattr(snapshot, 'widened_range_count', 0) or 0)}.",
                 ),
                 (
                     "Покрытие набора",
@@ -282,7 +282,7 @@ class DesktopOptimizerContractTab(ttk.Frame):
                     f"Включено {int(getattr(snapshot, 'enabled_suite_total', 0) or 0)}. "
                     f"По стадиям: {stage_counts}.",
                 ),
-                ("Примеры параметров поиска", sample_params),
+                ("Что будет изменяться", sample_params),
             ]
         )
         self.paths_panel.set_rows(
@@ -290,7 +290,7 @@ class DesktopOptimizerContractTab(ttk.Frame):
                 ("Модель", str(getattr(snapshot, "model_path", ""))),
                 ("Исполнитель", str(getattr(snapshot, "worker_path", ""))),
                 ("Исходные данные", str(getattr(snapshot, "base_json_path", ""))),
-                ("Диапазоны параметров", str(getattr(snapshot, "ranges_json_path", ""))),
+                ("Диапазоны поиска оптимизации", str(getattr(snapshot, "ranges_json_path", ""))),
                 ("Набор испытаний", str(getattr(snapshot, "suite_json_path", ""))),
                 (
                     "Настройка стадий",

@@ -334,7 +334,7 @@ class DesktopInputFieldSpec:
             if unit_line not in body:
                 body = f"{body}\n\n{unit_line}"
         if self.min_value is not None or self.max_value is not None:
-            range_line = f"Рабочий диапазон: {self.range_text}."
+            range_line = f"Допустимые значения ввода: {self.range_text}."
             if range_line not in body:
                 body = f"{body}\n{range_line}"
         return body.strip()

@@ -875,7 +875,7 @@ def test_desktop_shell_adapter_text_avoids_center_wording_for_diagnostics_and_se
         "центр подготовки отправки",
     ):
         assert forbidden not in joined
-    assert "Единое окно проверки окружения" in diag_adapter_src
+    assert "Единое окно проверки проекта" in diag_adapter_src
     assert "одно рабочее окно" in diag_adapter_src
     assert "Подготовка архива результатов" in send_adapter_src
     assert "Не удалось открыть подготовку отправки" in autotest_src

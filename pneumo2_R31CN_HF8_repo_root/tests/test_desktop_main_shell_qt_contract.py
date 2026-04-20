@@ -347,7 +347,7 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert 'menubar.addMenu("Запуск")' in src
     assert 'menubar.addMenu("Анализ")' in src
     assert 'menubar.addMenu("Анимация")' in src
-    assert 'menubar.addMenu("Диагностика")' in src
+    assert 'menubar.addMenu("Проверка")' in src
     assert 'menubar.addMenu("Инструменты")' in src
     assert 'menubar.addMenu("Справка")' in src
     assert 'run_menu.addMenu("Окна по задаче")' in src
@@ -370,7 +370,7 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert 'self.runtime_table.setHeaderLabels(("Окно", "Состояние", "Тип"))' in src
     assert 'self.diagnostics_button.setObjectName("AlwaysVisibleDiagnosticsAction")' in src
     assert 'self.diagnostics_button.setShortcut(QtGui.QKeySequence("F7"))' in src
-    assert 'self.diagnostics_button.setToolTip("F7. Собрать диагностику и подготовить архив.")' in src
+    assert 'self.diagnostics_button.setToolTip("F7. Проверить проект и подготовить архив для отправки.")' in src
     assert "Открыть диагностику и собрать" not in src
     assert "self.central_stack = QtWidgets.QStackedWidget(central)" in src
     assert 'self.banner_label = QtWidgets.QLabel(' in src
@@ -385,8 +385,8 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert '"5. Оптимизация"' in src
     assert '"6. Анализ"' in src
     assert '"7. Анимация"' in src
-    assert '"8. Диагностика"' in src
-    assert '"Собрать диагностику"' in src
+    assert '"8. Проверка и отправка"' in src
+    assert '"Проверить проект"' in src
     assert "self.start_action_buttons" in src
     assert 'self.start_action_buttons.setdefault(tool_key, button)' in src
     assert 'QtWidgets.QGroupBox("Достоверность отображения", self.overview_page)' in src
@@ -561,7 +561,7 @@ def test_desktop_shell_command_search_manual_keywords_are_operator_language() ->
     entries = build_shell_command_search_entries(build_desktop_shell_specs())
     checked_labels = {
         "Показать список рабочих окон",
-        "Собрать диагностику",
+        "Проверить проект и подготовить архив",
         "Показать в аниматоре",
         "Проверить подготовку анимации",
         "Проверить связь с аниматором",
@@ -762,7 +762,7 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
             "Запуск",
             "Анализ",
             "Анимация",
-            "Диагностика",
+            "Проверка",
             "Инструменты",
             "Справка",
         ]
@@ -857,7 +857,7 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
             "Запуск",
             "Анализ",
             "Анимация",
-            "Диагностика",
+            "Проверка",
             "Инструменты",
             "Справка",
         ]
@@ -873,7 +873,7 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
         assert "1. Исходные данные" in visible_audit["toolbar_buttons"]
         assert "2. Сценарии" in visible_audit["toolbar_buttons"]
         assert "7. Анимация" in visible_audit["toolbar_buttons"]
-        assert "8. Диагностика" in visible_audit["toolbar_buttons"]
+        assert "8. Проверка и отправка" in visible_audit["toolbar_buttons"]
         assert "Открыть сравнение" not in visible_audit["toolbar_buttons"]
         assert "Открыть в аниматоре" not in visible_audit["toolbar_buttons"]
         assert "Показать в аниматоре" in visible_audit["toolbar_buttons"]
@@ -883,7 +883,7 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
         assert "Прокрутить вкладки влево" in visible_audit["auxiliary_visible_texts"]
         assert "Прокрутить вкладки вправо" in visible_audit["auxiliary_visible_texts"]
         assert "Главное окно показывает первый путь пользователя и оставляет дополнительные окна во втором слое." in visible_audit["direct_visible_texts"]
-        assert "Что делать сначала: исходные данные; сценарии; набор испытаний; базовый прогон; оптимизация; анализ; анимация; диагностика." in visible_audit["direct_visible_texts"]
+        assert "Что делать сначала: исходные данные; сценарии; набор испытаний; базовый прогон; оптимизация; анализ; анимация; проверка и отправка." in visible_audit["direct_visible_texts"]
         assert "Окна, действия, испытания, сценарии, архивы отправки, расчёты, файлы" in visible_audit["direct_visible_texts"]
         assert "Панель проекта" in visible_audit["direct_visible_texts"]
         assert "Начните здесь" in visible_audit["direct_visible_texts"]
@@ -1002,6 +1002,7 @@ def test_desktop_qt_shell_handoff_payload_and_layout_state_are_runtime_checked(
         assert window.visual_truth_labels["Анимация"].text() == "Недоступна до результатов расчёта"
         window.start_action_buttons["desktop_ring_editor"].click()
         app.processEvents()
+        assert window._selected_surface_key == "ws_ring"
         input_index = window.launch_tool_combo.findData("desktop_input_editor")
         assert input_index >= 0
         window.launch_tool_combo.setCurrentIndex(input_index)
@@ -1011,7 +1012,6 @@ def test_desktop_qt_shell_handoff_payload_and_layout_state_are_runtime_checked(
 
         manager = _FakeCoexistenceManager.instances[-1]
         assert [session.spec.key for session in manager.opened] == [
-            "desktop_ring_editor",
             "desktop_input_editor",
             "desktop_animator",
         ]
@@ -1021,7 +1021,7 @@ def test_desktop_qt_shell_handoff_payload_and_layout_state_are_runtime_checked(
         assert payload["project_name"] == "Runtime Shell"
         assert payload["workspace_dir"] == str((tmp_path / "workspace").resolve())
         assert payload["repo_root"] == str((tmp_path / "repo").resolve())
-        assert window.runtime_table.topLevelItemCount() == 3
+        assert window.runtime_table.topLevelItemCount() == 2
         assert window.runtime_table.columnCount() == 3
         runtime_rows = [
             " | ".join(

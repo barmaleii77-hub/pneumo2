@@ -331,7 +331,7 @@ def test_desktop_diagnostics_operator_preview_localizes_markdown_reports() -> No
 
     log_text = _operator_log_text("Run dir: C:/tmp/run\nZip: C:/tmp/run.zip\nrc=1\n")
     assert "Папка запуска: C:/tmp/run" in log_text
-    assert "Архив диагностики: C:/tmp/run.zip" in log_text
+    assert "Архив для отправки: C:/tmp/run.zip" in log_text
     assert "код завершения 1" in log_text
     assert "Run dir:" not in log_text
     assert "Zip:" not in log_text
@@ -722,7 +722,7 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "bundle build failed" not in send_src
     assert "load_desktop_diagnostics_bundle_record" in send_src
     assert "ttk.Notebook" in center_src
-    assert "Диагностика и отправка" in center_src
+    assert "Проверка проекта и отправка" in center_src
     assert "Центр диагностики и отправки" not in center_src
     assert "Из этого центра" not in center_src
     assert "write_desktop_diagnostics_center_state" in center_src
@@ -833,18 +833,18 @@ def test_desktop_diagnostics_center_operator_text_is_russian_and_progress_global
 
     required = [
         "Текущий процесс",
-        "Прогресс диагностики и сборки архива всегда показывается здесь.",
-        "Идёт автономная диагностика. Прогресс показан здесь; можно оставаться в текущем разделе.",
-        "Идёт сборка диагностического архива. Прогресс показан здесь; можно оставаться в текущем разделе.",
+        "Прогресс проверки проекта и сборки архива всегда показывается здесь.",
+        "Идёт проверка проекта. Прогресс показан здесь; можно оставаться в текущем разделе.",
+        "Идёт сборка архива для отправки. Прогресс показан здесь; можно оставаться в текущем разделе.",
         "Пропустить быструю проверку окон приложения",
         "Папки для проверки",
-        "Открыть результат диагностики",
+        "Открыть отчёт проверки",
         "Обновить сводку",
         "Открыт шаг",
         "Прогресс любой длительной операции",
         "без переключения разделов",
-        "Здесь можно собрать архив диагностики",
-        "Сохранённое состояние диагностики",
+        "Здесь можно собрать архив для отправки",
+        "Сохранённое состояние проверки",
         "Скопировать архив в буфер обмена",
         "Папка файлов анимации",
         "Выберите папку с файлами анимации",

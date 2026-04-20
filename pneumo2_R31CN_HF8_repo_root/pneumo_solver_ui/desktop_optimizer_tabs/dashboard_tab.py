@@ -22,8 +22,8 @@ class DesktopOptimizerDashboardTab(ttk.Frame):
         ttk.Label(
             body,
             text=(
-                "Единая сводка для оператора: текущие настройки запуска, выполнение, готовность выпуска "
-                "и лучший кандидат на передачу без переключения по всем вкладкам."
+                "Единая сводка для оператора: какие параметры оптимизируются, где заданы диапазоны поиска, "
+                "какая цель выбрана, что выполняется сейчас и какой прогон готов к передаче."
             ),
             wraplength=980,
             justify="left",
@@ -36,7 +36,7 @@ class DesktopOptimizerDashboardTab(ttk.Frame):
         ttk.Button(actions, text="Перейти по рекомендации", command=controller.follow_selected_run_next_step).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Текущий прогон анализа", command=controller.open_latest_optimization_pointer).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Рабочая папка", command=lambda: controller.open_current_artifact("workspace_dir")).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Настройки запуска", command=controller.show_contract_tab).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Параметры оптимизации", command=controller.show_contract_tab).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Выполнение", command=controller.show_runtime_tab).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="История", command=controller.show_history_tab).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="Готовые прогоны", command=controller.show_finished_tab).pack(side="left", padx=(8, 0))

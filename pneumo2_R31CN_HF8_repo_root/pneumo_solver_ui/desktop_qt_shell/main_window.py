@@ -86,8 +86,8 @@ PRIMARY_START_ACTIONS = (
     ),
     (
         "desktop_diagnostics_center",
-        "8. Диагностика",
-        "Соберите диагностику и подготовьте материалы после проверки результата.",
+        "8. Проверка и отправка",
+        "Проверьте проект и подготовьте архив для отправки после проверки результата.",
     ),
 )
 
@@ -223,7 +223,7 @@ def _source_of_truth_label(spec: DesktopShellToolSpec) -> str:
     if role == "launcher":
         return "Запуск"
     if role == "support":
-        return "Справка и диагностика"
+        return "Справка и проверка проекта"
     return "Не задан"
 
 
@@ -615,8 +615,8 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                 continue
             self._add_tool_action(visual_detail_menu, spec)
 
-        diagnostics_menu = menubar.addMenu("Диагностика")
-        collect_diag_action = diagnostics_menu.addAction("Собрать диагностику")
+        diagnostics_menu = menubar.addMenu("Проверка")
+        collect_diag_action = diagnostics_menu.addAction("Проверить проект и подготовить архив")
         collect_diag_action.setShortcut(QtGui.QKeySequence("F7"))
         collect_diag_action.triggered.connect(lambda: self.open_tool("desktop_diagnostics_center"))
         focus_messages_action = diagnostics_menu.addAction("Показать сообщения рабочего места")
@@ -673,10 +673,10 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
 
         toolbar.addSeparator()
 
-        self.diagnostics_button = QtWidgets.QPushButton("Собрать диагностику", toolbar)
+        self.diagnostics_button = QtWidgets.QPushButton("Проверить проект", toolbar)
         self.diagnostics_button.setObjectName("AlwaysVisibleDiagnosticsAction")
         self.diagnostics_button.setShortcut(QtGui.QKeySequence("F7"))
-        self.diagnostics_button.setToolTip("F7. Собрать диагностику и подготовить архив.")
+        self.diagnostics_button.setToolTip("F7. Проверить проект и подготовить архив для отправки.")
         self.diagnostics_button.clicked.connect(lambda: self.open_tool("desktop_diagnostics_center"))
         toolbar.addWidget(self.diagnostics_button)
 
@@ -793,7 +793,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         central_layout.addWidget(self.banner_label)
 
         self.route_label = QtWidgets.QLabel(
-            "Что делать сначала: исходные данные; сценарии; набор испытаний; базовый прогон; оптимизация; анализ; анимация; диагностика.",
+            "Что делать сначала: исходные данные; сценарии; набор испытаний; базовый прогон; оптимизация; анализ; анимация; проверка и отправка.",
             central,
         )
         self.route_label.setWordWrap(True)
@@ -830,7 +830,10 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         for row_index, (tool_key, button_text, hint_text) in enumerate(PRIMARY_START_ACTIONS):
             button = QtWidgets.QPushButton(button_text, start_box)
             button.setObjectName(f"PrimaryStartAction_{row_index + 1}_{tool_key}")
-            button.clicked.connect(lambda _checked=False, key=tool_key: self.open_tool(key))
+            button.setToolTip("Переход к рабочему шагу внутри главного окна. Отдельное окно запускается только явной командой.")
+            button.clicked.connect(
+                lambda _checked=False, key=tool_key: self._select_surface(default_surface_key_for_tool(key))
+            )
             self.start_action_buttons.setdefault(tool_key, button)
             hint_label = QtWidgets.QLabel(hint_text, start_box)
             hint_label.setWordWrap(True)
@@ -909,7 +912,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.status_progress_bar.setMaximumWidth(170)
         self.mode_status_label = QtWidgets.QLabel(status)
         self.bundle_status_label = QtWidgets.QLabel(
-            "Последний архив диагностики: откройте центр диагностики",
+            "Архив для отправки: пока не подготовлен",
             status,
         )
         status.addWidget(self.status_label, 1)
@@ -1278,7 +1281,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             for query in (
                 "список проекта",
                 "исходные данные",
-                "диагностика",
+                "проверка проекта",
                 "Engineering Analysis",
             )
         }

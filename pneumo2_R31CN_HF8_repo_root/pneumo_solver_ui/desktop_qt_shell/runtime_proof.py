@@ -811,7 +811,7 @@ def collect_qt_main_shell_runtime_proof(*, offscreen: bool = False, state_path: 
                     "Запуск",
                     "Анализ",
                     "Анимация",
-                    "Диагностика",
+                    "Проверка",
                     "Инструменты",
                     "Справка",
                 ],

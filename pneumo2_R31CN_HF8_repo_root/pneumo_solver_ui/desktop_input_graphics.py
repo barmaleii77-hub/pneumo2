@@ -15,14 +15,14 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
     and CG-related inputs.
     """
 
-    CANVAS_WIDTH = 560
-    CANVAS_HEIGHT = 330
+    CANVAS_WIDTH = 680
+    CANVAS_HEIGHT = 380
     SCHEME_X0 = 16
-    SCHEME_Y0 = 54
-    SCHEME_X1 = 250
-    SCHEME_Y1 = 210
-    METRICS_X0 = 272
-    METRICS_Y0 = 54
+    SCHEME_Y0 = 64
+    SCHEME_X1 = 410
+    SCHEME_Y1 = 280
+    METRICS_X0 = 432
+    METRICS_Y0 = 64
     METRICS_X1 = CANVAS_WIDTH - 16
     METRICS_Y1 = CANVAS_HEIGHT - 24
     _MECH_SCHEME_PATH = Path(__file__).resolve().parent / "assets" / "mech_scheme.png"
@@ -91,8 +91,8 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
         )
         self.canvas.grid(row=2, column=0, sticky="nsew", pady=(8, 0))
         self._scheme_images: dict[str, tk.PhotoImage | None] = {
-            "mech": self._load_scheme_image(self._MECH_SCHEME_PATH, max_width=220, max_height=130),
-            "pneumo": self._load_scheme_image(self._PNEUMO_SCHEME_PATH, max_width=220, max_height=130),
+            "mech": self._load_scheme_image(self._MECH_SCHEME_PATH, max_width=340, max_height=190),
+            "pneumo": self._load_scheme_image(self._PNEUMO_SCHEME_PATH, max_width=340, max_height=190),
         }
 
     def refresh(
@@ -213,31 +213,128 @@ class DesktopInputGraphicPanel(ttk.LabelFrame):
                 (scheme_y0 + scheme_y1) / 2,
                 image=image,
             )
+        self.canvas.create_rectangle(scheme_x0 + 4, scheme_y0 + 4, scheme_x1 - 4, scheme_y1 - 4, outline="", fill="#ffffff")
+        if str(section_title or "").strip() == "Пневматика":
+            self._draw_pneumatic_overlay(scheme_x0, scheme_y0, scheme_x1, scheme_y1, active_context)
         else:
-            self.canvas.create_text(
-                (scheme_x0 + scheme_x1) / 2,
-                (scheme_y0 + scheme_y1) / 2,
-                text="Схема проекта недоступна",
-                font=("Segoe UI", 9),
-                fill="#6c757d",
-            )
+            self._draw_suspension_overlay(scheme_x0, scheme_y0, scheme_x1, scheme_y1, geom, active_context)
 
-        self.canvas.create_line(scheme_x0 + 12, 222, scheme_x1 - 12, 222, fill="#718096", arrow=tk.BOTH)
+        dimension_y = scheme_y1 + 20
+        self.canvas.create_line(scheme_x0 + 18, dimension_y, scheme_x1 - 18, dimension_y, fill="#718096", arrow=tk.BOTH)
         self.canvas.create_text(
             (scheme_x0 + scheme_x1) / 2,
-            234,
+            dimension_y + 13,
             text=f"База {geom['wheelbase']:.2f} м",
             font=("Segoe UI", 8),
             fill="#264653",
         )
-        self.canvas.create_line(scheme_x1 - 18, 74, scheme_x1 - 18, 190, fill="#718096", arrow=tk.BOTH)
+        self.canvas.create_line(scheme_x1 - 20, scheme_y0 + 24, scheme_x1 - 20, scheme_y1 - 24, fill="#718096", arrow=tk.BOTH)
         self.canvas.create_text(
-            scheme_x1 - 32,
-            132,
+            scheme_x1 - 36,
+            (scheme_y0 + scheme_y1) / 2,
             text=f"Колея {geom['track']:.2f} м",
             angle=90,
             font=("Segoe UI", 8),
             fill="#264653",
+        )
+
+    def _draw_suspension_overlay(
+        self,
+        x0: int,
+        y0: int,
+        x1: int,
+        y1: int,
+        geom: dict[str, float],
+        active_context: str,
+    ) -> None:
+        frame_left = x0 + 82
+        frame_right = x1 - 82
+        frame_top = y0 + 54
+        frame_bottom = y1 - 58
+        frame_color = self._stroke_color(active_context, "frame_dimensions", "track", "cg_height")
+        wheel_color = self._stroke_color(active_context, "wheel", "track")
+        cyl_color = self._stroke_color(active_context, "stroke", "trim_target")
+        self.canvas.create_rectangle(
+            frame_left,
+            frame_top,
+            frame_right,
+            frame_bottom,
+            outline=frame_color,
+            width=4,
+            fill="#edf4fb",
+        )
+        wheel_w = 46
+        wheel_h = 38
+        wheel_positions = (
+            (x0 + 30, frame_top - 8),
+            (x1 - 76, frame_top - 8),
+            (x0 + 30, frame_bottom - wheel_h + 8),
+            (x1 - 76, frame_bottom - wheel_h + 8),
+        )
+        for wx, wy in wheel_positions:
+            self.canvas.create_rectangle(wx, wy, wx + wheel_w, wy + wheel_h, outline=wheel_color, width=3, fill="#dbe6f2")
+            self.canvas.create_line(wx + wheel_w / 2, wy + wheel_h, wx + wheel_w / 2, frame_bottom + 18, fill=cyl_color, width=3)
+        cg_x = (frame_left + frame_right) / 2
+        cg_y = frame_top + (frame_bottom - frame_top) * 0.46
+        self.canvas.create_oval(cg_x - 9, cg_y - 9, cg_x + 9, cg_y + 9, fill="#d62828", outline="#9b1d20")
+        self.canvas.create_text(cg_x + 14, cg_y - 2, anchor="w", text="ЦМ", font=("Segoe UI", 9, "bold"), fill="#9b1d20")
+        self.canvas.create_text(
+            x0 + 16,
+            y0 + 18,
+            anchor="w",
+            text=f"Рама {geom['frame_length']:.2f} x {geom['frame_width']:.2f} м",
+            font=("Segoe UI", 9, "bold"),
+            fill="#264653",
+        )
+        self.canvas.create_text(
+            x0 + 16,
+            y1 - 22,
+            anchor="w",
+            text=f"Ход штока {geom['stroke']:.2f} м · колесо R {geom['wheel_radius']:.2f} м",
+            font=("Segoe UI", 9),
+            fill="#355070",
+        )
+
+    def _draw_pneumatic_overlay(self, x0: int, y0: int, x1: int, y1: int, active_context: str) -> None:
+        line_color = self._stroke_color(active_context, "pressure", "volume", "piston", "rod")
+        accent = self._stroke_color(active_context, "pressure")
+        top_y = y0 + 50
+        mid_y = y0 + 110
+        bottom_y = y0 + 170
+        left_x = x0 + 48
+        right_x = x1 - 48
+        center_x = (x0 + x1) / 2
+        self.canvas.create_line(left_x, mid_y, right_x, mid_y, fill=line_color, width=4)
+        self.canvas.create_line(center_x, top_y, center_x, bottom_y, fill=line_color, width=4)
+        for idx, (cx, cy, label) in enumerate(
+            (
+                (left_x + 28, top_y, "Р1"),
+                (center_x, top_y, "Р2"),
+                (right_x - 28, top_y, "Р3"),
+                (left_x + 28, bottom_y, "Ц1"),
+                (center_x, bottom_y, "Ц2"),
+                (right_x - 28, bottom_y, "Акк."),
+            )
+        ):
+            fill = "#e7f1ff" if idx < 3 else "#f4f7fb"
+            self.canvas.create_oval(cx - 28, cy - 20, cx + 28, cy + 20, outline=accent, width=3, fill=fill)
+            self.canvas.create_text(cx, cy, text=label, font=("Segoe UI", 9, "bold"), fill="#264653")
+            self.canvas.create_line(cx, cy + 20 if cy < mid_y else cy - 20, cx, mid_y, fill=line_color, width=3)
+        self.canvas.create_text(
+            x0 + 16,
+            y0 + 18,
+            anchor="w",
+            text="Контуры, ресиверы и исполнительные цилиндры",
+            font=("Segoe UI", 9, "bold"),
+            fill="#264653",
+        )
+        self.canvas.create_text(
+            x0 + 16,
+            y1 - 22,
+            anchor="w",
+            text="Схема показывает связи; расчётные значения справа.",
+            font=("Segoe UI", 9),
+            fill="#355070",
         )
 
     def _build_summary(

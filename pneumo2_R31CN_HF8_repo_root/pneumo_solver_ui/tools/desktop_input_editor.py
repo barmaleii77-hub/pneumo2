@@ -246,7 +246,7 @@ class DesktopInputEditor:
         self.inspector_title_var = tk.StringVar(value="Параметр не выбран")
         self.inspector_section_var = tk.StringVar(value="Раздел: —")
         self.inspector_unit_var = tk.StringVar(value="Единица: —")
-        self.inspector_range_var = tk.StringVar(value="Диапазон: —")
+        self.inspector_range_var = tk.StringVar(value="Допустимые значения ввода: —")
         self.inspector_context_var = tk.StringVar(value="Показано: —")
         self.inspector_source_state_var = tk.StringVar(value="Источник/состояние: —")
         self.inspector_help_var = tk.StringVar(value="Выберите параметр слева или в форме, чтобы увидеть пояснение.")
@@ -2792,7 +2792,10 @@ class DesktopInputEditor:
         self.inspector_title_var.set(spec.label)
         self.inspector_section_var.set(f"Раздел: {self._display_section_title(section_title)}")
         self.inspector_unit_var.set(f"Единица: {spec.unit_label or 'безразмерно'}")
-        self.inspector_range_var.set(f"Диапазон: {spec.range_text}")
+        self.inspector_range_var.set(
+            f"Допустимые значения ввода: {spec.range_text}. "
+            "Это проверка ввода, не выбор параметров оптимизации."
+        )
         self.inspector_context_var.set(
             f"Показано: {self._graphic_context_title(spec.effective_graphic_context) or 'общий'}"
         )

@@ -871,7 +871,7 @@ class DesktopOptimizerRuntime:
             scope_payload.get("mode_compatibility") or ""
         ) == "different":
             compat_status = "warn"
-            compat_summary = "Текущие настройки запуска используют другую область задачи или режим контрольной суммы."
+            compat_summary = "Текущие параметры оптимизации используют другую область задачи или режим контрольной суммы."
         elif baseline_compatibility == "different":
             compat_status = "warn"
             compat_summary = "Выбранный запуск ссылается на другой источник опорного прогона."
@@ -886,7 +886,7 @@ class DesktopOptimizerRuntime:
                 "title": "Совместимость запуска",
                 "status": compat_status,
                 "summary": compat_summary,
-                "action": "Настройки запуска",
+                "action": "Параметры оптимизации",
                 "action_kind": "show_contract_tab",
             }
         )
@@ -992,8 +992,8 @@ class DesktopOptimizerRuntime:
             next_action = "Выполнение"
             next_action_kind = "show_runtime_tab"
         elif compat_status == "warn":
-            headline = "Перед повторным использованием нужно проверить настройки запуска."
-            next_action = "Настройки запуска"
+            headline = "Перед повторным использованием нужно проверить параметры оптимизации."
+            next_action = "Параметры оптимизации"
             next_action_kind = "show_contract_tab"
         elif packaging_status == "warn":
             headline = "Перед выпуском нужно проверить готовность результатов."
@@ -1462,13 +1462,13 @@ class DesktopOptimizerRuntime:
                     if contract_issues
                     else "Цели, штрафной критерий и область задачи зафиксированы."
                 ),
-                "action": "Настройки запуска",
+                "action": "Параметры оптимизации",
             }
         )
 
         search_space_issues: list[str] = []
         if int(snapshot.search_param_count or 0) <= 0:
-            search_space_issues.append("нет параметров проектирования в диапазонах")
+            search_space_issues.append("нет выбранных параметров оптимизации с диапазонами поиска")
         if int(snapshot.enabled_suite_total or 0) <= 0:
             search_space_issues.append("нет включённых строк набора испытаний")
         rows.append(
@@ -1479,11 +1479,11 @@ class DesktopOptimizerRuntime:
                     "Блокировки: " + ", ".join(search_space_issues) + "."
                     if search_space_issues
                     else (
-                        f"Параметров проектирования: {int(snapshot.search_param_count or 0)}, "
+                        f"Параметров оптимизации: {int(snapshot.search_param_count or 0)}, "
                         f"включённых строк набора: {int(snapshot.enabled_suite_total or 0)}."
                     )
                 ),
-                "action": "Настройки запуска",
+                "action": "Параметры оптимизации",
             }
         )
 
@@ -1529,7 +1529,7 @@ class DesktopOptimizerRuntime:
             )
         elif baseline_compatibility == "different":
             align_status = "warn"
-            align_summary = "Выбранный запуск использует другой источник опорного прогона, чем текущие настройки запуска."
+            align_summary = "Выбранный запуск использует другой источник опорного прогона, чем текущие параметры оптимизации."
         elif diff_bits:
             align_status = "info"
             align_summary = (
@@ -1537,13 +1537,13 @@ class DesktopOptimizerRuntime:
             )
         else:
             align_status = "ok"
-            align_summary = "Выбранный запуск согласован с текущими настройками запуска и областью задачи."
+            align_summary = "Выбранный запуск согласован с текущими параметрами оптимизации и областью задачи."
         rows.append(
             {
                 "title": "Согласованность выбранного запуска",
                 "status": align_status,
                 "summary": align_summary,
-                "action": "Настройки запуска",
+                "action": "Параметры оптимизации",
             }
         )
 
@@ -1665,7 +1665,7 @@ class DesktopOptimizerRuntime:
         ok_count = sum(1 for row in rows if str(row.get("status") or "") == "ok")
         if warn_count > 0:
             headline = "Перед запуском нужно разобрать блокировки."
-            next_action = str(next((row.get("action") for row in rows if row.get("status") == "warn"), "Настройки запуска"))
+            next_action = str(next((row.get("action") for row in rows if row.get("status") == "warn"), "Параметры оптимизации"))
         elif info_count > 0:
             headline = "Запуск доступен, но есть примечания для оператора."
             next_action = str(next((row.get("action") for row in rows if row.get("status") == "info"), "Выполнение"))
