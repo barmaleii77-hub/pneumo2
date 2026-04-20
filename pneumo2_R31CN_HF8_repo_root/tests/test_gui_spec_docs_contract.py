@@ -33,6 +33,7 @@ IMPORTS_V32 = IMPORTS / "v32_connector_reconciled"
 IMPORTS_V33 = IMPORTS / "v33_connector_reconciled"
 IMPORTS_V37 = IMPORTS / "v37_github_kb_supplement"
 IMPORTS_V38 = IMPORTS / "v38_github_kb_commit_ready"
+IMPORTS_V19 = IMPORTS / "v19_graph_iteration"
 V32_COMPLETENESS = IMPORTS_V32 / "COMPLETENESS_ASSESSMENT.md"
 V32_WORKSTREAMS = IMPORTS_V32 / "PARALLEL_CHAT_WORKSTREAMS.md"
 V33_COMPLETENESS = IMPORTS_V33 / "COMPLETENESS_ASSESSMENT.md"
@@ -286,6 +287,154 @@ def test_v38_kb_commit_ready_import_layer_exists_and_resolves_ambiguities() -> N
     assert {row["status"] for row in gaps_rows} == {"open"}
     assert "WS-SHELL" in (IMPORTS_V38 / "PIPELINE_OPTIMIZED.dot").read_text(
         encoding="utf-8-sig"
+    )
+
+
+def test_v19_graph_iteration_import_layer_exists_and_loads_contracts() -> None:
+    required_files = {
+        "README.md",
+        "EXEC_SUMMARY.json",
+        "GRAPH_ANALYSIS_REPORT_V19.md",
+        "SEMANTIC_FIX_PRIORITY_V19.md",
+        "CHAOTIC_CLICK_MATRIX_V19.csv",
+        "COGNITIVE_VISIBILITY_MATRIX_V19.csv",
+        "COMPLIANCE_MATRIX_V19.csv",
+        "CURRENT_INTERNAL_DEFICITS_V19.csv",
+        "DOCK_WINDOW_AND_DOCK_WIDGET_MATRIX_V19.csv",
+        "EDGE_CATALOG_V19.csv",
+        "GRAPH_METRICS_V19.csv",
+        "GUI_LABEL_SEMANTIC_AUDIT_V19.csv",
+        "NODE_CATALOG_V19.csv",
+        "NOT_PROVEN_CURRENT_WINDOWS_V19.csv",
+        "PATH_COST_SCENARIOS_V19.csv",
+        "TASK_CHECK_BLOCK_LOOP_MATRIX_V19.csv",
+        "TREE_DIRECT_OPEN_MATRIX_V19.csv",
+        "USER_ACTION_FEEDBACK_MATRIX_V19.csv",
+        "SUBGRAPH_CURRENT_WS-DIAGNOSTICS_V19.dot",
+        "SUBGRAPH_CURRENT_WS-INPUTS_V19.dot",
+        "SUBGRAPH_CURRENT_WS-OPTIMIZATION_V19.dot",
+        "SUBGRAPH_CURRENT_WS-RING_V19.dot",
+        "SUBGRAPH_OPTIMIZED_WS-DIAGNOSTICS_V19.dot",
+        "SUBGRAPH_OPTIMIZED_WS-INPUTS_V19.dot",
+        "SUBGRAPH_OPTIMIZED_WS-OPTIMIZATION_V19.dot",
+        "SUBGRAPH_OPTIMIZED_WS-RING_V19.dot",
+    }
+
+    assert IMPORTS_V19.exists()
+    actual_files = {path.name for path in IMPORTS_V19.iterdir() if path.is_file()}
+    assert required_files <= actual_files
+    for file_name in required_files:
+        assert (IMPORTS_V19 / file_name).stat().st_size > 0, file_name
+
+    summary = json.loads((IMPORTS_V19 / "EXEC_SUMMARY.json").read_text(encoding="utf-8-sig"))
+    assert summary["package_id"] == "PNEUMO-GUI-GRAPH-V19-WORKSPACE-ACTION-FEEDBACK"
+    assert summary["workspaces"] == [
+        "WS-INPUTS",
+        "WS-RING",
+        "WS-OPTIMIZATION",
+        "WS-DIAGNOSTICS",
+    ]
+    assert summary["current_total_nodes"] == 26
+    assert summary["current_total_edges"] == 22
+    assert summary["optimized_total_nodes"] == 776
+    assert summary["optimized_total_edges"] == 1087
+    assert summary["semantic_rows"] == 812
+
+    readme_text = (IMPORTS_V19 / "README.md").read_text(encoding="utf-8")
+    report_text = (IMPORTS_V19 / "GRAPH_ANALYSIS_REPORT_V19.md").read_text(
+        encoding="utf-8-sig"
+    )
+    semantic_text = (IMPORTS_V19 / "SEMANTIC_FIX_PRIORITY_V19.md").read_text(
+        encoding="utf-8-sig"
+    )
+
+    assert "active detailed graph/action-feedback refinement" in readme_text
+    assert "not runtime-closure proof" in readme_text
+    assert "action→feedback" in report_text
+    assert "Полная coverage-паутина дана только в optimized canonical layer" in report_text
+    assert "архив диагностики" in semantic_text
+
+    node_rows = _load_csv_rows(IMPORTS_V19 / "NODE_CATALOG_V19.csv")
+    edge_rows = _load_csv_rows(IMPORTS_V19 / "EDGE_CATALOG_V19.csv")
+    feedback_rows = _load_csv_rows(IMPORTS_V19 / "USER_ACTION_FEEDBACK_MATRIX_V19.csv")
+    task_rows = _load_csv_rows(IMPORTS_V19 / "TASK_CHECK_BLOCK_LOOP_MATRIX_V19.csv")
+    visibility_rows = _load_csv_rows(IMPORTS_V19 / "COGNITIVE_VISIBILITY_MATRIX_V19.csv")
+    dock_rows = _load_csv_rows(IMPORTS_V19 / "DOCK_WINDOW_AND_DOCK_WIDGET_MATRIX_V19.csv")
+    path_rows = _load_csv_rows(IMPORTS_V19 / "PATH_COST_SCENARIOS_V19.csv")
+    not_proven_rows = _load_csv_rows(IMPORTS_V19 / "NOT_PROVEN_CURRENT_WINDOWS_V19.csv")
+    semantic_rows = _load_csv_rows(IMPORTS_V19 / "GUI_LABEL_SEMANTIC_AUDIT_V19.csv")
+
+    assert len(node_rows) == 802
+    assert len(edge_rows) == 1109
+    assert len(feedback_rows) == 146
+    assert len(task_rows) == 116
+    assert len(visibility_rows) == 12
+    assert len(dock_rows) == 12
+    assert len(path_rows) == 12
+    assert len(not_proven_rows) == 4
+    assert len(semantic_rows) == 812
+
+    assert {"node_id", "workspace", "layer", "node_kind", "label"} <= set(
+        node_rows[0].keys()
+    )
+    assert {"src", "dst", "workspace", "layer", "edge_kind", "evidence_status"} <= set(
+        edge_rows[0].keys()
+    )
+    assert {"vis_id", "workspace", "optimized_visibility", "required_feedback"} <= set(
+        visibility_rows[0].keys()
+    )
+    assert {"workspace", "tree_item", "optimized_route", "direct_open_required"} <= set(
+        _load_csv_rows(IMPORTS_V19 / "TREE_DIRECT_OPEN_MATRIX_V19.csv")[0].keys()
+    )
+
+    assert {row["workspace"] for row in not_proven_rows} == {
+        "WS-INPUTS",
+        "WS-RING",
+        "WS-OPTIMIZATION",
+        "WS-DIAGNOSTICS",
+    }
+    assert any(row["node_id"] == "IN-TASK-SELECT-GROUP" for row in task_rows)
+    assert any(row["workspace"] == "WS-RING" and row["allow_floating"] == "Да" for row in dock_rows)
+    assert any(row["scenario_id"] == "SCN-IN-01" for row in path_rows)
+
+    for workspace in ("INPUTS", "RING", "OPTIMIZATION", "DIAGNOSTICS"):
+        current_dot = IMPORTS_V19 / f"SUBGRAPH_CURRENT_WS-{workspace}_V19.dot"
+        optimized_dot = IMPORTS_V19 / f"SUBGRAPH_OPTIMIZED_WS-{workspace}_V19.dot"
+        assert f"WS-{workspace}" in current_dot.read_text(encoding="utf-8-sig")
+        assert f"WS-{workspace}" in optimized_dot.read_text(encoding="utf-8-sig")
+
+
+def test_v19_graph_iteration_is_registered_in_gui_knowledge_stack() -> None:
+    imports_readme = IMPORTS_README.read_text(encoding="utf-8")
+    project_sources_text = PROJECT_SOURCES.read_text(encoding="utf-8")
+    project_kb_text = PROJECT_KNOWLEDGE_BASE.read_text(encoding="utf-8")
+    index_text = GUI_INDEX.read_text(encoding="utf-8")
+    canon_18 = CANON_18.read_text(encoding="utf-8")
+
+    for text in (
+        imports_readme,
+        project_sources_text,
+        project_kb_text,
+        index_text,
+        canon_18,
+    ):
+        assert "v19_graph_iteration" in text
+        assert "GRAPH_ANALYSIS_REPORT_V19.md" in text
+        assert "SEMANTIC_FIX_PRIORITY_V19.md" in text
+        assert "USER_ACTION_FEEDBACK_MATRIX_V19.csv" in text
+        assert "WS-INPUTS" in text
+        assert "WS-RING" in text
+        assert "WS-OPTIMIZATION" in text
+        assert "WS-DIAGNOSTICS" in text
+
+    assert project_sources_text.index("v38_actualized_with_v10") < project_sources_text.index(
+        "v19_graph_iteration"
+    )
+    assert imports_readme.index("v38_actualized_with_v10") < imports_readme.index(
+        "v19_graph_iteration"
+    )
+    assert "not runtime-closure proof" in (IMPORTS_V19 / "README.md").read_text(
+        encoding="utf-8"
     )
 
 
@@ -1326,6 +1475,7 @@ def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
         IMPORTS_V38 / "REPO_GITHUB_KB_SUPPLEMENT.md",
         IMPORTS_V38 / "REPO_GITHUB_KB_SUPPLEMENT_SUMMARY.md",
         IMPORTS_V38 / "NON_RUNTIME_CLOSURE_NOTICE.md",
+        IMPORTS_V19 / "README.md",
         IMPORTS_V37 / "README.md",
         IMPORTS_V37 / "TECHNICAL_SPECIFICATION.md",
         IMPORTS_V37 / "REPO_GITHUB_KB_SUPPLEMENT.md",

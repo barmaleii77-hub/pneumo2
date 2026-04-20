@@ -1009,6 +1009,61 @@ Machine-readable и reference source set:
 - При расхождении `v38` с `17/18` приоритет остаётся у human-readable канона,
   а конфликт фиксируется через assumptions/gaps, а не замалчивается.
 
+## Х. V19 graph/action-feedback refinement layer
+
+`v19_graph_iteration` импортирован из `pneumo_gui_graph_iteration_v19.zip` как
+active detailed refinement layer для внутренних action-to-feedback subgraphs. Он
+не заменяет `17/18`, не заменяет `v38_actualized_with_v10` как KB/TZ/spec layer
+и не является runtime-closure proof.
+
+Reference source set:
+
+- [README.md](./context/gui_spec_imports/v19_graph_iteration/README.md)
+- [EXEC_SUMMARY.json](./context/gui_spec_imports/v19_graph_iteration/EXEC_SUMMARY.json)
+- [GRAPH_ANALYSIS_REPORT_V19.md](./context/gui_spec_imports/v19_graph_iteration/GRAPH_ANALYSIS_REPORT_V19.md)
+- [SEMANTIC_FIX_PRIORITY_V19.md](./context/gui_spec_imports/v19_graph_iteration/SEMANTIC_FIX_PRIORITY_V19.md)
+- [NODE_CATALOG_V19.csv](./context/gui_spec_imports/v19_graph_iteration/NODE_CATALOG_V19.csv)
+- [EDGE_CATALOG_V19.csv](./context/gui_spec_imports/v19_graph_iteration/EDGE_CATALOG_V19.csv)
+- [USER_ACTION_FEEDBACK_MATRIX_V19.csv](./context/gui_spec_imports/v19_graph_iteration/USER_ACTION_FEEDBACK_MATRIX_V19.csv)
+- [TASK_CHECK_BLOCK_LOOP_MATRIX_V19.csv](./context/gui_spec_imports/v19_graph_iteration/TASK_CHECK_BLOCK_LOOP_MATRIX_V19.csv)
+- [COGNITIVE_VISIBILITY_MATRIX_V19.csv](./context/gui_spec_imports/v19_graph_iteration/COGNITIVE_VISIBILITY_MATRIX_V19.csv)
+- [TREE_DIRECT_OPEN_MATRIX_V19.csv](./context/gui_spec_imports/v19_graph_iteration/TREE_DIRECT_OPEN_MATRIX_V19.csv)
+- [DOCK_WINDOW_AND_DOCK_WIDGET_MATRIX_V19.csv](./context/gui_spec_imports/v19_graph_iteration/DOCK_WINDOW_AND_DOCK_WIDGET_MATRIX_V19.csv)
+- [PATH_COST_SCENARIOS_V19.csv](./context/gui_spec_imports/v19_graph_iteration/PATH_COST_SCENARIOS_V19.csv)
+- [GUI_LABEL_SEMANTIC_AUDIT_V19.csv](./context/gui_spec_imports/v19_graph_iteration/GUI_LABEL_SEMANTIC_AUDIT_V19.csv)
+- [NOT_PROVEN_CURRENT_WINDOWS_V19.csv](./context/gui_spec_imports/v19_graph_iteration/NOT_PROVEN_CURRENT_WINDOWS_V19.csv)
+- [SUBGRAPH_CURRENT_WS-INPUTS_V19.dot](./context/gui_spec_imports/v19_graph_iteration/SUBGRAPH_CURRENT_WS-INPUTS_V19.dot)
+- [SUBGRAPH_OPTIMIZED_WS-INPUTS_V19.dot](./context/gui_spec_imports/v19_graph_iteration/SUBGRAPH_OPTIMIZED_WS-INPUTS_V19.dot)
+
+### Что уточняет V19
+
+- Для `WS-INPUTS` обязательна видимость двух пружин на угол как первой/второй
+  пружины, режима/метода/остатка выравнивания, зеркальной симметрии,
+  графического двойника и validated snapshot. Числа не должны выглядеть
+  самодостаточными без этой обратной связи.
+- Для `WS-RING` обязательны segment geometry semantics, turn type, единый
+  crossfall-параметр, seam gate, auto-close последнего сегмента и явный stale
+  export state.
+- Для `WS-OPTIMIZATION` обязательны one active mode, summary контракта целевых
+  показателей, stage live rows, причины underfill, условия допуска, причины
+  продвижения кандидата и objective contract в истории.
+- Для `WS-DIAGNOSTICS` обязательны один доминирующий collect route,
+  самопроверка/runtime provenance на первом экране, preview состава архива до
+  сборки и send-route только после готового архива диагностики.
+- Для всех четырёх workspace-ов shell обязан поддерживать direct-open из
+  дерева/command-search, dock/window роли, cognitive visibility и явный
+  `действие -> проверка -> feedback -> следующий шаг` loop.
+
+### Правило использования V19
+
+- Читать V19 после `v38_actualized_with_v10` для GUI-работ в `WS-INPUTS`,
+  `WS-RING`, `WS-OPTIMIZATION` и `WS-DIAGNOSTICS`.
+- Current-layer в V19 является evidence-bound: если live runtime/window internals
+  не доказаны отдельным артефактом, нельзя объявлять их принятыми.
+- User-facing текст должен следовать `SEMANTIC_FIX_PRIORITY_V19.md`: избегать
+  service jargon вроде `GUI`, `bundle`, `hash`, `hard gate`, `underfill` в
+  основном пользовательском слое, если рядом нет понятного русского объяснения.
+
 ## Ф. V37 GitHub KB supplement predecessor
 
 `v37_github_kb_supplement` импортирован из

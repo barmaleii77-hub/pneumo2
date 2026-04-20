@@ -70,6 +70,15 @@ Operational note:
 11. [docs/context/gui_spec_imports/v38_actualized_with_v10/V10_RECONCILIATION_MATRIX.csv](./context/gui_spec_imports/v38_actualized_with_v10/V10_RECONCILIATION_MATRIX.csv)
 12. [docs/context/gui_spec_imports/v38_actualized_with_v10/REQUIREMENTS_MATRIX.csv](./context/gui_spec_imports/v38_actualized_with_v10/REQUIREMENTS_MATRIX.csv)
 13. [docs/context/release_readiness/V38_ACTUALIZED_WITH_V10_KB_IMPORT_AUDIT_2026-04-19.md](./context/release_readiness/V38_ACTUALIZED_WITH_V10_KB_IMPORT_AUDIT_2026-04-19.md)
+14. [docs/context/gui_spec_imports/v19_graph_iteration/README.md](./context/gui_spec_imports/v19_graph_iteration/README.md)
+15. [docs/context/gui_spec_imports/v19_graph_iteration/EXEC_SUMMARY.json](./context/gui_spec_imports/v19_graph_iteration/EXEC_SUMMARY.json)
+16. [docs/context/gui_spec_imports/v19_graph_iteration/GRAPH_ANALYSIS_REPORT_V19.md](./context/gui_spec_imports/v19_graph_iteration/GRAPH_ANALYSIS_REPORT_V19.md)
+17. [docs/context/gui_spec_imports/v19_graph_iteration/SEMANTIC_FIX_PRIORITY_V19.md](./context/gui_spec_imports/v19_graph_iteration/SEMANTIC_FIX_PRIORITY_V19.md)
+18. [docs/context/gui_spec_imports/v19_graph_iteration/USER_ACTION_FEEDBACK_MATRIX_V19.csv](./context/gui_spec_imports/v19_graph_iteration/USER_ACTION_FEEDBACK_MATRIX_V19.csv)
+19. [docs/context/gui_spec_imports/v19_graph_iteration/TASK_CHECK_BLOCK_LOOP_MATRIX_V19.csv](./context/gui_spec_imports/v19_graph_iteration/TASK_CHECK_BLOCK_LOOP_MATRIX_V19.csv)
+20. [docs/context/gui_spec_imports/v19_graph_iteration/COGNITIVE_VISIBILITY_MATRIX_V19.csv](./context/gui_spec_imports/v19_graph_iteration/COGNITIVE_VISIBILITY_MATRIX_V19.csv)
+21. [docs/context/gui_spec_imports/v19_graph_iteration/TREE_DIRECT_OPEN_MATRIX_V19.csv](./context/gui_spec_imports/v19_graph_iteration/TREE_DIRECT_OPEN_MATRIX_V19.csv)
+22. [docs/context/gui_spec_imports/v19_graph_iteration/DOCK_WINDOW_AND_DOCK_WIDGET_MATRIX_V19.csv](./context/gui_spec_imports/v19_graph_iteration/DOCK_WINDOW_AND_DOCK_WIDGET_MATRIX_V19.csv)
 14. [docs/context/gui_spec_imports/v38_github_kb_commit_ready/README.md](./context/gui_spec_imports/v38_github_kb_commit_ready/README.md)
 15. [docs/context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md](./context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md)
 16. [docs/context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml](./context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml)
@@ -355,6 +364,28 @@ Operational note:
 - explicit non-runtime boundary: producer-side truth, cylinder packaging,
   browser performance trace/viewport gating and Windows visual/runtime
   acceptance остаются открытыми до named evidence.
+
+Что добавляет V19 graph/action-feedback iteration:
+
+- active detailed refinement layer после V38 actualized with V10 для четырёх
+  route-critical workspaces: `WS-INPUTS`, `WS-RING`, `WS-OPTIMIZATION`,
+  `WS-DIAGNOSTICS`;
+- фокус не на количестве кнопок, а на связке `действие пользователя -> проверка
+  системы -> блокировка/loop -> видимый feedback -> следующий шаг`;
+- `WS-INPUTS`: графический двойник, видимость C1/C2 как первой/второй пружины,
+  режим/метод/остаток выравнивания, зеркальная симметрия и validated snapshot
+  должны быть видимы до ощущения, что числовое редактирование завершено;
+- `WS-RING`: семантика сегмента, тип поворота, единый crossfall-параметр,
+  seam gate, auto-close последнего сегмента и stale export state становятся
+  обязательными first-class состояниями;
+- `WS-OPTIMIZATION`: один активный режим, summary контракта целевых показателей,
+  live rows стадий, причины underfill/условия допуска/продвижения кандидата и
+  provenance истории не прячутся в служебные вкладки;
+- `WS-DIAGNOSTICS`: один доминирующий маршрут сбора, самопроверка/runtime
+  provenance на первом экране, preview состава перед сбором и отправка только
+  после готового архива диагностики;
+- V19 не является runtime-closure proof: current internals для этих workspace-ов
+  остаются evidence-bound до отдельного runtime/visual artifact.
 
 Что остаётся от V38 commit-ready KB layer:
 

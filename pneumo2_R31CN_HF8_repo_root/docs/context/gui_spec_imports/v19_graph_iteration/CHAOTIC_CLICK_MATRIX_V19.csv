@@ -1,0 +1,9 @@
+workspace,chaotic_action,immediate_effect,risk,optimized_countermeasure
+WS-INPUTS,"Щёлкнуть по числам, не открывая графический двойник",Меняются числа без понимания конфигурации,"Не видно C1/C2, выравнивание, симметрия","Графический двойник, badges и inspector синхронизированы"
+WS-INPUTS,Открыть advanced настройку вместо проверки обязательных полей,Уход в служебщину до validation,Потеря главного маршрута,Validation summary и следующий шаг крупнее advanced controls
+WS-RING,"Кликать по плану, профилю и списку без синхронизации",Потеря текущего сегмента,Правка не того сегмента,Selection sync список↔план↔профиль↔inspector
+WS-RING,Экспортировать до проверки шва,Получить stale или некорректный export,Сценарий уйдёт дальше с дефектом,Seam gate перед export и явный stale state
+WS-OPTIMIZATION,Переключать режимы запуска без чтения контракта,Пользователь теряет понимание active mode,Запуск не того контура,Один активный режим и большой contract summary
+WS-OPTIMIZATION,Открывать history и compare до чтения underfill/promotion reason,Путаница причин stage поведения,Решения принимаются без понимания gate,Underfill/promotion reasons на текущем экране до history route
+WS-DIAGNOSTICS,Сразу нажать отправку результатов,Попытка обхода primary collect route,Отправка неполного или отсутствующего bundle,Send secondary after collect; explicit block before bundle ready
+WS-DIAGNOSTICS,Игнорировать selfcheck и provenance,Архив собирается при недоказанном runtime,Низкое доверие к diagnostic artifact,Health/runtime badges и blocking selfcheck state видны на первом экране

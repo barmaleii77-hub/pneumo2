@@ -20,6 +20,14 @@
    — current imported successor GitHub KB/TZ/spec commit-ready layer. Он
    уточняет requirements, workspace contracts, parameter catalogs, acceptance,
    optimized pipeline and open gaps, но не является runtime-closure proof.
+5. [gui_spec_imports/v19_graph_iteration/README.md](../context/gui_spec_imports/v19_graph_iteration/README.md),
+   [GRAPH_ANALYSIS_REPORT_V19.md](../context/gui_spec_imports/v19_graph_iteration/GRAPH_ANALYSIS_REPORT_V19.md),
+   [SEMANTIC_FIX_PRIORITY_V19.md](../context/gui_spec_imports/v19_graph_iteration/SEMANTIC_FIX_PRIORITY_V19.md),
+   [USER_ACTION_FEEDBACK_MATRIX_V19.csv](../context/gui_spec_imports/v19_graph_iteration/USER_ACTION_FEEDBACK_MATRIX_V19.csv)
+   и [COGNITIVE_VISIBILITY_MATRIX_V19.csv](../context/gui_spec_imports/v19_graph_iteration/COGNITIVE_VISIBILITY_MATRIX_V19.csv)
+   — active graph/action-feedback refinement for `WS-INPUTS`, `WS-RING`,
+   `WS-OPTIMIZATION` and `WS-DIAGNOSTICS`; читать после V38/V10 для GUI-работ
+   внутри этих workspace-ов, не как runtime-closure proof.
 5. [gui_spec_imports/v37_github_kb_supplement/README.md](../context/gui_spec_imports/v37_github_kb_supplement/README.md),
    [TECHNICAL_SPECIFICATION.md](../context/gui_spec_imports/v37_github_kb_supplement/TECHNICAL_SPECIFICATION.md)
    и [GUI_SPEC.yaml](../context/gui_spec_imports/v37_github_kb_supplement/GUI_SPEC.yaml)

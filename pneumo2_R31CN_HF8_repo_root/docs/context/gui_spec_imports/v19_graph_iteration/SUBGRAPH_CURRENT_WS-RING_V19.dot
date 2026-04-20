@@ -1,0 +1,20 @@
+digraph G {
+  rankdir=LR;
+  graph [fontname="Arial", labelloc=t, fontsize=20, label="V19 current evidence-bound: Редактор кольца"];
+  node [fontname="Arial", fontsize=10, style="rounded,filled", fillcolor=white];
+  edge [fontname="Arial", fontsize=9, color="#555555"];
+  subgraph cluster__evidence_bound_ {
+    label="Текущее evidence-bound состояние"; color="#cccccc"; style="rounded";
+    "TREE-WS-RING" [label="Сценарии и редактор кольца", shape=tab, fillcolor="#134f5c"];
+    "CUR-RG-LAUNCH" [label="Открыть редактор кольца или сценариев", shape=tab, fillcolor="#134f5c"];
+    "CUR-RG-NOT-DOMINANT" [label="Редактор кольца не доминирует в стартовом маршруте", shape=octagon, fillcolor="#990000"];
+    "CUR-RG-TELEMETRY-MIX" [label="Разгон и торможение смешиваются с семантикой сегмента", shape=octagon, fillcolor="#990000"];
+    "CUR-RG-SEAM-AMBIG" [label="Шов и источник цикличности выражены недостаточно явно", shape=octagon, fillcolor="#990000"];
+    "CUR-RG-EXPORT-HIDDEN" [label="Экспорт и handoff в suite видны не как следствие source-of-truth", shape=octagon, fillcolor="#990000"];
+  }
+  "TREE-WS-RING" -> "CUR-RG-LAUNCH" [label="navigates / 1.00", color="#0b5394", penwidth=1, style=solid];
+  "CUR-RG-LAUNCH" -> "CUR-RG-NOT-DOMINANT" [label="task_flow / 1.20", color="#0b5394", penwidth=1, style=solid];
+  "CUR-RG-NOT-DOMINANT" -> "CUR-RG-TELEMETRY-MIX" [label="task_flow / 1.20", color="#0b5394", penwidth=1, style=solid];
+  "CUR-RG-TELEMETRY-MIX" -> "CUR-RG-SEAM-AMBIG" [label="task_flow / 1.20", color="#0b5394", penwidth=1, style=solid];
+  "CUR-RG-SEAM-AMBIG" -> "CUR-RG-EXPORT-HIDDEN" [label="task_flow / 1.20", color="#0b5394", penwidth=1, style=solid];
+}

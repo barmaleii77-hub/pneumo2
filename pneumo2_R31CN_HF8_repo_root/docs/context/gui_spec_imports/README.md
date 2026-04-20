@@ -25,6 +25,12 @@
   secondary/advanced priority для `Desktop Mnemo` и инструментов. Не является
   `runtime-closure proof`; локальная разборка зафиксирована в
   `docs/context/release_readiness/V38_ACTUALIZED_WITH_V10_KB_IMPORT_AUDIT_2026-04-19.md`;
+- `v19_graph_iteration/` — active graph/action-feedback refinement layer из
+  `pneumo_gui_graph_iteration_v19.zip`. Слой уточняет `WS-INPUTS`, `WS-RING`,
+  `WS-OPTIMIZATION` и `WS-DIAGNOSTICS` через task/check/block/loop,
+  cognitive-visibility, direct-open, dock/window, semantic-label и path-cost
+  matrices. Он не заменяет `17/18` и не является `runtime-closure proof`:
+  текущие внутренние окна остаются evidence-bound до отдельного runtime evidence;
 - `v38_github_kb_commit_ready/` — predecessor import-ready successor
   knowledge-base commit-ready layer из
   `pneumo_codex_tz_spec_connector_reconciled_v38_github_kb_commit_ready.zip`.
@@ -86,22 +92,30 @@
    `../release_readiness/V38_ACTUALIZED_WITH_V10_KB_IMPORT_AUDIT_2026-04-19.md`
    as the current imported successor KB/TZ/spec layer. This layer is
    active for new GUI work, but not runtime closure proof.
-4. Затем читать `v38_github_kb_commit_ready/README.md`,
+4. Для GUI-работ внутри `WS-INPUTS`, `WS-RING`, `WS-OPTIMIZATION` или
+   `WS-DIAGNOSTICS` читать `v19_graph_iteration/README.md`,
+   `GRAPH_ANALYSIS_REPORT_V19.md`, `SEMANTIC_FIX_PRIORITY_V19.md`,
+   `USER_ACTION_FEEDBACK_MATRIX_V19.csv`, `TASK_CHECK_BLOCK_LOOP_MATRIX_V19.csv`,
+   `COGNITIVE_VISIBILITY_MATRIX_V19.csv`, `TREE_DIRECT_OPEN_MATRIX_V19.csv`,
+   `DOCK_WINDOW_AND_DOCK_WIDGET_MATRIX_V19.csv` и соответствующие current/optimized
+   `SUBGRAPH_*_V19.dot` после `v38_actualized_with_v10`. V19 активен для
+   graph/action-feedback refinement, но не является runtime closure proof.
+5. Затем читать `v38_github_kb_commit_ready/README.md`,
    `v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md`,
    `v38_github_kb_commit_ready/GUI_SPEC.yaml`, V38 catalog/matrix files and
    `../release_readiness/V38_KB_IMPORT_AUDIT_2026-04-18.md` as predecessor
    V38 commit-ready knowledge-base context.
-5. Затем читать `v37_github_kb_supplement/README.md` as predecessor
+6. Затем читать `v37_github_kb_supplement/README.md` as predecessor
    GitHub KB/TZ/spec supplement if lineage/provenance comparison is needed.
-6. Затем читать `v33_connector_reconciled/README.md` как active
+7. Затем читать `v33_connector_reconciled/README.md` как active
    connector-reconciled digest для V33: integrity policy, selfcheck,
    remediation, repo-canon read order, gate mapping и PB-008 provenance
    playbook.
-7. Для контекста V32 и параллельной разработки читать
+8. Для контекста V32 и параллельной разработки читать
    `v32_connector_reconciled/README.md` и
    `v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md`; если нужно понять
    достаточность архива, читать `v32_connector_reconciled/COMPLETENESS_ASSESSMENT.md`.
-8. Если задача касается release gates, acceptance evidence или open gaps, читать
+9. Если задача касается release gates, acceptance evidence или open gaps, читать
    `v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md` и local checked-in
    extracts `RELEASE_GATE_HARDENING_MATRIX.csv`,
    `GAP_TO_EVIDENCE_ACTION_MAP.csv`; for frozen inputs/suite handoff
@@ -123,20 +137,20 @@
    `v32_connector_reconciled/DIAGNOSTICS_PRODUCER_GAPS_HANDOFF.md`;
    for runtime/perf evidence gates, also read
    `v32_connector_reconciled/RUNTIME_RELEASE_EVIDENCE_NOTE.md`.
-9. Затем использовать `v3/*` как checked-in detailed machine-readable reference для:
+10. Затем использовать `v3/*` как checked-in detailed machine-readable reference для:
    layout, UI elements, field/help/tooltip catalogs, migration matrix,
    acceptance criteria, pipeline verification, source-of-truth, docking,
    keyboard, UI state и observability contracts.
-10. Если нужно понять, как текущий канон вырос из старых архивов, читать
+11. Если нужно понять, как текущий канон вырос из старых архивов, читать
    `GUI_SPEC_ARCHIVE_LINEAGE.md` и `gui_spec_archive_lineage.json`.
-11. Для `WS-RING` и handoff `WS-RING -> WS-SUITE` дополнительно использовать
+12. Для `WS-RING` и handoff `WS-RING -> WS-SUITE` дополнительно использовать
    `v13_ring_editor_migration/*` как специализированный addendum поверх `v3`:
    schema contract, screen blueprints, state machine, ring-level migration
    matrix, acceptance gates и suite-link contract.
-12. `v12_design_recovery/*` использовать как historical design-recovery layer:
+13. `v12_design_recovery/*` использовать как historical design-recovery layer:
    он фиксирует возврат в design-first ветку, канон ring editor, optimization
    control plane и truthful graphics перед `v13`.
-13. `v2` и `v1` использовать только как historical imports и источник для
+14. `v2` и `v1` использовать только как historical imports и источник для
    сравнения эволюции GUI-spec.
 
 ## Политика обновления
@@ -150,7 +164,9 @@
   затем у `foundations/*` как upstream intent/provenance layer, затем у
   `v38_actualized_with_v10/*` как current active successor KB/TZ/spec layer and
   `V38_ACTUALIZED_WITH_V10_KB_IMPORT_AUDIT_2026-04-19.md` as local ambiguity
-  resolution, затем у `v38_github_kb_commit_ready/*` and
+  resolution, затем у `v19_graph_iteration/*` как graph/action-feedback refinement
+  для `WS-INPUTS`, `WS-RING`, `WS-OPTIMIZATION` и `WS-DIAGNOSTICS`, затем у
+  `v38_github_kb_commit_ready/*` and
   `V38_KB_IMPORT_AUDIT_2026-04-18.md` as predecessor V38 layer, затем у
   `v37_github_kb_supplement/*` as predecessor KB/TZ/spec layer, затем у
   `v33_connector_reconciled/README.md` как connector-reconciled digest, затем у

@@ -1,0 +1,5 @@
+workspace,current_surface_status,what_is_not_proven,how_handled
+WS-INPUTS,internal_current_not_fully_opened,Полные внутренние live current-экраны и все контролы не подтверждены артефактами runtime,Current layer оставлен evidence-bound; full coverage дан только в optimized canonical subgraph
+WS-RING,internal_current_not_fully_opened,Полные внутренние live current-экраны и все контролы не подтверждены артефактами runtime,Current layer оставлен evidence-bound; full coverage дан только в optimized canonical subgraph
+WS-OPTIMIZATION,current_internal_known_better,Некоторые маршруты на главной поверхности и инженерной странице still split,Current layer оставлен evidence-bound; full coverage дан только в optimized canonical subgraph
+WS-DIAGNOSTICS,internal_current_not_fully_opened,Полные внутренние live current-экраны и все контролы не подтверждены артефактами runtime,Current layer оставлен evidence-bound; full coverage дан только в optimized canonical subgraph

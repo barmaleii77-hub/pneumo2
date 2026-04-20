@@ -1,0 +1,1110 @@
+src,dst,workspace,layer,edge_kind,weight,evidence_status,why
+TREE-WS-INPUTS,CUR-IN-HOME-LAUNCH,WS-INPUTS,current,navigates,1.0,evidence_bound,Текущий route и дефицит видимости.
+CUR-IN-HOME-LAUNCH,CUR-IN-NUMERIC-ONLY,WS-INPUTS,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-IN-NUMERIC-ONLY,CUR-IN-C1C2-HIDDEN,WS-INPUTS,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-IN-C1C2-HIDDEN,CUR-IN-LEVELING-HIDDEN,WS-INPUTS,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-IN-LEVELING-HIDDEN,CUR-IN-SYMMETRY-HIDDEN,WS-INPUTS,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-IN-SYMMETRY-HIDDEN,CUR-IN-TWIN-PARTIAL,WS-INPUTS,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-IN-TWIN-PARTIAL,CUR-IN-VALIDATE-SAVE,WS-INPUTS,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+TREE-WS-INPUTS,ROOT-WS-INPUTS,WS-INPUTS,optimized,open_direct,0.35,designed_target,Прямой вход и обязательный shell.
+ROOT-WS-INPUTS,DOCK-TREE-WS-INPUTS,WS-INPUTS,optimized,contains,0.12,designed_target,Прямой вход и обязательный shell.
+ROOT-WS-INPUTS,DOCK-INSPECTOR-WS-INPUTS,WS-INPUTS,optimized,contains,0.12,designed_target,Прямой вход и обязательный shell.
+ROOT-WS-INPUTS,DOCK-STATUS-WS-INPUTS,WS-INPUTS,optimized,contains,0.12,designed_target,Прямой вход и обязательный shell.
+ROOT-WS-INPUTS,PROJECT-SCR-01,WS-INPUTS,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+PROJECT-SCR-01,PR-HEADER,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+PROJECT-SCR-01,PR-ACTION,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+PROJECT-SCR-01,PR-STATUS,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+PROJECT-SCR-01,PR-RECENT,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+PROJECT-SCR-01,PR-RUNS,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+PROJECT-SCR-01,PR-FOOTER,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-INPUTS,PROJECT-SCR-02,WS-INPUTS,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+PROJECT-SCR-02,PR-HEADER,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+PROJECT-SCR-02,PR-RECENT,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+PROJECT-SCR-02,PR-STATUS,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+PROJECT-SCR-02,PR-FOOTER,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-INPUTS,PROJECT-SCR-03,WS-INPUTS,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+PROJECT-SCR-03,PR-HEADER,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+PROJECT-SCR-03,PR-ACTION,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+PROJECT-SCR-03,PR-STATUS,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+PROJECT-SCR-03,PR-FOOTER,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-INPUTS,INPUTS-SCR-01,WS-INPUTS,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+INPUTS-SCR-01,IN-HEADER,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-01,IN-GROUPS,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-01,IN-FORM,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-01,IN-TWIN,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-01,IN-VALID,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-01,IN-ACTIONS,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-INPUTS,INPUTS-SCR-02,WS-INPUTS,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+INPUTS-SCR-02,IN-HEADER,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-02,IN-GROUPS,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-02,IN-FORM,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-02,IN-TWIN,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-02,IN-ACTIONS,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-INPUTS,INPUTS-SCR-03,WS-INPUTS,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+INPUTS-SCR-03,IN-HEADER,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-03,IN-GROUPS,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-03,IN-FORM,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-03,IN-TWIN,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-03,IN-ACTIONS,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-INPUTS,INPUTS-SCR-04,WS-INPUTS,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+INPUTS-SCR-04,IN-HEADER,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-04,IN-GROUPS,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-04,IN-FORM,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-04,IN-TWIN,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-04,IN-ACTIONS,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-INPUTS,INPUTS-SCR-05,WS-INPUTS,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+INPUTS-SCR-05,IN-HEADER,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-05,IN-GROUPS,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-05,IN-FORM,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-05,IN-VALID,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-05,IN-ACTIONS,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-INPUTS,INPUTS-SCR-06,WS-INPUTS,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+INPUTS-SCR-06,IN-HEADER,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-06,IN-VALID,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-06,IN-TWIN,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+INPUTS-SCR-06,IN-ACTIONS,WS-INPUTS,optimized,contains,0.05,designed_target,Экран содержит region.
+PR-HEADER,PR-TXT-TITLE,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-HEADER,PR-BADGE-PROJECT-ID,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-HEADER,PR-BADGE-DIRTY,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-HEADER,PR-BADGE-HEALTH,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-HEADER,PR-TXT-LAST-SAVE,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-ACTION,PR-CARD-NEXT-ACTION,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-ACTION,PR-BTN-NEXT-ACTION,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-ACTION,PR-BTN-GO-INPUTS,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-ACTION,PR-CARD-PIPELINE,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-ACTION,PR-BTN-GO-RING,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-ACTION,PR-BTN-GO-SUITE,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-ACTION,PR-BTN-GO-BASELINE,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-ACTION,PR-BTN-GO-OPT,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-ACTION,PR-BTN-GO-DIAG,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-STATUS,PR-TABLE-BLOCKERS,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-STATUS,PR-TABLE-WARNINGS,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-STATUS,PR-CARD-RING-STATUS,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-STATUS,PR-CARD-SUITE-STATUS,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-STATUS,PR-CARD-BASELINE-STATUS,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-STATUS,PR-CARD-DIAG-STATUS,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-RECENT,PR-TABLE-RECENT-PROJECTS,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-RECENT,PR-BTN-OPEN-PROJECT,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-RECENT,PR-BTN-CREATE-PROJECT,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-RECENT,PR-BTN-IMPORT-PROJECT,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-RUNS,PR-TABLE-RECENT-RUNS,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-RUNS,PR-TABLE-RECENT-BUNDLES,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-RUNS,PR-BTN-OPEN-BUNDLE,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+PR-FOOTER,PR-HELP-ANCHOR,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-HEADER,IN-TXT-TITLE,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-HEADER,IN-BADGE-DIRTY,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-HEADER,IN-BADGE-UNIT-PROFILE,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-HEADER,IN-BADGE-MIRROR-MODE,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-HEADER,IN-STATUS-HANDOFF-READINESS,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-HEADER,IN-TXT-UNSAVED-COUNT,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-GROUPS,IN-TABS-GROUPS,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-GROUPS,IN-TREE-GROUPS,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-GROUPS,IN-BTN-EXPAND-ALL,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-GROUPS,IN-BTN-COLLAPSE-ALL,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-FORM,IN-LIST-GROUP-FIELDS,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-FORM,IN-CARD-GROUP-SUMMARY,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-FORM,IN-BTN-FILTER-REQUIRED,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-FORM,IN-BTN-SHOW-ONLY-INVALID,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-FORM,IN-FORM-FIELD-HOST,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-FORM,IN-BTN-COMPARE-LAST-SAVED,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-TWIN,IN-CANVAS-FRAME-TOP,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-TWIN,IN-CANVAS-SUSP-FRONT,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-TWIN,IN-CANVAS-SUSP-SIDE,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-TWIN,IN-CANVAS-PNEUMO-SCHEME,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-TWIN,IN-CANVAS-CYLINDER-RANGE,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-TWIN,IN-CANVAS-MASS-MAP,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-TWIN,IN-LEGEND-TWIN-MODE,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-TWIN,IN-TXT-TWIN-SOURCE,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-TWIN,IN-TXT-TWIN-WARNING,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-VALID,IN-BANNER-VALIDATION,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-VALID,IN-TABLE-VALIDATION-ISSUES,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-VALID,IN-TABLE-DIRTY-DIFF,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-ACTIONS,IN-BTN-VALIDATE,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-ACTIONS,IN-BTN-SAVE,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-ACTIONS,IN-BTN-APPLY,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-ACTIONS,IN-BTN-REVERT-GROUP,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-ACTIONS,IN-BTN-RESET-DEFAULTS,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-ACTIONS,IN-BTN-BACK-PROJECT,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-ACTIONS,IN-BTN-TO-RING,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-ACTIONS,IN-BTN-TO-SUITE,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-ACTIONS,IN-BTN-OPEN-DIAG,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+IN-ACTIONS,IN-HELP-ANCHOR,WS-INPUTS,optimized,contains,0.03,designed_target,Region contains element.
+ROOT-WS-INPUTS,FIELDGROUP-WS-INPUTS-group_project_meta,WS-INPUTS,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-INPUTS,FIELDGROUP-WS-INPUTS-group_frame_geometry,WS-INPUTS,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-INPUTS,FIELDGROUP-WS-INPUTS-group_masses_inertia,WS-INPUTS,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-INPUTS,FIELDGROUP-WS-INPUTS-group_springs,WS-INPUTS,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-INPUTS,FIELDGROUP-WS-INPUTS-group_cylinders,WS-INPUTS,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-INPUTS,FIELDGROUP-WS-INPUTS-group_pneumatics,WS-INPUTS,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-INPUTS,FIELDGROUP-WS-INPUTS-group_numerics,WS-INPUTS,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-INPUTS,FIELDGROUP-WS-INPUTS-group_flags_modes,WS-INPUTS,optimized,contains,0.07,designed_target,Workspace contains field groups.
+FIELDGROUP-WS-INPUTS-group_project_meta,PI-FLD-PROJECT-NAME,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_project_meta,PI-FLD-PROJECT-CODE,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_project_meta,PI-FLD-WORKSPACE-ROOT,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_project_meta,PI-FLD-VEHICLE-VARIANT,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_project_meta,PI-FLD-UNIT-PROFILE,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_project_meta,PI-FLD-MIRROR-MODE,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_frame_geometry,PI-FLD-WHEELBASE,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_frame_geometry,PI-FLD-FRONT-TRACK,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_frame_geometry,PI-FLD-REAR-TRACK,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_frame_geometry,PI-FLD-FRAME-LENGTH,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_frame_geometry,PI-FLD-FRAME-WIDTH,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_frame_geometry,PI-FLD-FRAME-HEIGHT,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_frame_geometry,PI-FLD-GROUND-CLEARANCE,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_frame_geometry,PI-FLD-CG-X,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_frame_geometry,PI-FLD-CG-Y,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_frame_geometry,PI-FLD-CG-Z,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_masses_inertia,PI-FLD-MASS-TOTAL,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_masses_inertia,PI-FLD-MASS-SPRUNG,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_masses_inertia,PI-FLD-MASS-UNSPRUNG-FRONT,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_masses_inertia,PI-FLD-MASS-UNSPRUNG-REAR,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_masses_inertia,PI-FLD-IXX,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_masses_inertia,PI-FLD-IYY,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_masses_inertia,PI-FLD-IZZ,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_masses_inertia,PI-FLD-PAYLOAD,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_springs,PI-FLD-SPRING-MODE-FR-C1,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_springs,PI-FLD-SPRING-RATE-FR-C1,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_springs,PI-FLD-SPRING-PRELOAD-FR-C1,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_springs,PI-FLD-SPRING-MODE-FR-C2,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_springs,PI-FLD-SPRING-RATE-FR-C2,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_springs,PI-FLD-SPRING-PRELOAD-FR-C2,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_springs,PI-FLD-SPRING-MODE-RR-C1,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_springs,PI-FLD-SPRING-RATE-RR-C1,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_springs,PI-FLD-SPRING-PRELOAD-RR-C1,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_springs,PI-FLD-SPRING-MODE-RR-C2,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_springs,PI-FLD-SPRING-RATE-RR-C2,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_springs,PI-FLD-SPRING-PRELOAD-RR-C2,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_cylinders,PI-FLD-CYL-BORE-FR-C1,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_cylinders,PI-FLD-CYL-STROKE-FR-C1,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_cylinders,PI-FLD-CYL-TOP-Z-FR-C1,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_cylinders,PI-FLD-CYL-TOP-Y-FR-C1,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_cylinders,PI-FLD-CYL-BORE-FR-C2,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_cylinders,PI-FLD-CYL-STROKE-FR-C2,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_cylinders,PI-FLD-CYL-TOP-Z-FR-C2,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_cylinders,PI-FLD-CYL-TOP-Y-FR-C2,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_cylinders,PI-FLD-CYL-BORE-RR-C1,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_cylinders,PI-FLD-CYL-STROKE-RR-C1,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_cylinders,PI-FLD-CYL-TOP-Z-RR-C1,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_cylinders,PI-FLD-CYL-TOP-Y-RR-C1,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_cylinders,PI-FLD-CYL-BORE-RR-C2,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_cylinders,PI-FLD-CYL-STROKE-RR-C2,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_cylinders,PI-FLD-CYL-TOP-Z-RR-C2,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_cylinders,PI-FLD-CYL-TOP-Y-RR-C2,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_pneumatics,PI-FLD-SUPPLY-P-NOM,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_pneumatics,PI-FLD-SUPPLY-P-MAX,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_pneumatics,PI-FLD-RECEIVER-1-V,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_pneumatics,PI-FLD-RECEIVER-2-V,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_pneumatics,PI-FLD-LINE-DIAM,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_pneumatics,PI-FLD-VALVE-C1-CV,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_pneumatics,PI-FLD-VALVE-C2-CV,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_pneumatics,PI-FLD-DEAD-VOLUME,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_numerics,PI-FLD-INTEGRATION-STEP,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_numerics,PI-FLD-SIM-TIME-DEFAULT,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_numerics,PI-FLD-CONTACT-LOSS-LIMIT,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_flags_modes,PI-FLD-DIAG-AUTO-EXIT,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_flags_modes,PI-FLD-DIAG-AUTO-CRASH,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-INPUTS-group_flags_modes,PI-FLD-SYMMETRY-LOCK,WS-INPUTS,optimized,contains,0.02,designed_target,Field group contains field.
+TREE-WS-INPUTS,ROOT-WS-INPUTS,WS-INPUTS,optimized,open_direct,0.35,designed_target,Operational action→feedback route.
+ROOT-WS-INPUTS,IN-TASK-SELECT-GROUP,WS-INPUTS,optimized,task_flow,0.22,designed_target,Operational action→feedback route.
+IN-TASK-SELECT-GROUP,IN-TASK-EDIT-GEOMETRY,WS-INPUTS,optimized,task_flow,0.18,designed_target,Operational action→feedback route.
+IN-TASK-EDIT-GEOMETRY,IN-TASK-SELECT-SPRING-CONFIG,WS-INPUTS,optimized,task_flow,0.16,designed_target,Operational action→feedback route.
+IN-TASK-SELECT-SPRING-CONFIG,IN-CHECK-SPRING-VIS,WS-INPUTS,optimized,checks,0.12,designed_target,Operational action→feedback route.
+IN-CHECK-SPRING-VIS,IN-FEEDBACK-C1C2,WS-INPUTS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+IN-TASK-SELECT-SPRING-CONFIG,IN-TASK-ENABLE-LEVELING,WS-INPUTS,optimized,task_flow,0.16,designed_target,Operational action→feedback route.
+IN-TASK-ENABLE-LEVELING,IN-CHECK-LEVELING-VIS,WS-INPUTS,optimized,checks,0.12,designed_target,Operational action→feedback route.
+IN-CHECK-LEVELING-VIS,IN-FEEDBACK-LEVELING,WS-INPUTS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+IN-TASK-EDIT-SYMMETRY,IN-CHECK-SYMMETRY-VIS,WS-INPUTS,optimized,checks,0.12,designed_target,Operational action→feedback route.
+IN-CHECK-SYMMETRY-VIS,IN-FEEDBACK-SYMMETRY,WS-INPUTS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+IN-TASK-EDIT-GEOMETRY,IN-TASK-EDIT-SYMMETRY,WS-INPUTS,optimized,task_flow,0.14,designed_target,Operational action→feedback route.
+IN-TASK-EDIT-SYMMETRY,IN-TASK-EDIT-CYL-POINTS,WS-INPUTS,optimized,task_flow,0.14,designed_target,Operational action→feedback route.
+IN-TASK-EDIT-CYL-POINTS,IN-TASK-OPEN-TWIN,WS-INPUTS,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+IN-TASK-OPEN-TWIN,IN-CHECK-TWIN-SYNC,WS-INPUTS,optimized,checks,0.12,designed_target,Operational action→feedback route.
+IN-CHECK-TWIN-SYNC,IN-FEEDBACK-TWIN,WS-INPUTS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+IN-TASK-OPEN-TWIN,IN-TASK-VALIDATE,WS-INPUTS,optimized,task_flow,0.18,designed_target,Operational action→feedback route.
+IN-TASK-VALIDATE,IN-CHECK-REQ,WS-INPUTS,optimized,checks,0.12,designed_target,Operational action→feedback route.
+IN-TASK-VALIDATE,IN-CHECK-GEOM,WS-INPUTS,optimized,checks,0.12,designed_target,Operational action→feedback route.
+IN-CHECK-REQ,IN-BLOCK-REQ,WS-INPUTS,optimized,blocked_by,0.22,designed_target,Operational action→feedback route.
+IN-CHECK-GEOM,IN-BLOCK-GEOM,WS-INPUTS,optimized,blocked_by,0.22,designed_target,Operational action→feedback route.
+IN-BLOCK-REQ,IN-LOOP-EDIT-VALIDATE,WS-INPUTS,optimized,loops,0.18,designed_target,Operational action→feedback route.
+IN-BLOCK-GEOM,IN-LOOP-EDIT-VALIDATE,WS-INPUTS,optimized,loops,0.18,designed_target,Operational action→feedback route.
+IN-LOOP-EDIT-VALIDATE,IN-TASK-EDIT-GEOMETRY,WS-INPUTS,optimized,returns_to,0.18,designed_target,Operational action→feedback route.
+IN-TASK-VALIDATE,IN-FEEDBACK-VALID,WS-INPUTS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+IN-FEEDBACK-VALID,IN-TASK-SAVE,WS-INPUTS,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+IN-TASK-SAVE,IN-FEEDBACK-SAVED,WS-INPUTS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+IN-FEEDBACK-SAVED,IN-TASK-HANDOFF,WS-INPUTS,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+IN-TASK-HANDOFF,IN-CHECK-REQ,WS-INPUTS,optimized,checks,0.08,designed_target,Operational action→feedback route.
+IN-TASK-HANDOFF,IN-BLOCK-HANDOFF,WS-INPUTS,optimized,blocked_by,0.18,designed_target,Operational action→feedback route.
+IN-FEEDBACK-TWIN,IN-LOOP-GRAPH-SYNC,WS-INPUTS,optimized,loops,0.12,designed_target,Operational action→feedback route.
+IN-LOOP-GRAPH-SYNC,IN-TASK-SELECT-GROUP,WS-INPUTS,optimized,returns_to,0.12,designed_target,Operational action→feedback route.
+IN-TASK-SELECT-GROUP,IN-GROUPS,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует region.
+IN-TASK-SELECT-GROUP,FIELDGROUP-WS-INPUTS-group_project_meta,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-SELECT-GROUP,FIELDGROUP-WS-INPUTS-group_frame_geometry,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-SELECT-GROUP,FIELDGROUP-WS-INPUTS-group_masses_inertia,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-SELECT-GROUP,FIELDGROUP-WS-INPUTS-group_springs,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-SELECT-GROUP,FIELDGROUP-WS-INPUTS-group_cylinders,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-SELECT-GROUP,FIELDGROUP-WS-INPUTS-group_pneumatics,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-SELECT-GROUP,FIELDGROUP-WS-INPUTS-group_numerics,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-SELECT-GROUP,FIELDGROUP-WS-INPUTS-group_flags_modes,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-EDIT-GEOMETRY,IN-FORM,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует region.
+IN-TASK-EDIT-GEOMETRY,IN-TWIN,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует region.
+IN-TASK-EDIT-GEOMETRY,FIELDGROUP-WS-INPUTS-group_frame_geometry,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-EDIT-GEOMETRY,FIELDGROUP-WS-INPUTS-group_masses_inertia,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-SELECT-SPRING-CONFIG,IN-FORM,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует region.
+IN-TASK-SELECT-SPRING-CONFIG,IN-TWIN,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует region.
+IN-TASK-SELECT-SPRING-CONFIG,FIELDGROUP-WS-INPUTS-group_springs,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-ENABLE-LEVELING,IN-FORM,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует region.
+IN-TASK-ENABLE-LEVELING,IN-TWIN,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует region.
+IN-TASK-ENABLE-LEVELING,IN-VALID,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует region.
+IN-TASK-ENABLE-LEVELING,FIELDGROUP-WS-INPUTS-group_springs,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-ENABLE-LEVELING,FIELDGROUP-WS-INPUTS-group_flags_modes,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-EDIT-SYMMETRY,IN-FORM,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует region.
+IN-TASK-EDIT-SYMMETRY,IN-TWIN,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует region.
+IN-TASK-EDIT-SYMMETRY,FIELDGROUP-WS-INPUTS-group_flags_modes,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-EDIT-SYMMETRY,FIELDGROUP-WS-INPUTS-group_springs,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-EDIT-SYMMETRY,FIELDGROUP-WS-INPUTS-group_cylinders,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-EDIT-CYL-POINTS,IN-FORM,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует region.
+IN-TASK-EDIT-CYL-POINTS,IN-TWIN,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует region.
+IN-TASK-EDIT-CYL-POINTS,FIELDGROUP-WS-INPUTS-group_cylinders,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-OPEN-TWIN,IN-TWIN,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует region.
+IN-TASK-OPEN-TWIN,FIELDGROUP-WS-INPUTS-group_frame_geometry,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-OPEN-TWIN,FIELDGROUP-WS-INPUTS-group_springs,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-OPEN-TWIN,FIELDGROUP-WS-INPUTS-group_cylinders,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-OPEN-TWIN,FIELDGROUP-WS-INPUTS-group_pneumatics,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-VALIDATE,IN-VALID,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует region.
+IN-TASK-VALIDATE,FIELDGROUP-WS-INPUTS-group_project_meta,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-VALIDATE,FIELDGROUP-WS-INPUTS-group_frame_geometry,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-VALIDATE,FIELDGROUP-WS-INPUTS-group_springs,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-VALIDATE,FIELDGROUP-WS-INPUTS-group_cylinders,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-VALIDATE,FIELDGROUP-WS-INPUTS-group_pneumatics,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-VALIDATE,FIELDGROUP-WS-INPUTS-group_numerics,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-VALIDATE,FIELDGROUP-WS-INPUTS-group_flags_modes,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-SAVE,IN-ACTIONS,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует region.
+IN-TASK-SAVE,IN-HEADER,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует region.
+IN-TASK-SAVE,FIELDGROUP-WS-INPUTS-group_project_meta,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-SAVE,FIELDGROUP-WS-INPUTS-group_frame_geometry,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-SAVE,FIELDGROUP-WS-INPUTS-group_springs,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-SAVE,FIELDGROUP-WS-INPUTS-group_cylinders,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+IN-TASK-HANDOFF,IN-ACTIONS,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует region.
+IN-TASK-HANDOFF,FIELDGROUP-WS-INPUTS-group_project_meta,WS-INPUTS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+TREE-WS-RING,CUR-RG-LAUNCH,WS-RING,current,navigates,1.0,evidence_bound,Текущий route и дефицит видимости.
+CUR-RG-LAUNCH,CUR-RG-NOT-DOMINANT,WS-RING,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-RG-NOT-DOMINANT,CUR-RG-TELEMETRY-MIX,WS-RING,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-RG-TELEMETRY-MIX,CUR-RG-SEAM-AMBIG,WS-RING,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-RG-SEAM-AMBIG,CUR-RG-EXPORT-HIDDEN,WS-RING,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+TREE-WS-RING,ROOT-WS-RING,WS-RING,optimized,open_direct,0.35,designed_target,Прямой вход и обязательный shell.
+ROOT-WS-RING,DOCK-TREE-WS-RING,WS-RING,optimized,contains,0.12,designed_target,Прямой вход и обязательный shell.
+ROOT-WS-RING,DOCK-INSPECTOR-WS-RING,WS-RING,optimized,contains,0.12,designed_target,Прямой вход и обязательный shell.
+ROOT-WS-RING,DOCK-STATUS-WS-RING,WS-RING,optimized,contains,0.12,designed_target,Прямой вход и обязательный shell.
+ROOT-WS-RING,RING-SCR-01,WS-RING,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+RING-SCR-01,RG-HEADER,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+RING-SCR-01,RG-LEFT,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+RING-SCR-01,RG-PLAN,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+RING-SCR-01,RG-LONG,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+RING-SCR-01,RG-CROSSFALL,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+RING-SCR-01,RG-FOOTER,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-RING,RING-SCR-02,WS-RING,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+RING-SCR-02,RG-HEADER,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+RING-SCR-02,RG-LEFT,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+RING-SCR-02,RG-PLAN,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+RING-SCR-02,RG-LONG,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+RING-SCR-02,RG-CROSSFALL,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+RING-SCR-02,RG-FOOTER,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-RING,RING-SCR-03,WS-RING,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+RING-SCR-03,RG-HEADER,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+RING-SCR-03,RG-LEFT,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+RING-SCR-03,RG-PLAN,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+RING-SCR-03,RG-LONG,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+RING-SCR-03,RG-CROSSFALL,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+RING-SCR-03,RG-FOOTER,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-RING,RING-SCR-04,WS-RING,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+RING-SCR-04,RG-HEADER,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+RING-SCR-04,RG-LEFT,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+RING-SCR-04,RG-PLAN,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+RING-SCR-04,RG-FOOTER,WS-RING,optimized,contains,0.05,designed_target,Экран содержит region.
+RG-HEADER,RG-FLD-SCENARIO-NAME,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-HEADER,RG-FLD-CLOSURE-POLICY,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-HEADER,RG-FLD-V0,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-HEADER,RG-FLD-DX,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-HEADER,RG-FLD-LAPS,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-HEADER,RG-FLD-SEED,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-HEADER,RG-FLD-ROAD-WIDTH,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-HEADER,RG-BTN-GENERATE-PREVIEW,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-LEFT,RG-SEGMENT-LIST,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-LEFT,RG-BTN-ADD-SEGMENT,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-LEFT,RG-BTN-DUP-SEGMENT,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-LEFT,RG-BTN-DELETE-SEGMENT,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-LEFT,RG-BTN-INSERT-BEFORE,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-LEFT,RG-BTN-INSERT-AFTER,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-LEFT,RG-BTN-MOVE-UP,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-LEFT,RG-BTN-MOVE-DOWN,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-LEFT,RG-SEAM-BADGE,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-LEFT,RING-MESSAGE-BAR,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-PLAN,RG-PLAN-VIEW,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-PLAN,RG-PLAN-LEGEND,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-LONG,RG-LONG-PROFILE-VIEW,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-LONG,RG-LONG-STATUS,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-CROSSFALL,RG-CROSSFALL-VIEW,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-CROSSFALL,RG-SEAM-DIAGNOSTICS,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-FOOTER,RG-BTN-CHECK-SEAM,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-FOOTER,RG-BTN-EXPORT-SCENARIO,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-FOOTER,RG-BTN-ADD-TO-SUITE,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-FOOTER,RG-SUITE-LINK-SUMMARY,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-FOOTER,RG-EXPORT-ARTIFACTS,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-FOOTER,RG-VALIDATION-SUMMARY,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-FOOTER,RG-HELP-ANCHOR,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-FOOTER,RING-VALIDATION-STRIP,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+RG-FOOTER,RING-UNITS-LEGEND,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,RG-INS-SEGMENT-CARD,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,RG-INS-SEAM-CARD,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,RG-INS-HELP-CARD,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-SCENARIO-NAME,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-CLOSURE-POLICY,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-V0,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-DX,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-LAPS,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-SEED,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-ROAD-WIDTH,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-START-HEIGHT,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-SHOV-THRESHOLD,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-SEGMENT-ID,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-SEGMENT-LABEL,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-SEGMENT-ENABLED,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-SEGMENT-LENGTH,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-TURN-DIRECTION,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-TURN-RADIUS,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-ARC-ANGLE,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-END-HEIGHT,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-CROSSFALL,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-SURFACE-TYPE,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-SURFACE-CLASS,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-SINE-AMPLITUDE,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-SINE-WAVELENGTH,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-PHASE-RIGHT,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-RANDOM-PHASES,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-TARGET-SPEED,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+GLOBAL-RIGHT-INSPECTOR,UI-RG-FLD-PASSAGE-MODE,WS-RING,optimized,contains,0.03,designed_target,Region contains element.
+ROOT-WS-RING,FIELDGROUP-WS-RING-scope_global,WS-RING,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-RING,FIELDGROUP-WS-RING-scope_segment0,WS-RING,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-RING,FIELDGROUP-WS-RING-scope_segment,WS-RING,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-RING,FIELDGROUP-WS-RING-scope_last_segment,WS-RING,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-RING,FIELDGROUP-WS-RING-scope_export,WS-RING,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-RING,FIELDGROUP-WS-RING-scope_suite_handoff,WS-RING,optimized,contains,0.07,designed_target,Workspace contains field groups.
+FIELDGROUP-WS-RING-scope_global,RG-FLD-SCENARIO-NAME,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_global,RG-FLD-CLOSURE-POLICY,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_global,RG-FLD-V0,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_global,RG-FLD-DX,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_global,RG-FLD-LAPS,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_global,RG-FLD-SEED,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_global,RG-FLD-ROAD-WIDTH,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment0,RG-FLD-START-HEIGHT,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_global,RG-FLD-SHOV-THRESHOLD,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment,RG-FLD-SEGMENT-ID,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment,RG-FLD-SEGMENT-LABEL,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment,RG-FLD-SEGMENT-ENABLED,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment,RG-FLD-SEGMENT-LENGTH,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment,RG-FLD-TURN-DIRECTION,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment,RG-FLD-TURN-RADIUS,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment,RG-FLD-ARC-ANGLE,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment,RG-FLD-END-HEIGHT,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment,RG-FLD-CROSSFALL,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment,RG-FLD-SURFACE-TYPE,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment,RG-FLD-SURFACE-CLASS,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment,RG-FLD-SINE-AMPLITUDE,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment,RG-FLD-SINE-WAVELENGTH,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment,RG-FLD-PHASE-RIGHT,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment,RG-FLD-RANDOM-PHASES,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment,RG-FLD-TARGET-SPEED,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment,RG-FLD-PASSAGE-MODE,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment,RG-FLD-NOTE,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_last_segment,RG-FLD-AUTO-CLOSE,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment,RG-FLD-START-STATE-DERIVED,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment,RG-FLD-LEFT-RUT-HEIGHT,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_segment,RG-FLD-RIGHT-RUT-HEIGHT,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_global,RG-FLD-SEAM-DELTA,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_global,RG-FLD-SEAM-STATUS,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_export,RG-FLD-EXPORT-ROAD-CSV,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_export,RG-FLD-EXPORT-SCENARIO-JSON,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_export,RG-FLD-EXPORT-META-ROAD,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_suite_handoff,RG-FLD-SUITE-LINK-MODE,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_suite_handoff,RG-FLD-SUITE-TARGET-TEST-ID,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_suite_handoff,RG-FLD-SUITE-STAGE,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_suite_handoff,RG-FLD-SUITE-DT,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_suite_handoff,RG-FLD-SUITE-T-END,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_suite_handoff,RG-FLD-SUITE-TYPE,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_export,RG-FLD-VALIDATION-LEVEL,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-RING-scope_export,RG-FLD-DIAGNOSTIC-REPORT,WS-RING,optimized,contains,0.02,designed_target,Field group contains field.
+TREE-WS-RING,ROOT-WS-RING,WS-RING,optimized,open_direct,0.35,designed_target,Operational action→feedback route.
+ROOT-WS-RING,RG-TASK-CREATE,WS-RING,optimized,task_flow,0.22,designed_target,Operational action→feedback route.
+RG-TASK-CREATE,RG-CHECK-EMPTY,WS-RING,optimized,checks,0.12,designed_target,Operational action→feedback route.
+RG-CHECK-EMPTY,RG-BLOCK-EMPTY,WS-RING,optimized,blocked_by,0.22,designed_target,Operational action→feedback route.
+RG-BLOCK-EMPTY,RG-TASK-CREATE,WS-RING,optimized,returns_to,0.18,designed_target,Operational action→feedback route.
+RG-TASK-CREATE,RG-TASK-EDIT-GLOBAL,WS-RING,optimized,task_flow,0.14,designed_target,Operational action→feedback route.
+RG-TASK-EDIT-GLOBAL,RG-TASK-SELECT-SEGMENT,WS-RING,optimized,task_flow,0.14,designed_target,Operational action→feedback route.
+RG-TASK-SELECT-SEGMENT,RG-FEEDBACK-SELECTION-SYNC,WS-RING,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+RG-TASK-SELECT-SEGMENT,RG-TASK-EDIT-SEG0,WS-RING,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+RG-TASK-EDIT-SEG0,RG-TASK-EDIT-SEGMENT,WS-RING,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+RG-TASK-EDIT-SEGMENT,RG-TASK-SET-TURN,WS-RING,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+RG-TASK-SET-TURN,RG-CHECK-TURN,WS-RING,optimized,checks,0.12,designed_target,Operational action→feedback route.
+RG-CHECK-TURN,RG-FEEDBACK-TURN,WS-RING,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+RG-TASK-SET-TURN,RG-TASK-SET-LONG,WS-RING,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+RG-TASK-SET-LONG,RG-CHECK-LONG,WS-RING,optimized,checks,0.12,designed_target,Operational action→feedback route.
+RG-TASK-SET-LONG,RG-TASK-SET-CROSSFALL,WS-RING,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+RG-TASK-SET-CROSSFALL,RG-CHECK-CROSSFALL,WS-RING,optimized,checks,0.12,designed_target,Operational action→feedback route.
+RG-TASK-SET-CROSSFALL,RG-FEEDBACK-PLAN-PROFILE,WS-RING,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+RG-FEEDBACK-PLAN-PROFILE,RG-TASK-CHECK-SEAM,WS-RING,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+RG-TASK-CHECK-SEAM,RG-CHECK-SEAM,WS-RING,optimized,checks,0.12,designed_target,Operational action→feedback route.
+RG-CHECK-SEAM,RG-BLOCK-SEAM,WS-RING,optimized,blocked_by,0.22,designed_target,Operational action→feedback route.
+RG-CHECK-SEAM,RG-FEEDBACK-SEAM,WS-RING,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+RG-FEEDBACK-SEAM,RG-FEEDBACK-AUTOCLOSE,WS-RING,optimized,feedback,0.06,designed_target,Operational action→feedback route.
+RG-BLOCK-SEAM,RG-LOOP-SEAM-FIX,WS-RING,optimized,loops,0.18,designed_target,Operational action→feedback route.
+RG-LOOP-SEAM-FIX,RG-TASK-EDIT-SEG0,WS-RING,optimized,returns_to,0.18,designed_target,Operational action→feedback route.
+RG-FEEDBACK-SEAM,RG-TASK-GENERATE-PREVIEW,WS-RING,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+RG-TASK-GENERATE-PREVIEW,RG-TASK-EXPORT,WS-RING,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+RG-TASK-EXPORT,RG-CHECK-EXPORT,WS-RING,optimized,checks,0.12,designed_target,Operational action→feedback route.
+RG-CHECK-EXPORT,RG-BLOCK-EXPORT-STALE,WS-RING,optimized,blocked_by,0.22,designed_target,Operational action→feedback route.
+RG-CHECK-EXPORT,RG-FEEDBACK-EXPORT,WS-RING,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+RG-BLOCK-EXPORT-STALE,RG-LOOP-EXPORT-REVALIDATE,WS-RING,optimized,loops,0.18,designed_target,Operational action→feedback route.
+RG-LOOP-EXPORT-REVALIDATE,RG-TASK-GENERATE-PREVIEW,WS-RING,optimized,returns_to,0.18,designed_target,Operational action→feedback route.
+RG-FEEDBACK-EXPORT,RG-TASK-HANDOFF-SUITE,WS-RING,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+RG-TASK-HANDOFF-SUITE,RG-FEEDBACK-EXPORT,WS-RING,optimized,feedback,0.06,designed_target,Operational action→feedback route.
+RG-TASK-CREATE,RG-HEADER,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-CREATE,RG-LEFT,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-CREATE,FIELDGROUP-WS-RING-scope_global,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-EDIT-GLOBAL,RG-HEADER,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-EDIT-GLOBAL,FIELDGROUP-WS-RING-scope_global,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-SELECT-SEGMENT,RG-LEFT,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-SELECT-SEGMENT,RG-PLAN,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-SELECT-SEGMENT,RG-LONG,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-SELECT-SEGMENT,RG-CROSSFALL,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-SELECT-SEGMENT,FIELDGROUP-WS-RING-scope_segment0,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-SELECT-SEGMENT,FIELDGROUP-WS-RING-scope_segment,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-SELECT-SEGMENT,FIELDGROUP-WS-RING-scope_last_segment,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-EDIT-SEG0,RG-LEFT,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-EDIT-SEG0,RG-PLAN,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-EDIT-SEG0,RG-LONG,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-EDIT-SEG0,RG-CROSSFALL,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-EDIT-SEG0,FIELDGROUP-WS-RING-scope_segment0,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-EDIT-SEGMENT,RG-LEFT,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-EDIT-SEGMENT,RG-PLAN,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-EDIT-SEGMENT,RG-LONG,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-EDIT-SEGMENT,RG-CROSSFALL,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-EDIT-SEGMENT,FIELDGROUP-WS-RING-scope_segment,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-EDIT-SEGMENT,FIELDGROUP-WS-RING-scope_last_segment,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-SET-TURN,RG-LEFT,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-SET-TURN,RG-PLAN,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-SET-TURN,FIELDGROUP-WS-RING-scope_segment0,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-SET-TURN,FIELDGROUP-WS-RING-scope_segment,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-SET-TURN,FIELDGROUP-WS-RING-scope_last_segment,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-SET-LONG,RG-LONG,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-SET-LONG,FIELDGROUP-WS-RING-scope_segment0,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-SET-LONG,FIELDGROUP-WS-RING-scope_segment,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-SET-LONG,FIELDGROUP-WS-RING-scope_last_segment,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-SET-CROSSFALL,RG-CROSSFALL,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-SET-CROSSFALL,FIELDGROUP-WS-RING-scope_segment0,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-SET-CROSSFALL,FIELDGROUP-WS-RING-scope_segment,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-SET-CROSSFALL,FIELDGROUP-WS-RING-scope_last_segment,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-CHECK-SEAM,RG-FOOTER,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-CHECK-SEAM,RG-PLAN,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-CHECK-SEAM,RG-LONG,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-CHECK-SEAM,FIELDGROUP-WS-RING-scope_export,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-GENERATE-PREVIEW,RG-PLAN,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-GENERATE-PREVIEW,RG-LONG,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-GENERATE-PREVIEW,RG-CROSSFALL,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-GENERATE-PREVIEW,RG-FOOTER,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-GENERATE-PREVIEW,FIELDGROUP-WS-RING-scope_segment0,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-GENERATE-PREVIEW,FIELDGROUP-WS-RING-scope_segment,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-GENERATE-PREVIEW,FIELDGROUP-WS-RING-scope_last_segment,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-EXPORT,RG-FOOTER,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-EXPORT,FIELDGROUP-WS-RING-scope_export,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+RG-TASK-HANDOFF-SUITE,RG-FOOTER,WS-RING,optimized,uses,0.03,designed_target,Задача использует region.
+RG-TASK-HANDOFF-SUITE,FIELDGROUP-WS-RING-scope_suite_handoff,WS-RING,optimized,uses,0.03,designed_target,Задача использует группу полей.
+TREE-WS-OPTIMIZATION,CUR-OPT-HOME-SPLIT,WS-OPTIMIZATION,current,navigates,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-OPT-HOME-SPLIT,CUR-OPT-ENTRY,WS-OPTIMIZATION,current,task_flow,1.0,evidence_bound,Текущий route и дефицит видимости.
+CUR-OPT-ENTRY,CUR-OPT-MODE-CHOOSER,WS-OPTIMIZATION,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-OPT-MODE-CHOOSER,CUR-OPT-OBJECTIVE-DRIFT,WS-OPTIMIZATION,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-OPT-OBJECTIVE-DRIFT,CUR-OPT-UNDERFILL-HIDDEN,WS-OPTIMIZATION,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+TREE-WS-OPTIMIZATION,ROOT-WS-OPTIMIZATION,WS-OPTIMIZATION,optimized,open_direct,0.35,designed_target,Прямой вход и обязательный shell.
+ROOT-WS-OPTIMIZATION,DOCK-TREE-WS-OPTIMIZATION,WS-OPTIMIZATION,optimized,contains,0.12,designed_target,Прямой вход и обязательный shell.
+ROOT-WS-OPTIMIZATION,DOCK-INSPECTOR-WS-OPTIMIZATION,WS-OPTIMIZATION,optimized,contains,0.12,designed_target,Прямой вход и обязательный shell.
+ROOT-WS-OPTIMIZATION,DOCK-STATUS-WS-OPTIMIZATION,WS-OPTIMIZATION,optimized,contains,0.12,designed_target,Прямой вход и обязательный shell.
+ROOT-WS-OPTIMIZATION,OPT-SCR-01,WS-OPTIMIZATION,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+OPT-SCR-01,OT-HEADER,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-01,OT-CONTRACT,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-01,OT-MODE,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-01,OT-HISTORY,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-01,OT-HANDOFF,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-OPTIMIZATION,OPT-SCR-02,WS-OPTIMIZATION,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+OPT-SCR-02,OT-HEADER,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-02,OT-CONTRACT,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-02,OT-MODE,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-OPTIMIZATION,OPT-SCR-03,WS-OPTIMIZATION,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+OPT-SCR-03,OT-HEADER,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-03,OT-CONTRACT,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-03,OT-MODE,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-03,OT-STAGE,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-OPTIMIZATION,OPT-SCR-04,WS-OPTIMIZATION,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+OPT-SCR-04,OT-HEADER,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-04,OT-MODE,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-04,OT-STAGE,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-04,OT-PROGRESS,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-04,OT-HISTORY,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-OPTIMIZATION,OPT-SCR-05,WS-OPTIMIZATION,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+OPT-SCR-05,OT-HEADER,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-05,OT-CONTRACT,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-05,OT-MODE,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-05,OT-DIST,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-OPTIMIZATION,OPT-SCR-06,WS-OPTIMIZATION,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+OPT-SCR-06,OT-HEADER,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-06,OT-MODE,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-06,OT-DIST,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-06,OT-PROGRESS,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-06,OT-HISTORY,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-OPTIMIZATION,OPT-SCR-07,WS-OPTIMIZATION,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+OPT-SCR-07,OT-HEADER,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-07,OT-CONTRACT,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-07,OT-HISTORY,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-07,OT-HANDOFF,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-OPTIMIZATION,OPT-SCR-08,WS-OPTIMIZATION,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+OPT-SCR-08,OT-HEADER,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-08,OT-HANDOFF,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OPT-SCR-08,OT-HISTORY,WS-OPTIMIZATION,optimized,contains,0.05,designed_target,Экран содержит region.
+OT-HEADER,OPT-TXT-TITLE,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HEADER,OPT-BADGE-BASELINE-ID,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HEADER,OPT-BADGE-OBJECTIVE-HASH,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HEADER,OPT-TXT-MODE,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HEADER,OPT-BTN-OPEN-BASELINE,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HEADER,OPT-BTN-OPEN-ANALYSIS,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HEADER,OPT-BTN-OPEN-ANIMATOR,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-CONTRACT,OPT-PATH-BASELINE-CONTRACT,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-CONTRACT,OPT-BADGE-BASELINE-SOURCE,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-CONTRACT,OPT-BADGE-SNAPSHOT-HASH,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-CONTRACT,OPT-BADGE-OBJECTIVE-VERSION,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-CONTRACT,OPT-TXT-OBJECTIVE-STACK,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-CONTRACT,OPT-TXT-HARD-GATE,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-CONTRACT,OPT-BADGE-CONTRACT-DRIFT,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-CONTRACT,OPT-BTN-SHOW-BASELINE-CONTRACT,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-CONTRACT,OPT-BTN-SHOW-OBJECTIVE-CONTRACT,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-CONTRACT,OPT-CARD-OBJECTIVE-ORDER,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-CONTRACT,OPT-CARD-HARD-GATE,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-CONTRACT,OPT-CARD-HASH-PAYLOAD,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-MODE,OPT-RAD-STAGE,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-MODE,OPT-RAD-DIST,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-MODE,OPT-BADGE-READY,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-MODE,OPT-TXT-MODE-HELP,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-MODE,OPT-BTN-LAUNCH-STAGE,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-MODE,OPT-BTN-LAUNCH-DIST,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-MODE,OPT-BTN-STOP,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-MODE,OPT-BTN-CANCEL,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-MODE,OPT-BTN-OPEN-DIAG,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-MODE,OPT-BTN-OPEN-HISTORY,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-STAGE,OPT-FLD-MINUTES,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-STAGE,OPT-FLD-JOBS,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-STAGE,OPT-FLD-WARMSTART,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-STAGE,OPT-FLD-SURR-SAMPLES,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-STAGE,OPT-FLD-SURR-TOPK,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-STAGE,OPT-FLD-SEED-CAND,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-STAGE,OPT-FLD-SEED-COND,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-STAGE,OPT-CHK-SORT-COST,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-STAGE,OPT-FLD-STOP-PEN-1,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-STAGE,OPT-FLD-STOP-PEN-2,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-STAGE,OPT-FLD-EPS-REL,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-STAGE,OPT-CHK-ADAPT-EPS,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-STAGE,OPT-FLD-POLICY-MODE,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-STAGE,OPT-CARD-STAGE-BUDGETS,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-STAGE,OPT-CARD-STAGE-PRIORITY,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-DIST,OPT-FLD-BACKEND,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-DIST,OPT-FLD-BUDGET,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-DIST,OPT-FLD-MAX-INFLIGHT,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-DIST,OPT-FLD-Q,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-DIST,OPT-FLD-DEVICE,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-DIST,OPT-FLD-DB-ENGINE,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-DIST,OPT-CHK-RESUME,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-DIST,OPT-FLD-RUN-ID,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-DIST,OPT-FLD-STALE-TTL,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-DIST,OPT-CHK-HV-LOG,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-DIST,OPT-FLD-EXPORT-EVERY,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-DIST,OPT-CARD-DASK,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-DIST,OPT-CARD-RAY,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-DIST,OPT-CARD-BOTORCH,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-PROGRESS,OPT-BAR-PROGRESS,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-PROGRESS,OPT-BADGE-STAGE,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-PROGRESS,OPT-TXT-ELAPSED,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-PROGRESS,OPT-TXT-STAGE-ROWS,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-PROGRESS,OPT-TXT-COMBINED-ROWS,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-PROGRESS,OPT-BADGE-UNDERFILL,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-PROGRESS,OPT-CARD-GATE-PREVIEW,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-PROGRESS,OPT-CARD-FOCUS-PREVIEW,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-PROGRESS,OPT-CARD-PROMO-PREVIEW,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-PROGRESS,OPT-PATH-RUN-DIR,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-PROGRESS,OPT-BTN-OPEN-RUN-DIR,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-PROGRESS,OPT-BTN-OPEN-LOGS,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HISTORY,OPT-TBL-HISTORY,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HISTORY,OPT-FLD-HISTORY-FILTER,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HISTORY,OPT-BTN-COMPARE,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HISTORY,OPT-CARD-RUN-CONTRACT,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HISTORY,OPT-CARD-RUN-METRICS,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HISTORY,OPT-BADGE-CONTRACT-MISMATCH,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HISTORY,OPT-BADGE-HARD-GATE-MISMATCH,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HISTORY,OPT-BTN-OPEN-RESULTS,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HISTORY,OPT-BTN-MARK-ANALYSIS,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HANDOFF,OPT-BADGE-ANALYSIS-READY,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HANDOFF,OPT-BADGE-ANIMATOR-READY,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HANDOFF,OPT-BADGE-DIAG-READY,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HANDOFF,OPT-TXT-SELECTED-RUN,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HANDOFF,OPT-BTN-OPEN-ANALYSIS-SELECTED,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HANDOFF,OPT-BTN-OPEN-ANIMATOR-SELECTED,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HANDOFF,OPT-BTN-COLLECT-DIAG,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HANDOFF,OPT-CARD-PAYLOAD,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HANDOFF,OPT-BTN-SHOW-LATEST-OPT,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+OT-HANDOFF,OPT-BTN-SHOW-SELECTED-CONTRACT,WS-OPTIMIZATION,optimized,contains,0.03,designed_target,Region contains element.
+ROOT-WS-OPTIMIZATION,FIELDGROUP-WS-OPTIMIZATION-scope_global,WS-OPTIMIZATION,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-OPTIMIZATION,FIELDGROUP-WS-OPTIMIZATION-scope_objective_contract,WS-OPTIMIZATION,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-OPTIMIZATION,FIELDGROUP-WS-OPTIMIZATION-scope_launch,WS-OPTIMIZATION,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-OPTIMIZATION,FIELDGROUP-WS-OPTIMIZATION-scope_stage_runner,WS-OPTIMIZATION,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-OPTIMIZATION,FIELDGROUP-WS-OPTIMIZATION-scope_stage_policy,WS-OPTIMIZATION,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-OPTIMIZATION,FIELDGROUP-WS-OPTIMIZATION-scope_distributed,WS-OPTIMIZATION,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-OPTIMIZATION,FIELDGROUP-WS-OPTIMIZATION-scope_distributed_advanced,WS-OPTIMIZATION,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-OPTIMIZATION,FIELDGROUP-WS-OPTIMIZATION-scope_run_progress,WS-OPTIMIZATION,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-OPTIMIZATION,FIELDGROUP-WS-OPTIMIZATION-scope_history,WS-OPTIMIZATION,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-OPTIMIZATION,FIELDGROUP-WS-OPTIMIZATION-scope_handoff,WS-OPTIMIZATION,optimized,contains,0.07,designed_target,Workspace contains field groups.
+FIELDGROUP-WS-OPTIMIZATION-scope_global,OPT-FLD-BASELINE-ID,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_global,OPT-FLD-BASELINE-HASH,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_global,OPT-FLD-BASELINE-SOURCE-KIND,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_global,OPT-FLD-SNAPSHOT-HASH,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_objective_contract,OPT-FLD-OBJECTIVE-CONTRACT-ID,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_objective_contract,OPT-FLD-OBJECTIVE-CONTRACT-HASH,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_objective_contract,OPT-FLD-OBJECTIVE-STACK,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_objective_contract,OPT-FLD-HARD-GATE-KEY,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_objective_contract,OPT-FLD-HARD-GATE-TOL,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_global,OPT-FLD-ACTIVE-MODE,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_global,OPT-FLD-READY-STATE,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_launch,OPT-FLD-RUN-NAME,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_launch,OPT-FLD-RUN-DIR,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_stage_runner,OPT-FLD-OPT-MINUTES,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_stage_runner,OPT-FLD-JOBS,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_stage_runner,OPT-FLD-WARMSTART,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_stage_runner,OPT-FLD-SURR-SAMPLES,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_stage_runner,OPT-FLD-SURR-TOPK,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_stage_runner,OPT-FLD-SEED-CANDIDATES,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_stage_runner,OPT-FLD-SEED-CONDITIONS,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_stage_runner,OPT-FLD-SORT-TESTS,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_stage_runner,OPT-FLD-STOP-PEN-1,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_stage_runner,OPT-FLD-STOP-PEN-2,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_stage_runner,OPT-FLD-INFLUENCE-EPS,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_stage_runner,OPT-FLD-ADAPTIVE-EPS,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_stage_runner,OPT-FLD-STAGE-POLICY,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_stage_policy,OPT-FLD-STAGE0-BUDGET,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_stage_policy,OPT-FLD-STAGE1-BUDGET,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_stage_policy,OPT-FLD-STAGE2-BUDGET,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_distributed,OPT-FLD-BACKEND,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_distributed,OPT-FLD-DIST-BUDGET,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_distributed,OPT-FLD-MAX-INFLIGHT,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_distributed,OPT-FLD-Q,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_distributed,OPT-FLD-DEVICE,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_distributed,OPT-FLD-DB-ENGINE,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_distributed,OPT-FLD-RESUME,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_distributed,OPT-FLD-RUN-ID-DIST,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_distributed,OPT-FLD-STALE-TTL,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_distributed,OPT-FLD-HV-LOG,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_distributed,OPT-FLD-EXPORT-EVERY,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_distributed_advanced,OPT-FLD-N-INIT,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_distributed_advanced,OPT-FLD-MIN-FEASIBLE,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_distributed_advanced,OPT-FLD-BOTORCH-RESTARTS,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_distributed_advanced,OPT-FLD-BOTORCH-RAW-SAMPLES,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_distributed_advanced,OPT-FLD-BOTORCH-MAXITER,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_distributed_advanced,OPT-FLD-BOTORCH-REF-MARGIN,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_run_progress,OPT-FLD-PROGRESS,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_run_progress,OPT-FLD-CURRENT-STAGE,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_run_progress,OPT-FLD-ELAPSED,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_run_progress,OPT-FLD-STAGE-ROWS,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_run_progress,OPT-FLD-COMBINED-ROWS,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_run_progress,OPT-FLD-UNDERFILL,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_run_progress,OPT-FLD-GATE-PREVIEW,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_run_progress,OPT-FLD-PROMO-PREVIEW,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_history,OPT-FLD-SELECTED-RUN,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_history,OPT-FLD-SELECTED-RUN-MODE,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_history,OPT-FLD-SELECTED-OBJECTIVE-HASH,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_history,OPT-FLD-HARD-GATE-MISMATCH,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_history,OPT-FLD-CONTRACT-MISMATCH,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_handoff,OPT-FLD-ANALYSIS-READY,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_handoff,OPT-FLD-ANIMATOR-READY,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-OPTIMIZATION-scope_handoff,OPT-FLD-DIAG-READY,WS-OPTIMIZATION,optimized,contains,0.02,designed_target,Field group contains field.
+TREE-WS-OPTIMIZATION,ROOT-WS-OPTIMIZATION,WS-OPTIMIZATION,optimized,open_direct,0.35,designed_target,Operational action→feedback route.
+ROOT-WS-OPTIMIZATION,OPT-TASK-REVIEW-BASELINE,WS-OPTIMIZATION,optimized,task_flow,0.18,designed_target,Operational action→feedback route.
+OPT-TASK-REVIEW-BASELINE,OPT-CHECK-BASELINE,WS-OPTIMIZATION,optimized,checks,0.12,designed_target,Operational action→feedback route.
+OPT-CHECK-BASELINE,OPT-BLOCK-BASELINE,WS-OPTIMIZATION,optimized,blocked_by,0.22,designed_target,Operational action→feedback route.
+OPT-TASK-REVIEW-BASELINE,OPT-TASK-REVIEW-CONTRACT,WS-OPTIMIZATION,optimized,task_flow,0.14,designed_target,Operational action→feedback route.
+OPT-TASK-REVIEW-CONTRACT,OPT-CHECK-CONTRACT,WS-OPTIMIZATION,optimized,checks,0.12,designed_target,Operational action→feedback route.
+OPT-TASK-REVIEW-CONTRACT,OPT-FEEDBACK-CONTRACT,WS-OPTIMIZATION,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+OPT-TASK-REVIEW-CONTRACT,OPT-TASK-SELECT-MODE,WS-OPTIMIZATION,optimized,task_flow,0.14,designed_target,Operational action→feedback route.
+OPT-TASK-SELECT-MODE,OPT-CHECK-MODE,WS-OPTIMIZATION,optimized,checks,0.1,designed_target,Operational action→feedback route.
+OPT-CHECK-MODE,OPT-FEEDBACK-MODE,WS-OPTIMIZATION,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+OPT-FEEDBACK-MODE,OPT-TASK-CONFIG-STAGE,WS-OPTIMIZATION,optimized,task_flow,0.1,designed_target,Operational action→feedback route.
+OPT-FEEDBACK-MODE,OPT-TASK-CONFIG-DIST,WS-OPTIMIZATION,optimized,task_flow,0.1,designed_target,Operational action→feedback route.
+OPT-TASK-CONFIG-STAGE,OPT-CHECK-SUITE,WS-OPTIMIZATION,optimized,checks,0.12,designed_target,Operational action→feedback route.
+OPT-TASK-CONFIG-DIST,OPT-CHECK-SUITE,WS-OPTIMIZATION,optimized,checks,0.12,designed_target,Operational action→feedback route.
+OPT-CHECK-SUITE,OPT-BLOCK-SUITE,WS-OPTIMIZATION,optimized,blocked_by,0.22,designed_target,Operational action→feedback route.
+OPT-BLOCK-BASELINE,OPT-LOOP-CONTRACT-TUNE,WS-OPTIMIZATION,optimized,loops,0.18,designed_target,Operational action→feedback route.
+OPT-BLOCK-SUITE,OPT-LOOP-CONTRACT-TUNE,WS-OPTIMIZATION,optimized,loops,0.18,designed_target,Operational action→feedback route.
+OPT-BLOCK-CONTRACT,OPT-LOOP-CONTRACT-TUNE,WS-OPTIMIZATION,optimized,loops,0.18,designed_target,Operational action→feedback route.
+OPT-LOOP-CONTRACT-TUNE,OPT-TASK-REVIEW-BASELINE,WS-OPTIMIZATION,optimized,returns_to,0.18,designed_target,Operational action→feedback route.
+OPT-TASK-CONFIG-STAGE,OPT-TASK-LAUNCH,WS-OPTIMIZATION,optimized,task_flow,0.14,designed_target,Operational action→feedback route.
+OPT-TASK-CONFIG-DIST,OPT-TASK-LAUNCH,WS-OPTIMIZATION,optimized,task_flow,0.14,designed_target,Operational action→feedback route.
+OPT-TASK-LAUNCH,OPT-CHECK-RUN-ID,WS-OPTIMIZATION,optimized,checks,0.1,designed_target,Operational action→feedback route.
+OPT-TASK-LAUNCH,OPT-FEEDBACK-STAGE,WS-OPTIMIZATION,optimized,feedback,0.1,designed_target,Operational action→feedback route.
+OPT-FEEDBACK-STAGE,OPT-TASK-MONITOR,WS-OPTIMIZATION,optimized,task_flow,0.1,designed_target,Operational action→feedback route.
+OPT-TASK-MONITOR,OPT-TASK-READ-UNDERFILL,WS-OPTIMIZATION,optimized,task_flow,0.1,designed_target,Operational action→feedback route.
+OPT-TASK-READ-UNDERFILL,OPT-FEEDBACK-UNDERFILL,WS-OPTIMIZATION,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+OPT-TASK-MONITOR,OPT-TASK-READ-PROMOTION,WS-OPTIMIZATION,optimized,task_flow,0.1,designed_target,Operational action→feedback route.
+OPT-TASK-READ-PROMOTION,OPT-FEEDBACK-PROMOTION,WS-OPTIMIZATION,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+OPT-FEEDBACK-UNDERFILL,OPT-BLOCK-UNDERFILL,WS-OPTIMIZATION,optimized,blocked_by,0.18,designed_target,Operational action→feedback route.
+OPT-BLOCK-UNDERFILL,OPT-LOOP-RUN-MONITOR,WS-OPTIMIZATION,optimized,loops,0.12,designed_target,Operational action→feedback route.
+OPT-TASK-MONITOR,OPT-TASK-HISTORY,WS-OPTIMIZATION,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+OPT-TASK-HISTORY,OPT-CHECK-HISTORY,WS-OPTIMIZATION,optimized,checks,0.1,designed_target,Operational action→feedback route.
+OPT-CHECK-HISTORY,OPT-BLOCK-HISTORY,WS-OPTIMIZATION,optimized,blocked_by,0.18,designed_target,Operational action→feedback route.
+OPT-CHECK-HISTORY,OPT-FEEDBACK-HISTORY,WS-OPTIMIZATION,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+OPT-FEEDBACK-HISTORY,OPT-TASK-OPEN-RESULTS,WS-OPTIMIZATION,optimized,task_flow,0.1,designed_target,Operational action→feedback route.
+OPT-TASK-OPEN-RESULTS,OPT-LOOP-HISTORY-COMPARE,WS-OPTIMIZATION,optimized,loops,0.12,designed_target,Operational action→feedback route.
+OPT-TASK-MONITOR,OPT-TASK-STOP-RESUME,WS-OPTIMIZATION,optimized,task_flow,0.1,designed_target,Operational action→feedback route.
+OPT-TASK-STOP-RESUME,OPT-LOOP-RUN-MONITOR,WS-OPTIMIZATION,optimized,loops,0.12,designed_target,Operational action→feedback route.
+OPT-TASK-REVIEW-BASELINE,OT-CONTRACT,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует region.
+OPT-TASK-REVIEW-BASELINE,OT-HEADER,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует region.
+OPT-TASK-REVIEW-BASELINE,FIELDGROUP-WS-OPTIMIZATION-scope_global,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-REVIEW-CONTRACT,OT-CONTRACT,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует region.
+OPT-TASK-REVIEW-CONTRACT,FIELDGROUP-WS-OPTIMIZATION-scope_objective_contract,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-REVIEW-CONTRACT,FIELDGROUP-WS-OPTIMIZATION-scope_global,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-SELECT-MODE,OT-MODE,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует region.
+OPT-TASK-SELECT-MODE,FIELDGROUP-WS-OPTIMIZATION-scope_launch,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-SELECT-MODE,FIELDGROUP-WS-OPTIMIZATION-scope_global,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-CONFIG-STAGE,OT-STAGE,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует region.
+OPT-TASK-CONFIG-STAGE,FIELDGROUP-WS-OPTIMIZATION-scope_stage_runner,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-CONFIG-STAGE,FIELDGROUP-WS-OPTIMIZATION-scope_stage_policy,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-CONFIG-STAGE,FIELDGROUP-WS-OPTIMIZATION-scope_launch,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-CONFIG-DIST,OT-DIST,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует region.
+OPT-TASK-CONFIG-DIST,FIELDGROUP-WS-OPTIMIZATION-scope_distributed,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-CONFIG-DIST,FIELDGROUP-WS-OPTIMIZATION-scope_distributed_advanced,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-CONFIG-DIST,FIELDGROUP-WS-OPTIMIZATION-scope_launch,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-LAUNCH,OT-STAGE,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует region.
+OPT-TASK-LAUNCH,OT-DIST,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует region.
+OPT-TASK-LAUNCH,OT-MODE,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует region.
+OPT-TASK-LAUNCH,FIELDGROUP-WS-OPTIMIZATION-scope_launch,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-MONITOR,OT-PROGRESS,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует region.
+OPT-TASK-MONITOR,OT-HISTORY,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует region.
+OPT-TASK-MONITOR,OT-STAGE,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует region.
+OPT-TASK-MONITOR,FIELDGROUP-WS-OPTIMIZATION-scope_run_progress,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-MONITOR,FIELDGROUP-WS-OPTIMIZATION-scope_history,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-READ-UNDERFILL,OT-PROGRESS,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует region.
+OPT-TASK-READ-UNDERFILL,OT-STAGE,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует region.
+OPT-TASK-READ-UNDERFILL,FIELDGROUP-WS-OPTIMIZATION-scope_run_progress,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-READ-UNDERFILL,FIELDGROUP-WS-OPTIMIZATION-scope_stage_policy,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-READ-PROMOTION,OT-PROGRESS,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует region.
+OPT-TASK-READ-PROMOTION,OT-STAGE,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует region.
+OPT-TASK-READ-PROMOTION,FIELDGROUP-WS-OPTIMIZATION-scope_run_progress,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-READ-PROMOTION,FIELDGROUP-WS-OPTIMIZATION-scope_stage_policy,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-HISTORY,OT-HISTORY,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует region.
+OPT-TASK-HISTORY,FIELDGROUP-WS-OPTIMIZATION-scope_history,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-HISTORY,FIELDGROUP-WS-OPTIMIZATION-scope_handoff,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-OPEN-RESULTS,OT-HISTORY,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует region.
+OPT-TASK-OPEN-RESULTS,OT-HANDOFF,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует region.
+OPT-TASK-OPEN-RESULTS,FIELDGROUP-WS-OPTIMIZATION-scope_handoff,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-OPEN-RESULTS,FIELDGROUP-WS-OPTIMIZATION-scope_history,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-STOP-RESUME,OT-PROGRESS,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует region.
+OPT-TASK-STOP-RESUME,OT-MODE,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует region.
+OPT-TASK-STOP-RESUME,FIELDGROUP-WS-OPTIMIZATION-scope_run_progress,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+OPT-TASK-STOP-RESUME,FIELDGROUP-WS-OPTIMIZATION-scope_launch,WS-OPTIMIZATION,optimized,uses,0.03,designed_target,Задача использует группу полей.
+TREE-WS-DIAGNOSTICS,CUR-DI-LAUNCH,WS-DIAGNOSTICS,current,navigates,1.0,evidence_bound,Текущий route и дефицит видимости.
+CUR-DI-LAUNCH,CUR-DI-SEND-LAUNCH,WS-DIAGNOSTICS,current,task_flow,1.0,evidence_bound,Текущий route и дефицит видимости.
+CUR-DI-SEND-LAUNCH,CUR-DI-ROUTE-SPLIT,WS-DIAGNOSTICS,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-DI-ROUTE-SPLIT,CUR-DI-BUNDLE-FRESHNESS,WS-DIAGNOSTICS,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-DI-BUNDLE-FRESHNESS,CUR-DI-RUNTIME-HIDDEN,WS-DIAGNOSTICS,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+TREE-WS-DIAGNOSTICS,ROOT-WS-DIAGNOSTICS,WS-DIAGNOSTICS,optimized,open_direct,0.35,designed_target,Прямой вход и обязательный shell.
+ROOT-WS-DIAGNOSTICS,DOCK-TREE-WS-DIAGNOSTICS,WS-DIAGNOSTICS,optimized,contains,0.12,designed_target,Прямой вход и обязательный shell.
+ROOT-WS-DIAGNOSTICS,DOCK-INSPECTOR-WS-DIAGNOSTICS,WS-DIAGNOSTICS,optimized,contains,0.12,designed_target,Прямой вход и обязательный shell.
+ROOT-WS-DIAGNOSTICS,DOCK-STATUS-WS-DIAGNOSTICS,WS-DIAGNOSTICS,optimized,contains,0.12,designed_target,Прямой вход и обязательный shell.
+ROOT-WS-DIAGNOSTICS,DI-SCR-01,WS-DIAGNOSTICS,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+DI-SCR-01,DI-HEADER,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-01,DI-BROWSER,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-01,DI-SUMMARY,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-01,DI-STATUS,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-DIAGNOSTICS,DI-SCR-02,WS-DIAGNOSTICS,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+DI-SCR-02,DI-HEADER,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-02,DI-BROWSER,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-02,DI-MANIFEST,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-02,DI-INSPECTOR,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-02,DI-STATUS,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-DIAGNOSTICS,DI-SCR-03,WS-DIAGNOSTICS,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+DI-SCR-03,DI-HEADER,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-03,DI-SUMMARY,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-03,DI-HEALTH,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-03,DI-INSPECTOR,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-03,DI-STATUS,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-DIAGNOSTICS,DI-SCR-04,WS-DIAGNOSTICS,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+DI-SCR-04,DI-HEADER,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-04,DI-CONTENTS,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-04,DI-INSPECTOR,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-04,DI-STATUS,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-DIAGNOSTICS,DI-SCR-05,WS-DIAGNOSTICS,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+DI-SCR-05,DI-HEADER,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-05,DI-HEALTH,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-05,DI-INSPECTOR,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-05,DI-STATUS,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-DIAGNOSTICS,DI-SCR-06,WS-DIAGNOSTICS,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+DI-SCR-06,DI-HEADER,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-06,DI-BROWSER,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-06,DI-SUMMARY,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-06,DI-ACTIONS,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-06,DI-STATUS,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-DIAGNOSTICS,DI-SCR-07,WS-DIAGNOSTICS,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+DI-SCR-07,DI-HEADER,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-07,DI-ACTIONS,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-07,DI-STATUS,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-07,DI-INSPECTOR,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+ROOT-WS-DIAGNOSTICS,DI-SCR-08,WS-DIAGNOSTICS,optimized,navigates,0.18,designed_target,Рабочее пространство раскрывается в режимы/экраны.
+DI-SCR-08,DI-HEADER,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-08,DI-SUMMARY,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-08,DI-ACTIONS,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-08,DI-INSPECTOR,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-SCR-08,DI-STATUS,WS-DIAGNOSTICS,optimized,contains,0.05,designed_target,Экран содержит region.
+DI-HEADER,DI-TXT-TITLE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEADER,DI-BADGE-BUNDLE-MODE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEADER,DI-BADGE-LAST-BUNDLE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEADER,DI-BADGE-LAST-SHA,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEADER,DI-BADGE-READY-SOURCE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEADER,DI-BADGE-HEALTH,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEADER,DI-BTN-COLLECT,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEADER,DI-BTN-OPEN-LATEST,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEADER,DI-BTN-RERUN-SELFCHECK,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEADER,DI-BTN-SHOW-EVIDENCE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEADER,DI-BTN-HELP,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEADER,DI-BTN-PARAMETERS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEADER,DI-BTN-INSTRUMENTS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-BROWSER,DI-TXT-BROWSER,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-BROWSER,DI-TREE-SOURCES,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-BROWSER,DI-CARD-SELECTED-RUN,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-BROWSER,DI-BADGE-RUN-ID,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-BROWSER,DI-BADGE-RUN-MODE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-BROWSER,DI-BADGE-OBJECTIVE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-BROWSER,DI-BADGE-BASELINE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-BROWSER,DI-BTN-IMPORT-AN,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-BROWSER,DI-BTN-IMPORT-AM,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-BROWSER,DI-LIST-WARNINGS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-BROWSER,DI-BADGE-MANIFEST-ID,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-BROWSER,DI-BADGE-MANIFEST-COUNTS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-BROWSER,DI-LIST-HISTORY,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-SUMMARY,DI-TXT-SUMMARY,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-SUMMARY,DI-CARD-HEALTH,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-SUMMARY,DI-CARD-SELFCHECK,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-SUMMARY,DI-CARD-TRIAGE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-SUMMARY,DI-CARD-AUTOSAVE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-SUMMARY,DI-BADGE-GEOM,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-SUMMARY,DI-BADGE-WORKSPACE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-SUMMARY,DI-BADGE-HELPER,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-SUMMARY,DI-BADGE-FRESHNESS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-SUMMARY,DI-MSG-OVERVIEW,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-MANIFEST,DI-TXT-MANIFEST,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-MANIFEST,DI-FILTER-CLASS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-MANIFEST,DI-FILTER-SOURCE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-MANIFEST,DI-FILTER-STATUS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-MANIFEST,DI-BTN-MERGE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-MANIFEST,DI-BTN-DEDUPE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-MANIFEST,DI-TABLE-MANIFEST,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-MANIFEST,DI-BTN-INCLUDE-ALL,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-MANIFEST,DI-BTN-CLEAR-OPTIONAL,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-MANIFEST,DI-BTN-RELOAD-POINTERS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-MANIFEST,DI-BTN-SHOW-GAPS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-MANIFEST,DI-BADGE-SOURCE-COUNT,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-MANIFEST,DI-BADGE-DERIVED-COUNT,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-MANIFEST,DI-BADGE-RUNTIME-COUNT,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-CONTENTS,DI-TXT-CONTENTS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-CONTENTS,DI-CHK-UI-LOGS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-CONTENTS,DI-CHK-RUN-ARTIFACTS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-CONTENTS,DI-CHK-ANIM-CAPTURE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-CONTENTS,DI-CHK-SYSTEM-INFO,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-CONTENTS,DI-CHK-PERF-TRACE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-CONTENTS,DI-CHK-BROWSER-TRACE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-CONTENTS,DI-CHK-RELEASE-META,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-CONTENTS,DI-CHK-SOURCE-ARTS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-CONTENTS,DI-CHK-DERIVED-ARTS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-CONTENTS,DI-CHK-RUNTIME-ARTS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-CONTENTS,DI-TXT-SIZE-EST,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-CONTENTS,DI-BADGE-SIZE-EST,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-CONTENTS,DI-INPUT-NOTES,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEALTH,DI-TXT-HEALTH,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEALTH,DI-BADGE-HEALTH-STATUS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEALTH,DI-BADGE-TRIAGE-STATUS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEALTH,DI-BADGE-GEOMETRY,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEALTH,DI-BADGE-EXPORT-VALID,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEALTH,DI-BTN-OPEN-HEALTH,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEALTH,DI-BTN-OPEN-TRIAGE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEALTH,DI-BTN-STANDARD-SELFCHECK,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEALTH,DI-BTN-FULL-SELFCHECK,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEALTH,DI-BADGE-STD-STATUS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEALTH,DI-BADGE-FULL-STATUS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEALTH,DI-VIEW-HEALTH-MD,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEALTH,DI-VIEW-TRIAGE-MD,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEALTH,DI-LIST-EVIDENCE-GAPS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-HEALTH,DI-LIST-HELPER-ERRORS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-ACTIONS,DI-TXT-ACTIONS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-ACTIONS,DI-BTN-BUILD,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-ACTIONS,DI-BTN-OPEN-BUNDLE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-ACTIONS,DI-BTN-OPEN-FOLDER,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-ACTIONS,DI-BTN-COPY-PATH,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-ACTIONS,DI-BTN-COPY-SHA,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-ACTIONS,DI-BTN-EXPORT-MANIFEST,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-ACTIONS,DI-BTN-SEND-MANUAL,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-ACTIONS,DI-INPUT-SEND-TARGET,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-ACTIONS,DI-BADGE-SEND-READY,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-ACTIONS,DI-LIST-BUILD-PHASES,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-ACTIONS,DI-LIST-BUILD-OUTPUTS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-INSPECTOR,DI-TXT-INSPECTOR,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-INSPECTOR,DI-BADGE-SELECTED-TYPE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-INSPECTOR,DI-BADGE-SELECTED-SOURCE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-INSPECTOR,DI-BADGE-PRODUCER,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-INSPECTOR,DI-VIEW-HELP,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-INSPECTOR,DI-VIEW-PROPERTIES,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-INSPECTOR,DI-LIST-WARNING-LINKS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-INSPECTOR,DI-LIST-ARTIFACT-POINTERS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-INSPECTOR,DI-BTN-OPEN-ARTIFACT,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-INSPECTOR,DI-BTN-SHOW-IN-FOLDER,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-STATUS,DI-BADGE-PHASE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-STATUS,DI-PROGRESS-BUILD,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-STATUS,DI-TXT-STATUS-MSG,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-STATUS,DI-BADGE-WORKSPACE-DIR,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-STATUS,DI-BADGE-UI-LOG-DIR,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-STATUS,DI-BADGE-HELPER-PY,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-STATUS,DI-BADGE-LATEST-POINTER,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-STATUS,DI-BADGE-AUTOSAVE,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+DI-STATUS,DI-BADGE-SESSION-STATUS,WS-DIAGNOSTICS,optimized,contains,0.03,designed_target,Region contains element.
+ROOT-WS-DIAGNOSTICS,FIELDGROUP-WS-DIAGNOSTICS-scope_selected_context,WS-DIAGNOSTICS,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-DIAGNOSTICS,FIELDGROUP-WS-DIAGNOSTICS-scope_diagnostics_manifest,WS-DIAGNOSTICS,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-DIAGNOSTICS,FIELDGROUP-WS-DIAGNOSTICS-scope_bundle,WS-DIAGNOSTICS,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-DIAGNOSTICS,FIELDGROUP-WS-DIAGNOSTICS-scope_latest_bundle,WS-DIAGNOSTICS,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-DIAGNOSTICS,FIELDGROUP-WS-DIAGNOSTICS-scope_health,WS-DIAGNOSTICS,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-DIAGNOSTICS,FIELDGROUP-WS-DIAGNOSTICS-scope_selfcheck,WS-DIAGNOSTICS,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-DIAGNOSTICS,FIELDGROUP-WS-DIAGNOSTICS-scope_runtime_env,WS-DIAGNOSTICS,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-DIAGNOSTICS,FIELDGROUP-WS-DIAGNOSTICS-scope_autosave,WS-DIAGNOSTICS,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-DIAGNOSTICS,FIELDGROUP-WS-DIAGNOSTICS-scope_bundle_policy,WS-DIAGNOSTICS,optimized,contains,0.07,designed_target,Workspace contains field groups.
+ROOT-WS-DIAGNOSTICS,FIELDGROUP-WS-DIAGNOSTICS-scope_send,WS-DIAGNOSTICS,optimized,contains,0.07,designed_target,Workspace contains field groups.
+FIELDGROUP-WS-DIAGNOSTICS-scope_selected_context,DI-FLD-RUN-ID,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_selected_context,DI-FLD-RUN-CONTRACT-HASH,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_selected_context,DI-FLD-OBJECTIVE-HASH,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_selected_context,DI-FLD-BASELINE-HASH,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_selected_context,DI-FLD-SUITE-SNAPSHOT-HASH,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_diagnostics_manifest,DI-FLD-EVIDENCE-MANIFEST-ID,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_diagnostics_manifest,DI-FLD-EVIDENCE-SOURCE-COUNT,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_diagnostics_manifest,DI-FLD-EVIDENCE-DERIVED-COUNT,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_diagnostics_manifest,DI-FLD-EVIDENCE-RUNTIME-COUNT,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_diagnostics_manifest,DI-FLD-TRUTH-WARNING-COUNT,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_diagnostics_manifest,DI-FLD-MISSING-ARTIFACT-COUNT,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle,DI-FLD-BUNDLE-MODE,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle,DI-FLD-BUNDLE-ID,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle,DI-FLD-BUILD-PHASE,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle,DI-FLD-BUILD-PROGRESS,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle,DI-FLD-BUILD-ERROR-TEXT,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_latest_bundle,DI-FLD-LATEST-BUNDLE-PATH,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_latest_bundle,DI-FLD-LATEST-BUNDLE-SHA256,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_latest_bundle,DI-FLD-LATEST-BUNDLE-SIZE,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_latest_bundle,DI-FLD-LATEST-BUNDLE-CREATED-UTC,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_latest_bundle,DI-FLD-LATEST-BUNDLE-FRESHNESS,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_health,DI-FLD-HEALTH-STATUS,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_health,DI-FLD-TRIAGE-STATUS,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_health,DI-FLD-GEOMETRY-ACCEPTANCE-STATUS,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_health,DI-FLD-EXPORT-VALIDATION-STATUS,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_selfcheck,DI-FLD-SELFCHECK-STANDARD-STATUS,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_selfcheck,DI-FLD-SELFCHECK-FULL-STATUS,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_selfcheck,DI-FLD-WORKSPACE-CONTRACT-STATUS,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_runtime_env,DI-FLD-PYTHON-EXECUTABLE,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_runtime_env,DI-FLD-PREFERRED-HELPER-PYTHON,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_runtime_env,DI-FLD-PYTHON-PREFIX,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_runtime_env,DI-FLD-PYTHON-BASE-PREFIX,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_runtime_env,DI-FLD-VENV-ACTIVE,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_runtime_env,DI-FLD-EFFECTIVE-WORKSPACE,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_runtime_env,DI-FLD-UI-LOG-DIR,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle,DI-FLD-BUNDLE-META-PATH,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle,DI-FLD-TRIAGE-REPORT-PATH,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle,DI-FLD-HEALTH-REPORT-JSON-PATH,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle,DI-FLD-HEALTH-REPORT-MD-PATH,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle,DI-FLD-SELFCHECK-STANDARD-PATH,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle,DI-FLD-SELFCHECK-FULL-PATH,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle,DI-FLD-EVIDENCE-MANIFEST-PATH,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_autosave,DI-FLD-CRASH-AUTOSAVE-REQUEST-ID,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_autosave,DI-FLD-AUTOSAVE-REQUEST-MODE,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle_policy,DI-FLD-INCLUDE-UI-LOGS,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle_policy,DI-FLD-INCLUDE-RUN-ARTIFACTS,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle_policy,DI-FLD-INCLUDE-ANIMATOR-CAPTURE,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle_policy,DI-FLD-INCLUDE-SYSTEM-INFO,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle_policy,DI-FLD-INCLUDE-PERF-TRACE,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle_policy,DI-FLD-INCLUDE-BROWSER-TRACE,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle_policy,DI-FLD-INCLUDE-RELEASE-METADATA,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle_policy,DI-FLD-INCLUDE-SOURCE-ARTIFACTS,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle_policy,DI-FLD-INCLUDE-DERIVED-ARTIFACTS,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle_policy,DI-FLD-INCLUDE-RUNTIME-ARTIFACTS,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle_policy,DI-FLD-BUNDLE-NOTES,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_send,DI-FLD-EXTERNAL-SEND-TARGET,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_send,DI-FLD-SEND-READY,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_runtime_env,DI-FLD-HELPER-RUNTIME-ERROR,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_health,DI-FLD-GEOMETRY-ACCEPTANCE-SUMMARY,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_health,DI-FLD-EVIDENCE-GAPS-SUMMARY,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_runtime_env,DI-FLD-LAUNCHER-READINESS-SOURCE,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+FIELDGROUP-WS-DIAGNOSTICS-scope_runtime_env,DI-FLD-LAST-UI-SESSION-STATUS,WS-DIAGNOSTICS,optimized,contains,0.02,designed_target,Field group contains field.
+TREE-WS-DIAGNOSTICS,ROOT-WS-DIAGNOSTICS,WS-DIAGNOSTICS,optimized,open_direct,0.35,designed_target,Operational action→feedback route.
+ROOT-WS-DIAGNOSTICS,DI-TASK-LOAD-MANIFEST,WS-DIAGNOSTICS,optimized,task_flow,0.18,designed_target,Operational action→feedback route.
+DI-TASK-LOAD-MANIFEST,DI-CHECK-CONTEXT,WS-DIAGNOSTICS,optimized,checks,0.12,designed_target,Operational action→feedback route.
+DI-CHECK-CONTEXT,DI-BLOCK-NO-CONTEXT,WS-DIAGNOSTICS,optimized,blocked_by,0.22,designed_target,Operational action→feedback route.
+DI-BLOCK-NO-CONTEXT,DI-TASK-LOAD-MANIFEST,WS-DIAGNOSTICS,optimized,returns_to,0.18,designed_target,Operational action→feedback route.
+DI-TASK-LOAD-MANIFEST,DI-TASK-SELFCHECK,WS-DIAGNOSTICS,optimized,task_flow,0.14,designed_target,Operational action→feedback route.
+DI-TASK-SELFCHECK,DI-CHECK-SELFCHECK,WS-DIAGNOSTICS,optimized,checks,0.12,designed_target,Operational action→feedback route.
+DI-TASK-SELFCHECK,DI-FEEDBACK-HEALTH,WS-DIAGNOSTICS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+DI-TASK-SELFCHECK,DI-TASK-RUNTIME,WS-DIAGNOSTICS,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+DI-TASK-RUNTIME,DI-CHECK-RUNTIME,WS-DIAGNOSTICS,optimized,checks,0.12,designed_target,Operational action→feedback route.
+DI-CHECK-RUNTIME,DI-BLOCK-RUNTIME,WS-DIAGNOSTICS,optimized,blocked_by,0.22,designed_target,Operational action→feedback route.
+DI-CHECK-RUNTIME,DI-FEEDBACK-RUNTIME,WS-DIAGNOSTICS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+DI-BLOCK-RUNTIME,DI-LOOP-RUNTIME-FIX,WS-DIAGNOSTICS,optimized,loops,0.18,designed_target,Operational action→feedback route.
+DI-LOOP-RUNTIME-FIX,DI-TASK-SELFCHECK,WS-DIAGNOSTICS,optimized,returns_to,0.18,designed_target,Operational action→feedback route.
+DI-FEEDBACK-RUNTIME,DI-TASK-CONTENTS,WS-DIAGNOSTICS,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+DI-TASK-CONTENTS,DI-CHECK-CONTENTS,WS-DIAGNOSTICS,optimized,checks,0.12,designed_target,Operational action→feedback route.
+DI-TASK-CONTENTS,DI-FEEDBACK-CONTENTS,WS-DIAGNOSTICS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+DI-FEEDBACK-CONTENTS,DI-TASK-COLLECT,WS-DIAGNOSTICS,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+DI-TASK-COLLECT,DI-CHECK-FRESH,WS-DIAGNOSTICS,optimized,checks,0.1,designed_target,Operational action→feedback route.
+DI-TASK-COLLECT,DI-FEEDBACK-LAST,WS-DIAGNOSTICS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+DI-FEEDBACK-LAST,DI-TASK-REVIEW-HEALTH,WS-DIAGNOSTICS,optimized,task_flow,0.1,designed_target,Operational action→feedback route.
+DI-TASK-REVIEW-HEALTH,DI-FEEDBACK-TRIAGE,WS-DIAGNOSTICS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+DI-FEEDBACK-TRIAGE,DI-TASK-OPEN-LAST,WS-DIAGNOSTICS,optimized,task_flow,0.1,designed_target,Operational action→feedback route.
+DI-TASK-OPEN-LAST,DI-TASK-SEND,WS-DIAGNOSTICS,optimized,task_flow,0.1,designed_target,Operational action→feedback route.
+DI-TASK-SEND,DI-BLOCK-BUNDLE,WS-DIAGNOSTICS,optimized,blocked_by,0.18,designed_target,Operational action→feedback route.
+DI-TASK-SEND,DI-FEEDBACK-SEND,WS-DIAGNOSTICS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+DI-BLOCK-BUNDLE,DI-LOOP-COLLECT-REVIEW-SEND,WS-DIAGNOSTICS,optimized,loops,0.18,designed_target,Operational action→feedback route.
+DI-LOOP-COLLECT-REVIEW-SEND,DI-TASK-COLLECT,WS-DIAGNOSTICS,optimized,returns_to,0.18,designed_target,Operational action→feedback route.
+DI-TASK-LOAD-MANIFEST,DI-MANIFEST,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует region.
+DI-TASK-LOAD-MANIFEST,DI-BROWSER,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует region.
+DI-TASK-LOAD-MANIFEST,FIELDGROUP-WS-DIAGNOSTICS-scope_diagnostics_manifest,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+DI-TASK-LOAD-MANIFEST,FIELDGROUP-WS-DIAGNOSTICS-scope_selected_context,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+DI-TASK-SELFCHECK,DI-HEALTH,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует region.
+DI-TASK-SELFCHECK,DI-SUMMARY,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует region.
+DI-TASK-SELFCHECK,FIELDGROUP-WS-DIAGNOSTICS-scope_selfcheck,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+DI-TASK-SELFCHECK,FIELDGROUP-WS-DIAGNOSTICS-scope_runtime_env,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+DI-TASK-RUNTIME,DI-HEALTH,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует region.
+DI-TASK-RUNTIME,DI-INSPECTOR,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует region.
+DI-TASK-RUNTIME,DI-STATUS,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует region.
+DI-TASK-RUNTIME,FIELDGROUP-WS-DIAGNOSTICS-scope_runtime_env,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+DI-TASK-RUNTIME,FIELDGROUP-WS-DIAGNOSTICS-scope_selfcheck,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+DI-TASK-CONTENTS,DI-CONTENTS,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует region.
+DI-TASK-CONTENTS,FIELDGROUP-WS-DIAGNOSTICS-scope_bundle_policy,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+DI-TASK-CONTENTS,FIELDGROUP-WS-DIAGNOSTICS-scope_bundle,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+DI-TASK-COLLECT,DI-HEADER,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует region.
+DI-TASK-COLLECT,DI-STATUS,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует region.
+DI-TASK-COLLECT,DI-SUMMARY,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует region.
+DI-TASK-COLLECT,FIELDGROUP-WS-DIAGNOSTICS-scope_bundle,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+DI-TASK-COLLECT,FIELDGROUP-WS-DIAGNOSTICS-scope_latest_bundle,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+DI-TASK-COLLECT,FIELDGROUP-WS-DIAGNOSTICS-scope_autosave,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+DI-TASK-REVIEW-HEALTH,DI-HEALTH,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует region.
+DI-TASK-REVIEW-HEALTH,DI-INSPECTOR,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует region.
+DI-TASK-REVIEW-HEALTH,FIELDGROUP-WS-DIAGNOSTICS-scope_health,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+DI-TASK-REVIEW-HEALTH,FIELDGROUP-WS-DIAGNOSTICS-scope_bundle,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+DI-TASK-OPEN-LAST,DI-STATUS,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует region.
+DI-TASK-OPEN-LAST,DI-SUMMARY,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует region.
+DI-TASK-OPEN-LAST,FIELDGROUP-WS-DIAGNOSTICS-scope_latest_bundle,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+DI-TASK-OPEN-LAST,FIELDGROUP-WS-DIAGNOSTICS-scope_bundle,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+DI-TASK-SEND,DI-STATUS,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует region.
+DI-TASK-SEND,DI-SUMMARY,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует region.
+DI-TASK-SEND,FIELDGROUP-WS-DIAGNOSTICS-scope_send,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует группу полей.
+DI-TASK-SEND,FIELDGROUP-WS-DIAGNOSTICS-scope_latest_bundle,WS-DIAGNOSTICS,optimized,uses,0.03,designed_target,Задача использует группу полей.

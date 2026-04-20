@@ -1,0 +1,813 @@
+node_id,scope,surface,kind,label_current,label_recommended,semantic_issue,severity,why_it_hurts,status,semantic_quality_score_1_5
+TREE-WS-INPUTS,optimized_target,WS-INPUTS,tree_entry,Исходные данные,Исходные данные,none,low,Семантика понятна и не требует переписывания.,keep,5
+CUR-IN-HOME-LAUNCH,current,WS-INPUTS,current_entry,Открыть редактор исходных данных,Открыть редактор исходных данных,none,low,Семантика понятна и не требует переписывания.,keep,5
+CUR-IN-NUMERIC-ONLY,current,WS-INPUTS,current_surface,Числовое редактирование без достаточной графической обратной связи,Числовое редактирование без достаточной графической обратной связи,none,low,Семантика понятна и не требует переписывания.,keep,5
+CUR-IN-C1C2-HIDDEN,current,WS-INPUTS,current_defect,"Неочевидно, что на угол выбраны две пружины","Неочевидно, что на угол выбраны две пружины",none,low,Семантика понятна и не требует переписывания.,keep,5
+CUR-IN-LEVELING-HIDDEN,current,WS-INPUTS,current_defect,"Неочевидно, что включено выравнивание пружинами и как оно выполнено","Неочевидно, что включено выравнивание пружинами и как оно выполнено",none,low,Семантика понятна и не требует переписывания.,keep,5
+CUR-IN-SYMMETRY-HIDDEN,current,WS-INPUTS,current_defect,Неочевидна зеркальная симметрия лево/право,Неочевидна зеркальная симметрия лево/право,none,low,Семантика понятна и не требует переписывания.,keep,5
+CUR-IN-TWIN-PARTIAL,current,WS-INPUTS,current_defect,"Графический двойник либо слабый, либо не синхронизирован полностью","Графический двойник либо слабый, либо не синхронизирован полностью",none,low,Семантика понятна и не требует переписывания.,keep,5
+CUR-IN-VALIDATE-SAVE,current,WS-INPUTS,current_action,Проверить и сохранить,Проверить и сохранить,none,low,Семантика понятна и не требует переписывания.,keep,5
+TREE-WS-INPUTS,optimized,WS-INPUTS,tree_entry,Исходные данные,Исходные данные,none,low,Семантика понятна и не требует переписывания.,keep,5
+ROOT-WS-INPUTS,optimized,WS-INPUTS,workspace,Исходные данные,Исходные данные,none,low,Семантика понятна и не требует переписывания.,keep,5
+DOCK-TREE-WS-INPUTS,optimized,WS-INPUTS,dock,Левое дерево,Левое дерево,none,low,Семантика понятна и не требует переписывания.,keep,5
+DOCK-INSPECTOR-WS-INPUTS,optimized,WS-INPUTS,dock,Правый inspector и help,Правый inspector и help,none,low,Семантика понятна и не требует переписывания.,keep,5
+DOCK-STATUS-WS-INPUTS,optimized,WS-INPUTS,dock,Нижний статус и прогресс,Нижний статус и прогресс,none,low,Семантика понятна и не требует переписывания.,keep,5
+PROJECT-SCR-01,optimized,WS-INPUTS,screen,Панель проекта — обзор,Панель проекта — обзор,none,low,Семантика понятна и не требует переписывания.,keep,5
+PROJECT-SCR-02,optimized,WS-INPUTS,screen,Панель проекта — recent и открытие,Панель проекта — recent и открытие,none,low,Семантика понятна и не требует переписывания.,keep,5
+PROJECT-SCR-03,optimized,WS-INPUTS,screen,Панель проекта — блокеры и next action,Панель проекта — блокеры и next action,none,low,Семантика понятна и не требует переписывания.,keep,5
+INPUTS-SCR-01,optimized,WS-INPUTS,screen,Исходные данные — обзор групп,Исходные данные — обзор групп,none,low,Семантика понятна и не требует переписывания.,keep,5
+INPUTS-SCR-02,optimized,WS-INPUTS,screen,Исходные данные — геометрия и рама,Исходные данные — геометрия и рама,none,low,Семантика понятна и не требует переписывания.,keep,5
+INPUTS-SCR-03,optimized,WS-INPUTS,screen,Исходные данные — массы и пружины,Исходные данные — массы и пружины,none,low,Семантика понятна и не требует переписывания.,keep,5
+INPUTS-SCR-04,optimized,WS-INPUTS,screen,Исходные данные — цилиндры и пневматика,Исходные данные — цилиндры и пневматика,none,low,Семантика понятна и не требует переписывания.,keep,5
+INPUTS-SCR-05,optimized,WS-INPUTS,screen,Исходные данные — численные параметры и режимы,Исходные данные — численные параметры и режимы,none,low,Семантика понятна и не требует переписывания.,keep,5
+INPUTS-SCR-06,optimized,WS-INPUTS,screen,Исходные данные — validation и handoff,Исходные данные — validation и handoff,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-ACTIONS,optimized,WS-INPUTS,region,IN-ACTIONS,IN-ACTIONS,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-FORM,optimized,WS-INPUTS,region,IN-FORM,IN-FORM,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-GROUPS,optimized,WS-INPUTS,region,IN-GROUPS,IN-GROUPS,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-HEADER,optimized,WS-INPUTS,region,IN-HEADER,IN-HEADER,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-TWIN,optimized,WS-INPUTS,region,IN-TWIN,IN-TWIN,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-VALID,optimized,WS-INPUTS,region,IN-VALID,IN-VALID,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-ACTION,optimized,WS-INPUTS,region,PR-ACTION,PR-ACTION,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-FOOTER,optimized,WS-INPUTS,region,PR-FOOTER,PR-FOOTER,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-HEADER,optimized,WS-INPUTS,region,PR-HEADER,PR-HEADER,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-RECENT,optimized,WS-INPUTS,region,PR-RECENT,PR-RECENT,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-RUNS,optimized,WS-INPUTS,region,PR-RUNS,PR-RUNS,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-STATUS,optimized,WS-INPUTS,region,PR-STATUS,PR-STATUS,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-TXT-TITLE,optimized,WS-INPUTS,title_text,Рабочее пространство «Панель проекта»,Рабочее пространство «Панель проекта»,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-BADGE-PROJECT-ID,optimized,WS-INPUTS,badge,Идентификатор проекта,Идентификатор проекта,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-BADGE-DIRTY,optimized,WS-INPUTS,status_badge,Индикатор несохранённых изменений,Индикатор несохранённых изменений,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-BADGE-HEALTH,optimized,WS-INPUTS,status_badge,Сводный статус проекта,Сводный статус проекта,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-TXT-LAST-SAVE,optimized,WS-INPUTS,caption,Последнее сохранение,Последнее сохранение,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-CARD-NEXT-ACTION,optimized,WS-INPUTS,action_card,Карточка следующего действия,Карточка следующего действия,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-BTN-NEXT-ACTION,optimized,WS-INPUTS,primary_button,Выполнить следующее действие,Выполнить следующее действие,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-BTN-GO-INPUTS,optimized,WS-INPUTS,secondary_button,Перейти к исходным данным,Перейти к исходным данным,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-CARD-PIPELINE,optimized,WS-INPUTS,diagram_card,Карта pipeline,Карта pipeline,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-BTN-GO-RING,optimized,WS-INPUTS,ghost_button,Открыть редактор кольца,Открыть редактор кольца,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-BTN-GO-SUITE,optimized,WS-INPUTS,ghost_button,Открыть матрицу испытаний,Открыть матрицу испытаний,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-BTN-GO-BASELINE,optimized,WS-INPUTS,ghost_button,Открыть базовый прогон,Открыть базовый прогон,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-BTN-GO-OPT,optimized,WS-INPUTS,ghost_button,Открыть оптимизацию,Открыть оптимизацию,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-BTN-GO-DIAG,optimized,WS-INPUTS,ghost_button,Открыть диагностику,Открыть диагностику,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-TABLE-BLOCKERS,optimized,WS-INPUTS,data_table,Таблица блокеров,Таблица блокеров,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-TABLE-WARNINGS,optimized,WS-INPUTS,data_table,Таблица предупреждений,Таблица предупреждений,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-CARD-RING-STATUS,optimized,WS-INPUTS,status_card,Карточка статуса кольца,Карточка статуса кольца,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-CARD-SUITE-STATUS,optimized,WS-INPUTS,status_card,Карточка статуса набора испытаний,Карточка статуса набора испытаний,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-CARD-BASELINE-STATUS,optimized,WS-INPUTS,status_card,Карточка статуса baseline,Карточка статуса базовый прогон,mixed_language,medium,В пользовательском слое предпочесть «базовый прогон».,rewrite,3
+PR-CARD-DIAG-STATUS,optimized,WS-INPUTS,status_card,Карточка статуса диагностики,Карточка статуса диагностики,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-TABLE-RECENT-PROJECTS,optimized,WS-INPUTS,data_table,Таблица недавних проектов,Таблица недавних проектов,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-BTN-OPEN-PROJECT,optimized,WS-INPUTS,secondary_button,Открыть выбранный проект,Открыть выбранный проект,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-BTN-CREATE-PROJECT,optimized,WS-INPUTS,secondary_button,Создать новый проект,Создать новый проект,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-BTN-IMPORT-PROJECT,optimized,WS-INPUTS,secondary_button,Импортировать проект,Импортировать проект,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-TABLE-RECENT-RUNS,optimized,WS-INPUTS,data_table,Таблица недавних прогонов,Таблица недавних прогонов,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-TABLE-RECENT-BUNDLES,optimized,WS-INPUTS,data_table,Таблица последних архивов диагностики,Таблица последних архивов диагностики,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-BTN-OPEN-BUNDLE,optimized,WS-INPUTS,secondary_button,Открыть выбранный архив диагностики,Открыть выбранный архив диагностики,none,low,Семантика понятна и не требует переписывания.,keep,5
+PR-HELP-ANCHOR,optimized,WS-INPUTS,help_anchor,Контекстная справка панели проекта,Контекстная справка панели проекта,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-TXT-TITLE,optimized,WS-INPUTS,title_text,Рабочее пространство «Исходные данные»,Рабочее пространство «Исходные данные»,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BADGE-DIRTY,optimized,WS-INPUTS,status_badge,Несохранённые изменения,Несохранённые изменения,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BADGE-UNIT-PROFILE,optimized,WS-INPUTS,badge,Профиль единиц,Профиль единиц,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BADGE-MIRROR-MODE,optimized,WS-INPUTS,badge,Режим зеркальности,Режим зеркальности,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-STATUS-HANDOFF-READINESS,optimized,WS-INPUTS,status_badge,Индикатор готовности handoff,Индикатор готовности handoff,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-TXT-UNSAVED-COUNT,optimized,WS-INPUTS,caption,Количество несохранённых полей,Количество несохранённых полей,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-TABS-GROUPS,optimized,WS-INPUTS,tab_strip,Вкладки групп исходных данных,Вкладки групп исходных данных,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-TREE-GROUPS,optimized,WS-INPUTS,tree,Дерево групп исходных данных,Дерево групп исходных данных,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BTN-EXPAND-ALL,optimized,WS-INPUTS,ghost_button,Развернуть все группы,Развернуть все группы,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BTN-COLLAPSE-ALL,optimized,WS-INPUTS,ghost_button,Свернуть все группы,Свернуть все группы,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-LIST-GROUP-FIELDS,optimized,WS-INPUTS,field_list,Список полей активной группы,Список полей активной группы,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-CARD-GROUP-SUMMARY,optimized,WS-INPUTS,summary_card,Карточка сводки активной группы,Карточка сводки активной группы,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BTN-FILTER-REQUIRED,optimized,WS-INPUTS,ghost_button,Показать только обязательные,Показать только обязательные,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BTN-SHOW-ONLY-INVALID,optimized,WS-INPUTS,ghost_button,Показать только проблемные,Показать только проблемные,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-FORM-FIELD-HOST,optimized,WS-INPUTS,form_host,Область полей активной группы,Область полей активной группы,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BTN-COMPARE-LAST-SAVED,optimized,WS-INPUTS,ghost_button,Сравнить с последним сохранением,Сравнить с последним сохранением,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-CANVAS-FRAME-TOP,optimized,WS-INPUTS,canvas,Эскиз рамы сверху,Эскиз рамы сверху,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-CANVAS-SUSP-FRONT,optimized,WS-INPUTS,canvas,Эскиз подвески спереди,Эскиз подвески спереди,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-CANVAS-SUSP-SIDE,optimized,WS-INPUTS,canvas,Эскиз подвески сбоку,Эскиз подвески сбоку,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-CANVAS-PNEUMO-SCHEME,optimized,WS-INPUTS,canvas,Схема пневматической сети,Схема пневматической сети,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-CANVAS-CYLINDER-RANGE,optimized,WS-INPUTS,canvas,Диапазоны хода цилиндров,Диапазоны хода цилиндров,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-CANVAS-MASS-MAP,optimized,WS-INPUTS,canvas,Карта масс и центра тяжести,Карта масс и центра тяжести,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-LEGEND-TWIN-MODE,optimized,WS-INPUTS,legend,Легенда режима visual twin,Легенда режима visual twin,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-TXT-TWIN-SOURCE,optimized,WS-INPUTS,caption,Подпись источника visual twin,Подпись источника visual twin,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-TXT-TWIN-WARNING,optimized,WS-INPUTS,warning_text,Предупреждение visual twin,Предупреждение visual twin,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BANNER-VALIDATION,optimized,WS-INPUTS,message_bar,Баннер проверки исходных данных,Баннер проверки исходных данных,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-TABLE-VALIDATION-ISSUES,optimized,WS-INPUTS,data_table,Таблица validation issues,Таблица validation issues,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-TABLE-DIRTY-DIFF,optimized,WS-INPUTS,data_table,Таблица отличий от last saved,Таблица отличий от last saved,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BTN-VALIDATE,optimized,WS-INPUTS,primary_button,Проверить исходные данные,Проверить исходные данные,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BTN-SAVE,optimized,WS-INPUTS,primary_button,Сохранить исходные данные,Сохранить исходные данные,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BTN-APPLY,optimized,WS-INPUTS,secondary_button,Применить и обновить эскизы,Применить и обновить эскизы,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BTN-REVERT-GROUP,optimized,WS-INPUTS,secondary_button,Откатить активную группу,Откатить активную группу,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BTN-RESET-DEFAULTS,optimized,WS-INPUTS,secondary_button,Сбросить к каноническим defaults,Сбросить к каноническим defaults,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BTN-BACK-PROJECT,optimized,WS-INPUTS,ghost_button,Вернуться к панели проекта,Вернуться к панели проекта,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BTN-TO-RING,optimized,WS-INPUTS,primary_button,Перейти в редактор кольца,Перейти в редактор кольца,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BTN-TO-SUITE,optimized,WS-INPUTS,secondary_button,Перейти в матрицу испытаний,Перейти в матрицу испытаний,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BTN-OPEN-DIAG,optimized,WS-INPUTS,ghost_button,Открыть диагностику,Открыть диагностику,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-HELP-ANCHOR,optimized,WS-INPUTS,help_anchor,Контекстная справка исходных данных,Контекстная справка исходных данных,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-INPUTS-group_project_meta,optimized,WS-INPUTS,field_group,group_project_meta,group_project_meta,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-INPUTS-group_frame_geometry,optimized,WS-INPUTS,field_group,group_frame_geometry,group_frame_geometry,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-INPUTS-group_masses_inertia,optimized,WS-INPUTS,field_group,group_masses_inertia,group_masses_inertia,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-INPUTS-group_springs,optimized,WS-INPUTS,field_group,group_springs,group_springs,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-INPUTS-group_cylinders,optimized,WS-INPUTS,field_group,group_cylinders,group_cylinders,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-INPUTS-group_pneumatics,optimized,WS-INPUTS,field_group,group_pneumatics,group_pneumatics,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-INPUTS-group_numerics,optimized,WS-INPUTS,field_group,group_numerics,group_numerics,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-INPUTS-group_flags_modes,optimized,WS-INPUTS,field_group,group_flags_modes,group_flags_modes,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-PROJECT-NAME,optimized,WS-INPUTS,field,Название проекта,Название проекта,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-PROJECT-CODE,optimized,WS-INPUTS,field,Код проекта,Код проекта,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-WORKSPACE-ROOT,optimized,WS-INPUTS,field,Рабочий каталог проекта,Рабочий каталог проекта,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-VEHICLE-VARIANT,optimized,WS-INPUTS,field,Вариант машины,Вариант машины,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-UNIT-PROFILE,optimized,WS-INPUTS,field,Профиль единиц,Профиль единиц,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-MIRROR-MODE,optimized,WS-INPUTS,field,Режим зеркальности левого и правого борта,Режим зеркальности левого и правого борта,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-WHEELBASE,optimized,WS-INPUTS,field,База машины,База машины,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-FRONT-TRACK,optimized,WS-INPUTS,field,Передняя колея,Передняя колея,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-REAR-TRACK,optimized,WS-INPUTS,field,Задняя колея,Задняя колея,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-FRAME-LENGTH,optimized,WS-INPUTS,field,Длина рамы,Длина рамы,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-FRAME-WIDTH,optimized,WS-INPUTS,field,Ширина рамы,Ширина рамы,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-FRAME-HEIGHT,optimized,WS-INPUTS,field,Высота рамы,Высота рамы,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-GROUND-CLEARANCE,optimized,WS-INPUTS,field,Статический дорожный просвет,Статический дорожный просвет,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-CG-X,optimized,WS-INPUTS,field,Продольная координата центра тяжести,Продольная координата центра тяжести,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-CG-Y,optimized,WS-INPUTS,field,Поперечная координата центра тяжести,Поперечная координата центра тяжести,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-CG-Z,optimized,WS-INPUTS,field,Высота центра тяжести,Высота центра тяжести,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-MASS-TOTAL,optimized,WS-INPUTS,field,Полная масса машины,Полная масса машины,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-MASS-SPRUNG,optimized,WS-INPUTS,field,Подрессоренная масса,Подрессоренная масса,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-MASS-UNSPRUNG-FRONT,optimized,WS-INPUTS,field,Неподрессоренная масса передней оси,Неподрессоренная масса передней оси,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-MASS-UNSPRUNG-REAR,optimized,WS-INPUTS,field,Неподрессоренная масса задней оси,Неподрессоренная масса задней оси,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-IXX,optimized,WS-INPUTS,field,Момент инерции вокруг продольной оси,Момент инерции вокруг продольной оси,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-IYY,optimized,WS-INPUTS,field,Момент инерции вокруг поперечной оси,Момент инерции вокруг поперечной оси,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-IZZ,optimized,WS-INPUTS,field,Момент инерции вокруг вертикальной оси,Момент инерции вокруг вертикальной оси,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-PAYLOAD,optimized,WS-INPUTS,field,Дополнительная полезная нагрузка,Дополнительная полезная нагрузка,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-SPRING-MODE-FR-C1,optimized,WS-INPUTS,field,Передняя пружина C1 — режим настройки,Передняя пружина первого контура (C1) — режим настройки,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-SPRING-RATE-FR-C1,optimized,WS-INPUTS,field,Передняя пружина C1 — жёсткость,Передняя пружина первого контура (C1) — жёсткость,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-SPRING-PRELOAD-FR-C1,optimized,WS-INPUTS,field,Передняя пружина C1 — преднатяг,Передняя пружина первого контура (C1) — преднатяг,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-SPRING-MODE-FR-C2,optimized,WS-INPUTS,field,Передняя пружина C2 — режим настройки,Передняя пружина второго контура (C2) — режим настройки,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-SPRING-RATE-FR-C2,optimized,WS-INPUTS,field,Передняя пружина C2 — жёсткость,Передняя пружина второго контура (C2) — жёсткость,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-SPRING-PRELOAD-FR-C2,optimized,WS-INPUTS,field,Передняя пружина C2 — преднатяг,Передняя пружина второго контура (C2) — преднатяг,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-SPRING-MODE-RR-C1,optimized,WS-INPUTS,field,Задняя пружина C1 — режим настройки,Задняя пружина первого контура (C1) — режим настройки,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-SPRING-RATE-RR-C1,optimized,WS-INPUTS,field,Задняя пружина C1 — жёсткость,Задняя пружина первого контура (C1) — жёсткость,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-SPRING-PRELOAD-RR-C1,optimized,WS-INPUTS,field,Задняя пружина C1 — преднатяг,Задняя пружина первого контура (C1) — преднатяг,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-SPRING-MODE-RR-C2,optimized,WS-INPUTS,field,Задняя пружина C2 — режим настройки,Задняя пружина второго контура (C2) — режим настройки,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-SPRING-RATE-RR-C2,optimized,WS-INPUTS,field,Задняя пружина C2 — жёсткость,Задняя пружина второго контура (C2) — жёсткость,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-SPRING-PRELOAD-RR-C2,optimized,WS-INPUTS,field,Задняя пружина C2 — преднатяг,Задняя пружина второго контура (C2) — преднатяг,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-CYL-BORE-FR-C1,optimized,WS-INPUTS,field,Передний цилиндр C1 — диаметр цилиндра,Передний цилиндр первого контура (C1) — диаметр цилиндра,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-CYL-STROKE-FR-C1,optimized,WS-INPUTS,field,Передний цилиндр C1 — ход штока,Передний цилиндр первого контура (C1) — ход штока,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-CYL-TOP-Z-FR-C1,optimized,WS-INPUTS,field,Передний цилиндр C1 — верхняя точка крепления по высоте,Передний цилиндр первого контура (C1) — верхняя точка крепления по высоте,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-CYL-TOP-Y-FR-C1,optimized,WS-INPUTS,field,Передний цилиндр C1 — верхняя точка крепления по ширине,Передний цилиндр первого контура (C1) — верхняя точка крепления по ширине,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-CYL-BORE-FR-C2,optimized,WS-INPUTS,field,Передний цилиндр C2 — диаметр цилиндра,Передний цилиндр второго контура (C2) — диаметр цилиндра,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-CYL-STROKE-FR-C2,optimized,WS-INPUTS,field,Передний цилиндр C2 — ход штока,Передний цилиндр второго контура (C2) — ход штока,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-CYL-TOP-Z-FR-C2,optimized,WS-INPUTS,field,Передний цилиндр C2 — верхняя точка крепления по высоте,Передний цилиндр второго контура (C2) — верхняя точка крепления по высоте,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-CYL-TOP-Y-FR-C2,optimized,WS-INPUTS,field,Передний цилиндр C2 — верхняя точка крепления по ширине,Передний цилиндр второго контура (C2) — верхняя точка крепления по ширине,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-CYL-BORE-RR-C1,optimized,WS-INPUTS,field,Задний цилиндр C1 — диаметр цилиндра,Задний цилиндр первого контура (C1) — диаметр цилиндра,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-CYL-STROKE-RR-C1,optimized,WS-INPUTS,field,Задний цилиндр C1 — ход штока,Задний цилиндр первого контура (C1) — ход штока,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-CYL-TOP-Z-RR-C1,optimized,WS-INPUTS,field,Задний цилиндр C1 — верхняя точка крепления по высоте,Задний цилиндр первого контура (C1) — верхняя точка крепления по высоте,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-CYL-TOP-Y-RR-C1,optimized,WS-INPUTS,field,Задний цилиндр C1 — верхняя точка крепления по ширине,Задний цилиндр первого контура (C1) — верхняя точка крепления по ширине,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-CYL-BORE-RR-C2,optimized,WS-INPUTS,field,Задний цилиндр C2 — диаметр цилиндра,Задний цилиндр второго контура (C2) — диаметр цилиндра,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-CYL-STROKE-RR-C2,optimized,WS-INPUTS,field,Задний цилиндр C2 — ход штока,Задний цилиндр второго контура (C2) — ход штока,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-CYL-TOP-Z-RR-C2,optimized,WS-INPUTS,field,Задний цилиндр C2 — верхняя точка крепления по высоте,Задний цилиндр второго контура (C2) — верхняя точка крепления по высоте,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-CYL-TOP-Y-RR-C2,optimized,WS-INPUTS,field,Задний цилиндр C2 — верхняя точка крепления по ширине,Задний цилиндр второго контура (C2) — верхняя точка крепления по ширине,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-SUPPLY-P-NOM,optimized,WS-INPUTS,field,Номинальное питающее давление,Номинальное питающее давление,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-SUPPLY-P-MAX,optimized,WS-INPUTS,field,Максимальное питающее давление,Максимальное питающее давление,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-RECEIVER-1-V,optimized,WS-INPUTS,field,Объём ресивера 1,Объём ресивера 1,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-RECEIVER-2-V,optimized,WS-INPUTS,field,Объём ресивера 2,Объём ресивера 2,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-LINE-DIAM,optimized,WS-INPUTS,field,Внутренний диаметр магистрали,Внутренний диаметр магистрали,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-VALVE-C1-CV,optimized,WS-INPUTS,field,Пропускная способность клапанов C1,Пропускная способность клапанов C1,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-VALVE-C2-CV,optimized,WS-INPUTS,field,Пропускная способность клапанов C2,Пропускная способность клапанов C2,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+PI-FLD-DEAD-VOLUME,optimized,WS-INPUTS,field,Мёртвый объём камеры,Мёртвый объём камеры,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-INTEGRATION-STEP,optimized,WS-INPUTS,field,Шаг интегрирования,Шаг интегрирования,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-SIM-TIME-DEFAULT,optimized,WS-INPUTS,field,Время моделирования по умолчанию,Время моделирования по умолчанию,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-CONTACT-LOSS-LIMIT,optimized,WS-INPUTS,field,Допустимая доля потери контакта,Допустимая доля потери контакта,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-DIAG-AUTO-EXIT,optimized,WS-INPUTS,field,Автосбор диагностики при штатном выходе,Автосбор диагностики при штатном выходе,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-DIAG-AUTO-CRASH,optimized,WS-INPUTS,field,Автосбор диагностики при аварии,Автосбор диагностики при аварии,none,low,Семантика понятна и не требует переписывания.,keep,5
+PI-FLD-SYMMETRY-LOCK,optimized,WS-INPUTS,field,Замок зеркальной симметрии,Замок зеркальной симметрии,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-TASK-SELECT-GROUP,optimized,WS-INPUTS,task,Выбрать группу входных данных,Выбрать группу входных данных,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-TASK-EDIT-GEOMETRY,optimized,WS-INPUTS,task,"Отредактировать геометрию, раму и массы","Отредактировать геометрию, раму и массы",none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-TASK-SELECT-SPRING-CONFIG,optimized,WS-INPUTS,task,Выбрать конфигурацию пружин по углу,Выбрать конфигурацию пружин по углу,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-TASK-ENABLE-LEVELING,optimized,WS-INPUTS,task,Включить или отключить выравнивание пружинами,Включить или отключить выравнивание пружинами,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-TASK-EDIT-SYMMETRY,optimized,WS-INPUTS,task,Установить или снять зеркальную симметрию лево/право,Установить или снять зеркальную симметрию лево/право,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-TASK-EDIT-CYL-POINTS,optimized,WS-INPUTS,task,Отредактировать точки крепления и ограничения цилиндров,Отредактировать точки крепления и ограничения цилиндров,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-TASK-OPEN-TWIN,optimized,WS-INPUTS,task,Открыть графический двойник и схему,Открыть графический двойник и схему,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-TASK-VALIDATE,optimized,WS-INPUTS,task,Проверить входные данные,Проверить входные данные,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-TASK-SAVE,optimized,WS-INPUTS,task,Сохранить validated snapshot,Сохранить validated snapshot,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-TASK-HANDOFF,optimized,WS-INPUTS,task,Передать validated snapshot дальше по pipeline,Передать validated snapshot дальше по pipeline,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-CHECK-REQ,optimized,WS-INPUTS,check,Проверка обязательных полей и единиц измерения,Проверка обязательных полей и единиц измерения,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-CHECK-GEOM,optimized,WS-INPUTS,check,Проверка геометрической согласованности,Проверка геометрической согласованности,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-CHECK-SPRING-VIS,optimized,WS-INPUTS,check,Проверка видимости выбора C1/C2 на угол,Проверка видимости выбора C1/C2 на угол,notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+IN-CHECK-LEVELING-VIS,optimized,WS-INPUTS,check,Проверка видимости режима выравнивания и остатка,Проверка видимости режима выравнивания и остатка,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-CHECK-SYMMETRY-VIS,optimized,WS-INPUTS,check,Проверка видимости режима зеркальной симметрии,Проверка видимости режима зеркальной симметрии,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-CHECK-TWIN-SYNC,optimized,WS-INPUTS,check,Проверка двусторонней синхронизации с графическим двойником,Проверка двусторонней синхронизации с графическим двойником,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BLOCK-REQ,optimized,WS-INPUTS,block,Не все обязательные входы заполнены,Не все обязательные входы заполнены,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BLOCK-GEOM,optimized,WS-INPUTS,block,Геометрия противоречива или нарушает ограничения,Геометрия противоречива или нарушает ограничения,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BLOCK-TWIN,optimized,WS-INPUTS,block,Графический двойник не может быть построен честно,Графический двойник не может быть построен честно,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-BLOCK-HANDOFF,optimized,WS-INPUTS,block,Нельзя передать дальше: snapshot не сохранён или не валиден,Нельзя передать дальше: snapshot не сохранён или не валиден,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-FEEDBACK-C1C2,optimized,WS-INPUTS,feedback,На угол установлены две пружины: контур C1 и контур C2,На угол установлены две пружины: контур первого контура (C1) и контур второго контура (C2),notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+IN-FEEDBACK-LEVELING,optimized,WS-INPUTS,feedback,"Выравнивание кузова пружинами активно; показан метод и остаточная разница, миллиметры","Выравнивание кузова пружинами активно; показан метод и остаточная разница, миллиметры",none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-FEEDBACK-SYMMETRY,optimized,WS-INPUTS,feedback,Зеркальная симметрия лево/право включена и заблокирована,Зеркальная симметрия лево/право включена и заблокирована,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-FEEDBACK-TWIN,optimized,WS-INPUTS,feedback,Графический двойник обновлён по введённым данным,Графический двойник обновлён по введённым данным,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-FEEDBACK-VALID,optimized,WS-INPUTS,feedback,Validation summary виден на текущем экране,Validation summary виден на текущем экране,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-FEEDBACK-SAVED,optimized,WS-INPUTS,feedback,Validated snapshot сохранён и готов к handoff,Validated snapshot сохранён и готов к handoff,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-LOOP-EDIT-VALIDATE,optimized,WS-INPUTS,loop,Правка → проверка → правка,Правка → проверка → правка,none,low,Семантика понятна и не требует переписывания.,keep,5
+IN-LOOP-GRAPH-SYNC,optimized,WS-INPUTS,loop,Выбор в схеме ↔ inspector ↔ поле,Выбор в схеме ↔ inspector ↔ поле,none,low,Семантика понятна и не требует переписывания.,keep,5
+TREE-WS-RING,optimized_target,WS-RING,tree_entry,Сценарии и редактор кольца,Сценарии и редактор кольца,none,low,Семантика понятна и не требует переписывания.,keep,5
+CUR-RG-LAUNCH,current,WS-RING,current_entry,Открыть редактор кольца или сценариев,Открыть редактор кольца или сценариев,none,low,Семантика понятна и не требует переписывания.,keep,5
+CUR-RG-NOT-DOMINANT,current,WS-RING,current_defect,Редактор кольца не доминирует в стартовом маршруте,Редактор кольца не доминирует в стартовом маршруте,none,low,Семантика понятна и не требует переписывания.,keep,5
+CUR-RG-TELEMETRY-MIX,current,WS-RING,current_defect,Разгон и торможение смешиваются с семантикой сегмента,Разгон и торможение смешиваются с семантикой сегмента,none,low,Семантика понятна и не требует переписывания.,keep,5
+CUR-RG-SEAM-AMBIG,current,WS-RING,current_defect,Шов и источник цикличности выражены недостаточно явно,Шов и источник цикличности выражены недостаточно явно,none,low,Семантика понятна и не требует переписывания.,keep,5
+CUR-RG-EXPORT-HIDDEN,current,WS-RING,current_defect,Экспорт и handoff в suite видны не как следствие source-of-truth,Экспорт и handoff в suite видны не как следствие source-of-truth,none,low,Семантика понятна и не требует переписывания.,keep,5
+TREE-WS-RING,optimized,WS-RING,tree_entry,Сценарии и редактор кольца,Сценарии и редактор кольца,none,low,Семантика понятна и не требует переписывания.,keep,5
+ROOT-WS-RING,optimized,WS-RING,workspace,Редактор кольца,Редактор кольца,none,low,Семантика понятна и не требует переписывания.,keep,5
+DOCK-TREE-WS-RING,optimized,WS-RING,dock,Левое дерево,Левое дерево,none,low,Семантика понятна и не требует переписывания.,keep,5
+DOCK-INSPECTOR-WS-RING,optimized,WS-RING,dock,Правый inspector и help,Правый inspector и help,none,low,Семантика понятна и не требует переписывания.,keep,5
+DOCK-STATUS-WS-RING,optimized,WS-RING,dock,Нижний статус и прогресс,Нижний статус и прогресс,none,low,Семантика понятна и не требует переписывания.,keep,5
+RING-SCR-01,optimized,WS-RING,screen,Редактор кольца — обзор,Редактор кольца — обзор,none,low,Семантика понятна и не требует переписывания.,keep,5
+RING-SCR-02,optimized,WS-RING,screen,Редактор кольца — карточка сегмента,Редактор кольца — карточка сегмента,none,low,Семантика понятна и не требует переписывания.,keep,5
+RING-SCR-03,optimized,WS-RING,screen,Редактор кольца — шов и экспорт,Редактор кольца — шов и экспорт,none,low,Семантика понятна и не требует переписывания.,keep,5
+RING-SCR-04,optimized,WS-RING,screen,Редактор кольца — связь с матрицей испытаний,Редактор кольца — связь с матрицей испытаний,none,low,Семантика понятна и не требует переписывания.,keep,5
+GLOBAL-RIGHT-INSPECTOR,optimized,WS-RING,region,GLOBAL-RIGHT-INSPECTOR,GLOBAL-RIGHT-INSPECTOR,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-CROSSFALL,optimized,WS-RING,region,RG-CROSSFALL,RG-CROSSFALL,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FOOTER,optimized,WS-RING,region,RG-FOOTER,RG-FOOTER,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-HEADER,optimized,WS-RING,region,RG-HEADER,RG-HEADER,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-LEFT,optimized,WS-RING,region,RG-LEFT,RG-LEFT,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-LONG,optimized,WS-RING,region,RG-LONG,RG-LONG,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-PLAN,optimized,WS-RING,region,RG-PLAN,RG-PLAN,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-SCENARIO-NAME,optimized,WS-RING,text_editor,Название сценария,Название сценария,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-CLOSURE-POLICY,optimized,WS-RING,combo_box,Политика замыкания кольца,Политика замыкания кольца,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-V0,optimized,WS-RING,numeric_editor,Начальная скорость,Начальная скорость,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-DX,optimized,WS-RING,numeric_editor,Шаг дискретизации,Шаг дискретизации,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-LAPS,optimized,WS-RING,integer_editor,Количество кругов,Количество кругов,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-SEED,optimized,WS-RING,integer_editor,Код генератора,Код генератора,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-ROAD-WIDTH,optimized,WS-RING,numeric_editor,Ширина дороги,Ширина дороги,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-BTN-GENERATE-PREVIEW,optimized,WS-RING,secondary_button,Сгенерировать предварительный просмотр,Сгенерировать предварительный просмотр,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-SEGMENT-LIST,optimized,WS-RING,list_view,Список сегментов,Список сегментов,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-BTN-ADD-SEGMENT,optimized,WS-RING,small_button,Добавить сегмент,Добавить сегмент,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-BTN-DUP-SEGMENT,optimized,WS-RING,small_button,Дублировать сегмент,Дублировать сегмент,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-BTN-DELETE-SEGMENT,optimized,WS-RING,small_button,Удалить сегмент,Удалить сегмент,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-BTN-INSERT-BEFORE,optimized,WS-RING,small_button,Вставить перед,Вставить перед,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-BTN-INSERT-AFTER,optimized,WS-RING,small_button,Вставить после,Вставить после,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-BTN-MOVE-UP,optimized,WS-RING,small_button,Поднять сегмент,Поднять сегмент,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-BTN-MOVE-DOWN,optimized,WS-RING,small_button,Опустить сегмент,Опустить сегмент,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-SEAM-BADGE,optimized,WS-RING,state_badge,Индикатор шва,Индикатор шва,none,low,Семантика понятна и не требует переписывания.,keep,5
+RING-MESSAGE-BAR,optimized,WS-RING,message_bar,Локальная строка сообщений,Локальная строка сообщений,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-PLAN-VIEW,optimized,WS-RING,canvas,План кольца,План кольца,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-PLAN-LEGEND,optimized,WS-RING,legend_panel,Легенда плана кольца,Легенда плана кольца,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-LONG-PROFILE-VIEW,optimized,WS-RING,chart,Продольный профиль,Продольный профиль,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-LONG-STATUS,optimized,WS-RING,state_badge,Статус продольного профиля,Статус продольного профиля,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-CROSSFALL-VIEW,optimized,WS-RING,chart_panel,Поперечный уклон,Поперечный уклон,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-SEAM-DIAGNOSTICS,optimized,WS-RING,message_list,Диагностика замыкания,Диагностика замыкания,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-BTN-CHECK-SEAM,optimized,WS-RING,secondary_button,Проверить шов кольца,Проверить шов кольца,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-BTN-EXPORT-SCENARIO,optimized,WS-RING,secondary_button,Экспортировать сценарий,Экспортировать сценарий,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-BTN-ADD-TO-SUITE,optimized,WS-RING,primary_button,Добавить в испытания,Добавить в испытания,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-SUITE-LINK-SUMMARY,optimized,WS-RING,summary_card,Сводка передачи в испытания,Сводка передачи в испытания,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-EXPORT-ARTIFACTS,optimized,WS-RING,summary_card,Сводка экспортированных файлов,Сводка экспортированных файлов,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-VALIDATION-SUMMARY,optimized,WS-RING,summary_card,Сводка проверок,Сводка проверок,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-HELP-ANCHOR,optimized,WS-RING,help_anchor,Локальный знак вопроса,Локальный знак вопроса,none,low,Семантика понятна и не требует переписывания.,keep,5
+RING-VALIDATION-STRIP,optimized,WS-RING,validation_strip,Полоса валидации,Полоса валидации,none,low,Семантика понятна и не требует переписывания.,keep,5
+RING-UNITS-LEGEND,optimized,WS-RING,units_legend,Легенда единиц измерения,Легенда единиц измерения,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-INS-SEGMENT-CARD,optimized,WS-RING,inspector_card,Карточка выбранного сегмента,Карточка выбранного сегмента,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-INS-SEAM-CARD,optimized,WS-RING,inspector_card,Карточка шва и экспорта,Карточка шва и экспорта,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-INS-HELP-CARD,optimized,WS-RING,inspector_card,Контекстная помощь по элементу,Контекстная помощь по элементу,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-SCENARIO-NAME,optimized,WS-RING,field_row,Название сценария,Название сценария,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-CLOSURE-POLICY,optimized,WS-RING,field_row,Политика замыкания кольца,Политика замыкания кольца,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-V0,optimized,WS-RING,field_row,Начальная скорость прохождения,Начальная скорость прохождения,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-DX,optimized,WS-RING,field_row,Шаг дискретизации дороги,Шаг дискретизации дороги,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-LAPS,optimized,WS-RING,field_row,Количество кругов,Количество кругов,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-SEED,optimized,WS-RING,field_row,Код генератора случайности,Код генератора случайности,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-ROAD-WIDTH,optimized,WS-RING,field_row,Ширина дороги,Ширина дороги,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-START-HEIGHT,optimized,WS-RING,field_row,Высота дороги в начале кольца,Высота дороги в начале кольца,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-SHOV-THRESHOLD,optimized,WS-RING,field_row,Порог допуска шва кольца,Порог допуска шва кольца,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-SEGMENT-ID,optimized,WS-RING,field_row,Номер сегмента,Номер сегмента,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-SEGMENT-LABEL,optimized,WS-RING,field_row,Имя сегмента,Имя сегмента,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-SEGMENT-ENABLED,optimized,WS-RING,field_row,Сегмент включён,Сегмент включён,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-SEGMENT-LENGTH,optimized,WS-RING,field_row,Длина сегмента,Длина сегмента,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-TURN-DIRECTION,optimized,WS-RING,field_row,Направление поворота,Направление поворота,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-TURN-RADIUS,optimized,WS-RING,field_row,Радиус поворота,Радиус поворота,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-ARC-ANGLE,optimized,WS-RING,field_row,Угол дуги,Угол дуги,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-END-HEIGHT,optimized,WS-RING,field_row,Высота дороги в конце сегмента,Высота дороги в конце сегмента,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-CROSSFALL,optimized,WS-RING,field_row,Поперечный уклон,Поперечный уклон,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-SURFACE-TYPE,optimized,WS-RING,field_row,Тип покрытия,Тип покрытия,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-SURFACE-CLASS,optimized,WS-RING,field_row,Класс шероховатости или профиль,Класс шероховатости или профиль,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-SINE-AMPLITUDE,optimized,WS-RING,field_row,Амплитуда синусоиды,Амплитуда синусоиды,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-SINE-WAVELENGTH,optimized,WS-RING,field_row,Длина волны синусоиды,Длина волны синусоиды,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-PHASE-RIGHT,optimized,WS-RING,field_row,Фаза правой колеи,Фаза правой колеи,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-RANDOM-PHASES,optimized,WS-RING,field_row,Случайные фазы,Случайные фазы,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-TARGET-SPEED,optimized,WS-RING,field_row,Целевая скорость прохождения,Целевая скорость прохождения,none,low,Семантика понятна и не требует переписывания.,keep,5
+UI-RG-FLD-PASSAGE-MODE,optimized,WS-RING,field_row,Режим прохождения сегмента,Режим прохождения сегмента,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-RING-scope_global,optimized,WS-RING,field_group,scope global,scope global,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-RING-scope_segment0,optimized,WS-RING,field_group,scope segment0,scope segment0,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-RING-scope_segment,optimized,WS-RING,field_group,scope segment,scope segment,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-RING-scope_last_segment,optimized,WS-RING,field_group,scope last_segment,scope last_segment,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-RING-scope_export,optimized,WS-RING,field_group,scope export,scope export,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-RING-scope_suite_handoff,optimized,WS-RING,field_group,scope suite_handoff,scope suite_handoff,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-START-HEIGHT,optimized,WS-RING,field,Высота дороги в начале кольца,Высота дороги в начале кольца,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-SHOV-THRESHOLD,optimized,WS-RING,field,Порог допуска шва кольца,Порог допуска шва кольца,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-SEGMENT-ID,optimized,WS-RING,field,Номер сегмента,Номер сегмента,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-SEGMENT-LABEL,optimized,WS-RING,field,Имя сегмента,Имя сегмента,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-SEGMENT-ENABLED,optimized,WS-RING,field,Сегмент включён,Сегмент включён,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-SEGMENT-LENGTH,optimized,WS-RING,field,Длина сегмента,Длина сегмента,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-TURN-DIRECTION,optimized,WS-RING,field,Направление поворота,Направление поворота,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-TURN-RADIUS,optimized,WS-RING,field,Радиус поворота,Радиус поворота,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-ARC-ANGLE,optimized,WS-RING,field,Угол дуги,Угол дуги,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-END-HEIGHT,optimized,WS-RING,field,Высота дороги в конце сегмента,Высота дороги в конце сегмента,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-CROSSFALL,optimized,WS-RING,field,Поперечный уклон,Поперечный уклон,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-SURFACE-TYPE,optimized,WS-RING,field,Тип покрытия,Тип покрытия,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-SURFACE-CLASS,optimized,WS-RING,field,Класс шероховатости или профиль,Класс шероховатости или профиль,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-SINE-AMPLITUDE,optimized,WS-RING,field,Амплитуда синусоиды,Амплитуда синусоиды,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-SINE-WAVELENGTH,optimized,WS-RING,field,Длина волны синусоиды,Длина волны синусоиды,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-PHASE-RIGHT,optimized,WS-RING,field,Фаза правой колеи,Фаза правой колеи,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-RANDOM-PHASES,optimized,WS-RING,field,Случайные фазы,Случайные фазы,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-TARGET-SPEED,optimized,WS-RING,field,Целевая скорость прохождения,Целевая скорость прохождения,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-PASSAGE-MODE,optimized,WS-RING,field,Режим прохождения сегмента,Режим прохождения сегмента,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-NOTE,optimized,WS-RING,field,Комментарий сегмента,Комментарий сегмента,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-AUTO-CLOSE,optimized,WS-RING,field,Автозамыкание последнего сегмента,Автозамыкание последнего сегмента,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-START-STATE-DERIVED,optimized,WS-RING,field,Начало текущего сегмента,Начало текущего сегмента,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-LEFT-RUT-HEIGHT,optimized,WS-RING,field,Высота левой колеи,Высота левой колеи,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-RIGHT-RUT-HEIGHT,optimized,WS-RING,field,Высота правой колеи,Высота правой колеи,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-SEAM-DELTA,optimized,WS-RING,field,Расхождение шва,Расхождение шва,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-SEAM-STATUS,optimized,WS-RING,field,Статус шва,Статус шва,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-EXPORT-ROAD-CSV,optimized,WS-RING,field,Путь road_csv,Путь road_csv,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-EXPORT-SCENARIO-JSON,optimized,WS-RING,field,Путь scenario_json,Путь scenario_json,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-EXPORT-META-ROAD,optimized,WS-RING,field,Сводка meta road segments,Сводка meta road segments,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-SUITE-LINK-MODE,optimized,WS-RING,field,Режим связи с матрицей испытаний,Режим связи с матрицей испытаний,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-SUITE-TARGET-TEST-ID,optimized,WS-RING,field,Целевое испытание,Целевое испытание,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-SUITE-STAGE,optimized,WS-RING,field,Стадия испытания,Стадия испытания,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-SUITE-DT,optimized,WS-RING,field,Шаг интегрирования испытания,Шаг интегрирования испытания,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-SUITE-T-END,optimized,WS-RING,field,Время моделирования испытания,Время моделирования испытания,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-SUITE-TYPE,optimized,WS-RING,field,Тип испытания,Тип испытания,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-VALIDATION-LEVEL,optimized,WS-RING,field,Уровень проверки перед экспортом,Уровень проверки перед экспортом,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FLD-DIAGNOSTIC-REPORT,optimized,WS-RING,field,Диагностический отчёт кольца,Диагностический отчёт кольца,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-TASK-CREATE,optimized,WS-RING,task,Создать или импортировать сценарий,Создать или импортировать сценарий,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-TASK-EDIT-GLOBAL,optimized,WS-RING,task,Отредактировать глобальные параметры кольца,Отредактировать глобальные параметры кольца,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-TASK-SELECT-SEGMENT,optimized,WS-RING,task,"Выбрать сегмент в списке, на плане или профиле","Выбрать сегмент в списке, на плане или профиле",none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-TASK-EDIT-SEG0,optimized,WS-RING,task,Редактировать старт и конец сегмента 0,Редактировать старт и конец сегмента 0,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-TASK-EDIT-SEGMENT,optimized,WS-RING,task,Редактировать конец выбранного сегмента,Редактировать конец выбранного сегмента,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-TASK-SET-TURN,optimized,WS-RING,task,Задать явный тип поворота сегмента,Задать явный тип поворота сегмента,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-TASK-SET-LONG,optimized,WS-RING,task,Задать продольный профиль по конечной высоте,Задать продольный профиль по конечной высоте,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-TASK-SET-CROSSFALL,optimized,WS-RING,task,Задать поперечный уклон одним параметром,Задать поперечный уклон одним параметром,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-TASK-CHECK-SEAM,optimized,WS-RING,task,Проверить шов и автозамыкание,Проверить шов и автозамыкание,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-TASK-GENERATE-PREVIEW,optimized,WS-RING,task,Сгенерировать предварительный просмотр,Сгенерировать предварительный просмотр,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-TASK-EXPORT,optimized,WS-RING,task,Экспортировать сценарий,Экспортировать сценарий,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-TASK-HANDOFF-SUITE,optimized,WS-RING,task,Передать сценарий в набор испытаний,Передать сценарий в набор испытаний,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-CHECK-EMPTY,optimized,WS-RING,check,"Проверка, что сценарий создан и сегменты существуют","Проверка, что сценарий создан и сегменты существуют",none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-CHECK-TURN,optimized,WS-RING,check,"Проверка, что поворот задан явно, а не выведен по телеметрии","Проверка, что поворот задан явно, а не выведен по телеметрии",none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-CHECK-LONG,optimized,WS-RING,check,Проверка продольного профиля по началу и концам сегментов,Проверка продольного профиля по началу и концам сегментов,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-CHECK-CROSSFALL,optimized,WS-RING,check,Проверка единственного параметра поперечного уклона,Проверка единственного параметра поперечного уклона,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-CHECK-SEAM,optimized,WS-RING,check,Проверка шва последний → первый,Проверка шва последний → первый,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-CHECK-EXPORT,optimized,WS-RING,check,Проверка актуальности export artifacts,Проверка актуальности export artifacts,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-BLOCK-EMPTY,optimized,WS-RING,block,Сценарий пуст: нет сегментов для генерации и экспорта,Сценарий пуст: нет сегментов для генерации и экспорта,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-BLOCK-FIELDS,optimized,WS-RING,block,Не заполнены обязательные поля сегмента,Не заполнены обязательные поля сегмента,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-BLOCK-SEAM,optimized,WS-RING,block,Шов кольца не согласован,Шов кольца не согласован,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-BLOCK-EXPORT-STALE,optimized,WS-RING,block,Экспорт устарел после правки сценария,Экспорт устарел после правки сценария,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FEEDBACK-SELECTION-SYNC,optimized,WS-RING,feedback,"Выбор сегмента синхронно виден в списке, плане, профиле и inspector","Выбор сегмента синхронно виден в списке, плане, профиле и inspector",none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FEEDBACK-PLAN-PROFILE,optimized,WS-RING,feedback,"План кольца, продольный профиль и поперечный уклон обновлены синхронно","План кольца, продольный профиль и поперечный уклон обновлены синхронно",none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FEEDBACK-TURN,optimized,WS-RING,feedback,Явный тип поворота сегмента виден текстом и графически,Явный тип поворота сегмента виден текстом и графически,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FEEDBACK-SEAM,optimized,WS-RING,feedback,Статус шва кольца виден на текущем экране,Статус шва кольца виден на текущем экране,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FEEDBACK-AUTOCLOSE,optimized,WS-RING,feedback,Последний сегмент автозамыкается на сегмент 0 и помечен как locked,Последний сегмент автозамыкается на сегмент 0 и помечен как locked,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-FEEDBACK-EXPORT,optimized,WS-RING,feedback,Экспорт сценария и связанные артефакты готовы и видимы,Экспорт сценария и связанные артефакты готовы и видимы,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-LOOP-EDIT-SYNC,optimized,WS-RING,loop,Правка сегмента ↔ синхронный preview,Правка сегмента ↔ синхронный preview,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-LOOP-SEAM-FIX,optimized,WS-RING,loop,Исправить шов → повторная проверка,Исправить шов → повторная проверка,none,low,Семантика понятна и не требует переписывания.,keep,5
+RG-LOOP-EXPORT-REVALIDATE,optimized,WS-RING,loop,После правки экспорт помечается stale и требует пересборки,После правки экспорт помечается stale и требует пересборки,mixed_language,medium,Показывать русские эквиваленты и provenance.,rewrite,3
+TREE-WS-OPTIMIZATION,optimized_target,WS-OPTIMIZATION,tree_entry,Оптимизация,Оптимизация,none,low,Семантика понятна и не требует переписывания.,keep,5
+CUR-OPT-HOME-SPLIT,current,WS-OPTIMIZATION,current_defect,Оптимизация размазана между главной поверхностью и отдельной страницей,Оптимизация размазана между главной поверхностью и отдельной страницей,none,low,Семантика понятна и не требует переписывания.,keep,5
+CUR-OPT-ENTRY,current,WS-OPTIMIZATION,current_entry,Открыть страницу оптимизации,Открыть страницу оптимизации,none,low,Семантика понятна и не требует переписывания.,keep,5
+CUR-OPT-MODE-CHOOSER,current,WS-OPTIMIZATION,current_surface,Single-mode chooser на странице оптимизации,Single-mode chooser на странице оптимизации,none,low,Семантика понятна и не требует переписывания.,keep,5
+CUR-OPT-OBJECTIVE-DRIFT,current,WS-OPTIMIZATION,current_defect,Контракт цели staged/distributed может читаться неравномерно,Контракт цели staged/distributed может читаться неравномерно,none,low,Семантика понятна и не требует переписывания.,keep,5
+CUR-OPT-UNDERFILL-HIDDEN,current,WS-OPTIMIZATION,current_defect,Причина недобора seed budget и promotion может читаться не сразу,Причина недобора seed budget и продвижение кандидата может читаться не сразу,jargon,medium,Заменить на «продвижение кандидата».,rewrite,3
+TREE-WS-OPTIMIZATION,optimized,WS-OPTIMIZATION,tree_entry,Оптимизация,Оптимизация,none,low,Семантика понятна и не требует переписывания.,keep,5
+ROOT-WS-OPTIMIZATION,optimized,WS-OPTIMIZATION,workspace,Оптимизация,Оптимизация,none,low,Семантика понятна и не требует переписывания.,keep,5
+DOCK-TREE-WS-OPTIMIZATION,optimized,WS-OPTIMIZATION,dock,Левое дерево,Левое дерево,none,low,Семантика понятна и не требует переписывания.,keep,5
+DOCK-INSPECTOR-WS-OPTIMIZATION,optimized,WS-OPTIMIZATION,dock,Правый inspector и help,Правый inspector и help,none,low,Семантика понятна и не требует переписывания.,keep,5
+DOCK-STATUS-WS-OPTIMIZATION,optimized,WS-OPTIMIZATION,dock,Нижний статус и прогресс,Нижний статус и прогресс,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-SCR-01,optimized,WS-OPTIMIZATION,screen,Оптимизация — обзор и контракт,Оптимизация — обзор и контракт,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-SCR-02,optimized,WS-OPTIMIZATION,screen,Оптимизация — objective contract и hard gate,Оптимизация — контракт целевых показателей и hard условие допуска,jargon+mixed_language,medium,Заменить на «контракт целевых показателей». Заменить на «ограничение» / «условие допуска».,rewrite,3
+OPT-SCR-03,optimized,WS-OPTIMIZATION,screen,Оптимизация — StageRunner настройка,Оптимизация — StageRunner настройка,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-SCR-04,optimized,WS-OPTIMIZATION,screen,Оптимизация — StageRunner выполнение,Оптимизация — StageRunner выполнение,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-SCR-05,optimized,WS-OPTIMIZATION,screen,Оптимизация — distributed coordinator настройка,Оптимизация — distributed coordinator настройка,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-SCR-06,optimized,WS-OPTIMIZATION,screen,Оптимизация — distributed выполнение и история,Оптимизация — distributed выполнение и история,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-SCR-07,optimized,WS-OPTIMIZATION,screen,Оптимизация — история и сравнение,Оптимизация — история и сравнение,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-SCR-08,optimized,WS-OPTIMIZATION,screen,Оптимизация — handoff в анализ и аниматор,Оптимизация — handoff в анализ и аниматор,none,low,Семантика понятна и не требует переписывания.,keep,5
+OT-CONTRACT,optimized,WS-OPTIMIZATION,region,OT-CONTRACT,OT-CONTRACT,none,low,Семантика понятна и не требует переписывания.,keep,5
+OT-DIST,optimized,WS-OPTIMIZATION,region,OT-DIST,OT-DIST,none,low,Семантика понятна и не требует переписывания.,keep,5
+OT-HANDOFF,optimized,WS-OPTIMIZATION,region,OT-HANDOFF,OT-HANDOFF,none,low,Семантика понятна и не требует переписывания.,keep,5
+OT-HEADER,optimized,WS-OPTIMIZATION,region,OT-HEADER,OT-HEADER,none,low,Семантика понятна и не требует переписывания.,keep,5
+OT-HISTORY,optimized,WS-OPTIMIZATION,region,OT-HISTORY,OT-HISTORY,none,low,Семантика понятна и не требует переписывания.,keep,5
+OT-MODE,optimized,WS-OPTIMIZATION,region,OT-MODE,OT-MODE,none,low,Семантика понятна и не требует переписывания.,keep,5
+OT-PROGRESS,optimized,WS-OPTIMIZATION,region,OT-PROGRESS,OT-PROGRESS,none,low,Семантика понятна и не требует переписывания.,keep,5
+OT-STAGE,optimized,WS-OPTIMIZATION,region,OT-STAGE,OT-STAGE,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-TXT-TITLE,optimized,WS-OPTIMIZATION,title_text,Рабочее пространство «Оптимизация»,Рабочее пространство «Оптимизация»,none,low,Специально нормализованная пользовательская подпись.,keep,5
+OPT-BADGE-BASELINE-ID,optimized,WS-OPTIMIZATION,badge,Идентификатор active baseline,Идентификатор активного базового прогона,mixed_language,medium,Специально нормализованная пользовательская подпись.,rewrite,3
+OPT-BADGE-OBJECTIVE-HASH,optimized,WS-OPTIMIZATION,badge,Hash objective contract,Хэш контракта целевых показателей,mixed_language,medium,Специально нормализованная пользовательская подпись.,rewrite,3
+OPT-TXT-MODE,optimized,WS-OPTIMIZATION,info_text,Активный режим оптимизации,Активный режим оптимизации,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BTN-OPEN-BASELINE,optimized,WS-OPTIMIZATION,secondary_button,Открыть baseline,Открыть базовый прогон,mixed_language,medium,В пользовательском слое предпочесть «базовый прогон».,rewrite,3
+OPT-BTN-OPEN-ANALYSIS,optimized,WS-OPTIMIZATION,secondary_button,Открыть анализ,Открыть анализ,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BTN-OPEN-ANIMATOR,optimized,WS-OPTIMIZATION,secondary_button,Открыть аниматор,Открыть аниматор,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-PATH-BASELINE-CONTRACT,optimized,WS-OPTIMIZATION,path_text,Путь к active baseline contract,Путь к активный базовый прогон contract,mixed_language,medium,В пользовательском слое предпочесть «базовый прогон».,rewrite,3
+OPT-BADGE-BASELINE-SOURCE,optimized,WS-OPTIMIZATION,status_badge,Источник baseline,Источник базовый прогон,mixed_language,medium,В пользовательском слое предпочесть «базовый прогон».,rewrite,3
+OPT-BADGE-SNAPSHOT-HASH,optimized,WS-OPTIMIZATION,badge,Hash snapshot,Хэш snapshot,implementation_leak,high,Заменить на «хэш» или скрыть в advanced/provenance. ,rewrite,1
+OPT-BADGE-OBJECTIVE-VERSION,optimized,WS-OPTIMIZATION,badge,Версия objective contract,Версия контракт целевых показателей,mixed_language,medium,Заменить на «контракт целевых показателей».,rewrite,3
+OPT-TXT-OBJECTIVE-STACK,optimized,WS-OPTIMIZATION,info_text,Стек целевых показателей,Стек целевых показателей,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-TXT-HARD-GATE,optimized,WS-OPTIMIZATION,info_text,Жёсткое ограничение,Жёсткое ограничение,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BADGE-CONTRACT-DRIFT,optimized,WS-OPTIMIZATION,status_badge,Несовпадение контрактов,Несовпадение контрактов,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BTN-SHOW-BASELINE-CONTRACT,optimized,WS-OPTIMIZATION,secondary_button,Показать baseline contract,Показать базовый прогон contract,mixed_language,medium,В пользовательском слое предпочесть «базовый прогон».,rewrite,3
+OPT-BTN-SHOW-OBJECTIVE-CONTRACT,optimized,WS-OPTIMIZATION,secondary_button,Показать objective contract,Показать контракт целевых показателей,mixed_language,medium,Заменить на «контракт целевых показателей».,rewrite,3
+OPT-CARD-OBJECTIVE-ORDER,optimized,WS-OPTIMIZATION,visual_card,Графическая иерархия objective stack,Графическая иерархия objective stack,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-CARD-HARD-GATE,optimized,WS-OPTIMIZATION,policy_card,Карточка hard gate,Карточка hard условие допуска,jargon,medium,Заменить на «ограничение» / «условие допуска».,rewrite,3
+OPT-CARD-HASH-PAYLOAD,optimized,WS-OPTIMIZATION,metric_card,Сводка problem hash payload,Сводка problem хэш payload,implementation_leak,high,Заменить на «хэш» или скрыть в advanced/provenance. ,rewrite,1
+OPT-RAD-STAGE,optimized,WS-OPTIMIZATION,radio_option,Режим по стадиям (рекомендуется),Режим по стадиям (рекомендуется),none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-RAD-DIST,optimized,WS-OPTIMIZATION,radio_option,Distributed coordinator,Distributed coordinator,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BADGE-READY,optimized,WS-OPTIMIZATION,status_badge,Готовность запуска,Готовность запуска,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-TXT-MODE-HELP,optimized,WS-OPTIMIZATION,info_text,Что делает выбранный режим,Что делает выбранный режим,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BTN-LAUNCH-STAGE,optimized,WS-OPTIMIZATION,primary_button,Запустить StageRunner,Запустить StageRunner,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BTN-LAUNCH-DIST,optimized,WS-OPTIMIZATION,primary_button,Запустить distributed coordinator,Запустить distributed coordinator,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BTN-STOP,optimized,WS-OPTIMIZATION,danger_button,Остановить,Остановить,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BTN-CANCEL,optimized,WS-OPTIMIZATION,secondary_button,Отменить запуск,Отменить запуск,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BTN-OPEN-DIAG,optimized,WS-OPTIMIZATION,primary_aux_button,Собрать диагностику,Собрать диагностику,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BTN-OPEN-HISTORY,optimized,WS-OPTIMIZATION,secondary_button,Открыть историю,Открыть историю,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-MINUTES,optimized,WS-OPTIMIZATION,number_box,Лимит времени оптимизации,Лимит времени оптимизации,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-JOBS,optimized,WS-OPTIMIZATION,number_box,Параллельные задания,Параллельные задания,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-WARMSTART,optimized,WS-OPTIMIZATION,combo_box,Режим warm-start,Режим warm-start,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-SURR-SAMPLES,optimized,WS-OPTIMIZATION,number_box,Число surrogate samples,Число surroусловие допуска samples,jargon,medium,Заменить на «ограничение» / «условие допуска».,rewrite,3
+OPT-FLD-SURR-TOPK,optimized,WS-OPTIMIZATION,number_box,Surrogate top-k,Surroусловие допуска top-k,jargon,medium,Заменить на «ограничение» / «условие допуска».,rewrite,3
+OPT-FLD-SEED-CAND,optimized,WS-OPTIMIZATION,number_box,Seed кандидатов,Seed кандидатов,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-SEED-COND,optimized,WS-OPTIMIZATION,number_box,Seed условий,Seed условий,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-CHK-SORT-COST,optimized,WS-OPTIMIZATION,check_box,Сортировать тесты по стоимости,Сортировать тесты по стоимости,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-STOP-PEN-1,optimized,WS-OPTIMIZATION,number_box,Порог ранней остановки stage1,Порог ранней остановки stage1,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-STOP-PEN-2,optimized,WS-OPTIMIZATION,number_box,Порог ранней остановки stage2,Порог ранней остановки stage2,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-EPS-REL,optimized,WS-OPTIMIZATION,number_box,System influence eps_rel,System influence eps_rel,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-CHK-ADAPT-EPS,optimized,WS-OPTIMIZATION,check_box,Adaptive epsilon,Adaptive epsilon,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-POLICY-MODE,optimized,WS-OPTIMIZATION,combo_box,Seed/promotion policy,Seed/продвижение кандидата policy,jargon,medium,Заменить на «продвижение кандидата».,rewrite,3
+OPT-CARD-STAGE-BUDGETS,optimized,WS-OPTIMIZATION,visual_card,Графическое распределение бюджета по стадиям,Графическое распределение бюджета по стадиям,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-CARD-STAGE-PRIORITY,optimized,WS-OPTIMIZATION,visual_card,Графический профиль приоритета параметров,Графический профиль приоритета параметров,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-BACKEND,optimized,WS-OPTIMIZATION,combo_box,Вычислительный backend,Вычислительный backend,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-BUDGET,optimized,WS-OPTIMIZATION,number_box,Бюджет распределённой оптимизации,Бюджет распределённой оптимизации,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-MAX-INFLIGHT,optimized,WS-OPTIMIZATION,number_box,Максимум задач в полёте,Максимум задач в полёте,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-Q,optimized,WS-OPTIMIZATION,number_box,Размер пакета предложений q,Размер пакета предложений q,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-DEVICE,optimized,WS-OPTIMIZATION,combo_box,Устройство proposer,Устройство proposer,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-DB-ENGINE,optimized,WS-OPTIMIZATION,combo_box,Движок базы run history,Движок базы run history,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-CHK-RESUME,optimized,WS-OPTIMIZATION,check_box,Возобновлять run,Возобновлять run,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-RUN-ID,optimized,WS-OPTIMIZATION,text_box,Идентификатор distributed run,Идентификатор distributed run,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-STALE-TTL,optimized,WS-OPTIMIZATION,number_box,"TTL устаревания, секунды","TTL устаревания, секунды",none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-CHK-HV-LOG,optimized,WS-OPTIMIZATION,check_box,Писать hypervolume log,Писать hypervolume log,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-EXPORT-EVERY,optimized,WS-OPTIMIZATION,number_box,Период экспорта результатов,Период экспорта результатов,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-CARD-DASK,optimized,WS-OPTIMIZATION,policy_card,Карточка Dask local cluster,Карточка Dask local cluster,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-CARD-RAY,optimized,WS-OPTIMIZATION,policy_card,Карточка Ray runtime,Карточка Ray runtime,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-CARD-BOTORCH,optimized,WS-OPTIMIZATION,policy_card,Карточка BoTorch/qNEHVI,Карточка BoTorch/qNEHVI,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BAR-PROGRESS,optimized,WS-OPTIMIZATION,progress_bar,Общий progress bar,Общий progress bar,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BADGE-STAGE,optimized,WS-OPTIMIZATION,status_badge,Текущая стадия,Текущая стадия,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-TXT-ELAPSED,optimized,WS-OPTIMIZATION,info_text,Прошло времени,Прошло времени,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-TXT-STAGE-ROWS,optimized,WS-OPTIMIZATION,info_text,Строк текущей стадии,Строк текущей стадии,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-TXT-COMBINED-ROWS,optimized,WS-OPTIMIZATION,info_text,Суммарные строки,Суммарные строки,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BADGE-UNDERFILL,optimized,WS-OPTIMIZATION,status_badge,Состояние underfill,Состояние недобор бюджета стадии,jargon,medium,Заменить на объяснимую формулировку о недоборе бюджета.,rewrite,3
+OPT-CARD-GATE-PREVIEW,optimized,WS-OPTIMIZATION,reason_card,Причины gate reject,Причины условие допуска reject,jargon,medium,Заменить на «ограничение» / «условие допуска».,rewrite,3
+OPT-CARD-FOCUS-PREVIEW,optimized,WS-OPTIMIZATION,reason_card,Причины focus-block,Причины focus-block,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-CARD-PROMO-PREVIEW,optimized,WS-OPTIMIZATION,reason_card,Причины promotion-block,Причины продвижение кандидата-block,jargon,medium,Заменить на «продвижение кандидата».,rewrite,3
+OPT-PATH-RUN-DIR,optimized,WS-OPTIMIZATION,path_text,Каталог текущего run,Каталог текущего run,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BTN-OPEN-RUN-DIR,optimized,WS-OPTIMIZATION,secondary_button,Открыть run dir,Открыть run dir,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BTN-OPEN-LOGS,optimized,WS-OPTIMIZATION,secondary_button,Открыть логи,Открыть логи,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-TBL-HISTORY,optimized,WS-OPTIMIZATION,table,Таблица истории optimization run,Таблица истории optimization run,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-HISTORY-FILTER,optimized,WS-OPTIMIZATION,combo_box,Фильтр истории,Фильтр истории,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BTN-COMPARE,optimized,WS-OPTIMIZATION,primary_button,Сравнить выбранные run,Сравнить выбранные run,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-CARD-RUN-CONTRACT,optimized,WS-OPTIMIZATION,policy_card,Карточка выбранного run contract,Карточка выбранного run contract,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-CARD-RUN-METRICS,optimized,WS-OPTIMIZATION,metric_card,Сводка метрик выбранного run,Сводка метрик выбранного run,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BADGE-CONTRACT-MISMATCH,optimized,WS-OPTIMIZATION,status_badge,Разный objective contract,Разный контракт целевых показателей,mixed_language,medium,Заменить на «контракт целевых показателей».,rewrite,3
+OPT-BADGE-HARD-GATE-MISMATCH,optimized,WS-OPTIMIZATION,status_badge,Разный hard gate,Разный hard условие допуска,jargon,medium,Заменить на «ограничение» / «условие допуска».,rewrite,3
+OPT-BTN-OPEN-RESULTS,optimized,WS-OPTIMIZATION,secondary_button,Открыть results CSV,Открыть results CSV,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BTN-MARK-ANALYSIS,optimized,WS-OPTIMIZATION,secondary_button,Открыть в анализе,Открыть в анализе,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BADGE-ANALYSIS-READY,optimized,WS-OPTIMIZATION,status_badge,Готовность handoff в анализ,Готовность handoff в анализ,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BADGE-ANIMATOR-READY,optimized,WS-OPTIMIZATION,status_badge,Готовность handoff в аниматор,Готовность handoff в аниматор,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BADGE-DIAG-READY,optimized,WS-OPTIMIZATION,status_badge,Готовность диагностики,Готовность диагностики,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-TXT-SELECTED-RUN,optimized,WS-OPTIMIZATION,info_text,Выбранный run для передачи,Выбранный run для передачи,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BTN-OPEN-ANALYSIS-SELECTED,optimized,WS-OPTIMIZATION,primary_button,Открыть анализ для run,Открыть анализ для run,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BTN-OPEN-ANIMATOR-SELECTED,optimized,WS-OPTIMIZATION,primary_button,Открыть аниматор для run,Открыть аниматор для run,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BTN-COLLECT-DIAG,optimized,WS-OPTIMIZATION,primary_aux_button,Собрать диагностику,Собрать диагностику,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-CARD-PAYLOAD,optimized,WS-OPTIMIZATION,visual_card,Состав payload для handoff,Состав payload для handoff,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BTN-SHOW-LATEST-OPT,optimized,WS-OPTIMIZATION,secondary_button,Показать latest_optimization,Показать latest_optimization,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BTN-SHOW-SELECTED-CONTRACT,optimized,WS-OPTIMIZATION,secondary_button,Показать selected run contract,Показать selected run contract,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-OPTIMIZATION-scope_global,optimized,WS-OPTIMIZATION,field_group,scope global,scope global,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-OPTIMIZATION-scope_objective_contract,optimized,WS-OPTIMIZATION,field_group,scope objective_contract,scope objective_contract,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-OPTIMIZATION-scope_launch,optimized,WS-OPTIMIZATION,field_group,scope launch,scope launch,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-OPTIMIZATION-scope_stage_runner,optimized,WS-OPTIMIZATION,field_group,scope stage_runner,scope stage_runner,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-OPTIMIZATION-scope_stage_policy,optimized,WS-OPTIMIZATION,field_group,scope stage_policy,scope stage_policy,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-OPTIMIZATION-scope_distributed,optimized,WS-OPTIMIZATION,field_group,scope distributed,scope distributed,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-OPTIMIZATION-scope_distributed_advanced,optimized,WS-OPTIMIZATION,field_group,scope distributed_advanced,scope distributed_advanced,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-OPTIMIZATION-scope_run_progress,optimized,WS-OPTIMIZATION,field_group,scope run_progress,scope run_progress,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-OPTIMIZATION-scope_history,optimized,WS-OPTIMIZATION,field_group,scope history,scope history,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-OPTIMIZATION-scope_handoff,optimized,WS-OPTIMIZATION,field_group,scope handoff,scope handoff,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-BASELINE-ID,optimized,WS-OPTIMIZATION,field,Идентификатор active baseline,Идентификатор активного базового прогона,mixed_language,medium,Специально нормализованная пользовательская подпись.,rewrite,3
+OPT-FLD-BASELINE-HASH,optimized,WS-OPTIMIZATION,field,Hash active baseline,Хэш активный базовый прогон,implementation_leak+mixed_language,high,В пользовательском слое предпочесть «базовый прогон». Заменить на «хэш» или скрыть в advanced/provenance. ,rewrite,1
+OPT-FLD-BASELINE-SOURCE-KIND,optimized,WS-OPTIMIZATION,field,Источник active baseline,Источник активного базового прогона,mixed_language,medium,Специально нормализованная пользовательская подпись.,rewrite,3
+OPT-FLD-SNAPSHOT-HASH,optimized,WS-OPTIMIZATION,field,Hash validated snapshot,Хэш validated snapshot,implementation_leak,high,Заменить на «хэш» или скрыть в advanced/provenance. ,rewrite,1
+OPT-FLD-OBJECTIVE-CONTRACT-ID,optimized,WS-OPTIMIZATION,field,Идентификатор objective contract,Идентификатор контракт целевых показателей,mixed_language,medium,Заменить на «контракт целевых показателей».,rewrite,3
+OPT-FLD-OBJECTIVE-CONTRACT-HASH,optimized,WS-OPTIMIZATION,field,Hash objective contract,Хэш контракта целевых показателей,mixed_language,medium,Специально нормализованная пользовательская подпись.,rewrite,3
+OPT-FLD-OBJECTIVE-STACK,optimized,WS-OPTIMIZATION,field,Стек целевых показателей,Стек целевых показателей,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-HARD-GATE-KEY,optimized,WS-OPTIMIZATION,field,Ключ жёсткого ограничения,Ключ жёсткого ограничения,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-HARD-GATE-TOL,optimized,WS-OPTIMIZATION,field,Порог жёсткого ограничения,Порог жёсткого ограничения,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-ACTIVE-MODE,optimized,WS-OPTIMIZATION,field,Активный режим оптимизации,Активный режим оптимизации,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-READY-STATE,optimized,WS-OPTIMIZATION,field,Готовность запуска optimization,Готовность запуска optimization,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-RUN-NAME,optimized,WS-OPTIMIZATION,field,Имя optimization run,Имя optimization run,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-RUN-DIR,optimized,WS-OPTIMIZATION,field,Каталог optimization run,Каталог optimization run,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-OPT-MINUTES,optimized,WS-OPTIMIZATION,field,Лимит времени оптимизации,Лимит времени оптимизации,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-SEED-CANDIDATES,optimized,WS-OPTIMIZATION,field,Seed кандидатов,Seed кандидатов,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-SEED-CONDITIONS,optimized,WS-OPTIMIZATION,field,Seed условий,Seed условий,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-SORT-TESTS,optimized,WS-OPTIMIZATION,field,Сортировать тесты по стоимости,Сортировать тесты по стоимости,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-INFLUENCE-EPS,optimized,WS-OPTIMIZATION,field,System influence eps_rel,System influence eps_rel,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-ADAPTIVE-EPS,optimized,WS-OPTIMIZATION,field,Adaptive influence epsilon,Adaptive influence epsilon,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-STAGE-POLICY,optimized,WS-OPTIMIZATION,field,Режим seed/promotion policy,Режим seed/продвижение кандидата policy,jargon,medium,Заменить на «продвижение кандидата».,rewrite,3
+OPT-FLD-STAGE0-BUDGET,optimized,WS-OPTIMIZATION,field,Бюджет stage0,Бюджет stage0,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-STAGE1-BUDGET,optimized,WS-OPTIMIZATION,field,Бюджет stage1,Бюджет stage1,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-STAGE2-BUDGET,optimized,WS-OPTIMIZATION,field,Бюджет stage2,Бюджет stage2,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-DIST-BUDGET,optimized,WS-OPTIMIZATION,field,Бюджет distributed run,Бюджет distributed run,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-RESUME,optimized,WS-OPTIMIZATION,field,Возобновлять run,Возобновлять run,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-RUN-ID-DIST,optimized,WS-OPTIMIZATION,field,Идентификатор distributed run,Идентификатор distributed run,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-HV-LOG,optimized,WS-OPTIMIZATION,field,Логировать hypervolume,Логировать hypervolume,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-N-INIT,optimized,WS-OPTIMIZATION,field,Число начальных точек,Число начальных точек,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-MIN-FEASIBLE,optimized,WS-OPTIMIZATION,field,Минимум feasible before qNEHVI,Минимум feasible before qNEHVI,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-BOTORCH-RESTARTS,optimized,WS-OPTIMIZATION,field,Число рестартов BoTorch,Число рестартов BoTorch,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-BOTORCH-RAW-SAMPLES,optimized,WS-OPTIMIZATION,field,Raw samples BoTorch,Raw samples BoTorch,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-BOTORCH-MAXITER,optimized,WS-OPTIMIZATION,field,Максимум итераций BoTorch,Максимум итераций BoTorch,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-BOTORCH-REF-MARGIN,optimized,WS-OPTIMIZATION,field,Запас reference margin,Запас reference margin,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-PROGRESS,optimized,WS-OPTIMIZATION,field,Доля выполнения optimization,Доля выполнения optimization,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-CURRENT-STAGE,optimized,WS-OPTIMIZATION,field,Текущая стадия,Текущая стадия,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-ELAPSED,optimized,WS-OPTIMIZATION,field,Прошло времени,Прошло времени,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-STAGE-ROWS,optimized,WS-OPTIMIZATION,field,Строк текущей стадии,Строк текущей стадии,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-COMBINED-ROWS,optimized,WS-OPTIMIZATION,field,Суммарные строки результата,Суммарные строки результата,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-UNDERFILL,optimized,WS-OPTIMIZATION,field,Underfill стадии,недобор бюджета стадии стадии,jargon,medium,Заменить на объяснимую формулировку о недоборе бюджета.,rewrite,3
+OPT-FLD-GATE-PREVIEW,optimized,WS-OPTIMIZATION,field,Причины gate reject,Причины условие допуска reject,jargon,medium,Заменить на «ограничение» / «условие допуска».,rewrite,3
+OPT-FLD-PROMO-PREVIEW,optimized,WS-OPTIMIZATION,field,Причины promotion block,Причины продвижение кандидата block,jargon,medium,Заменить на «продвижение кандидата».,rewrite,3
+OPT-FLD-SELECTED-RUN,optimized,WS-OPTIMIZATION,field,Выбранный run в истории,Выбранный run в истории,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-SELECTED-RUN-MODE,optimized,WS-OPTIMIZATION,field,Режим выбранного run,Режим выбранного run,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-SELECTED-OBJECTIVE-HASH,optimized,WS-OPTIMIZATION,field,Hash выбранного objective contract,Хэш выбранного контракт целевых показателей,implementation_leak+mixed_language,high,Заменить на «контракт целевых показателей». Заменить на «хэш» или скрыть в advanced/provenance. ,rewrite,1
+OPT-FLD-HARD-GATE-MISMATCH,optimized,WS-OPTIMIZATION,field,Несовпадение hard gate,Несовпадение hard условие допуска,jargon,medium,Заменить на «ограничение» / «условие допуска».,rewrite,3
+OPT-FLD-CONTRACT-MISMATCH,optimized,WS-OPTIMIZATION,field,Несовпадение objective contract,Несовпадение контракт целевых показателей,mixed_language,medium,Заменить на «контракт целевых показателей».,rewrite,3
+OPT-FLD-ANALYSIS-READY,optimized,WS-OPTIMIZATION,field,Готовность передачи в анализ,Готовность передачи в анализ,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-ANIMATOR-READY,optimized,WS-OPTIMIZATION,field,Готовность передачи в аниматор,Готовность передачи в аниматор,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FLD-DIAG-READY,optimized,WS-OPTIMIZATION,field,Готовность диагностики,Готовность диагностики,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-TASK-REVIEW-BASELINE,optimized,WS-OPTIMIZATION,task,Проверить active baseline и его происхождение,Проверить активный базовый прогон и его происхождение,mixed_language,medium,В пользовательском слое предпочесть «базовый прогон».,rewrite,3
+OPT-TASK-REVIEW-CONTRACT,optimized,WS-OPTIMIZATION,task,Проверить stack целей и жёсткое ограничение,Проверить stack целей и жёсткое ограничение,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-TASK-SELECT-MODE,optimized,WS-OPTIMIZATION,task,Выбрать один активный режим запуска,Выбрать один активный режим запуска,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-TASK-CONFIG-STAGE,optimized,WS-OPTIMIZATION,task,Настроить StageRunner,Настроить StageRunner,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-TASK-CONFIG-DIST,optimized,WS-OPTIMIZATION,task,Настроить distributed coordinator,Настроить distributed coordinator,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-TASK-LAUNCH,optimized,WS-OPTIMIZATION,task,Запустить активный режим,Запустить активный режим,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-TASK-MONITOR,optimized,WS-OPTIMIZATION,task,"Следить за текущей стадией, количеством строк и бюджетом","Следить за текущей стадией, количеством строк и бюджетом",none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-TASK-READ-UNDERFILL,optimized,WS-OPTIMIZATION,task,Понять причину underfill и gate decisions,Понять причину недобор бюджета стадии и условие допуска decisions,jargon,medium,Заменить на «ограничение» / «условие допуска». Заменить на объяснимую формулировку о недоборе бюджета.,rewrite,3
+OPT-TASK-READ-PROMOTION,optimized,WS-OPTIMIZATION,task,Понять причину promotion или блокировки кандидата,Понять причину продвижение кандидата или блокировки кандидата,jargon,medium,Заменить на «продвижение кандидата».,rewrite,3
+OPT-TASK-HISTORY,optimized,WS-OPTIMIZATION,task,Сравнить исторические прогоны по контракту,Сравнить исторические прогоны по контракту,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-TASK-OPEN-RESULTS,optimized,WS-OPTIMIZATION,task,Открыть анализ и аниматор от выбранного прогона,Открыть анализ и аниматор от выбранного прогона,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-TASK-STOP-RESUME,optimized,WS-OPTIMIZATION,task,"Остановить, продолжить или возобновить прогон","Остановить, продолжить или возобновить прогон",none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-CHECK-BASELINE,optimized,WS-OPTIMIZATION,check,"Проверка, что baseline готов и не устарел","Проверка, что базовый прогон готов и не устарел",mixed_language,medium,В пользовательском слое предпочесть «базовый прогон».,rewrite,3
+OPT-CHECK-SUITE,optimized,WS-OPTIMIZATION,check,"Проверка, что validated suite snapshot готов","Проверка, что validated suite snapshot готов",none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-CHECK-CONTRACT,optimized,WS-OPTIMIZATION,check,Проверка полноты objective contract и hard gate,Проверка полноты контракт целевых показателей и hard условие допуска,jargon+mixed_language,medium,Заменить на «контракт целевых показателей». Заменить на «ограничение» / «условие допуска».,rewrite,3
+OPT-CHECK-MODE,optimized,WS-OPTIMIZATION,check,Проверка единственного активного режима,Проверка единственного активного режима,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-CHECK-RUN-ID,optimized,WS-OPTIMIZATION,check,Проверка identity problem hash / objective contract,Проверка identity problem хэш / контракт целевых показателей,implementation_leak+mixed_language,high,Заменить на «контракт целевых показателей». Заменить на «хэш» или скрыть в advanced/provenance. ,rewrite,1
+OPT-CHECK-HISTORY,optimized,WS-OPTIMIZATION,check,Проверка совместимости historical run с текущим контрактом,Проверка совместимости historical run с текущим контрактом,mixed_language,medium,Показывать русские эквиваленты и provenance.,rewrite,3
+OPT-BLOCK-BASELINE,optimized,WS-OPTIMIZATION,block,Нет active baseline или он невалиден,Нет активный базовый прогон или он невалиден,mixed_language,medium,В пользовательском слое предпочесть «базовый прогон».,rewrite,3
+OPT-BLOCK-SUITE,optimized,WS-OPTIMIZATION,block,Набор испытаний устарел или невалиден,Набор испытаний устарел или невалиден,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BLOCK-CONTRACT,optimized,WS-OPTIMIZATION,block,Контракт цели/ограничения не подтверждён,Контракт цели/ограничения не подтверждён,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BLOCK-UNDERFILL,optimized,WS-OPTIMIZATION,block,Стадия недобрала seed budget,Стадия недобрала seed budget,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-BLOCK-HISTORY,optimized,WS-OPTIMIZATION,block,Исторический прогон собран по другому контракту,Исторический прогон собран по другому контракту,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FEEDBACK-MODE,optimized,WS-OPTIMIZATION,feedback,Активный режим виден крупно и однозначно,Активный режим виден крупно и однозначно,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FEEDBACK-CONTRACT,optimized,WS-OPTIMIZATION,feedback,Стек целей и жёсткое ограничение видны на одном уровне,Стек целей и жёсткое ограничение видны на одном уровне,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FEEDBACK-STAGE,optimized,WS-OPTIMIZATION,feedback,"Текущая стадия, live rows и elapsed budget видны на текущем экране","Текущая стадия, live rows и elapsed budget видны на текущем экране",none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-FEEDBACK-UNDERFILL,optimized,WS-OPTIMIZATION,feedback,"Underfill, gate reasons и selected counts видны на текущем экране","недобор бюджета стадии, условие допуска reasons и selected counts видны на текущем экране",jargon,medium,Заменить на «ограничение» / «условие допуска». Заменить на объяснимую формулировку о недоборе бюджета.,rewrite,3
+OPT-FEEDBACK-PROMOTION,optimized,WS-OPTIMIZATION,feedback,Причины promotion и blocked promotion видны на текущем экране,Причины продвижение кандидата и blocked продвижение кандидата видны на текущем экране,jargon,medium,Заменить на «продвижение кандидата».,rewrite,3
+OPT-FEEDBACK-HISTORY,optimized,WS-OPTIMIZATION,feedback,History показывает objective contract и hard gate каждого run,History показывает контракт целевых показателей и hard условие допуска каждого run,jargon+mixed_language,medium,Заменить на «контракт целевых показателей». Заменить на «ограничение» / «условие допуска».,rewrite,3
+OPT-LOOP-CONTRACT-TUNE,optimized,WS-OPTIMIZATION,loop,Правка контракта → повторная готовность,Правка контракта → повторная готовность,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-LOOP-RUN-MONITOR,optimized,WS-OPTIMIZATION,loop,Запуск → мониторинг → stop/resume,Запуск → мониторинг → stop/resume,none,low,Семантика понятна и не требует переписывания.,keep,5
+OPT-LOOP-HISTORY-COMPARE,optimized,WS-OPTIMIZATION,loop,История → анализ → возврат к запуску,История → анализ → возврат к запуску,none,low,Семантика понятна и не требует переписывания.,keep,5
+TREE-WS-DIAGNOSTICS,optimized_target,WS-DIAGNOSTICS,tree_entry,Диагностика,Диагностика,none,low,Семантика понятна и не требует переписывания.,keep,5
+CUR-DI-LAUNCH,current,WS-DIAGNOSTICS,current_entry,Открыть GUI диагностики,Открыть диагностики,implementation_leak,high,Убрать слово «GUI» из пользовательской подписи.,rewrite,1
+CUR-DI-SEND-LAUNCH,current,WS-DIAGNOSTICS,current_entry,Открыть GUI отправки результатов,Открыть отправки результатов,implementation_leak,high,Убрать слово «GUI» из пользовательской подписи.,rewrite,1
+CUR-DI-ROUTE-SPLIT,current,WS-DIAGNOSTICS,current_defect,Диагностика и отправка архива конкурируют как первые шаги,Диагностика и отправка архива конкурируют как первые шаги,none,low,Семантика понятна и не требует переписывания.,keep,5
+CUR-DI-BUNDLE-FRESHNESS,current,WS-DIAGNOSTICS,current_defect,"Свежесть, путь и состав последнего bundle читаются не всегда на первом экране","Свежесть, путь и состав последнего архив диагностики читаются не всегда на первом экране",mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+CUR-DI-RUNTIME-HIDDEN,current,WS-DIAGNOSTICS,current_defect,"Helper runtime, selfcheck и provenance видны недостаточно рано","Helper runtime, самопроверка и provenance видны недостаточно рано",mixed_language,medium,Заменить на «самопроверка».,rewrite,3
+TREE-WS-DIAGNOSTICS,optimized,WS-DIAGNOSTICS,tree_entry,Диагностика,Диагностика,none,low,Семантика понятна и не требует переписывания.,keep,5
+ROOT-WS-DIAGNOSTICS,optimized,WS-DIAGNOSTICS,workspace,Диагностика,Диагностика,none,low,Семантика понятна и не требует переписывания.,keep,5
+DOCK-TREE-WS-DIAGNOSTICS,optimized,WS-DIAGNOSTICS,dock,Левое дерево,Левое дерево,none,low,Семантика понятна и не требует переписывания.,keep,5
+DOCK-INSPECTOR-WS-DIAGNOSTICS,optimized,WS-DIAGNOSTICS,dock,Правый inspector и help,Правый inspector и help,none,low,Семантика понятна и не требует переписывания.,keep,5
+DOCK-STATUS-WS-DIAGNOSTICS,optimized,WS-DIAGNOSTICS,dock,Нижний статус и прогресс,Нижний статус и прогресс,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-SCR-01,optimized,WS-DIAGNOSTICS,screen,Диагностика — обзор и готовность,Диагностика — обзор и готовность,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-SCR-02,optimized,WS-DIAGNOSTICS,screen,Диагностика — intake evidence manifest,Диагностика — intake evidence manifest,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-SCR-03,optimized,WS-DIAGNOSTICS,screen,Диагностика — selfcheck и runtime окружение,Диагностика — самопроверка и runtime-окружение,mixed_language,medium,Специально нормализованная пользовательская подпись.,rewrite,3
+DI-SCR-04,optimized,WS-DIAGNOSTICS,screen,Диагностика — состав bundle и политика включения,Диагностика — состав архив диагностики и политика включения,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-SCR-05,optimized,WS-DIAGNOSTICS,screen,Диагностика — health report и triage,Диагностика — health report и triage,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-SCR-06,optimized,WS-DIAGNOSTICS,screen,Диагностика — история и latest bundle,Диагностика — история и latest архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-SCR-07,optimized,WS-DIAGNOSTICS,screen,Диагностика — сборка и отправка bundle,Диагностика — сборка и отправка архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-SCR-08,optimized,WS-DIAGNOSTICS,screen,Диагностика — auto-exit и crash autosave recovery,Диагностика — auto-exit и crash autosave recovery,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-ACTIONS,optimized,WS-DIAGNOSTICS,region,DI-ACTIONS,DI-ACTIONS,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BROWSER,optimized,WS-DIAGNOSTICS,region,DI-BROWSER,DI-BROWSER,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-CONTENTS,optimized,WS-DIAGNOSTICS,region,DI-CONTENTS,DI-CONTENTS,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-HEADER,optimized,WS-DIAGNOSTICS,region,DI-HEADER,DI-HEADER,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-HEALTH,optimized,WS-DIAGNOSTICS,region,DI-HEALTH,DI-HEALTH,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-INSPECTOR,optimized,WS-DIAGNOSTICS,region,DI-INSPECTOR,DI-INSPECTOR,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-MANIFEST,optimized,WS-DIAGNOSTICS,region,DI-MANIFEST,DI-MANIFEST,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-STATUS,optimized,WS-DIAGNOSTICS,region,DI-STATUS,DI-STATUS,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-SUMMARY,optimized,WS-DIAGNOSTICS,region,DI-SUMMARY,DI-SUMMARY,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-TXT-TITLE,optimized,WS-DIAGNOSTICS,title_text,Рабочее пространство «Диагностика»,Рабочее пространство «Диагностика»,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-BUNDLE-MODE,optimized,WS-DIAGNOSTICS,badge,Режим bundle,Режим архива диагностики,mixed_language,medium,Специально нормализованная пользовательская подпись.,rewrite,3
+DI-BADGE-LAST-BUNDLE,optimized,WS-DIAGNOSTICS,badge,Последний bundle,Последний архив диагностики,mixed_language,medium,Специально нормализованная пользовательская подпись.,rewrite,3
+DI-BADGE-LAST-SHA,optimized,WS-DIAGNOSTICS,badge,SHA256,SHA256,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-READY-SOURCE,optimized,WS-DIAGNOSTICS,badge,Источник readiness,Источник readiness,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-HEALTH,optimized,WS-DIAGNOSTICS,badge,Health,Health,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-COLLECT,optimized,WS-DIAGNOSTICS,primary_button,Собрать диагностику,Собрать диагностику,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-OPEN-LATEST,optimized,WS-DIAGNOSTICS,secondary_button,Открыть последний bundle,Открыть последний архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-BTN-RERUN-SELFCHECK,optimized,WS-DIAGNOSTICS,secondary_button,Перезапустить selfcheck,Перезапустить самопроверка,mixed_language,medium,Заменить на «самопроверка».,rewrite,3
+DI-BTN-SHOW-EVIDENCE,optimized,WS-DIAGNOSTICS,secondary_button,Evidence,Evidence,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-HELP,optimized,WS-DIAGNOSTICS,help_button,?,?,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-PARAMETERS,optimized,WS-DIAGNOSTICS,secondary_button,Параметры,Параметры,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-INSTRUMENTS,optimized,WS-DIAGNOSTICS,secondary_button,Инструменты,Инструменты,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-TXT-BROWSER,optimized,WS-DIAGNOSTICS,section_title,Источники и история,Источники и история,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-TREE-SOURCES,optimized,WS-DIAGNOSTICS,tree_view,Дерево источников evidence,Дерево источников evidence,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-CARD-SELECTED-RUN,optimized,WS-DIAGNOSTICS,info_card,Карточка выбранного прогона,Карточка выбранного прогона,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-RUN-ID,optimized,WS-DIAGNOSTICS,badge,Run ID,Run ID,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-RUN-MODE,optimized,WS-DIAGNOSTICS,badge,Run mode,Run mode,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-OBJECTIVE,optimized,WS-DIAGNOSTICS,badge,Objective,Objective,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-BASELINE,optimized,WS-DIAGNOSTICS,badge,Baseline,базовый прогон,mixed_language,medium,В пользовательском слое предпочесть «базовый прогон».,rewrite,3
+DI-BTN-IMPORT-AN,optimized,WS-DIAGNOSTICS,secondary_button,Импорт из анализа,Импорт из анализа,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-IMPORT-AM,optimized,WS-DIAGNOSTICS,secondary_button,Импорт из аниматора,Импорт из аниматора,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-LIST-WARNINGS,optimized,WS-DIAGNOSTICS,list_view,Список truth/mismatch warnings,Список truth/mismatch warnings,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-MANIFEST-ID,optimized,WS-DIAGNOSTICS,badge,Manifest ID,Manifest ID,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-MANIFEST-COUNTS,optimized,WS-DIAGNOSTICS,badge,Source/Derived/Runtime,Source/Derived/Runtime,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-LIST-HISTORY,optimized,WS-DIAGNOSTICS,list_view,История bundle,История архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-TXT-SUMMARY,optimized,WS-DIAGNOSTICS,section_title,Сводка готовности,Сводка готовности,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-CARD-HEALTH,optimized,WS-DIAGNOSTICS,status_card,Карточка health,Карточка health,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-CARD-SELFCHECK,optimized,WS-DIAGNOSTICS,status_card,Карточка selfcheck,Карточка самопроверка,mixed_language,medium,Заменить на «самопроверка».,rewrite,3
+DI-CARD-TRIAGE,optimized,WS-DIAGNOSTICS,status_card,Карточка triage,Карточка triage,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-CARD-AUTOSAVE,optimized,WS-DIAGNOSTICS,status_card,Карточка autosave,Карточка autosave,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-GEOM,optimized,WS-DIAGNOSTICS,badge,Geometry acceptance,Geometry acceptance,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-WORKSPACE,optimized,WS-DIAGNOSTICS,badge,Workspace contract,рабочее пространство contract,mixed_language,medium,Заменить на «рабочее пространство».,rewrite,3
+DI-BADGE-HELPER,optimized,WS-DIAGNOSTICS,badge,Helper python,Helper python,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-FRESHNESS,optimized,WS-DIAGNOSTICS,badge,Свежесть last bundle,Свежесть last архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-MSG-OVERVIEW,optimized,WS-DIAGNOSTICS,message_bar,Строка обзорного сообщения,Строка обзорного сообщения,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-TXT-MANIFEST,optimized,WS-DIAGNOSTICS,section_title,Evidence manifest,Evidence manifest,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FILTER-CLASS,optimized,WS-DIAGNOSTICS,combo_box,Фильтр по классу,Фильтр по классу,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FILTER-SOURCE,optimized,WS-DIAGNOSTICS,combo_box,Фильтр по producer,Фильтр по producer,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FILTER-STATUS,optimized,WS-DIAGNOSTICS,combo_box,Фильтр по статусу,Фильтр по статусу,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-MERGE,optimized,WS-DIAGNOSTICS,primary_button,Слить manifest,Слить manifest,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-DEDUPE,optimized,WS-DIAGNOSTICS,secondary_button,Дедупликация,Дедупликация,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-TABLE-MANIFEST,optimized,WS-DIAGNOSTICS,data_grid,Таблица manifest,Таблица manifest,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-INCLUDE-ALL,optimized,WS-DIAGNOSTICS,secondary_button,Включить обязательное,Включить обязательное,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-CLEAR-OPTIONAL,optimized,WS-DIAGNOSTICS,secondary_button,Снять optional,Снять optional,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-RELOAD-POINTERS,optimized,WS-DIAGNOSTICS,secondary_button,Перечитать pointers,Перечитать pointers,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-SHOW-GAPS,optimized,WS-DIAGNOSTICS,secondary_button,Показать gaps,Показать gaps,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-SOURCE-COUNT,optimized,WS-DIAGNOSTICS,badge,Source,Source,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-DERIVED-COUNT,optimized,WS-DIAGNOSTICS,badge,Derived,Derived,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-RUNTIME-COUNT,optimized,WS-DIAGNOSTICS,badge,Runtime,Runtime,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-TXT-CONTENTS,optimized,WS-DIAGNOSTICS,section_title,Состав bundle,Состав архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-CHK-UI-LOGS,optimized,WS-DIAGNOSTICS,check_box,UI логи,UI логи,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-CHK-RUN-ARTIFACTS,optimized,WS-DIAGNOSTICS,check_box,Run artifacts,Run artifacts,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-CHK-ANIM-CAPTURE,optimized,WS-DIAGNOSTICS,check_box,Animator capture,Animator capture,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-CHK-SYSTEM-INFO,optimized,WS-DIAGNOSTICS,check_box,System info,System info,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-CHK-PERF-TRACE,optimized,WS-DIAGNOSTICS,check_box,Perf trace,Perf trace,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-CHK-BROWSER-TRACE,optimized,WS-DIAGNOSTICS,check_box,Browser trace,Browser trace,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-CHK-RELEASE-META,optimized,WS-DIAGNOSTICS,check_box,Release metadata,Release metadata,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-CHK-SOURCE-ARTS,optimized,WS-DIAGNOSTICS,check_box,Source artifacts,Source artifacts,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-CHK-DERIVED-ARTS,optimized,WS-DIAGNOSTICS,check_box,Derived artifacts,Derived artifacts,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-CHK-RUNTIME-ARTS,optimized,WS-DIAGNOSTICS,check_box,Runtime artifacts,Runtime artifacts,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-TXT-SIZE-EST,optimized,WS-DIAGNOSTICS,label,Оценка размера,Оценка размера,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-SIZE-EST,optimized,WS-DIAGNOSTICS,badge,Размер bundle,Размер архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-INPUT-NOTES,optimized,WS-DIAGNOSTICS,text_area,Заметка к bundle,Заметка к архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-TXT-HEALTH,optimized,WS-DIAGNOSTICS,section_title,Health / triage / selfcheck,Health / triage / самопроверка,mixed_language,medium,Заменить на «самопроверка».,rewrite,3
+DI-BADGE-HEALTH-STATUS,optimized,WS-DIAGNOSTICS,badge,Health status,Health status,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-TRIAGE-STATUS,optimized,WS-DIAGNOSTICS,badge,Triage status,Triage status,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-GEOMETRY,optimized,WS-DIAGNOSTICS,badge,Geometry acceptance,Geometry acceptance,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-EXPORT-VALID,optimized,WS-DIAGNOSTICS,badge,Export validation,Export validation,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-OPEN-HEALTH,optimized,WS-DIAGNOSTICS,secondary_button,Открыть health report,Открыть health report,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-OPEN-TRIAGE,optimized,WS-DIAGNOSTICS,secondary_button,Открыть triage report,Открыть triage report,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-STANDARD-SELFCHECK,optimized,WS-DIAGNOSTICS,secondary_button,Запустить standard selfcheck,Запустить standard самопроверка,mixed_language,medium,Заменить на «самопроверка».,rewrite,3
+DI-BTN-FULL-SELFCHECK,optimized,WS-DIAGNOSTICS,secondary_button,Запустить full selfcheck,Запустить full самопроверка,mixed_language,medium,Заменить на «самопроверка».,rewrite,3
+DI-BADGE-STD-STATUS,optimized,WS-DIAGNOSTICS,badge,Standard,Standard,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-FULL-STATUS,optimized,WS-DIAGNOSTICS,badge,Full,Full,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-VIEW-HEALTH-MD,optimized,WS-DIAGNOSTICS,markdown_view,Просмотр markdown health report,Просмотр markdown health report,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-VIEW-TRIAGE-MD,optimized,WS-DIAGNOSTICS,markdown_view,Просмотр markdown triage report,Просмотр markdown triage report,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-LIST-EVIDENCE-GAPS,optimized,WS-DIAGNOSTICS,list_view,Список evidence gaps,Список evidence gaps,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-LIST-HELPER-ERRORS,optimized,WS-DIAGNOSTICS,list_view,Список helper/runtime ошибок,Список helper/runtime ошибок,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-TXT-ACTIONS,optimized,WS-DIAGNOSTICS,section_title,Финализация и отправка,Финализация и отправка,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-BUILD,optimized,WS-DIAGNOSTICS,primary_button,Собрать SEND bundle,Собрать SEND архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-BTN-OPEN-BUNDLE,optimized,WS-DIAGNOSTICS,secondary_button,Открыть final zip,Открыть final zip,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-OPEN-FOLDER,optimized,WS-DIAGNOSTICS,secondary_button,Открыть папку,Открыть папку,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-COPY-PATH,optimized,WS-DIAGNOSTICS,secondary_button,Скопировать путь,Скопировать путь,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-COPY-SHA,optimized,WS-DIAGNOSTICS,secondary_button,Скопировать SHA256,Скопировать SHA256,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-EXPORT-MANIFEST,optimized,WS-DIAGNOSTICS,secondary_button,Сохранить manifest,Сохранить manifest,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-SEND-MANUAL,optimized,WS-DIAGNOSTICS,secondary_button,Отправить вручную,Отправить вручную,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-INPUT-SEND-TARGET,optimized,WS-DIAGNOSTICS,text_field,Канал/адрес отправки,Канал/адрес отправки,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-SEND-READY,optimized,WS-DIAGNOSTICS,badge,Готовность к отправке,Готовность к отправке,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-LIST-BUILD-PHASES,optimized,WS-DIAGNOSTICS,list_view,Список фаз сборки,Список фаз сборки,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-LIST-BUILD-OUTPUTS,optimized,WS-DIAGNOSTICS,list_view,Список ожидаемых outputs,Список ожидаемых outputs,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-TXT-INSPECTOR,optimized,WS-DIAGNOSTICS,section_title,Свойства и пояснения,Свойства и пояснения,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-SELECTED-TYPE,optimized,WS-DIAGNOSTICS,badge,Тип выбранного объекта,Тип выбранного объекта,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-SELECTED-SOURCE,optimized,WS-DIAGNOSTICS,badge,Источник,Источник,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-PRODUCER,optimized,WS-DIAGNOSTICS,badge,Producer workspace,Producer рабочее пространство,mixed_language,medium,Заменить на «рабочее пространство».,rewrite,3
+DI-VIEW-HELP,optimized,WS-DIAGNOSTICS,help_panel,Развёрнутая помощь,Развёрнутая помощь,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-VIEW-PROPERTIES,optimized,WS-DIAGNOSTICS,property_panel,Свойства выбранного evidence item,Свойства выбранного evidence item,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-LIST-WARNING-LINKS,optimized,WS-DIAGNOSTICS,list_view,Связанные warnings,Связанные warnings,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-LIST-ARTIFACT-POINTERS,optimized,WS-DIAGNOSTICS,list_view,Связанные artifact pointers,Связанные artifact pointers,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-OPEN-ARTIFACT,optimized,WS-DIAGNOSTICS,secondary_button,Открыть артефакт,Открыть артефакт,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BTN-SHOW-IN-FOLDER,optimized,WS-DIAGNOSTICS,secondary_button,Показать в папке,Показать в папке,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-PHASE,optimized,WS-DIAGNOSTICS,badge,Фаза,Фаза,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-PROGRESS-BUILD,optimized,WS-DIAGNOSTICS,progress_bar,Ход сборки,Ход сборки,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-TXT-STATUS-MSG,optimized,WS-DIAGNOSTICS,status_text,Строка статуса,Строка статуса,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-WORKSPACE-DIR,optimized,WS-DIAGNOSTICS,badge,Workspace,рабочее пространство,mixed_language,medium,Заменить на «рабочее пространство».,rewrite,3
+DI-BADGE-UI-LOG-DIR,optimized,WS-DIAGNOSTICS,badge,UI log dir,UI log dir,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-HELPER-PY,optimized,WS-DIAGNOSTICS,badge,Helper python,Helper python,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-LATEST-POINTER,optimized,WS-DIAGNOSTICS,badge,Latest pointer,Latest pointer,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-AUTOSAVE,optimized,WS-DIAGNOSTICS,badge,Autosave mode,Autosave mode,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BADGE-SESSION-STATUS,optimized,WS-DIAGNOSTICS,badge,Статус UI-сессии,Статус UI-сессии,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-DIAGNOSTICS-scope_selected_context,optimized,WS-DIAGNOSTICS,field_group,scope selected_context,scope selected_context,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-DIAGNOSTICS-scope_diagnostics_manifest,optimized,WS-DIAGNOSTICS,field_group,scope diagnostics_manifest,scope diagnostics_manifest,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle,optimized,WS-DIAGNOSTICS,field_group,scope bundle,scope архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+FIELDGROUP-WS-DIAGNOSTICS-scope_latest_bundle,optimized,WS-DIAGNOSTICS,field_group,scope latest_bundle,scope latest_архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+FIELDGROUP-WS-DIAGNOSTICS-scope_health,optimized,WS-DIAGNOSTICS,field_group,scope health,scope health,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-DIAGNOSTICS-scope_selfcheck,optimized,WS-DIAGNOSTICS,field_group,scope selfcheck,scope самопроверка,mixed_language,medium,Заменить на «самопроверка».,rewrite,3
+FIELDGROUP-WS-DIAGNOSTICS-scope_runtime_env,optimized,WS-DIAGNOSTICS,field_group,scope runtime_env,scope runtime_env,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-DIAGNOSTICS-scope_autosave,optimized,WS-DIAGNOSTICS,field_group,scope autosave,scope autosave,none,low,Семантика понятна и не требует переписывания.,keep,5
+FIELDGROUP-WS-DIAGNOSTICS-scope_bundle_policy,optimized,WS-DIAGNOSTICS,field_group,scope bundle_policy,scope архив диагностики_policy,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+FIELDGROUP-WS-DIAGNOSTICS-scope_send,optimized,WS-DIAGNOSTICS,field_group,scope send,scope send,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-RUN-ID,optimized,WS-DIAGNOSTICS,field,Идентификатор прогона,Идентификатор прогона,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-RUN-CONTRACT-HASH,optimized,WS-DIAGNOSTICS,field,Hash контракта прогона,Хэш контракта прогона,implementation_leak,high,Заменить на «хэш» или скрыть в advanced/provenance. ,rewrite,1
+DI-FLD-OBJECTIVE-HASH,optimized,WS-DIAGNOSTICS,field,Hash objective contract,Хэш контракта целевых показателей,mixed_language,medium,Специально нормализованная пользовательская подпись.,rewrite,3
+DI-FLD-BASELINE-HASH,optimized,WS-DIAGNOSTICS,field,Hash active baseline,Хэш активный базовый прогон,implementation_leak+mixed_language,high,В пользовательском слое предпочесть «базовый прогон». Заменить на «хэш» или скрыть в advanced/provenance. ,rewrite,1
+DI-FLD-SUITE-SNAPSHOT-HASH,optimized,WS-DIAGNOSTICS,field,Hash validated suite snapshot,Хэш validated suite snapshot,implementation_leak,high,Заменить на «хэш» или скрыть в advanced/provenance. ,rewrite,1
+DI-FLD-EVIDENCE-MANIFEST-ID,optimized,WS-DIAGNOSTICS,field,Идентификатор evidence manifest,Идентификатор evidence manifest,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-EVIDENCE-SOURCE-COUNT,optimized,WS-DIAGNOSTICS,field,Количество source artifacts,Количество source artifacts,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-EVIDENCE-DERIVED-COUNT,optimized,WS-DIAGNOSTICS,field,Количество derived artifacts,Количество derived artifacts,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-EVIDENCE-RUNTIME-COUNT,optimized,WS-DIAGNOSTICS,field,Количество runtime artifacts,Количество runtime artifacts,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-TRUTH-WARNING-COUNT,optimized,WS-DIAGNOSTICS,field,Количество truth warnings,Количество truth warnings,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-MISSING-ARTIFACT-COUNT,optimized,WS-DIAGNOSTICS,field,Количество пропущенных артефактов,Количество пропущенных артефактов,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-BUNDLE-MODE,optimized,WS-DIAGNOSTICS,field,Режим bundle,Режим архива диагностики,mixed_language,medium,Специально нормализованная пользовательская подпись.,rewrite,3
+DI-FLD-BUNDLE-ID,optimized,WS-DIAGNOSTICS,field,Идентификатор bundle,Идентификатор архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-FLD-BUILD-PHASE,optimized,WS-DIAGNOSTICS,field,Фаза сборки,Фаза сборки,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-BUILD-PROGRESS,optimized,WS-DIAGNOSTICS,field,Ход сборки,Ход сборки,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-BUILD-ERROR-TEXT,optimized,WS-DIAGNOSTICS,field,Текст ошибки сборки,Текст ошибки сборки,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-LATEST-BUNDLE-PATH,optimized,WS-DIAGNOSTICS,field,Путь к последнему bundle,Путь к последнему архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-FLD-LATEST-BUNDLE-SHA256,optimized,WS-DIAGNOSTICS,field,SHA256 последнего bundle,SHA256 последнего архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-FLD-LATEST-BUNDLE-SIZE,optimized,WS-DIAGNOSTICS,field,Размер последнего bundle,Размер последнего архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-FLD-LATEST-BUNDLE-CREATED-UTC,optimized,WS-DIAGNOSTICS,field,Время создания последнего bundle,Время создания последнего архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-FLD-LATEST-BUNDLE-FRESHNESS,optimized,WS-DIAGNOSTICS,field,Свежесть последнего bundle,Свежесть последнего архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-FLD-HEALTH-STATUS,optimized,WS-DIAGNOSTICS,field,Статус health report,Статус health report,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-TRIAGE-STATUS,optimized,WS-DIAGNOSTICS,field,Статус triage,Статус triage,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-GEOMETRY-ACCEPTANCE-STATUS,optimized,WS-DIAGNOSTICS,field,Статус geometry acceptance,Статус geometry acceptance,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-EXPORT-VALIDATION-STATUS,optimized,WS-DIAGNOSTICS,field,Статус export validation,Статус export validation,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-SELFCHECK-STANDARD-STATUS,optimized,WS-DIAGNOSTICS,field,Статус standard selfcheck,Статус standard самопроверка,mixed_language,medium,Заменить на «самопроверка».,rewrite,3
+DI-FLD-SELFCHECK-FULL-STATUS,optimized,WS-DIAGNOSTICS,field,Статус full selfcheck,Статус full самопроверка,mixed_language,medium,Заменить на «самопроверка».,rewrite,3
+DI-FLD-WORKSPACE-CONTRACT-STATUS,optimized,WS-DIAGNOSTICS,field,Статус workspace contract,Статус рабочее пространство contract,mixed_language,medium,Заменить на «рабочее пространство».,rewrite,3
+DI-FLD-PYTHON-EXECUTABLE,optimized,WS-DIAGNOSTICS,field,Фактический python executable,Фактический python executable,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-PREFERRED-HELPER-PYTHON,optimized,WS-DIAGNOSTICS,field,Предпочтительный helper python,Предпочтительный helper python,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-PYTHON-PREFIX,optimized,WS-DIAGNOSTICS,field,Python prefix,Python prefix,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-PYTHON-BASE-PREFIX,optimized,WS-DIAGNOSTICS,field,Python base prefix,Python base prefix,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-VENV-ACTIVE,optimized,WS-DIAGNOSTICS,field,Признак активного venv,Признак активного venv,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-EFFECTIVE-WORKSPACE,optimized,WS-DIAGNOSTICS,field,Effective workspace,Effective рабочее пространство,mixed_language,medium,Заменить на «рабочее пространство».,rewrite,3
+DI-FLD-UI-LOG-DIR,optimized,WS-DIAGNOSTICS,field,Путь к каталогу UI логов,Путь к каталогу UI логов,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-BUNDLE-META-PATH,optimized,WS-DIAGNOSTICS,field,Путь к bundle/meta.json,Путь к архив диагностики/meta.json,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-FLD-TRIAGE-REPORT-PATH,optimized,WS-DIAGNOSTICS,field,Путь к triage report,Путь к triage report,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-HEALTH-REPORT-JSON-PATH,optimized,WS-DIAGNOSTICS,field,Путь к health_report.json,Путь к health_report.json,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-HEALTH-REPORT-MD-PATH,optimized,WS-DIAGNOSTICS,field,Путь к health_report.md,Путь к health_report.md,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-SELFCHECK-STANDARD-PATH,optimized,WS-DIAGNOSTICS,field,Путь к standard selfcheck,Путь к standard самопроверка,mixed_language,medium,Заменить на «самопроверка».,rewrite,3
+DI-FLD-SELFCHECK-FULL-PATH,optimized,WS-DIAGNOSTICS,field,Путь к full selfcheck,Путь к full самопроверка,mixed_language,medium,Заменить на «самопроверка».,rewrite,3
+DI-FLD-EVIDENCE-MANIFEST-PATH,optimized,WS-DIAGNOSTICS,field,Путь к merged evidence manifest,Путь к merged evidence manifest,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-CRASH-AUTOSAVE-REQUEST-ID,optimized,WS-DIAGNOSTICS,field,Идентификатор autosave-запроса,Идентификатор autosave-запроса,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-AUTOSAVE-REQUEST-MODE,optimized,WS-DIAGNOSTICS,field,Режим autosave,Режим autosave,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-INCLUDE-UI-LOGS,optimized,WS-DIAGNOSTICS,field,Включать UI логи,Включать UI логи,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-INCLUDE-RUN-ARTIFACTS,optimized,WS-DIAGNOSTICS,field,Включать run artifacts,Включать run artifacts,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-INCLUDE-ANIMATOR-CAPTURE,optimized,WS-DIAGNOSTICS,field,Включать animator capture,Включать animator capture,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-INCLUDE-SYSTEM-INFO,optimized,WS-DIAGNOSTICS,field,Включать system info,Включать system info,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-INCLUDE-PERF-TRACE,optimized,WS-DIAGNOSTICS,field,Включать perf trace,Включать perf trace,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-INCLUDE-BROWSER-TRACE,optimized,WS-DIAGNOSTICS,field,Включать browser trace,Включать browser trace,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-INCLUDE-RELEASE-METADATA,optimized,WS-DIAGNOSTICS,field,Включать release metadata,Включать release metadata,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-INCLUDE-SOURCE-ARTIFACTS,optimized,WS-DIAGNOSTICS,field,Включать source artifacts,Включать source artifacts,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-INCLUDE-DERIVED-ARTIFACTS,optimized,WS-DIAGNOSTICS,field,Включать derived artifacts,Включать derived artifacts,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-INCLUDE-RUNTIME-ARTIFACTS,optimized,WS-DIAGNOSTICS,field,Включать runtime artifacts,Включать runtime artifacts,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-BUNDLE-NOTES,optimized,WS-DIAGNOSTICS,field,Заметка к bundle,Заметка к архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-FLD-EXTERNAL-SEND-TARGET,optimized,WS-DIAGNOSTICS,field,Целевой адрес/канал отправки,Целевой адрес/канал отправки,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-SEND-READY,optimized,WS-DIAGNOSTICS,field,Готовность к отправке,Готовность к отправке,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-HELPER-RUNTIME-ERROR,optimized,WS-DIAGNOSTICS,field,Ошибка helper runtime,Ошибка helper runtime,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-GEOMETRY-ACCEPTANCE-SUMMARY,optimized,WS-DIAGNOSTICS,field,Сводка geometry acceptance,Сводка geometry acceptance,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-EVIDENCE-GAPS-SUMMARY,optimized,WS-DIAGNOSTICS,field,Сводка evidence gaps,Сводка evidence gaps,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-LAUNCHER-READINESS-SOURCE,optimized,WS-DIAGNOSTICS,field,Источник readiness launcher,Источник readiness launcher,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FLD-LAST-UI-SESSION-STATUS,optimized,WS-DIAGNOSTICS,field,Статус последней UI сессии,Статус последней UI сессии,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-TASK-LOAD-MANIFEST,optimized,WS-DIAGNOSTICS,task,Загрузить и слить evidence manifest,Загрузить и слить evidence manifest,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-TASK-SELFCHECK,optimized,WS-DIAGNOSTICS,task,Запустить standard selfcheck,Запустить standard самопроверка,mixed_language,medium,Заменить на «самопроверка».,rewrite,3
+DI-TASK-RUNTIME,optimized,WS-DIAGNOSTICS,task,Проверить helper runtime и effective workspace,Проверить helper runtime и effective рабочее пространство,mixed_language,medium,Заменить на «рабочее пространство».,rewrite,3
+DI-TASK-CONTENTS,optimized,WS-DIAGNOSTICS,task,Выбрать состав bundle,Выбрать состав архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-TASK-COLLECT,optimized,WS-DIAGNOSTICS,task,Собрать diagnostics bundle,Собрать diagnostics архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-TASK-REVIEW-HEALTH,optimized,WS-DIAGNOSTICS,task,Открыть health report и triage,Открыть health report и triage,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-TASK-OPEN-LAST,optimized,WS-DIAGNOSTICS,task,Открыть последний bundle и путь к нему,Открыть последний архив диагностики и путь к нему,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-TASK-SEND,optimized,WS-DIAGNOSTICS,task,Отправить архив диагностики,Отправить архив диагностики,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-CHECK-CONTEXT,optimized,WS-DIAGNOSTICS,check,"Проверка, что context и evidence manifest загружены","Проверка, что context и evidence manifest загружены",none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-CHECK-SELFCHECK,optimized,WS-DIAGNOSTICS,check,"Проверка, что standard selfcheck актуален","Проверка, что standard самопроверка актуален",mixed_language,medium,Заменить на «самопроверка».,rewrite,3
+DI-CHECK-RUNTIME,optimized,WS-DIAGNOSTICS,check,Проверка helper python и workspace contract,Проверка helper python и рабочее пространство contract,mixed_language,medium,Заменить на «рабочее пространство».,rewrite,3
+DI-CHECK-CONTENTS,optimized,WS-DIAGNOSTICS,check,Проверка обязательного состава bundle,Проверка обязательного состава архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-CHECK-FRESH,optimized,WS-DIAGNOSTICS,check,Проверка свежести последнего bundle,Проверка свежести последнего архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-BLOCK-NO-CONTEXT,optimized,WS-DIAGNOSTICS,block,Нет контекста или evidence manifest,Нет контекста или evidence manifest,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BLOCK-SELFCHECK,optimized,WS-DIAGNOSTICS,block,Standard selfcheck не пройден,Standard самопроверка не пройден,mixed_language,medium,Заменить на «самопроверка».,rewrite,3
+DI-BLOCK-RUNTIME,optimized,WS-DIAGNOSTICS,block,Helper runtime не готов или provenance не подтверждён,Helper runtime не готов или provenance не подтверждён,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-BLOCK-BUNDLE,optimized,WS-DIAGNOSTICS,block,Нельзя отправить: архив диагностики ещё не собран,Нельзя отправить: архив диагностики ещё не собран,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FEEDBACK-HEALTH,optimized,WS-DIAGNOSTICS,feedback,Health summary виден на первом экране,Health summary виден на первом экране,none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FEEDBACK-RUNTIME,optimized,WS-DIAGNOSTICS,feedback,"Показаны helper python, interpreter provenance и effective workspace","Показаны helper python, interpreter provenance и effective рабочее пространство",mixed_language,medium,Заменить на «рабочее пространство».,rewrite,3
+DI-FEEDBACK-CONTENTS,optimized,WS-DIAGNOSTICS,feedback,Состав bundle виден до сборки,Состав архив диагностики виден до сборки,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-FEEDBACK-LAST,optimized,WS-DIAGNOSTICS,feedback,"Видны путь, свежесть и состав последнего bundle","Видны путь, свежесть и состав последнего архив диагностики",mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-FEEDBACK-TRIAGE,optimized,WS-DIAGNOSTICS,feedback,"Health report, triage и geometry acceptance доступны сразу после сборки","Health report, triage и geometry acceptance доступны сразу после сборки",none,low,Семантика понятна и не требует переписывания.,keep,5
+DI-FEEDBACK-SEND,optimized,WS-DIAGNOSTICS,feedback,Отправка архива разрешена только после готового bundle,Отправка архива разрешена только после готового архив диагностики,mixed_language,medium,В пользовательском слое предпочесть «архив диагностики».,rewrite,3
+DI-LOOP-RUNTIME-FIX,optimized,WS-DIAGNOSTICS,loop,Исправить runtime → повторить selfcheck,Исправить runtime → повторить самопроверка,mixed_language,medium,Заменить на «самопроверка».,rewrite,3
+DI-LOOP-COLLECT-REVIEW-SEND,optimized,WS-DIAGNOSTICS,loop,Собрать → проверить → отправить,Собрать → проверить → отправить,none,low,Семантика понятна и не требует переписывания.,keep,5
+MSG-TWO-SPRINGS,optimized,WS-INPUTS,message,На угол установлены две пружины: контур C1 и контур C2,На угол установлены две пружины: контур первого контура (C1) и контур второго контура (C2),notation_without_name,high,Оставлять C1/C2 только вторым планом после полного названия.,rewrite,1
+MSG-LEVELING,optimized,WS-INPUTS,message,"Выравнивание кузова пружинами активно; способ выравнивания и остаточная разница, миллиметры","Выравнивание кузова пружинами активно; способ выравнивания и остаточная разница, миллиметры",none,low,Семантика понятна и не требует переписывания.,keep,5
+MSG-SYMMETRY,optimized,WS-INPUTS,message,Зеркальная симметрия лево/право включена,Зеркальная симметрия лево/право включена,none,low,Семантика понятна и не требует переписывания.,keep,5
+MSG-SEAM,optimized,WS-RING,message,Шов кольца согласован: последний сегмент замкнут на сегмент 0,Шов кольца согласован: последний сегмент замкнут на сегмент 0,none,low,Семантика понятна и не требует переписывания.,keep,5
+MSG-SEAM-BLOCK,optimized,WS-RING,message,Шов кольца не согласован: проверьте конец последнего сегмента и начало сегмента 0,Шов кольца не согласован: проверьте конец последнего сегмента и начало сегмента 0,none,low,Семантика понятна и не требует переписывания.,keep,5
+MSG-OPT-CONTRACT,optimized,WS-OPTIMIZATION,message,Сейчас оптимизируются именно эти целевые показатели и действует это жёсткое ограничение,Сейчас оптимизируются именно эти целевые показатели и действует это жёсткое ограничение,none,low,Семантика понятна и не требует переписывания.,keep,5
+MSG-UNDERFILL,optimized,WS-OPTIMIZATION,message,Стадия недобрала бюджет: показаны причины недобора и условия допуска,Стадия недобрала бюджет: показаны причины недобора и условия допуска,none,low,Семантика понятна и не требует переписывания.,keep,5
+MSG-PROMOTION,optimized,WS-OPTIMIZATION,message,Кандидат не продвинут: показана причина блокировки продвижения,Кандидат не продвинут: показана причина блокировки продвижения,none,low,Семантика понятна и не требует переписывания.,keep,5
+MSG-DIAG-PRIMARY,optimized,WS-DIAGNOSTICS,message,"Сначала соберите диагностику, потом отправляйте архив","Сначала соберите диагностику, потом отправляйте архив",none,low,Семантика понятна и не требует переписывания.,keep,5
+MSG-DIAG-RUNTIME,optimized,WS-DIAGNOSTICS,message,"Helper python, effective workspace и provenance подтверждены","Helper python, effective рабочее пространство и provenance подтверждены",mixed_language,medium,Заменить на «рабочее пространство».,rewrite,3

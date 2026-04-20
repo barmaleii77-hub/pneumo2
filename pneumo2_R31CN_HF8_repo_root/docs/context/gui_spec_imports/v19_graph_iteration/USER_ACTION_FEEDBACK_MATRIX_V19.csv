@@ -1,0 +1,147 @@
+src,dst,workspace,layer,edge_kind,weight,evidence_status,why
+CUR-IN-HOME-LAUNCH,CUR-IN-NUMERIC-ONLY,WS-INPUTS,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-IN-NUMERIC-ONLY,CUR-IN-C1C2-HIDDEN,WS-INPUTS,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-IN-C1C2-HIDDEN,CUR-IN-LEVELING-HIDDEN,WS-INPUTS,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-IN-LEVELING-HIDDEN,CUR-IN-SYMMETRY-HIDDEN,WS-INPUTS,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-IN-SYMMETRY-HIDDEN,CUR-IN-TWIN-PARTIAL,WS-INPUTS,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-IN-TWIN-PARTIAL,CUR-IN-VALIDATE-SAVE,WS-INPUTS,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+ROOT-WS-INPUTS,IN-TASK-SELECT-GROUP,WS-INPUTS,optimized,task_flow,0.22,designed_target,Operational action→feedback route.
+IN-TASK-SELECT-GROUP,IN-TASK-EDIT-GEOMETRY,WS-INPUTS,optimized,task_flow,0.18,designed_target,Operational action→feedback route.
+IN-TASK-EDIT-GEOMETRY,IN-TASK-SELECT-SPRING-CONFIG,WS-INPUTS,optimized,task_flow,0.16,designed_target,Operational action→feedback route.
+IN-TASK-SELECT-SPRING-CONFIG,IN-CHECK-SPRING-VIS,WS-INPUTS,optimized,checks,0.12,designed_target,Operational action→feedback route.
+IN-CHECK-SPRING-VIS,IN-FEEDBACK-C1C2,WS-INPUTS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+IN-TASK-SELECT-SPRING-CONFIG,IN-TASK-ENABLE-LEVELING,WS-INPUTS,optimized,task_flow,0.16,designed_target,Operational action→feedback route.
+IN-TASK-ENABLE-LEVELING,IN-CHECK-LEVELING-VIS,WS-INPUTS,optimized,checks,0.12,designed_target,Operational action→feedback route.
+IN-CHECK-LEVELING-VIS,IN-FEEDBACK-LEVELING,WS-INPUTS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+IN-TASK-EDIT-SYMMETRY,IN-CHECK-SYMMETRY-VIS,WS-INPUTS,optimized,checks,0.12,designed_target,Operational action→feedback route.
+IN-CHECK-SYMMETRY-VIS,IN-FEEDBACK-SYMMETRY,WS-INPUTS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+IN-TASK-EDIT-GEOMETRY,IN-TASK-EDIT-SYMMETRY,WS-INPUTS,optimized,task_flow,0.14,designed_target,Operational action→feedback route.
+IN-TASK-EDIT-SYMMETRY,IN-TASK-EDIT-CYL-POINTS,WS-INPUTS,optimized,task_flow,0.14,designed_target,Operational action→feedback route.
+IN-TASK-EDIT-CYL-POINTS,IN-TASK-OPEN-TWIN,WS-INPUTS,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+IN-TASK-OPEN-TWIN,IN-CHECK-TWIN-SYNC,WS-INPUTS,optimized,checks,0.12,designed_target,Operational action→feedback route.
+IN-CHECK-TWIN-SYNC,IN-FEEDBACK-TWIN,WS-INPUTS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+IN-TASK-OPEN-TWIN,IN-TASK-VALIDATE,WS-INPUTS,optimized,task_flow,0.18,designed_target,Operational action→feedback route.
+IN-TASK-VALIDATE,IN-CHECK-REQ,WS-INPUTS,optimized,checks,0.12,designed_target,Operational action→feedback route.
+IN-TASK-VALIDATE,IN-CHECK-GEOM,WS-INPUTS,optimized,checks,0.12,designed_target,Operational action→feedback route.
+IN-CHECK-REQ,IN-BLOCK-REQ,WS-INPUTS,optimized,blocked_by,0.22,designed_target,Operational action→feedback route.
+IN-CHECK-GEOM,IN-BLOCK-GEOM,WS-INPUTS,optimized,blocked_by,0.22,designed_target,Operational action→feedback route.
+IN-BLOCK-REQ,IN-LOOP-EDIT-VALIDATE,WS-INPUTS,optimized,loops,0.18,designed_target,Operational action→feedback route.
+IN-BLOCK-GEOM,IN-LOOP-EDIT-VALIDATE,WS-INPUTS,optimized,loops,0.18,designed_target,Operational action→feedback route.
+IN-LOOP-EDIT-VALIDATE,IN-TASK-EDIT-GEOMETRY,WS-INPUTS,optimized,returns_to,0.18,designed_target,Operational action→feedback route.
+IN-TASK-VALIDATE,IN-FEEDBACK-VALID,WS-INPUTS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+IN-FEEDBACK-VALID,IN-TASK-SAVE,WS-INPUTS,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+IN-TASK-SAVE,IN-FEEDBACK-SAVED,WS-INPUTS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+IN-FEEDBACK-SAVED,IN-TASK-HANDOFF,WS-INPUTS,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+IN-TASK-HANDOFF,IN-CHECK-REQ,WS-INPUTS,optimized,checks,0.08,designed_target,Operational action→feedback route.
+IN-TASK-HANDOFF,IN-BLOCK-HANDOFF,WS-INPUTS,optimized,blocked_by,0.18,designed_target,Operational action→feedback route.
+IN-FEEDBACK-TWIN,IN-LOOP-GRAPH-SYNC,WS-INPUTS,optimized,loops,0.12,designed_target,Operational action→feedback route.
+IN-LOOP-GRAPH-SYNC,IN-TASK-SELECT-GROUP,WS-INPUTS,optimized,returns_to,0.12,designed_target,Operational action→feedback route.
+CUR-RG-LAUNCH,CUR-RG-NOT-DOMINANT,WS-RING,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-RG-NOT-DOMINANT,CUR-RG-TELEMETRY-MIX,WS-RING,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-RG-TELEMETRY-MIX,CUR-RG-SEAM-AMBIG,WS-RING,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-RG-SEAM-AMBIG,CUR-RG-EXPORT-HIDDEN,WS-RING,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+ROOT-WS-RING,RG-TASK-CREATE,WS-RING,optimized,task_flow,0.22,designed_target,Operational action→feedback route.
+RG-TASK-CREATE,RG-CHECK-EMPTY,WS-RING,optimized,checks,0.12,designed_target,Operational action→feedback route.
+RG-CHECK-EMPTY,RG-BLOCK-EMPTY,WS-RING,optimized,blocked_by,0.22,designed_target,Operational action→feedback route.
+RG-BLOCK-EMPTY,RG-TASK-CREATE,WS-RING,optimized,returns_to,0.18,designed_target,Operational action→feedback route.
+RG-TASK-CREATE,RG-TASK-EDIT-GLOBAL,WS-RING,optimized,task_flow,0.14,designed_target,Operational action→feedback route.
+RG-TASK-EDIT-GLOBAL,RG-TASK-SELECT-SEGMENT,WS-RING,optimized,task_flow,0.14,designed_target,Operational action→feedback route.
+RG-TASK-SELECT-SEGMENT,RG-FEEDBACK-SELECTION-SYNC,WS-RING,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+RG-TASK-SELECT-SEGMENT,RG-TASK-EDIT-SEG0,WS-RING,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+RG-TASK-EDIT-SEG0,RG-TASK-EDIT-SEGMENT,WS-RING,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+RG-TASK-EDIT-SEGMENT,RG-TASK-SET-TURN,WS-RING,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+RG-TASK-SET-TURN,RG-CHECK-TURN,WS-RING,optimized,checks,0.12,designed_target,Operational action→feedback route.
+RG-CHECK-TURN,RG-FEEDBACK-TURN,WS-RING,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+RG-TASK-SET-TURN,RG-TASK-SET-LONG,WS-RING,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+RG-TASK-SET-LONG,RG-CHECK-LONG,WS-RING,optimized,checks,0.12,designed_target,Operational action→feedback route.
+RG-TASK-SET-LONG,RG-TASK-SET-CROSSFALL,WS-RING,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+RG-TASK-SET-CROSSFALL,RG-CHECK-CROSSFALL,WS-RING,optimized,checks,0.12,designed_target,Operational action→feedback route.
+RG-TASK-SET-CROSSFALL,RG-FEEDBACK-PLAN-PROFILE,WS-RING,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+RG-FEEDBACK-PLAN-PROFILE,RG-TASK-CHECK-SEAM,WS-RING,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+RG-TASK-CHECK-SEAM,RG-CHECK-SEAM,WS-RING,optimized,checks,0.12,designed_target,Operational action→feedback route.
+RG-CHECK-SEAM,RG-BLOCK-SEAM,WS-RING,optimized,blocked_by,0.22,designed_target,Operational action→feedback route.
+RG-CHECK-SEAM,RG-FEEDBACK-SEAM,WS-RING,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+RG-FEEDBACK-SEAM,RG-FEEDBACK-AUTOCLOSE,WS-RING,optimized,feedback,0.06,designed_target,Operational action→feedback route.
+RG-BLOCK-SEAM,RG-LOOP-SEAM-FIX,WS-RING,optimized,loops,0.18,designed_target,Operational action→feedback route.
+RG-LOOP-SEAM-FIX,RG-TASK-EDIT-SEG0,WS-RING,optimized,returns_to,0.18,designed_target,Operational action→feedback route.
+RG-FEEDBACK-SEAM,RG-TASK-GENERATE-PREVIEW,WS-RING,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+RG-TASK-GENERATE-PREVIEW,RG-TASK-EXPORT,WS-RING,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+RG-TASK-EXPORT,RG-CHECK-EXPORT,WS-RING,optimized,checks,0.12,designed_target,Operational action→feedback route.
+RG-CHECK-EXPORT,RG-BLOCK-EXPORT-STALE,WS-RING,optimized,blocked_by,0.22,designed_target,Operational action→feedback route.
+RG-CHECK-EXPORT,RG-FEEDBACK-EXPORT,WS-RING,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+RG-BLOCK-EXPORT-STALE,RG-LOOP-EXPORT-REVALIDATE,WS-RING,optimized,loops,0.18,designed_target,Operational action→feedback route.
+RG-LOOP-EXPORT-REVALIDATE,RG-TASK-GENERATE-PREVIEW,WS-RING,optimized,returns_to,0.18,designed_target,Operational action→feedback route.
+RG-FEEDBACK-EXPORT,RG-TASK-HANDOFF-SUITE,WS-RING,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+RG-TASK-HANDOFF-SUITE,RG-FEEDBACK-EXPORT,WS-RING,optimized,feedback,0.06,designed_target,Operational action→feedback route.
+CUR-OPT-HOME-SPLIT,CUR-OPT-ENTRY,WS-OPTIMIZATION,current,task_flow,1.0,evidence_bound,Текущий route и дефицит видимости.
+CUR-OPT-ENTRY,CUR-OPT-MODE-CHOOSER,WS-OPTIMIZATION,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-OPT-MODE-CHOOSER,CUR-OPT-OBJECTIVE-DRIFT,WS-OPTIMIZATION,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-OPT-OBJECTIVE-DRIFT,CUR-OPT-UNDERFILL-HIDDEN,WS-OPTIMIZATION,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+ROOT-WS-OPTIMIZATION,OPT-TASK-REVIEW-BASELINE,WS-OPTIMIZATION,optimized,task_flow,0.18,designed_target,Operational action→feedback route.
+OPT-TASK-REVIEW-BASELINE,OPT-CHECK-BASELINE,WS-OPTIMIZATION,optimized,checks,0.12,designed_target,Operational action→feedback route.
+OPT-CHECK-BASELINE,OPT-BLOCK-BASELINE,WS-OPTIMIZATION,optimized,blocked_by,0.22,designed_target,Operational action→feedback route.
+OPT-TASK-REVIEW-BASELINE,OPT-TASK-REVIEW-CONTRACT,WS-OPTIMIZATION,optimized,task_flow,0.14,designed_target,Operational action→feedback route.
+OPT-TASK-REVIEW-CONTRACT,OPT-CHECK-CONTRACT,WS-OPTIMIZATION,optimized,checks,0.12,designed_target,Operational action→feedback route.
+OPT-TASK-REVIEW-CONTRACT,OPT-FEEDBACK-CONTRACT,WS-OPTIMIZATION,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+OPT-TASK-REVIEW-CONTRACT,OPT-TASK-SELECT-MODE,WS-OPTIMIZATION,optimized,task_flow,0.14,designed_target,Operational action→feedback route.
+OPT-TASK-SELECT-MODE,OPT-CHECK-MODE,WS-OPTIMIZATION,optimized,checks,0.1,designed_target,Operational action→feedback route.
+OPT-CHECK-MODE,OPT-FEEDBACK-MODE,WS-OPTIMIZATION,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+OPT-FEEDBACK-MODE,OPT-TASK-CONFIG-STAGE,WS-OPTIMIZATION,optimized,task_flow,0.1,designed_target,Operational action→feedback route.
+OPT-FEEDBACK-MODE,OPT-TASK-CONFIG-DIST,WS-OPTIMIZATION,optimized,task_flow,0.1,designed_target,Operational action→feedback route.
+OPT-TASK-CONFIG-STAGE,OPT-CHECK-SUITE,WS-OPTIMIZATION,optimized,checks,0.12,designed_target,Operational action→feedback route.
+OPT-TASK-CONFIG-DIST,OPT-CHECK-SUITE,WS-OPTIMIZATION,optimized,checks,0.12,designed_target,Operational action→feedback route.
+OPT-CHECK-SUITE,OPT-BLOCK-SUITE,WS-OPTIMIZATION,optimized,blocked_by,0.22,designed_target,Operational action→feedback route.
+OPT-BLOCK-BASELINE,OPT-LOOP-CONTRACT-TUNE,WS-OPTIMIZATION,optimized,loops,0.18,designed_target,Operational action→feedback route.
+OPT-BLOCK-SUITE,OPT-LOOP-CONTRACT-TUNE,WS-OPTIMIZATION,optimized,loops,0.18,designed_target,Operational action→feedback route.
+OPT-BLOCK-CONTRACT,OPT-LOOP-CONTRACT-TUNE,WS-OPTIMIZATION,optimized,loops,0.18,designed_target,Operational action→feedback route.
+OPT-LOOP-CONTRACT-TUNE,OPT-TASK-REVIEW-BASELINE,WS-OPTIMIZATION,optimized,returns_to,0.18,designed_target,Operational action→feedback route.
+OPT-TASK-CONFIG-STAGE,OPT-TASK-LAUNCH,WS-OPTIMIZATION,optimized,task_flow,0.14,designed_target,Operational action→feedback route.
+OPT-TASK-CONFIG-DIST,OPT-TASK-LAUNCH,WS-OPTIMIZATION,optimized,task_flow,0.14,designed_target,Operational action→feedback route.
+OPT-TASK-LAUNCH,OPT-CHECK-RUN-ID,WS-OPTIMIZATION,optimized,checks,0.1,designed_target,Operational action→feedback route.
+OPT-TASK-LAUNCH,OPT-FEEDBACK-STAGE,WS-OPTIMIZATION,optimized,feedback,0.1,designed_target,Operational action→feedback route.
+OPT-FEEDBACK-STAGE,OPT-TASK-MONITOR,WS-OPTIMIZATION,optimized,task_flow,0.1,designed_target,Operational action→feedback route.
+OPT-TASK-MONITOR,OPT-TASK-READ-UNDERFILL,WS-OPTIMIZATION,optimized,task_flow,0.1,designed_target,Operational action→feedback route.
+OPT-TASK-READ-UNDERFILL,OPT-FEEDBACK-UNDERFILL,WS-OPTIMIZATION,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+OPT-TASK-MONITOR,OPT-TASK-READ-PROMOTION,WS-OPTIMIZATION,optimized,task_flow,0.1,designed_target,Operational action→feedback route.
+OPT-TASK-READ-PROMOTION,OPT-FEEDBACK-PROMOTION,WS-OPTIMIZATION,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+OPT-FEEDBACK-UNDERFILL,OPT-BLOCK-UNDERFILL,WS-OPTIMIZATION,optimized,blocked_by,0.18,designed_target,Operational action→feedback route.
+OPT-BLOCK-UNDERFILL,OPT-LOOP-RUN-MONITOR,WS-OPTIMIZATION,optimized,loops,0.12,designed_target,Operational action→feedback route.
+OPT-TASK-MONITOR,OPT-TASK-HISTORY,WS-OPTIMIZATION,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+OPT-TASK-HISTORY,OPT-CHECK-HISTORY,WS-OPTIMIZATION,optimized,checks,0.1,designed_target,Operational action→feedback route.
+OPT-CHECK-HISTORY,OPT-BLOCK-HISTORY,WS-OPTIMIZATION,optimized,blocked_by,0.18,designed_target,Operational action→feedback route.
+OPT-CHECK-HISTORY,OPT-FEEDBACK-HISTORY,WS-OPTIMIZATION,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+OPT-FEEDBACK-HISTORY,OPT-TASK-OPEN-RESULTS,WS-OPTIMIZATION,optimized,task_flow,0.1,designed_target,Operational action→feedback route.
+OPT-TASK-OPEN-RESULTS,OPT-LOOP-HISTORY-COMPARE,WS-OPTIMIZATION,optimized,loops,0.12,designed_target,Operational action→feedback route.
+OPT-TASK-MONITOR,OPT-TASK-STOP-RESUME,WS-OPTIMIZATION,optimized,task_flow,0.1,designed_target,Operational action→feedback route.
+OPT-TASK-STOP-RESUME,OPT-LOOP-RUN-MONITOR,WS-OPTIMIZATION,optimized,loops,0.12,designed_target,Operational action→feedback route.
+CUR-DI-LAUNCH,CUR-DI-SEND-LAUNCH,WS-DIAGNOSTICS,current,task_flow,1.0,evidence_bound,Текущий route и дефицит видимости.
+CUR-DI-SEND-LAUNCH,CUR-DI-ROUTE-SPLIT,WS-DIAGNOSTICS,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-DI-ROUTE-SPLIT,CUR-DI-BUNDLE-FRESHNESS,WS-DIAGNOSTICS,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+CUR-DI-BUNDLE-FRESHNESS,CUR-DI-RUNTIME-HIDDEN,WS-DIAGNOSTICS,current,task_flow,1.2,evidence_bound,Текущий route и дефицит видимости.
+ROOT-WS-DIAGNOSTICS,DI-TASK-LOAD-MANIFEST,WS-DIAGNOSTICS,optimized,task_flow,0.18,designed_target,Operational action→feedback route.
+DI-TASK-LOAD-MANIFEST,DI-CHECK-CONTEXT,WS-DIAGNOSTICS,optimized,checks,0.12,designed_target,Operational action→feedback route.
+DI-CHECK-CONTEXT,DI-BLOCK-NO-CONTEXT,WS-DIAGNOSTICS,optimized,blocked_by,0.22,designed_target,Operational action→feedback route.
+DI-BLOCK-NO-CONTEXT,DI-TASK-LOAD-MANIFEST,WS-DIAGNOSTICS,optimized,returns_to,0.18,designed_target,Operational action→feedback route.
+DI-TASK-LOAD-MANIFEST,DI-TASK-SELFCHECK,WS-DIAGNOSTICS,optimized,task_flow,0.14,designed_target,Operational action→feedback route.
+DI-TASK-SELFCHECK,DI-CHECK-SELFCHECK,WS-DIAGNOSTICS,optimized,checks,0.12,designed_target,Operational action→feedback route.
+DI-TASK-SELFCHECK,DI-FEEDBACK-HEALTH,WS-DIAGNOSTICS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+DI-TASK-SELFCHECK,DI-TASK-RUNTIME,WS-DIAGNOSTICS,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+DI-TASK-RUNTIME,DI-CHECK-RUNTIME,WS-DIAGNOSTICS,optimized,checks,0.12,designed_target,Operational action→feedback route.
+DI-CHECK-RUNTIME,DI-BLOCK-RUNTIME,WS-DIAGNOSTICS,optimized,blocked_by,0.22,designed_target,Operational action→feedback route.
+DI-CHECK-RUNTIME,DI-FEEDBACK-RUNTIME,WS-DIAGNOSTICS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+DI-BLOCK-RUNTIME,DI-LOOP-RUNTIME-FIX,WS-DIAGNOSTICS,optimized,loops,0.18,designed_target,Operational action→feedback route.
+DI-LOOP-RUNTIME-FIX,DI-TASK-SELFCHECK,WS-DIAGNOSTICS,optimized,returns_to,0.18,designed_target,Operational action→feedback route.
+DI-FEEDBACK-RUNTIME,DI-TASK-CONTENTS,WS-DIAGNOSTICS,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+DI-TASK-CONTENTS,DI-CHECK-CONTENTS,WS-DIAGNOSTICS,optimized,checks,0.12,designed_target,Operational action→feedback route.
+DI-TASK-CONTENTS,DI-FEEDBACK-CONTENTS,WS-DIAGNOSTICS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+DI-FEEDBACK-CONTENTS,DI-TASK-COLLECT,WS-DIAGNOSTICS,optimized,task_flow,0.12,designed_target,Operational action→feedback route.
+DI-TASK-COLLECT,DI-CHECK-FRESH,WS-DIAGNOSTICS,optimized,checks,0.1,designed_target,Operational action→feedback route.
+DI-TASK-COLLECT,DI-FEEDBACK-LAST,WS-DIAGNOSTICS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+DI-FEEDBACK-LAST,DI-TASK-REVIEW-HEALTH,WS-DIAGNOSTICS,optimized,task_flow,0.1,designed_target,Operational action→feedback route.
+DI-TASK-REVIEW-HEALTH,DI-FEEDBACK-TRIAGE,WS-DIAGNOSTICS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+DI-FEEDBACK-TRIAGE,DI-TASK-OPEN-LAST,WS-DIAGNOSTICS,optimized,task_flow,0.1,designed_target,Operational action→feedback route.
+DI-TASK-OPEN-LAST,DI-TASK-SEND,WS-DIAGNOSTICS,optimized,task_flow,0.1,designed_target,Operational action→feedback route.
+DI-TASK-SEND,DI-BLOCK-BUNDLE,WS-DIAGNOSTICS,optimized,blocked_by,0.18,designed_target,Operational action→feedback route.
+DI-TASK-SEND,DI-FEEDBACK-SEND,WS-DIAGNOSTICS,optimized,feedback,0.08,designed_target,Operational action→feedback route.
+DI-BLOCK-BUNDLE,DI-LOOP-COLLECT-REVIEW-SEND,WS-DIAGNOSTICS,optimized,loops,0.18,designed_target,Operational action→feedback route.
+DI-LOOP-COLLECT-REVIEW-SEND,DI-TASK-COLLECT,WS-DIAGNOSTICS,optimized,returns_to,0.18,designed_target,Operational action→feedback route.

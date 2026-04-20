@@ -28,6 +28,17 @@
 - `docs/context/gui_spec_imports/v38_actualized_with_v10/V10_RECONCILIATION_MATRIX.csv` — matrix integration of V10 findings into V38.
 - `docs/context/gui_spec_imports/v38_actualized_with_v10/REQUIREMENTS_MATRIX.csv` — requirements matrix with `REQ-046` ... `REQ-050`.
 - `docs/context/release_readiness/V38_ACTUALIZED_WITH_V10_KB_IMPORT_AUDIT_2026-04-19.md` — local V38+V10 import audit: read coverage, priority, conflict resolution and open runtime gaps.
+- `docs/context/gui_spec_imports/v19_graph_iteration/README.md` — active graph/action-feedback refinement layer for `WS-INPUTS`, `WS-RING`, `WS-OPTIMIZATION` and `WS-DIAGNOSTICS`; imported from `pneumo_gui_graph_iteration_v19.zip` and not a runtime-closure proof.
+- `docs/context/gui_spec_imports/v19_graph_iteration/EXEC_SUMMARY.json` — V19 package metrics and workspace scope.
+- `docs/context/gui_spec_imports/v19_graph_iteration/GRAPH_ANALYSIS_REPORT_V19.md` — action-to-feedback graph analysis and evidence boundary.
+- `docs/context/gui_spec_imports/v19_graph_iteration/SEMANTIC_FIX_PRIORITY_V19.md` — semantic label/microcopy priority list.
+- `docs/context/gui_spec_imports/v19_graph_iteration/USER_ACTION_FEEDBACK_MATRIX_V19.csv` — user action -> feedback route matrix.
+- `docs/context/gui_spec_imports/v19_graph_iteration/TASK_CHECK_BLOCK_LOOP_MATRIX_V19.csv` — task/check/block/loop contract matrix.
+- `docs/context/gui_spec_imports/v19_graph_iteration/COGNITIVE_VISIBILITY_MATRIX_V19.csv` — cognitive visibility requirements.
+- `docs/context/gui_spec_imports/v19_graph_iteration/TREE_DIRECT_OPEN_MATRIX_V19.csv` — direct-open route requirements.
+- `docs/context/gui_spec_imports/v19_graph_iteration/DOCK_WINDOW_AND_DOCK_WIDGET_MATRIX_V19.csv` — dock/window expectations.
+- `docs/context/gui_spec_imports/v19_graph_iteration/GUI_LABEL_SEMANTIC_AUDIT_V19.csv` — label semantic audit for optimized/current graph nodes.
+- `docs/context/gui_spec_imports/v19_graph_iteration/SUBGRAPH_OPTIMIZED_WS-INPUTS_V19.dot` — optimized `WS-INPUTS` subgraph; companion current/optimized DOT files cover `WS-RING`, `WS-OPTIMIZATION` and `WS-DIAGNOSTICS`.
 - `docs/context/gui_spec_imports/v38_github_kb_commit_ready/README.md` — predecessor consolidated GUI-spec / knowledge-base commit-ready layer из `pneumo_codex_tz_spec_connector_reconciled_v38_github_kb_commit_ready.zip`; не является runtime-closure proof.
 - `docs/context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md` — V38 human-readable technical specification with local ambiguity audit boundary.
 - `docs/context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml` — V38 machine-readable successor GUI-spec/TZ connector.
@@ -148,16 +159,17 @@
 2. `18_PNEUMOAPP_WINDOWS_GUI_SPEC.md`
 3. `docs/context/gui_spec_imports/foundations/*` как upstream intent/provenance layer
 4. `docs/context/gui_spec_imports/v38_actualized_with_v10/*` как current active successor KB/TZ/spec layer, плюс `docs/context/release_readiness/V38_ACTUALIZED_WITH_V10_KB_IMPORT_AUDIT_2026-04-19.md` для снятия неоднозначностей; не runtime-closure proof
-5. `docs/context/gui_spec_imports/v38_github_kb_commit_ready/*` как predecessor V38 KB/TZ/spec layer, плюс `docs/context/release_readiness/V38_KB_IMPORT_AUDIT_2026-04-18.md`
-6. `docs/context/gui_spec_imports/v37_github_kb_supplement/*` как predecessor KB/TZ/spec supplement/provenance layer
-7. `docs/context/gui_spec_imports/v33_connector_reconciled/README.md` как connector-reconciled GUI/TZ digest
-8. `docs/context/gui_spec_imports/v32_connector_reconciled/README.md`, `PARALLEL_CHAT_WORKSTREAMS.md` и `RELEASE_GATE_ACCEPTANCE_MAP.md` как previous digest/workstream/release-evidence layer
-9. `docs/context/gui_spec_imports/v3/*`
-10. `docs/context/gui_spec_imports/v13_ring_editor_migration/*` для `WS-RING` и handoff `WS-RING -> WS-SUITE`
-11. `docs/context/gui_spec_imports/v12_design_recovery/*` как historical design-recovery layer
-12. `docs/context/gui_spec_archive_lineage.json` и `docs/context/GUI_SPEC_ARCHIVE_LINEAGE.md`
-13. older versions в `docs/context/gui_spec_imports/*`
-14. `docs/gui_chat_prompts/*`
+5. `docs/context/gui_spec_imports/v19_graph_iteration/*` как graph/action-feedback refinement для `WS-INPUTS`, `WS-RING`, `WS-OPTIMIZATION` и `WS-DIAGNOSTICS`; не runtime-closure proof
+6. `docs/context/gui_spec_imports/v38_github_kb_commit_ready/*` как predecessor V38 KB/TZ/spec layer, плюс `docs/context/release_readiness/V38_KB_IMPORT_AUDIT_2026-04-18.md`
+7. `docs/context/gui_spec_imports/v37_github_kb_supplement/*` как predecessor KB/TZ/spec supplement/provenance layer
+8. `docs/context/gui_spec_imports/v33_connector_reconciled/README.md` как connector-reconciled GUI/TZ digest
+9. `docs/context/gui_spec_imports/v32_connector_reconciled/README.md`, `PARALLEL_CHAT_WORKSTREAMS.md` и `RELEASE_GATE_ACCEPTANCE_MAP.md` как previous digest/workstream/release-evidence layer
+10. `docs/context/gui_spec_imports/v3/*`
+11. `docs/context/gui_spec_imports/v13_ring_editor_migration/*` для `WS-RING` и handoff `WS-RING -> WS-SUITE`
+12. `docs/context/gui_spec_imports/v12_design_recovery/*` как historical design-recovery layer
+13. `docs/context/gui_spec_archive_lineage.json` и `docs/context/GUI_SPEC_ARCHIVE_LINEAGE.md`
+14. older versions в `docs/context/gui_spec_imports/*`
+15. `docs/gui_chat_prompts/*`
 
 ## Зафиксированные внешние AI snapshots
 
@@ -176,7 +188,7 @@
 ## Правило использования
 
 - Внешние ссылки не заменяют локальный канон.
-- Для GUI-first задач сначала читать `17`, затем `18`, затем `gui_spec_imports/foundations/*`, затем `gui_spec_imports/v38_actualized_with_v10/*` и `context/release_readiness/V38_ACTUALIZED_WITH_V10_KB_IMPORT_AUDIT_2026-04-19.md` для active KB/TZ/spec reconciliation, затем `gui_spec_imports/v38_github_kb_commit_ready/*` и `context/release_readiness/V38_KB_IMPORT_AUDIT_2026-04-18.md` как predecessor V38 provenance, затем `gui_spec_imports/v37_github_kb_supplement/*`, затем `gui_spec_imports/v33_connector_reconciled/README.md` и `COMPLETENESS_ASSESSMENT.md`, затем `gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md`, `gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md`, затем `gui_spec_imports/v3/*`, parity docs и только потом lane-level prompts.
+- Для GUI-first задач сначала читать `17`, затем `18`, затем `gui_spec_imports/foundations/*`, затем `gui_spec_imports/v38_actualized_with_v10/*` и `context/release_readiness/V38_ACTUALIZED_WITH_V10_KB_IMPORT_AUDIT_2026-04-19.md` для active KB/TZ/spec reconciliation, затем `gui_spec_imports/v19_graph_iteration/*` для action-feedback уточнений `WS-INPUTS`/`WS-RING`/`WS-OPTIMIZATION`/`WS-DIAGNOSTICS`, затем `gui_spec_imports/v38_github_kb_commit_ready/*` и `context/release_readiness/V38_KB_IMPORT_AUDIT_2026-04-18.md` как predecessor V38 provenance, затем `gui_spec_imports/v37_github_kb_supplement/*`, затем `gui_spec_imports/v33_connector_reconciled/README.md` и `COMPLETENESS_ASSESSMENT.md`, затем `gui_spec_imports/v32_connector_reconciled/PARALLEL_CHAT_WORKSTREAMS.md`, `gui_spec_imports/v32_connector_reconciled/RELEASE_GATE_ACCEPTANCE_MAP.md`, затем `gui_spec_imports/v3/*`, parity docs и только потом lane-level prompts.
 - Для release-readiness merge сначала сверять `docs/context/release_readiness/WORKTREE_TRIAGE_2026-04-17.md`, `docs/context/release_readiness/V32_16_ACCEPTANCE_NOTE_2026-04-17.md`, `docs/context/release_readiness/PROJECT_KB_CONFORMANCE_AUDIT_2026-04-17.md`, `docs/context/release_readiness/DESKTOP_STARTUP_VISIBLE_PROOF_2026-04-17.md` и `docs/context/release_readiness/BRANCH_CLEANUP_AND_NEXT_WORK_PLAN_2026-04-18.md`, затем принимать V32-16 docs/helper patch и только после этого разбирать lane-пакеты с их evidence.
 - Для новых parallel-chat starts после приемки 10 GUI handoffs, `7823dc2` resolution и V38+V10 import сначала сверять `docs/context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md`, `docs/context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md`, `docs/context/release_readiness/V38_ACTUALIZED_WITH_V10_KB_IMPORT_AUDIT_2026-04-19.md`, active V38+V10 `GUI_SPEC.yaml`, `WORKSPACE_CONTRACT_MATRIX.csv`, `ACCEPTANCE_MATRIX.csv`, `PIPELINE_OPTIMIZED.dot`, `LAUNCHER_HIERARCHY_RECONCILIATION_V10.md` и использовать текущие GUI prompt packs; historical chat branches and worktrees are not working sources.
 - Imported JSON/DOT/CSV используются как reference artifacts, а не как единственный источник правды.

@@ -1,0 +1,16 @@
+{
+  "package_id": "PNEUMO-GUI-GRAPH-V19-WORKSPACE-ACTION-FEEDBACK",
+  "workspaces": [
+    "WS-INPUTS",
+    "WS-RING",
+    "WS-OPTIMIZATION",
+    "WS-DIAGNOSTICS"
+  ],
+  "current_total_nodes": 26,
+  "current_total_edges": 22,
+  "optimized_total_nodes": 776,
+  "optimized_total_edges": 1087,
+  "semantic_rows": 812,
+  "path_scenarios": 12,
+  "focus": "internal action→feedback subgraphs with task/check/block/loop/cognitive-visibility"
+}

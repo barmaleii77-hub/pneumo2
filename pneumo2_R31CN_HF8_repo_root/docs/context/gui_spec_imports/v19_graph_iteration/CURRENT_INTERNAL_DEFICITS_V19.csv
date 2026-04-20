@@ -1,0 +1,23 @@
+workspace,node_id,current_issue,why_it_hurts
+WS-INPUTS,CUR-IN-HOME-LAUNCH,Открыть редактор исходных данных,Подтвержден launchpoint; внутренности current evidence-bound.
+WS-INPUTS,CUR-IN-NUMERIC-ONLY,Числовое редактирование без достаточной графической обратной связи,Проблема видимости выбора пружин/выравнивания/симметрии.
+WS-INPUTS,CUR-IN-C1C2-HIDDEN,"Неочевидно, что на угол выбраны две пружины",Критичный когнитивный дефект.
+WS-INPUTS,CUR-IN-LEVELING-HIDDEN,"Неочевидно, что включено выравнивание пружинами и как оно выполнено",Критичный когнитивный дефект.
+WS-INPUTS,CUR-IN-SYMMETRY-HIDDEN,Неочевидна зеркальная симметрия лево/право,Критичный когнитивный дефект.
+WS-INPUTS,CUR-IN-TWIN-PARTIAL,"Графический двойник либо слабый, либо не синхронизирован полностью",Нарушает правило графического представления вводимых данных.
+WS-INPUTS,CUR-IN-VALIDATE-SAVE,Проверить и сохранить,Финальное действие перед handoff.
+WS-RING,CUR-RG-LAUNCH,Открыть редактор кольца или сценариев,Current старт не доминирует достаточно явно.
+WS-RING,CUR-RG-NOT-DOMINANT,Редактор кольца не доминирует в стартовом маршруте,Сценарный центр продукта ослаблен.
+WS-RING,CUR-RG-TELEMETRY-MIX,Разгон и торможение смешиваются с семантикой сегмента,Нарушение доменной семантики.
+WS-RING,CUR-RG-SEAM-AMBIG,Шов и источник цикличности выражены недостаточно явно,Пользователь может не понять замыкание.
+WS-RING,CUR-RG-EXPORT-HIDDEN,Экспорт и handoff в suite видны не как следствие source-of-truth,Нарушение понятности pipeline.
+WS-OPTIMIZATION,CUR-OPT-HOME-SPLIT,Оптимизация размазана между главной поверхностью и отдельной страницей,Ранняя путаница старта.
+WS-OPTIMIZATION,CUR-OPT-ENTRY,Открыть страницу оптимизации,Подтверждён live route.
+WS-OPTIMIZATION,CUR-OPT-MODE-CHOOSER,Single-mode chooser на странице оптимизации,Это уже хороший текущий слой.
+WS-OPTIMIZATION,CUR-OPT-OBJECTIVE-DRIFT,Контракт цели staged/distributed может читаться неравномерно,Даже после HF8 требует явной surfacing.
+WS-OPTIMIZATION,CUR-OPT-UNDERFILL-HIDDEN,Причина недобора seed budget и promotion может читаться не сразу,"Live stage-policy слой был добит серией hotfix, но маршрут остаётся сложным."
+WS-DIAGNOSTICS,CUR-DI-LAUNCH,Открыть GUI диагностики,Подтверждён launchpoint.
+WS-DIAGNOSTICS,CUR-DI-SEND-LAUNCH,Открыть GUI отправки результатов,Конкурирующий стартовый route.
+WS-DIAGNOSTICS,CUR-DI-ROUTE-SPLIT,Диагностика и отправка архива конкурируют как первые шаги,Нарушение доминирующего diagnostics-route.
+WS-DIAGNOSTICS,CUR-DI-BUNDLE-FRESHNESS,"Свежесть, путь и состав последнего bundle читаются не всегда на первом экране",Операционная неопределённость.
+WS-DIAGNOSTICS,CUR-DI-RUNTIME-HIDDEN,"Helper runtime, selfcheck и provenance видны недостаточно рано","Пользователь не понимает, можно ли доверять bundle."

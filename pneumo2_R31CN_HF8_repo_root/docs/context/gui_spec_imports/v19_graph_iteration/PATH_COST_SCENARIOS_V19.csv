@@ -1,0 +1,13 @@
+scenario_id,workspace,user_goal,current_start,current_end,optimized_start,optimized_end,current_cost_estimated,optimized_cost,delta_abs,delta_pct,current_status,optimized_status
+SCN-IN-01,WS-INPUTS,"Понять, что на угол выбраны две пружины",CUR-IN-HOME-LAUNCH,CUR-IN-C1C2-HIDDEN,TREE-WS-INPUTS,IN-FEEDBACK-C1C2,2.4,1.11,1.29,53.8,evidence_bound_estimate,canonical_target
+SCN-IN-02,WS-INPUTS,"Понять, как включено выравнивание и на сколько выровнено",CUR-IN-HOME-LAUNCH,CUR-IN-LEVELING-HIDDEN,TREE-WS-INPUTS,IN-FEEDBACK-LEVELING,3.6,1.27,2.33,64.7,evidence_bound_estimate,canonical_target
+SCN-IN-03,WS-INPUTS,Проверить входы и сохранить snapshot,CUR-IN-HOME-LAUNCH,CUR-IN-VALIDATE-SAVE,TREE-WS-INPUTS,IN-FEEDBACK-SAVED,7.2,1.61,5.59,77.6,evidence_bound_estimate,canonical_target
+SCN-RG-01,WS-RING,Выбрать сегмент и понять его состояние везде,CUR-RG-LAUNCH,CUR-RG-NOT-DOMINANT,TREE-WS-RING,RG-FEEDBACK-SELECTION-SYNC,1.2,0.93,0.27,22.5,evidence_bound_estimate,canonical_target
+SCN-RG-02,WS-RING,Понять статус шва и автозамыкания,CUR-RG-LAUNCH,CUR-RG-SEAM-AMBIG,TREE-WS-RING,RG-FEEDBACK-SEAM,3.6,1.85,1.75,48.6,evidence_bound_estimate,canonical_target
+SCN-RG-03,WS-RING,Экспортировать сценарий и передать в suite,CUR-RG-LAUNCH,CUR-RG-EXPORT-HIDDEN,TREE-WS-RING,RG-FEEDBACK-EXPORT,4.8,2.29,2.51,52.3,evidence_bound_estimate,canonical_target
+SCN-OPT-01,WS-OPTIMIZATION,Понять активный режим и контракт до запуска,CUR-OPT-ENTRY,CUR-OPT-OBJECTIVE-DRIFT,TREE-WS-OPTIMIZATION,OPT-FEEDBACK-CONTRACT,2.4,0.75,1.65,68.8,evidence_bound_estimate,canonical_target
+SCN-OPT-02,WS-OPTIMIZATION,"Понять, почему стадия недобрала budget",CUR-OPT-ENTRY,CUR-OPT-UNDERFILL-HIDDEN,TREE-WS-OPTIMIZATION,OPT-FEEDBACK-UNDERFILL,3.6,1.61,1.99,55.3,evidence_bound_estimate,canonical_target
+SCN-OPT-03,WS-OPTIMIZATION,"Понять, почему кандидат не продвинут дальше",CUR-OPT-ENTRY,CUR-OPT-UNDERFILL-HIDDEN,TREE-WS-OPTIMIZATION,OPT-FEEDBACK-PROMOTION,3.6,1.61,1.99,55.3,evidence_bound_estimate,canonical_target
+SCN-DI-01,WS-DIAGNOSTICS,Собрать диагностику как один доминирующий маршрут,CUR-DI-LAUNCH,CUR-DI-ROUTE-SPLIT,TREE-WS-DIAGNOSTICS,DI-FEEDBACK-SEND,2.2,1.85,0.35,15.9,evidence_bound_estimate,canonical_target
+SCN-DI-02,WS-DIAGNOSTICS,"Понять, готов ли helper runtime и selfcheck",CUR-DI-LAUNCH,CUR-DI-RUNTIME-HIDDEN,TREE-WS-DIAGNOSTICS,DI-FEEDBACK-RUNTIME,4.6,0.99,3.61,78.5,evidence_bound_estimate,canonical_target
+SCN-DI-03,WS-DIAGNOSTICS,Увидеть свежесть и путь последнего bundle,CUR-DI-LAUNCH,CUR-DI-BUNDLE-FRESHNESS,TREE-WS-DIAGNOSTICS,DI-FEEDBACK-LAST,3.4,1.39,2.01,59.1,evidence_bound_estimate,canonical_target

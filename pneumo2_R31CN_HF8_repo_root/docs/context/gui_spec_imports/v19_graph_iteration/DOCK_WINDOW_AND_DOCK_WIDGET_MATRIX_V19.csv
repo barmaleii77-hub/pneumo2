@@ -1,0 +1,13 @@
+workspace,dock_or_window_id,name,kind,role,direct_open_from_tree,allow_docking,allow_floating,allow_auto_hide,note
+WS-INPUTS,DOCK-TREE-WS-INPUTS,Левое дерево,dock_widget,primary_navigator,Да,Да,Нет,Да,Главный путь прямого открытия рабочих пространств.
+WS-INPUTS,DOCK-INSPECTOR-WS-INPUTS,Правый inspector/help,dock_widget,context_help_and_properties,Нет,Да,Да,Да,"Контекстная помощь, свойства и provenance."
+WS-INPUTS,DOCK-STATUS-WS-INPUTS,Нижний status/progress,dock_widget,feedback_bar,Нет,Нет,Нет,Нет,"Прогресс, предупреждения, состояние и сообщения."
+WS-RING,DOCK-TREE-WS-RING,Левое дерево,dock_widget,primary_navigator,Да,Да,Нет,Да,Главный путь прямого открытия рабочих пространств.
+WS-RING,DOCK-INSPECTOR-WS-RING,Правый inspector/help,dock_widget,context_help_and_properties,Нет,Да,Да,Да,"Контекстная помощь, свойства и provenance."
+WS-RING,DOCK-STATUS-WS-RING,Нижний status/progress,dock_widget,feedback_bar,Нет,Нет,Нет,Нет,"Прогресс, предупреждения, состояние и сообщения."
+WS-OPTIMIZATION,DOCK-TREE-WS-OPTIMIZATION,Левое дерево,dock_widget,primary_navigator,Да,Да,Нет,Да,Главный путь прямого открытия рабочих пространств.
+WS-OPTIMIZATION,DOCK-INSPECTOR-WS-OPTIMIZATION,Правый inspector/help,dock_widget,context_help_and_properties,Нет,Да,Да,Да,"Контекстная помощь, свойства и provenance."
+WS-OPTIMIZATION,DOCK-STATUS-WS-OPTIMIZATION,Нижний status/progress,dock_widget,feedback_bar,Нет,Нет,Нет,Нет,"Прогресс, предупреждения, состояние и сообщения."
+WS-DIAGNOSTICS,DOCK-TREE-WS-DIAGNOSTICS,Левое дерево,dock_widget,primary_navigator,Да,Да,Нет,Да,Главный путь прямого открытия рабочих пространств.
+WS-DIAGNOSTICS,DOCK-INSPECTOR-WS-DIAGNOSTICS,Правый inspector/help,dock_widget,context_help_and_properties,Нет,Да,Да,Да,"Контекстная помощь, свойства и provenance."
+WS-DIAGNOSTICS,DOCK-STATUS-WS-DIAGNOSTICS,Нижний status/progress,dock_widget,feedback_bar,Нет,Нет,Нет,Нет,"Прогресс, предупреждения, состояние и сообщения."

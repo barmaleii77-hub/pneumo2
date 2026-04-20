@@ -1,0 +1,9 @@
+workspace,layer,node_count,edge_count,avg_out_degree,max_out_degree
+WS-INPUTS,current,8,7,0.875,1
+WS-INPUTS,optimized,194,279,1.433,21
+WS-RING,current,6,5,0.833,1
+WS-RING,optimized,152,227,1.487,29
+WS-OPTIMIZATION,current,6,5,0.833,1
+WS-OPTIMIZATION,optimized,201,289,1.433,22
+WS-DIAGNOSTICS,current,6,5,0.833,1
+WS-DIAGNOSTICS,optimized,229,292,1.271,22
