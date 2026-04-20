@@ -29,6 +29,7 @@ V19_TASK_CHECK_BLOCK_LOOP_PATH = V19_GRAPH_IMPORT_ROOT / "TASK_CHECK_BLOCK_LOOP_
 V19_TREE_DIRECT_OPEN_PATH = V19_GRAPH_IMPORT_ROOT / "TREE_DIRECT_OPEN_MATRIX_V19.csv"
 V19_NOT_PROVEN_CURRENT_WINDOWS_PATH = V19_GRAPH_IMPORT_ROOT / "NOT_PROVEN_CURRENT_WINDOWS_V19.csv"
 V19_PATH_COST_SCENARIOS_PATH = V19_GRAPH_IMPORT_ROOT / "PATH_COST_SCENARIOS_V19.csv"
+V19_GUI_LABEL_SEMANTIC_AUDIT_PATH = V19_GRAPH_IMPORT_ROOT / "GUI_LABEL_SEMANTIC_AUDIT_V19.csv"
 
 
 @dataclass(frozen=True)
@@ -161,6 +162,20 @@ class V19WorkspaceGuidance:
     evidence_boundary: str
 
 
+@dataclass(frozen=True)
+class V19SemanticLabelEntry:
+    node_id: str
+    scope: str
+    surface: str
+    kind: str
+    label_current: str
+    label_recommended: str
+    semantic_issue: str
+    severity: str
+    status: str
+    semantic_quality_score: int | None
+
+
 def _load_csv_rows(path: Path) -> tuple[dict[str, str], ...]:
     if not path.exists():
         return ()
@@ -212,13 +227,155 @@ def _safe_float(raw: Any) -> float | None:
         return None
 
 
+def _safe_int(raw: Any) -> int | None:
+    try:
+        return int(raw)
+    except Exception:
+        return None
+
+
 def _split_workspace_codes(raw: str) -> tuple[str, ...]:
     values = [part.strip() for part in str(raw or "").replace(",", ";").split(";")]
     return tuple(part for part in values if part)
 
 
-def _operator_v19_text(raw: Any) -> str:
+@lru_cache(maxsize=1)
+def load_v19_semantic_label_audit() -> tuple[V19SemanticLabelEntry, ...]:
+    entries: list[V19SemanticLabelEntry] = []
+    for row in _load_csv_rows(V19_GUI_LABEL_SEMANTIC_AUDIT_PATH):
+        entries.append(
+            V19SemanticLabelEntry(
+                node_id=_safe_text(_row_value(row, "node_id")),
+                scope=_safe_text(_row_value(row, "scope")),
+                surface=_safe_text(_row_value(row, "surface")),
+                kind=_safe_text(_row_value(row, "kind")),
+                label_current=_safe_text(_row_value(row, "label_current")),
+                label_recommended=_safe_text(_row_value(row, "label_recommended")),
+                semantic_issue=_safe_text(_row_value(row, "semantic_issue")),
+                severity=_safe_text(_row_value(row, "severity")),
+                status=_safe_text(_row_value(row, "status")),
+                semantic_quality_score=_safe_int(
+                    _row_value(row, "semantic_quality_score_1_5")
+                ),
+            )
+        )
+    return tuple(entries)
+
+
+@lru_cache(maxsize=1)
+def v19_notation_rewrites_by_label() -> dict[str, str]:
+    rewrites: dict[str, str] = {}
+    for entry in load_v19_semantic_label_audit():
+        if entry.status != "rewrite" or entry.semantic_issue != "notation_without_name":
+            continue
+        if not entry.label_current or not entry.label_recommended:
+            continue
+        rewrites[entry.label_current] = entry.label_recommended
+    return rewrites
+
+
+def operator_semantic_text(raw: Any) -> str:
     text = _safe_text(raw)
+    if not text:
+        return ""
+
+    text = v19_notation_rewrites_by_label().get(text, text)
+    replacements = (
+        ("C1/C2", "первый и второй контуры (C1/C2)"),
+        ("problem hash", "контрольная метка задачи"),
+        ("Problem hash", "Контрольная метка задачи"),
+        ("hash", "контрольная метка"),
+        ("Hash", "Контрольная метка"),
+        ("objective contract", "цели расчёта"),
+        ("Objective contract", "Цели расчёта"),
+        ("baseline history", "история опорных прогонов"),
+        ("Baseline history", "История опорных прогонов"),
+        ("active baseline", "активный опорный прогон"),
+        ("Active baseline", "Активный опорный прогон"),
+        ("baseline", "опорный прогон"),
+        ("Baseline", "Опорный прогон"),
+        ("suite snapshot", "снимок набора испытаний"),
+        ("Suite snapshot", "Снимок набора испытаний"),
+        ("snapshot", "снимок"),
+        ("Snapshot", "Снимок"),
+        ("hard gate", "условие допуска"),
+        ("Hard gate", "Условие допуска"),
+        ("underfill", "недобор"),
+        ("Underfill", "Недобор"),
+        ("seed budget", "первичный лимит"),
+        ("Seed budget", "Первичный лимит"),
+        ("promotion-block", "блокировка продвижения кандидата"),
+        ("promotion", "продвижение кандидата"),
+        ("Promotion", "Продвижение кандидата"),
+        ("gate reject", "отклонение по условию допуска"),
+        ("surrogate samples", "черновые образцы"),
+        ("Surrogate samples", "Черновые образцы"),
+        ("Surrogate top-k", "Лучшие черновые варианты"),
+        ("surrogate top-k", "лучшие черновые варианты"),
+        ("Seed/promotion policy", "Правило первичного лимита и продвижения кандидата"),
+        ("seed/promotion policy", "правило первичного лимита и продвижения кандидата"),
+        ("StageRunner", "поэтапный запуск"),
+        ("staged", "поэтапный"),
+        ("Staged", "Поэтапный"),
+        ("self-check", "самопроверка"),
+        ("Self-check", "Самопроверка"),
+        ("selfcheck", "самопроверка"),
+        ("Selfcheck", "Самопроверка"),
+        ("diagnostics bundle", "архив диагностики"),
+        ("Diagnostics bundle", "Архив диагностики"),
+        ("send-bundle", "архив отправки"),
+        ("send bundle", "архив отправки"),
+        ("bundle", "архив"),
+        ("Bundle", "Архив"),
+        ("helper python", "вспомогательный Python"),
+        ("Helper python", "Вспомогательный Python"),
+        ("helper-команд", "вспомогательных команд"),
+        ("helper", "вспомогательный модуль"),
+        ("Helper", "Вспомогательный модуль"),
+        ("runtime", "среда выполнения"),
+        ("Runtime", "Среда выполнения"),
+        ("provenance", "происхождение"),
+        ("Provenance", "Происхождение"),
+        ("GUI ", ""),
+        (" GUI", ""),
+        ("stale", "устаревший"),
+        ("Stale", "Устаревший"),
+    )
+    for old, new in replacements:
+        text = text.replace(old, new)
+    polish_replacements = (
+        ("Допуск по условие допуска", "Допуск по условию допуска"),
+        ("меняет контрольная метка задачи", "меняет контрольную метку задачи"),
+        ("Режим контрольная метка задачи", "Режим контрольной метки задачи"),
+        ("Путь к вспомогательный Python, через который", "Путь к вспомогательному Python; через него"),
+        ("Путь к вспомогательный Python", "Путь к вспомогательному Python"),
+        ("Карточка последнего опорный прогон", "Карточка последнего опорного прогона"),
+        ("последнего опорный прогон", "последнего опорного прогона"),
+        ("активный опорный прогон contract", "правила активного опорного прогона"),
+        ("опорный прогон contract", "правила опорного прогона"),
+        ("контрольная метка проверенный снимок", "контрольная метка проверенного снимка"),
+        (" and ", " и "),
+        (" or ", " или "),
+    )
+    for old, new in polish_replacements:
+        text = text.replace(old, new)
+    return " ".join(text.split()).strip()
+
+
+def _semantic_payload(value: Any) -> Any:
+    if isinstance(value, str):
+        return operator_semantic_text(value)
+    if isinstance(value, dict):
+        return {key: _semantic_payload(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_semantic_payload(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_semantic_payload(item) for item in value)
+    return value
+
+
+def _operator_v19_text(raw: Any) -> str:
+    text = operator_semantic_text(raw)
     replacements = (
         ("Badge", "метка"),
         ("badge", "метка"),
@@ -348,7 +505,7 @@ def _row_value_ru(row: dict[str, Any], *keys: str) -> Any:
 
 
 def _help_payload_and_title(row: dict[str, Any]) -> tuple[str, dict[str, Any]]:
-    title = _safe_text(_row_value_ru(row, "название"))
+    title = operator_semantic_text(_row_value_ru(row, "название"))
     payload_obj = _safe_literal(
         _row_value_ru(row, "структура_развёрнутого_описания")
     )
@@ -357,12 +514,12 @@ def _help_payload_and_title(row: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     nested_payload = _row_value_ru(payload_obj, "структура_развёрнутого_описания")
     if isinstance(nested_payload, dict):
         return (
-            title or _safe_text(_row_value_ru(payload_obj, "название")),
-            nested_payload,
+            title or operator_semantic_text(_row_value_ru(payload_obj, "название")),
+            _semantic_payload(nested_payload),
         )
     return (
-        title or _safe_text(_row_value_ru(payload_obj, "название")),
-        payload_obj,
+        title or operator_semantic_text(_row_value_ru(payload_obj, "название")),
+        _semantic_payload(payload_obj),
     )
 
 
@@ -373,12 +530,12 @@ def load_ui_element_catalog() -> dict[str, UiElementCatalogEntry]:
         element = UiElementCatalogEntry(
             element_id=_safe_text(_row_value(row, "id")),
             automation_id=_safe_text(_row_value(row, "automation_id")),
-            title=_safe_text(_row_value_ru(row, "название")),
+            title=operator_semantic_text(_row_value_ru(row, "название")),
             kind=_safe_text(_row_value_ru(row, "тип")),
             region=_safe_text(_row_value_ru(row, "регион")),
             tooltip_id=_safe_text(_row_value(row, "tooltip_id")),
             help_id=_safe_text(_row_value(row, "help_id")),
-            purpose=_safe_text(_row_value_ru(row, "назначение")),
+            purpose=operator_semantic_text(_row_value_ru(row, "назначение")),
             pipeline_node=_safe_text(_row_value_ru(row, "узел_пайплайна")),
             visibility=_safe_text(_row_value_ru(row, "видимость")),
             availability=_safe_text(_row_value_ru(row, "доступность")),
@@ -399,14 +556,14 @@ def load_field_catalog() -> dict[str, FieldCatalogEntry]:
     for row in _load_csv_rows(FIELD_CATALOG_PATH):
         entry = FieldCatalogEntry(
             field_id=_safe_text(_row_value(row, "id")),
-            title=_safe_text(_row_value_ru(row, "название")),
+            title=operator_semantic_text(_row_value_ru(row, "название")),
             field_type=_safe_text(_row_value_ru(row, "тип")),
             required=_safe_bool(_row_value_ru(row, "обязательное")),
             help_id=_safe_text(_row_value(row, "help_id")),
-            short_hint=_safe_text(_row_value_ru(row, "короткая_подсказка")),
+            short_hint=operator_semantic_text(_row_value_ru(row, "короткая_подсказка")),
             catalog=_safe_text(_row_value_ru(row, "каталог")),
             options=_tuple_from_scalar_or_list(_row_value_ru(row, "варианты")),
-            unit=_safe_text(_row_value_ru(row, "единица_измерения")),
+            unit=operator_semantic_text(_row_value_ru(row, "единица_измерения")),
         )
         if entry.field_id:
             entries[entry.field_id] = entry
@@ -434,8 +591,8 @@ def load_tooltip_catalog() -> dict[str, TooltipCatalogEntry]:
     for row in _load_csv_rows(TOOLTIP_CATALOG_PATH):
         entry = TooltipCatalogEntry(
             tooltip_id=_safe_text(_row_value(row, "id")),
-            text=_safe_text(_row_value_ru(row, "текст")),
-            rule=_safe_text(_row_value_ru(row, "правило")),
+            text=operator_semantic_text(_row_value_ru(row, "текст")),
+            rule=operator_semantic_text(_row_value_ru(row, "правило")),
             related_help_id=_safe_text(_row_value_ru(row, "связанная_помощь")),
         )
         if entry.tooltip_id:

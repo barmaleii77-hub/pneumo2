@@ -17,8 +17,10 @@ from pneumo_solver_ui.desktop_spec_shell.catalogs import (
     load_tooltip_catalog,
     load_ui_element_catalog,
     load_v19_cognitive_visibility_matrix,
+    load_v19_semantic_label_audit,
     load_v19_task_check_block_loop_matrix,
     load_v19_tree_direct_open_matrix,
+    operator_semantic_text,
     ui_state_palette,
     v19_search_hints_by_workspace_code,
 )
@@ -131,7 +133,7 @@ def test_v19_graph_iteration_exposes_runtime_action_feedback_contract() -> None:
 
     assert "две пружины" in input_text
     assert "статус шва" in ring_text.casefold()
-    assert "недобор" in optimization_text
+    assert "недобор" in optimization_text.casefold()
     assert "архив" in diagnostics_text
     for forbidden in (
         "bundle",
@@ -150,4 +152,57 @@ def test_v19_graph_iteration_exposes_runtime_action_feedback_contract() -> None:
     hints = v19_search_hints_by_workspace_code()
     assert any("две пружины" in hint for hint in hints["WS-INPUTS"])
     assert any("статус шва" in hint.casefold() for hint in hints["WS-RING"])
-    assert any("недобор" in hint for hint in hints["WS-OPTIMIZATION"])
+    assert any("недобор" in hint.casefold() for hint in hints["WS-OPTIMIZATION"])
+
+
+def test_v19_semantic_label_audit_normalizes_operator_catalog_text() -> None:
+    audit_rows = load_v19_semantic_label_audit()
+    fields = load_field_catalog()
+    tooltips = load_tooltip_catalog()
+    help_topics = load_help_catalog()
+
+    assert len(audit_rows) == 812
+    assert sum(1 for row in audit_rows if row.status == "rewrite") == 145
+    assert (
+        operator_semantic_text("Передняя пружина C1 — жёсткость")
+        == "Передняя пружина первого контура (C1) — жёсткость"
+    )
+
+    hash_mode = fields["OPD-FLD-HASH-MODE"]
+    penalty_tolerance = fields["OP-FLD-PENALTY-TOL"]
+    helper_python = fields["DG-FLD-PREFERRED-PYTHON"]
+
+    assert hash_mode.title == "Режим контрольной метки задачи"
+    assert "problem hash" not in hash_mode.short_hint
+    assert "условию допуска" in penalty_tolerance.short_hint
+    assert "hard gate" not in penalty_tolerance.short_hint
+    assert "контрольную метку задачи" in penalty_tolerance.short_hint
+    assert helper_python.title == "Предпочтительный интерпретатор вспомогательных команд"
+    assert "Путь к вспомогательному Python" in helper_python.short_hint
+    assert "helper" not in helper_python.short_hint
+    assert "self-check" not in helper_python.short_hint
+    assert "diagnostics bundle" not in helper_python.short_hint
+    assert tooltips["TT-PJ-CARD-LAST-BASELINE"].text == "Карточка последнего опорного прогона"
+
+    visible_catalog_text = "\n".join(
+        (
+            *(field.title for field in fields.values()),
+            *(field.short_hint for field in fields.values()),
+            *(tooltip.text for tooltip in tooltips.values()),
+            *(
+                str(value)
+                for topic in help_topics.values()
+                for value in topic.payload.values()
+                if isinstance(value, str)
+            ),
+        )
+    )
+    for forbidden in (
+        "problem hash",
+        "hard gate",
+        "diagnostics bundle",
+        "self-check",
+        "objective contract",
+        "StageRunner",
+    ):
+        assert forbidden not in visible_catalog_text
