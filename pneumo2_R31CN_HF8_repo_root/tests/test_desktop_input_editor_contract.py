@@ -856,9 +856,10 @@ def test_desktop_section_issue_cards_group_live_issues_by_cluster() -> None:
     assert cards_by_title["Компоненты"]["issue_count"] == 2
     assert "Кинематика подвески" in cards_by_title["Компоненты"]["issue_labels"]
     assert "Режим колесо_координата" in cards_by_title["Компоненты"]["issue_labels"]
-    assert cards_by_title["Справочные данные"]["issue_count"] == 2
+    assert cards_by_title["Справочные данные"]["issue_count"] == 3
     assert "Режим термодинамики" in cards_by_title["Справочные данные"]["issue_labels"]
     assert "Модель теплоёмкости" in cards_by_title["Справочные данные"]["issue_labels"]
+    assert "Лимит внутренних шагов" in cards_by_title["Справочные данные"]["issue_labels"]
     assert cards_by_title["Численные настройки"]["issue_count"] == 1
     assert "Лимит внутренних шагов" in cards_by_title["Численные настройки"]["issue_labels"]
     assert "замечани" in str(cards_by_title["Численные настройки"]["summary"]).lower()
