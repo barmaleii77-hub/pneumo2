@@ -5,6 +5,11 @@ from typing import Any, Callable, Iterable
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
+from pneumo_solver_ui.desktop_suite_runtime import (
+    build_desktop_suite_snapshot_context,
+    write_desktop_suite_handoff_snapshot,
+)
+from pneumo_solver_ui.desktop_suite_snapshot import load_suite_rows
 from pneumo_solver_ui.optimization_baseline_source import (
     apply_baseline_center_action,
     build_baseline_center_surface,
@@ -68,8 +73,8 @@ def _baseline_state_label(state: str) -> str:
         "blocked": "заблокировано",
         "cancelled": "отменено",
         "current": "актуален",
-        "historical_mismatch": "другой контекст",
-        "historical_same_context": "тот же контекст",
+        "historical_mismatch": "другой набор данных",
+        "historical_same_context": "тот же набор данных",
         "invalid": "требует проверки",
         "missing": "не найден",
         "review_only": "просмотр выполнен",
@@ -114,7 +119,7 @@ def _workspace_owner_text(raw: str) -> str:
         "WS-OPTIMIZATION": "Оптимизация",
         "WS-ANALYSIS": "Анализ результатов",
         "WS-ANIMATOR": "Анимация",
-        "WS-DIAGNOSTICS": "Проверка и отправка",
+        "WS-DIAGNOSTICS": "Проверка проекта",
         "WS-SETTINGS": "Параметры приложения",
         "WS-TOOLS": "Инструменты",
     }
@@ -129,7 +134,7 @@ def _workspace_owner_text(raw: str) -> str:
 def _launch_surface_text(raw: str) -> str:
     labels = {
         "workspace": "встроенное окно",
-        "legacy_bridge": "отдельное окно",
+        "legacy_bridge": "рабочее окно",
         "external_window": "отдельное специализированное окно",
         "tooling": "инструментальное окно",
     }
@@ -173,14 +178,14 @@ def _operator_catalog_text(raw: str) -> str:
         ("Workspace", "Рабочее окно"),
         ("surface", "окно"),
         ("Surface", "Окно"),
-        ("bundle", "архив для отправки"),
-        ("Bundle", "Архив для отправки"),
+        ("bundle", "архив проекта"),
+        ("Bundle", "Архив проекта"),
         ("legacy", "отдельное"),
         ("Legacy", "Отдельное"),
         ("run-ов", "запусков"),
         ("baseline", "опорный прогон"),
-        ("contract", "контекст"),
-        ("Contract", "Контекст"),
+        ("contract", "условия"),
+        ("Contract", "Условия"),
         ("контрактов", "условий"),
         ("Контрактов", "Условий"),
         ("контракта", "условий"),
@@ -191,6 +196,91 @@ def _operator_catalog_text(raw: str) -> str:
     for old, new in replacements:
         text = text.replace(old, new)
     return text
+
+
+def _suite_row_enabled(row: dict[str, Any]) -> bool:
+    value = row.get("включен", row.get("enabled", True))
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().casefold() not in {"0", "false", "no", "off", "нет"}
+    return bool(value)
+
+
+def _suite_visible_name(row: dict[str, Any]) -> str:
+    raw = str(row.get("имя") or row.get("name") or row.get("id") or "без названия")
+    return " ".join(raw.replace("_", " ").split())
+
+
+def _suite_visible_type(row: dict[str, Any]) -> str:
+    raw = str(row.get("тип") or row.get("type") or "").strip()
+    labels = {
+        "maneuver_csv": "манёвр из файла",
+        "road_profile_csv": "профиль дороги",
+        "worldroad": "дорожная модель",
+        "инерция_крен": "крен при боковом ускорении",
+        "инерция_тангаж": "тангаж при продольном ускорении",
+        "микро_разнофаза": "микроход в противофазе",
+        "микро_разнофаза_перед_зад": "передняя и задняя ось в противофазе",
+        "микро_разнофаза_диагональ": "диагональный микроход",
+        "микро_синфаза": "микроход в синфазе",
+        "кочка_одно_колесо": "одиночная кочка под колесом",
+    }
+    if raw in labels:
+        return labels[raw]
+    return " ".join(raw.replace("_", " ").split()) or "обычное испытание"
+
+
+def _suite_visible_stage(row: dict[str, Any]) -> str:
+    value = row.get("стадия", row.get("stage", ""))
+    text = str(value).strip()
+    if text in {"", "0", "0.0"}:
+        return "сразу"
+    return f"после шага {text}"
+
+
+def _suite_number_text(row: dict[str, Any], key: str) -> str:
+    value = row.get(key, "")
+    if value in ("", None):
+        return "не задано"
+    try:
+        return f"{float(value):g}"
+    except Exception:
+        return str(value)
+
+
+def _suite_scenario_refs_text(row: dict[str, Any]) -> str:
+    refs: list[str] = []
+    if str(row.get("scenario_json") or "").strip():
+        refs.append("циклический сценарий")
+    if str(row.get("road_csv") or "").strip():
+        refs.append("дорога")
+    if str(row.get("axay_csv") or "").strip():
+        refs.append("манёвр")
+    return ", ".join(refs) if refs else "не требуется"
+
+
+def _suite_validation_message(context: dict[str, Any]) -> str:
+    snapshot = dict(context.get("snapshot") or {})
+    validation = dict(snapshot.get("validation") or {})
+    preview = dict(snapshot.get("preview") or {})
+    enabled_count = int(preview.get("enabled_count", 0) or 0)
+    missing_refs = int(validation.get("blocking_missing_ref_count", 0) or 0)
+    upstream_errors = int(validation.get("upstream_ref_error_count", 0) or 0)
+    ownership_errors = int(validation.get("ownership_violation_count", 0) or 0)
+    if bool(validation.get("ok", False)):
+        return "Набор проверен и готов для базового прогона."
+    if enabled_count <= 0:
+        return "Включите хотя бы одно испытание перед базовым прогоном."
+    if upstream_errors:
+        return "Сначала сохраните исходные данные проекта, затем проверьте набор ещё раз."
+    if missing_refs:
+        return "Есть испытания, где не найден файл сценария, дороги или манёвра."
+    if ownership_errors:
+        return "В набор попали параметры, которые должны задаваться в исходных данных или сценарии."
+    return "Набор требует повторной проверки перед базовым прогоном."
 
 
 class RuntimeWorkspacePage(QtWidgets.QWidget):
@@ -475,6 +565,237 @@ class ControlHubWorkspacePage(QtWidgets.QWidget):
             meta.setWordWrap(True)
             meta.setStyleSheet("color: #576574;")
             self.actions_layout.addWidget(meta)
+
+
+class SuiteWorkspacePage(QtWidgets.QWidget):
+    def __init__(
+        self,
+        workspace: DesktopWorkspaceSpec,
+        action_commands: Iterable[DesktopShellCommandSpec],
+        on_command: Callable[[str], None],
+        *,
+        repo_root: Path,
+        parent: QtWidgets.QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.workspace = workspace
+        self.action_commands = tuple(action_commands)
+        self.on_command = on_command
+        self.repo_root = Path(repo_root)
+        self.suite_source_path = self.repo_root / "pneumo_solver_ui" / "default_suite.json"
+        self._suite_rows: list[dict[str, Any]] = []
+        self._refreshing_suite_table = False
+
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        inner = QtWidgets.QWidget()
+        scroll.setWidget(inner)
+        layout = QtWidgets.QVBoxLayout(inner)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(14)
+
+        title = QtWidgets.QLabel(workspace.title)
+        title_font = title.font()
+        title_font.setPointSize(title_font.pointSize() + 5)
+        title_font.setBold(True)
+        title.setFont(title_font)
+        layout.addWidget(title)
+
+        summary = QtWidgets.QLabel(
+            "Здесь выбираются испытания для следующего расчёта и проверяется связь "
+            "с исходными данными и циклическим сценарием."
+        )
+        summary.setWordWrap(True)
+        layout.addWidget(summary)
+
+        state_box = QtWidgets.QGroupBox("Готовность набора")
+        state_layout = QtWidgets.QVBoxLayout(state_box)
+        self.summary_label = QtWidgets.QLabel("")
+        self.summary_label.setWordWrap(True)
+        self.ring_link_label = QtWidgets.QLabel("")
+        self.ring_link_label.setWordWrap(True)
+        self.validation_label = QtWidgets.QLabel("")
+        self.validation_label.setWordWrap(True)
+        self.snapshot_label = QtWidgets.QLabel("Снимок набора ещё не сохранён для базового прогона.")
+        self.snapshot_label.setWordWrap(True)
+        state_layout.addWidget(self.summary_label)
+        state_layout.addWidget(self.ring_link_label)
+        state_layout.addWidget(self.validation_label)
+        state_layout.addWidget(self.snapshot_label)
+        layout.addWidget(state_box)
+
+        table_box = QtWidgets.QGroupBox("Испытания в наборе")
+        table_layout = QtWidgets.QVBoxLayout(table_box)
+        self.suite_table = QtWidgets.QTableWidget(0, 7)
+        self.suite_table.setHorizontalHeaderLabels(
+            (
+                "Включено",
+                "Название",
+                "Тип испытания",
+                "Первый вход",
+                "Шаг, с",
+                "Длительность, с",
+                "Связанные файлы",
+            )
+        )
+        self.suite_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.suite_table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.suite_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.suite_table.verticalHeader().setVisible(False)
+        self.suite_table.horizontalHeader().setStretchLastSection(True)
+        self.suite_table.itemChanged.connect(self._on_suite_item_changed)
+        table_layout.addWidget(self.suite_table)
+        layout.addWidget(table_box, 1)
+
+        actions_box = QtWidgets.QGroupBox("Действия")
+        actions_layout = QtWidgets.QHBoxLayout(actions_box)
+        self.check_button = QtWidgets.QPushButton("Проверить набор")
+        self.check_button.clicked.connect(self.check_suite)
+        actions_layout.addWidget(self.check_button)
+        self.save_button = QtWidgets.QPushButton("Сохранить снимок для базового прогона")
+        self.save_button.clicked.connect(self.save_suite_snapshot)
+        actions_layout.addWidget(self.save_button)
+        scenario_button = QtWidgets.QPushButton("Редактировать циклический сценарий")
+        scenario_button.clicked.connect(
+            lambda _checked=False: self.on_command("workspace.ring_editor.open")
+        )
+        actions_layout.addWidget(scenario_button)
+        for command in self.action_commands:
+            if command.command_id != "test.center.open":
+                continue
+            advanced_button = QtWidgets.QPushButton("Расширенная настройка набора")
+            advanced_button.setToolTip(command.summary)
+            advanced_button.clicked.connect(
+                lambda _checked=False, cid=command.command_id: self.on_command(cid)
+            )
+            actions_layout.addWidget(advanced_button)
+            break
+        layout.addWidget(actions_box)
+
+        v19_box = build_v19_action_feedback_box(workspace)
+        if v19_box is not None:
+            layout.addWidget(v19_box)
+        layout.addStretch(1)
+
+        outer = QtWidgets.QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(scroll)
+        self.refresh_view()
+
+    def refresh_view(self) -> None:
+        try:
+            self._suite_rows = load_suite_rows(self.suite_source_path)
+        except Exception:
+            self._suite_rows = []
+            self.validation_label.setText("Не удалось прочитать основной набор испытаний.")
+        self._refreshing_suite_table = True
+        try:
+            self.suite_table.setRowCount(len(self._suite_rows))
+            for row_index, row in enumerate(self._suite_rows):
+                self._fill_table_row(row_index, row)
+        finally:
+            self._refreshing_suite_table = False
+        self._resize_table()
+        self._update_summary_labels()
+        if self._suite_rows:
+            self.validation_label.setText("Нажмите «Проверить набор» перед базовым прогоном.")
+
+    def _fill_table_row(self, row_index: int, row: dict[str, Any]) -> None:
+        enabled_item = QtWidgets.QTableWidgetItem("")
+        enabled_item.setFlags(
+            QtCore.Qt.ItemIsEnabled
+            | QtCore.Qt.ItemIsSelectable
+            | QtCore.Qt.ItemIsUserCheckable
+        )
+        enabled_item.setCheckState(QtCore.Qt.Checked if _suite_row_enabled(row) else QtCore.Qt.Unchecked)
+        self.suite_table.setItem(row_index, 0, enabled_item)
+        values = (
+            _suite_visible_name(row),
+            _suite_visible_type(row),
+            _suite_visible_stage(row),
+            _suite_number_text(row, "dt"),
+            _suite_number_text(row, "t_end"),
+            _suite_scenario_refs_text(row),
+        )
+        for column, value in enumerate(values, start=1):
+            item = QtWidgets.QTableWidgetItem(value)
+            item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable)
+            self.suite_table.setItem(row_index, column, item)
+
+    def _resize_table(self) -> None:
+        self.suite_table.resizeColumnsToContents()
+        self.suite_table.setMinimumHeight(260)
+
+    def _rows_from_table(self) -> list[dict[str, Any]]:
+        rows = [dict(row) for row in self._suite_rows]
+        for row_index, row in enumerate(rows):
+            item = self.suite_table.item(row_index, 0)
+            if item is not None:
+                row["включен"] = item.checkState() == QtCore.Qt.Checked
+        return rows
+
+    def _update_summary_labels(self) -> None:
+        rows = self._rows_from_table() if self._suite_rows else []
+        enabled_count = sum(1 for row in rows if _suite_row_enabled(row))
+        linked_count = sum(1 for row in rows if _suite_scenario_refs_text(row) != "не требуется")
+        self.summary_label.setText(
+            f"Всего испытаний - {len(rows)}. Включено для следующего прогона - {enabled_count}."
+        )
+        if linked_count:
+            self.ring_link_label.setText(
+                "Связано с редактором циклического сценария - "
+                f"{linked_count} испытаний используют файлы сценария, дороги или манёвра."
+            )
+        else:
+            self.ring_link_label.setText(
+                "Связь с редактором циклического сценария не требуется для текущих строк."
+            )
+
+    def _on_suite_item_changed(self, _item: QtWidgets.QTableWidgetItem) -> None:
+        if self._refreshing_suite_table:
+            return
+        self._update_summary_labels()
+        self.validation_label.setText("Набор изменён. Проверьте его перед базовым прогоном.")
+        self.snapshot_label.setText("Снимок набора нужно сохранить заново.")
+
+    def _snapshot_context(self) -> dict[str, Any]:
+        return build_desktop_suite_snapshot_context(
+            self._rows_from_table(),
+            suite_source_path=self.suite_source_path,
+            repo_root=self.repo_root,
+            context_label="main_window_test_matrix",
+            require_inputs_snapshot=True,
+            require_ring_hash_for_ring_refs=True,
+        )
+
+    def check_suite(self) -> None:
+        try:
+            context = self._snapshot_context()
+        except Exception:
+            self.validation_label.setText("Проверка набора не выполнена из-за ошибки чтения данных.")
+            return
+        self.validation_label.setText(_suite_validation_message(context))
+
+    def save_suite_snapshot(self) -> None:
+        try:
+            context = self._snapshot_context()
+            if not bool(dict(context.get("snapshot") or {}).get("validated", False)):
+                self.validation_label.setText(_suite_validation_message(context))
+                self.snapshot_label.setText("Снимок набора не сохранён, пока проверка не пройдена.")
+                return
+            write_desktop_suite_handoff_snapshot(
+                self._rows_from_table(),
+                suite_source_path=self.suite_source_path,
+                repo_root=self.repo_root,
+                context_label="main_window_test_matrix",
+                require_inputs_snapshot=True,
+                require_ring_hash_for_ring_refs=True,
+            )
+        except Exception:
+            self.snapshot_label.setText("Не удалось сохранить снимок набора.")
+            return
+        self.snapshot_label.setText("Снимок набора сохранён для базового прогона.")
+        self.validation_label.setText("Набор проверен и готов для базового прогона.")
 
 
 class BaselineWorkspacePage(RuntimeWorkspacePage):

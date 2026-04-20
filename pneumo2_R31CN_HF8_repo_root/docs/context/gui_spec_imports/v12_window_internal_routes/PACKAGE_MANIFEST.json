@@ -1,0 +1,50 @@
+{
+  "EXEC_SUMMARY.md": {
+    "sha256": "8d380774c844f8c0839d59dc4d7bdeaaf24dd4bde1093b78f4cf672ce436b898",
+    "size": 2152
+  },
+  "WINDOW_FIRST_SCREEN_CONTRACT_V12.md": {
+    "sha256": "f6e9e0acf39d99c67aca7e5488336468aa7907fbd69983bd72489f7f14d746e3",
+    "size": 4250
+  },
+  "CURRENT_VS_CANONICAL_DIAGNOSTICS_INTERNAL_V12.md": {
+    "sha256": "da4fb2cdf8aed4f76ded2d63fd66d2d0f3e626d72e3444a5f2fd5a70cca3faa6",
+    "size": 1730
+  },
+  "CURRENT_VS_CANONICAL_COMPARE_INTERNAL_V12.md": {
+    "sha256": "f5efa3261136d99b652b8507fb55c3cd84d6070662e393ea95390ff33efadb7f",
+    "size": 1708
+  },
+  "CURRENT_VS_CANONICAL_INPUT_EDITOR_INTERNAL_V12.md": {
+    "sha256": "28228169c3bbc692474560d151602cbd8da5d89b59d4a7ef2a3db61ea16e49e4",
+    "size": 1993
+  },
+  "CURRENT_VS_CANONICAL_TEST_CENTER_INTERNAL_V12.md": {
+    "sha256": "af72b9627167ff6f88b55ac50bbddee1b4e1a1960d08eb0174c3bd2225281e27",
+    "size": 1474
+  },
+  "DIAGNOSTICS_ACTION_FEEDBACK_SUBGRAPH_V12.dot": {
+    "sha256": "ff636ae077f373dede08a3d4e53280b92a7850506c293b1624ad22d9fdbdecac",
+    "size": 1431
+  },
+  "COMPARE_ACTION_FEEDBACK_SUBGRAPH_V12.dot": {
+    "sha256": "c5798549f44b3c00a74e37e476ba5d98a11b17ca2003c8eff59edfebb878bc56",
+    "size": 1318
+  },
+  "INPUT_EDITOR_ACTION_FEEDBACK_SUBGRAPH_V12.dot": {
+    "sha256": "a0ceeba0bbeebba90aa069e35452ae494c5c192ef994a4590f15f60257bb337b",
+    "size": 1971
+  },
+  "TEST_CENTER_ACTION_FEEDBACK_SUBGRAPH_V12.dot": {
+    "sha256": "34bd03e879e08e46af0d64cca628c3e1942d819c4a10b8131b8571c47abdabb2",
+    "size": 1294
+  },
+  "LIMITS_AND_NOT_OPENED_V12.md": {
+    "sha256": "59f9449e7e76eff2075612fd2ec5597c4a2e3279851c82448d480d69a9cea724",
+    "size": 825
+  },
+  "NEXT_STEP_V12.md": {
+    "sha256": "2bbc93e27ad26fe45e4f68c5717213cfc769d456dc77c8cd6737ab5e53be5111",
+    "size": 768
+  }
+}

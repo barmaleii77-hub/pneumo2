@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Точка входа desktop-диагностики.
+"""Точка входа desktop-проверки проекта.
 
 Обёртка сохраняет прежний module/class API для hosted shell launchers, но
-реальное окно живёт в едином desktop-окне диагностики и отправки.
+реальное окно живёт в едином desktop-окне проверки проекта и архива.
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ class App(DesktopDiagnosticsCenter):
             auto_build_bundle=False,
         )
         if not self._hosted:
-            self.root.title("Диагностика - PneumoApp")
+            self.root.title("Проверка проекта - PneumoApp")
 
     def on_close(self) -> None:
         super().on_close()

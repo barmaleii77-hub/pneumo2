@@ -1,0 +1,23 @@
+digraph G {
+  rankdir=LR;
+  node [shape=box, fontsize=10];
+  TREE_SUITE [label="Дерево: Набор испытаний"];
+  WIN_SUITE [label="Окно: Набор испытаний"];
+  TABLE_TESTS [label="Таблица испытаний"];
+  BADGE_RING_LINK [label="Badge: связано с редактором кольца"];
+  WARN_STALE [label="Feedback: контекст сценария устарел"];
+  BTN_VALIDATE_SUITE [label="Кнопка: Проверить набор"];
+  STATE_VALID [label="Feedback: Набор испытаний проверен"];
+  STATE_INVALID [label="Feedback: Есть ошибки набора"];
+  BTN_SAVE_SNAPSHOT [label="Кнопка: Сохранить снимок набора"];
+  BTN_OPEN_RING [label="Кнопка: Открыть редактор кольца"];
+  TREE_SUITE -> WIN_SUITE [label="прямое открытие из дерева"];
+  WIN_SUITE -> TABLE_TESTS;
+  TABLE_TESTS -> BADGE_RING_LINK;
+  TABLE_TESTS -> WARN_STALE;
+  TABLE_TESTS -> BTN_VALIDATE_SUITE;
+  BTN_VALIDATE_SUITE -> STATE_VALID [label="успех"];
+  BTN_VALIDATE_SUITE -> STATE_INVALID [label="ошибки"];
+  STATE_VALID -> BTN_SAVE_SNAPSHOT;
+  WARN_STALE -> BTN_OPEN_RING [label="возврат к источнику сценариев"];
+}

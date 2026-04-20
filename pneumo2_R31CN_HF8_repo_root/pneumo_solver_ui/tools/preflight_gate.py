@@ -6,7 +6,7 @@
 - чтобы ошибки типов/режимов/паспортов/ISO-математики ловились сразу
 
 Покрытие:
-1) Контракты параметров (tools/param_contract_check.py)
+1) Условия параметров (tools/param_contract_check.py)
 2) Паспорт компонентов (passport_check.py)
 3) Самопроверка модели и ISO-сети (self_check.py)
 4) Проверка свойств контактных моделей (tools/contact_models_property_check.py)

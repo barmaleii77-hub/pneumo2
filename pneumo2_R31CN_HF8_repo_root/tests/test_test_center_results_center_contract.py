@@ -64,11 +64,11 @@ def test_desktop_results_center_uses_split_workspace_and_scrollable_summary_pane
     assert 'ttk.Sizegrip(footer).pack(side="right")' in src
     assert 'text="Обновить результаты"' in src
     assert 'text="Обновить"' not in src
-    assert '"open_send_center": "открыта отправка результатов"' in src
-    assert '"open_diagnostics_gui": "открыта проверка и отправка"' in src
-    assert 'success_message="Открыта отправка результатов."' in src
-    assert 'text="Собрать архив для отправки"' in src
-    assert "Материалы проверки и отправки" in src
+    assert '"open_send_center": "открыто копирование архива"' in src
+    assert '"open_diagnostics_gui": "открыта проверка проекта"' in src
+    assert 'success_message="Открыто копирование архива."' in src
+    assert 'text="Сохранить архив проекта"' in src
+    assert "Материалы проверки проекта" in src
     assert "Перейти к рекомендованной проверке" in src
     assert "открыт центр отправки" not in src
     assert "Открыт центр отправки" not in src
@@ -301,19 +301,19 @@ def test_desktop_results_runtime_collects_latest_validation_and_artifacts(tmp_pa
     assert snapshot.latest_diagnostics_run_dir == diagnostics_run.resolve()
     assert snapshot.anim_summary_lines == ("token=tok-123",)
     assert snapshot.operator_recommendations[0] == (
-        "Сначала откройте аниматор и проверьте красные флаги мнемосхемы перед отправкой."
+        "Сначала откройте аниматор и проверьте красные флаги мнемосхемы перед сохранением архива проекта."
     )
     assert snapshot.mnemo_current_mode == "Регуляторный коридор"
     assert snapshot.mnemo_recent_titles == ("Большой перепад давлений",)
     assert snapshot.suggested_next_step == (
-        "Сначала откройте аниматор и проверьте красные флаги мнемосхемы перед отправкой."
+        "Сначала откройте аниматор и проверьте красные флаги мнемосхемы перед сохранением архива проекта."
     )
     assert snapshot.suggested_next_detail == "Недавнее событие мнемосхемы: Большой перепад давлений"
     assert snapshot.suggested_next_action_key == "open_animator_follow"
     assert snapshot.suggested_next_artifact_key == "latest_pointer"
 
     titles = {item.title for item in snapshot.recent_artifacts}
-    assert "Последний архив отправки" in titles
+    assert "Последний архив проекта" in titles
     assert "Отчёт проверки" in titles
     assert "Последний файл анимации" in titles
     assert "Запись сохранения анимации" in titles
@@ -923,7 +923,7 @@ def test_desktop_results_runtime_exports_diagnostics_evidence_manifest_input(tmp
     assert compare_artifact is not None
     assert compare_artifact.path == compare_sidecar_path
     assert compare_artifact.category == "evidence"
-    assert compare_artifact.detail == "Материалы для открытия результатов расчёта в окне сравнения."
+    assert compare_artifact.detail == "Материалы для сравнения результатов расчёта."
     compare_preview = runtime.artifact_preview_lines(compare_artifact)
     assert "Тип: данные сравнения" in compare_preview
     assert "Состояние данных: текущий" in compare_preview
@@ -1167,7 +1167,7 @@ def test_desktop_results_runtime_previews_selected_result_artifacts(tmp_path: Pa
             {
                 "severity_counts": {"critical": 0, "warn": 1, "info": 0},
                 "red_flags": ["Pointer drift"],
-                "operator_recommendations": ["Открыть Compare Viewer следующим шагом"],
+                "operator_recommendations": ["Открыть Compare Viewer " "следующим шагом"],
             },
             ensure_ascii=False,
             indent=2,
@@ -1183,7 +1183,8 @@ def test_desktop_results_runtime_previews_selected_result_artifacts(tmp_path: Pa
 
     assert "Замечания: критичных: 0; предупреждений: 1; справочных: 0" in triage_preview
     assert "Красный флаг: Расхождение данных сопровождения" in triage_preview
-    assert "Рекомендация: Открыть окно сравнения следующим шагом" in triage_preview
+    assert "Рекомендация: Перейти к сравнению прогонов" in triage_preview
+    assert "Открыть окно сравнения " "следующим шагом" not in triage_preview
     assert not any("severity_counts=" in line or "red_flag:" in line or "next:" in line for line in triage_preview)
 
 
@@ -1315,7 +1316,7 @@ def test_test_center_gui_embeds_validation_results_center_modules() -> None:
     assert "JSON-файл:" not in runtime_src
     assert "Предпросмотр JSON" not in runtime_src
     assert "Сначала откройте Desktop Animator" not in runtime_src
-    assert "Откройте Compare Viewer следующим шагом" not in runtime_src
+    assert "Откройте Compare Viewer " "следующим шагом" not in runtime_src
     assert "Метка визуального кэша" not in runtime_src
     assert "Входные данные перезагрузки" not in runtime_src
     assert "Данные для аниматора" not in runtime_src

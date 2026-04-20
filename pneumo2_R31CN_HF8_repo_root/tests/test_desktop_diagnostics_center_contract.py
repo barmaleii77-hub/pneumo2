@@ -315,14 +315,15 @@ def test_desktop_diagnostics_operator_preview_localizes_markdown_reports() -> No
 
     translated = _operator_preview_text(raw)
 
-    assert "# Проверка архива для отправки" in translated
+    assert "# Проверка архива проекта" in translated
     assert "- Успешно: **нет**" in translated
     assert "- Вложенный отчёт о состоянии: да" in translated
     assert "## Файл состава данных" in translated
-    assert "- Нет данных: нет состояния контекста анализа результатов." in translated
+    assert "- Нет данных: нет состояния данных анализа результатов." in translated
     assert "## Данные инженерного анализа" in translated
     assert "- Состояние: готово" in translated
-    assert "## Диагностика последней анимации" in translated
+    assert "## Данные последней анимации" in translated
+    assert "## Сведения о последней анимации" not in translated
     assert "- Доступно: нет" in translated
     assert "- Последняя анимация синхронизирована: нет данных" in translated
     assert "- Файл анимации синхронизирован: да" in translated
@@ -331,7 +332,7 @@ def test_desktop_diagnostics_operator_preview_localizes_markdown_reports() -> No
 
     log_text = _operator_log_text("Run dir: C:/tmp/run\nZip: C:/tmp/run.zip\nrc=1\n")
     assert "Папка запуска: C:/tmp/run" in log_text
-    assert "Архив для отправки: C:/tmp/run.zip" in log_text
+    assert "Архив проекта: C:/tmp/run.zip" in log_text
     assert "код завершения 1" in log_text
     assert "Run dir:" not in log_text
     assert "Zip:" not in log_text
@@ -709,20 +710,22 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
 
     assert "DesktopDiagnosticsCenter" in diag_src
     assert 'initial_tab="diagnostics"' in diag_src
-    assert "Диагностика - PneumoApp" in diag_src
+    assert "Проверка проекта - PneumoApp" in diag_src
     assert "Центр диагностики" not in diag_src
     assert "Full Diagnostics (GUI)" not in diag_src
     assert "DesktopDiagnosticsCenter" in send_src
     assert 'initial_tab="send"' in send_src
     assert "latest_send_bundle_clipboard_status.json" in send_src
-    assert "Архив для отправки в чат готов и уже скопирован в буфер." in send_src
-    assert "Диагностика последней анимации:" in send_src
+    assert "Архив проекта готов и уже скопирован в буфер обмена." in send_src
+    assert "Данные последней анимации:" in send_src
+    assert "Сведения о последней анимации:" not in send_src
     assert "Anim pointer diagnostics:" not in send_src
-    assert "Не удалось собрать архив отправки" in send_src
+    assert "Не удалось сохранить архив проекта" in send_src
     assert "bundle build failed" not in send_src
     assert "load_desktop_diagnostics_bundle_record" in send_src
     assert "ttk.Notebook" in center_src
-    assert "Проверка проекта и отправка" in center_src
+    assert "Проверка проекта и сохранение архива" in center_src
+    assert "Проверка проекта и архив" not in center_src
     assert "Центр диагностики и отправки" not in center_src
     assert "Из этого центра" not in center_src
     assert "write_desktop_diagnostics_center_state" in center_src
@@ -743,7 +746,7 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "def _open_engineering_analysis_evidence(self) -> None:" in center_src
     assert "def _engineering_analysis_evidence_summary_lines(self, bundle) -> list[str]:" in center_src
     assert "def _engineering_analysis_status_text(self, bundle) -> str:" in center_src
-    assert "Готовность данных для отправки" in center_src
+    assert "Готовность архива проекта" in center_src
     assert "Связь с анимацией" in center_src
     assert "Файлы для аниматора" in center_src
     assert "Захват для анимации" not in center_src
@@ -788,7 +791,7 @@ def test_diagnostics_and_send_wrappers_delegate_to_shared_desktop_center() -> No
     assert "def _restore_bundle_state_from_last_center_state(self) -> None:" in center_src
     assert "def _restore_diagnostics_request_from_last_center_state(self) -> None:" in center_src
     assert "def _resolve_initial_tab_name(self, initial_tab: str) -> str:" in center_src
-    assert "## Последний прогон диагностики" in center_src
+    assert "## Последняя проверка проекта" in center_src
     assert "status=\"running\"" in center_src
     assert "status=\"stopping\"" in center_src
     assert "- Состояние:" in center_src
@@ -813,7 +816,7 @@ def test_desktop_diagnostics_center_uses_split_workspace_and_sidebar_actions() -
     assert 'quick_box = ttk.LabelFrame(sidebar, text="Основные действия", padding=8)' in center_src
     assert 'ttk.Button(header_actions, text="Настройки проверки", command=lambda: self.notebook.select(self.diag_tab)).pack(side="left")' in center_src
     assert 'ttk.Button(header_actions, text="Состав архива", command=lambda: self.notebook.select(self.bundle_tab)).pack(side="left", padx=(8, 0))' in center_src
-    assert 'ttk.Button(header_actions, text="Отправка", command=lambda: self.notebook.select(self.send_tab)).pack(side="left", padx=(8, 0))' in center_src
+    assert 'ttk.Button(header_actions, text="Архив", command=lambda: self.notebook.select(self.send_tab)).pack(side="left", padx=(8, 0))' in center_src
     assert 'process_box = ttk.LabelFrame(outer, text="Текущий процесс", padding=8)' in center_src
     assert "self.process_progress = ttk.Progressbar(" in center_src
     assert "preview_area = ttk.Frame(self.bundle_body)" in center_src
@@ -835,17 +838,17 @@ def test_desktop_diagnostics_center_operator_text_is_russian_and_progress_global
 
     required = [
         "Текущий процесс",
-        "Прогресс проверки проекта и сборки архива всегда показывается здесь.",
+        "Прогресс проверки проекта и сохранения архива всегда показывается здесь.",
         "Идёт проверка проекта. Прогресс показан здесь; можно оставаться в текущем разделе.",
-        "Идёт сборка архива для отправки. Прогресс показан здесь; можно оставаться в текущем разделе.",
+        "Идёт сохранение архива проекта. Прогресс показан здесь; можно оставаться в текущем разделе.",
         "Пропустить быструю проверку окон приложения",
         "Папки для проверки",
         "Открыть отчёт проверки",
         "Обновить сводку",
-        "Открыт шаг",
+        "Раздел «",
         "Прогресс любой длительной операции",
         "без переключения разделов",
-        "Архив для отправки собирается здесь.",
+        "Архив проекта сохраняется здесь.",
         "Сохранённое состояние проверки",
         "Скопировать архив в буфер обмена",
         "Папка файлов анимации",
@@ -901,6 +904,7 @@ def test_desktop_diagnostics_center_operator_text_is_russian_and_progress_global
         "Сборка пакета отправки",
         "Запущен автономный",
         "Открыт раздел",
+        "Открыт шаг",
         "выбранного раздела",
         "Центр диагностики",
         "Из этого центра",

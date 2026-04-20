@@ -7,8 +7,8 @@ Goal
 ----
 Provide a *single* standalone GUI to run the most important autonomous checks:
 - Autotest Harness (`tools/run_autotest.py`)
-- Full Diagnostics (`tools/run_full_diagnostics.py`)
-- Optional Send Bundle creation + open the shared diagnostics/send desktop center
+- Full project check (`tools/run_full_diagnostics.py`)
+- Optional project archive creation + open the shared project-check desktop center
 
 This GUI intentionally runs underlying tools as subprocesses so that:
 - stdout/stderr is captured exactly as in CLI
@@ -222,7 +222,7 @@ class App:
         self.auto_open_folder = BooleanVar(value=False)
         self.continue_on_failure = BooleanVar(value=True)
         self.context_summary = StringVar(
-            value="Слева настройки набора и автономных проверок, справа журнал, результаты и быстрый переход к диагностике."
+            value="Слева настройки набора и автономных проверок, справа журнал, результаты и быстрый переход к проверке проекта."
         )
         self.suite_handoff_status = StringVar(value="Снимок набора испытаний: состояние ещё не прочитано.")
         self.status = StringVar(value="Готов.")
@@ -315,7 +315,7 @@ class App:
 
         ttk.Label(top, text="Что запускать:").grid(row=0, column=0, sticky="w")
         ttk.Checkbutton(top, text="Автотест", variable=self.do_autotest).grid(row=0, column=1, sticky="w", padx=(8, 0))
-        ttk.Checkbutton(top, text="Полная диагностика", variable=self.do_diagnostics).grid(row=0, column=2, sticky="w", padx=(8, 0))
+        ttk.Checkbutton(top, text="Полная проверка проекта", variable=self.do_diagnostics).grid(row=0, column=2, sticky="w", padx=(8, 0))
 
         # Levels
         lvl = ttk.LabelFrame(config_body, text="Уровни и режим", padding=pad)
@@ -330,7 +330,7 @@ class App:
             state="readonly",
         ).grid(row=0, column=1, sticky="w", padx=(6, 16))
 
-        ttk.Label(lvl, text="Уровень диагностики:").grid(row=0, column=2, sticky="w")
+        ttk.Label(lvl, text="Уровень проверки проекта:").grid(row=0, column=2, sticky="w")
         ttk.Combobox(
             lvl,
             textvariable=self.diagnostics_level,
@@ -342,8 +342,8 @@ class App:
         ttk.Checkbutton(lvl, text="Продолжать при ошибках", variable=self.continue_on_failure).grid(row=0, column=4, sticky="w")
         lvl.columnconfigure(5, weight=1)
 
-        # Diagnostics options
-        diag = ttk.LabelFrame(config_body, text="Опции полной диагностики", padding=pad)
+        # Project-check options
+        diag = ttk.LabelFrame(config_body, text="Опции проверки проекта", padding=pad)
         diag.pack(fill="x", padx=pad, pady=(0, pad))
 
         ttk.Checkbutton(diag, text="Пропустить быструю проверку интерфейса (не запускать Streamlit)", variable=self.skip_ui_smoke).grid(row=0, column=0, sticky="w")
@@ -361,9 +361,9 @@ class App:
         # After run
         aft = ttk.LabelFrame(config_body, text="После завершения", padding=pad)
         aft.pack(fill="x", padx=pad, pady=(0, pad))
-        ttk.Checkbutton(aft, text="Подготовить архив для отправки в чат", variable=self.make_send_bundle).grid(row=0, column=0, sticky="w")
-        ttk.Checkbutton(aft, text="Сразу открыть диагностику и отправку", variable=self.open_send_gui).grid(row=0, column=1, sticky="w", padx=(16, 0))
-        ttk.Checkbutton(aft, text="Открыть папку архивов отправки", variable=self.auto_open_folder).grid(row=0, column=2, sticky="w", padx=(16, 0))
+        ttk.Checkbutton(aft, text="Сохранить архив проекта", variable=self.make_send_bundle).grid(row=0, column=0, sticky="w")
+        ttk.Checkbutton(aft, text="Сразу открыть проверку проекта и архив", variable=self.open_send_gui).grid(row=0, column=1, sticky="w", padx=(16, 0))
+        ttk.Checkbutton(aft, text="Открыть папку архивов проекта", variable=self.auto_open_folder).grid(row=0, column=2, sticky="w", padx=(16, 0))
         aft.columnconfigure(3, weight=1)
 
         # Buttons
@@ -375,9 +375,9 @@ class App:
         self.btn_stop = ttk.Button(btns, text="Остановить", command=self._on_stop, state="disabled")
         self.btn_stop.pack(side="left", padx=(8, 0))
 
-        ttk.Button(btns, text="Архивы отправки", command=self._open_send_bundles).pack(side="left", padx=(8, 0))
+        ttk.Button(btns, text="Архивы проекта", command=self._open_send_bundles).pack(side="left", padx=(8, 0))
         ttk.Button(btns, text="Папка автотеста", command=self._open_autotest_runs).pack(side="left", padx=(8, 0))
-        ttk.Button(btns, text="Папка диагностики", command=self._open_diagnostics_runs).pack(side="left", padx=(8, 0))
+        ttk.Button(btns, text="Папка проверки проекта", command=self._open_diagnostics_runs).pack(side="left", padx=(8, 0))
         ttk.Button(
             btns,
             text="Результаты и анализ",
@@ -579,7 +579,7 @@ class App:
                     cmd.append("--skip_ui_smoke")
                 if self.run_opt_smoke.get():
                     cmd += ["--run_opt_smoke", "--opt_minutes", str(int(self.opt_minutes.get())), "--opt_jobs", str(int(self.opt_jobs.get()))]
-                rc = self._run_cmd(cmd, f"Полная диагностика ({diagnostics_level_label})")
+                rc = self._run_cmd(cmd, f"Проверка проекта ({diagnostics_level_label})")
                 self.state.diagnostics_rc = rc
                 if rc != 0:
                     final_rc = rc
@@ -590,7 +590,7 @@ class App:
 
             if self.make_send_bundle.get():
                 self.q.put("\n" + "=" * 80 + "\n")
-                self.q.put("[шаг] Подготовка архива для отправки\n")
+                self.q.put("[шаг] Сохранение архива проекта\n")
                 self.q.put("=" * 80 + "\n")
                 _rr("send_bundle_start")
                 try:
@@ -608,7 +608,7 @@ class App:
                     self.state.send_bundle_ok = False
                     self.state.send_bundle_error = str(e)
                     _rr("send_bundle_failed", error=repr(e))
-                    self.q.put(f"[Ошибка подготовки архива для отправки] {e}\n")
+                    self.q.put(f"[Ошибка сохранения архива проекта] {e}\n")
                     if final_rc == 0:
                         final_rc = 2
 
@@ -677,15 +677,15 @@ class App:
             )
         if self.state.requested_diagnostics:
             step_lines.append(
-                f"Полная диагностика ({self.diagnostics_level.get()}): код {self.state.diagnostics_rc}"
+                f"Проверка проекта ({self.diagnostics_level.get()}): код {self.state.diagnostics_rc}"
             )
         if self.state.requested_send_bundle:
             if self.state.send_bundle_ok:
-                step_lines.append("Архив отправки: готов")
+                step_lines.append("Архив проекта: сохранён")
             elif self.state.send_bundle_ok is False:
-                step_lines.append("Архив отправки: ошибка")
+                step_lines.append("Архив проекта: ошибка сохранения")
         if self.open_send_gui.get():
-            step_lines.append("Автооткрытие центра отправки: вкл")
+            step_lines.append("Автооткрытие проверки проекта и архива: вкл")
         if self.auto_open_folder.get():
             step_lines.append("Автооткрытие папки архивов: вкл")
         handoff_detail = (
@@ -693,7 +693,7 @@ class App:
             "Ниже подготовлен рекомендуемый следующий шаг для проверки и разбора результатов."
         )
         if self.state.send_bundle_error:
-            handoff_detail = handoff_detail + f" Ошибка архива отправки: {self.state.send_bundle_error}"
+            handoff_detail = handoff_detail + f" Ошибка сохранения архива проекта: {self.state.send_bundle_error}"
         self.results_center.set_session_handoff(
             DesktopResultsSessionHandoff(
                 summary=f"код {rc} | длительность {dur:.1f} с",
@@ -722,7 +722,7 @@ class App:
             msg_lines.extend(format_anim_dashboard_brief_lines(load_latest_send_bundle_anim_dashboard(out_dir)))
             diag_json = out_dir / ANIM_DIAG_SIDECAR_JSON
             if diag_json.exists():
-                msg_lines.append(f"Диагностика последней анимации: {diag_json}")
+                msg_lines.append(f"Сведения о последней анимации: {diag_json}")
 
         messagebox.showinfo("Автономное тестирование", "\n".join(msg_lines))
 

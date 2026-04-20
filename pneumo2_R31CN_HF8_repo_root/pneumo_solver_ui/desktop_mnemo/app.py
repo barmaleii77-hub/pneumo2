@@ -5174,7 +5174,7 @@ def _edge_operability_meta(
             }
 
     return {
-        "operability_status": "состояние ветви требует контекста",
+        "operability_status": "для оценки ветви не хватает данных",
         "operability_label": "оценка опирается на Q, ΔP и тип элемента без надёжного сигнала открытия",
         "operability_badge": "OP ctx",
         "operability_tone": "info",
@@ -5231,7 +5231,7 @@ def _edge_consistency_meta(
         }
     return {
         "consistency_status": "сигналы неполные или переходные",
-        "consistency_label": "оценка требует дополнительного контекста по соседним ветвям",
+        "consistency_label": "для оценки нужны соседние ветви или более полные сигналы",
         "consistency_badge": "CS ctx",
         "consistency_tone": "neutral",
     }
@@ -5684,7 +5684,7 @@ def _edge_recent_causality_meta(
             "causality_tone": "info",
         }
     return {
-        "causality_status": "причинная связка требует контекста",
+        "causality_status": "для причинной связки не хватает данных",
         "causality_label": "для уверенного вывода нужен соседний контур или большее временное окно",
         "causality_badge": "CX ctx",
         "causality_tone": "neutral",
@@ -13780,7 +13780,7 @@ class MnemoMainWindow(QtWidgets.QMainWindow):
             "<b>Серый</b> — закрытый элемент.<br/>"
             "<b>Inline symbol</b> — canonical-тип арматуры прямо на линии маршрута.</p>"
             "<p><b>Плотность overlays:</b><br/>"
-            "<b>Тихо</b> — только основной контекст и минимум карточек.<br/>"
+            "<b>Тихо</b> — только основная схема и минимум карточек.<br/>"
             "<b>Оператор</b> — сбалансированный рабочий режим.<br/>"
             "<b>Полно</b> — максимум labels и inline-символов для разборов схемы.</p>"
             "<p><b>Что где читать:</b><br/>"

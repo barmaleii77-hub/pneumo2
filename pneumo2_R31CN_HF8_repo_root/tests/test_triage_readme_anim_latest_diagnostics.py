@@ -79,24 +79,24 @@ def test_generate_triage_report_exposes_anim_latest_diagnostics_from_sidecar(tmp
     assert mnemo["current_mode"] == "Регуляторный коридор"
     assert summary["severity_counts"]["critical"] == 1
     assert summary["severity_counts"]["warn"] >= 1
-    assert summary["operator_recommendations"][0].startswith("Open Desktop Mnemo first")
-    assert any("open ring seam is intentional" in item for item in summary["operator_recommendations"])
-    assert any("Desktop Mnemo reports 1 active latched event(s)" in flag for flag in summary["red_flags"])
-    assert any("Ring seam remains open under strict_exact" in flag for flag in summary["red_flags"])
+    assert summary["operator_recommendations"][0].startswith("Сначала откройте мнемосхему")
+    assert any("открытый шов кольца ожидаем" in item for item in summary["operator_recommendations"])
+    assert any("В мнемосхеме есть активные события: 1" in flag for flag in summary["red_flags"])
+    assert any("Шов кольца открыт в режиме strict_exact" in flag for flag in summary["red_flags"])
     assert summary["ring_closure"]["severity"] == "warn"
     assert summary["ring_closure"]["closure_policy"] == "strict_exact"
     assert os.path.normcase(paths["latest_anim_pointer_diagnostics_json"]) == os.path.normcase(str((sb_root / ANIM_DIAG_SIDECAR_JSON).resolve()))
     assert os.path.normcase(paths["latest_anim_pointer_diagnostics_md"]) == os.path.normcase(str((sb_root / ANIM_DIAG_SIDECAR_MD).resolve()))
-    assert "## Desktop Mnemo events" in md
-    assert "## Recommended actions" in md
+    assert "## События мнемосхемы" in md
+    assert "## Рекомендуемые действия" in md
     assert "Регуляторный коридор" in md
     assert "Большой перепад давлений" in md
-    assert "## Anim latest diagnostics" in md
+    assert "## Последняя анимация" in md
     assert "tok-triage" in md
     assert "npz, road_csv" in md
-    assert "scenario_kind: `ring`" in md
-    assert "ring_closure: policy=`strict_exact` / applied=`False` / seam_open=`True` / seam_max_jump_m=`0.012` / raw_seam_max_jump_m=`0.015`" in md
-    assert "Latest anim diagnostics json" in md
+    assert "Тип сценария: `ring`" in md
+    assert "Замыкание кольца: режим=`strict_exact` / применено=`False` / шов открыт=`True` / скачок шва, м=`0.012` / исходный скачок, м=`0.015`" in md
+    assert "Данные последней анимации, JSON" in md
 
 
 
@@ -105,14 +105,14 @@ def test_build_send_bundle_readme_includes_anim_latest_token_and_reload_inputs()
 
     text = _build_send_bundle_readme(diag)
 
-    assert "SEND BUNDLE (for chat)" in text
-    assert "anim_latest_visual_cache_token: tok-readme" in text
-    assert "anim_latest_visual_reload_inputs: npz, road_csv" in text
-    assert "scenario_kind: ring" in text
-    assert "ring_closure: policy=strict_exact / applied=False / seam_open=True / seam_max_jump_m=0.012 / raw_seam_max_jump_m=0.015" in text
-    assert "Recommended actions (operator-first):" in text
-    assert "Open Desktop Mnemo first" in text
-    assert "anim_latest_global_pointer_json: /abs/workspace/_pointers/anim_latest.json" in text
+    assert "АРХИВ ПРОЕКТА" in text
+    assert "Токен визуального кэша: tok-readme" in text
+    assert "Входные данные перезагрузки: npz, road_csv" in text
+    assert "Тип сценария: ring" in text
+    assert "Замыкание кольца: режим=strict_exact / применено=False / шов открыт=True / скачок шва, м=0.012 / исходный скачок, м=0.015" in text
+    assert "Рекомендуемые действия:" in text
+    assert "Сначала откройте мнемосхему" in text
+    assert "Общий указатель: /abs/workspace/_pointers/anim_latest.json" in text
     assert ANIM_DIAG_JSON in text
     assert ANIM_DIAG_MD in text
 
@@ -124,20 +124,20 @@ def test_sources_wire_anim_latest_diagnostics_into_triage_and_readme() -> None:
 
     assert '_load_anim_latest_summary' in triage_text
     assert '"anim_latest": anim_summary' in triage_text
-    assert '## Anim latest diagnostics' in triage_text
-    assert 'scenario_kind' in triage_text
-    assert 'ring_closure:' in triage_text
-    assert '## Desktop Mnemo events' in triage_text
+    assert '## Последняя анимация' in triage_text
+    assert 'Тип сценария' in triage_text
+    assert 'Замыкание кольца' in triage_text
+    assert '## События мнемосхемы' in triage_text
     assert '"mnemo_event_log": mnemo_event_summary' in triage_text
     assert '"operator_recommendations": operator_recommendations' in triage_text
-    assert '## Recommended actions' in triage_text
+    assert '## Рекомендуемые действия' in triage_text
     assert 'ANIM_DIAG_SIDECAR_JSON' in triage_text
     assert 'ANIM_DIAG_SIDECAR_MD' in triage_text
 
     assert '_build_send_bundle_readme' in bundle_text
     assert 'anim_latest_visual_cache_token' in bundle_text
-    assert 'scenario_kind:' in bundle_text
-    assert 'ring_closure: policy=' in bundle_text
+    assert 'Тип сценария:' in bundle_text
+    assert 'Замыкание кольца: режим=' in bundle_text
     assert 'ANIM_DIAG_JSON' in bundle_text
     assert 'ANIM_DIAG_MD' in bundle_text
     assert 'readme = _build_send_bundle_readme(anim_diag_event)' in bundle_text

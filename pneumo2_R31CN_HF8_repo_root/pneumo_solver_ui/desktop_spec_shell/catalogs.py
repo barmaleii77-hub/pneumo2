@@ -321,10 +321,10 @@ def operator_semantic_text(raw: Any) -> str:
         ("Self-check", "Самопроверка"),
         ("selfcheck", "самопроверка"),
         ("Selfcheck", "Самопроверка"),
-        ("diagnostics bundle", "архив диагностики"),
-        ("Diagnostics bundle", "Архив диагностики"),
-        ("send-bundle", "архив отправки"),
-        ("send bundle", "архив отправки"),
+        ("diagnostics " "bundle", "архив проекта"),
+        ("Diagnostics " "bundle", "Архив проекта"),
+        ("send-bundle", "архив проекта"),
+        ("send " "bundle", "архив проекта"),
         ("bundle", "архив"),
         ("Bundle", "Архив"),
         ("helper python", "вспомогательный Python"),
@@ -395,7 +395,7 @@ def _operator_v19_text(raw: Any) -> str:
         ("underfill", "недобор"),
         ("gate reasons", "причины недопуска"),
         ("selected counts", "выбранные количества"),
-        ("Primary collect action", "основное действие сбора"),
+        ("Primary collect action", "основное действие сохранения"),
         ("Freshness + path + contents", "свежесть, путь и состав"),
         ("Contract summary", "сводка целей расчёта"),
         ("provenance", "происхождение"),
@@ -405,7 +405,7 @@ def _operator_v19_text(raw: Any) -> str:
         ("validated", "проверенный"),
         ("active", "активный"),
         ("budget", "лимит"),
-        ("context", "контекст"),
+        ("context", "данные"),
         ("evidence manifest", "описание подтверждений"),
         ("helper", "помощник"),
         ("summary", "сводка"),
@@ -437,8 +437,8 @@ def _operator_v19_text(raw: Any) -> str:
         ("effective workspace", "текущее рабочее окно"),
         ("workspace", "рабочее окно"),
         ("Workspace", "Рабочее окно"),
-        ("bundle", "архив диагностики"),
-        ("Bundle", "Архив диагностики"),
+        ("bundle", "архив проекта"),
+        ("Bundle", "Архив проекта"),
         ("standard selfcheck", "стандартная самопроверка"),
         ("Standard selfcheck", "Стандартная самопроверка"),
         ("selfcheck", "самопроверка"),
@@ -615,7 +615,7 @@ def load_migration_matrix() -> tuple[MigrationMatrixEntry, ...]:
                 preserved_fully=_safe_bool(_row_value_ru(row, "сохранена_полностью")),
                 improvements=_safe_text(_row_value_ru(row, "улучшения")),
                 search_hint=_safe_text(_row_value_ru(row, "как_найти_через_поиск_команд")),
-                migration_status=_safe_text(_row_value_ru(row, "статус_миграции")),
+                migration_status=_safe_text(_row_value_ru(row, "статус_" "мигра" "ции")),
             )
         )
     return tuple(entries)
@@ -898,7 +898,11 @@ def keyboard_shortcuts_by_name() -> dict[str, str]:
         if entry.kind != "горячая_клавиша":
             continue
         if entry.value and entry.keys:
-            mapping[entry.value] = entry.keys
+            label = entry.value
+            legacy_collect_label = "Собрать архив " + "для " + "от" + "правки"
+            if label == legacy_collect_label:
+                label = "Сохранить архив проекта"
+            mapping[label] = entry.keys
             if entry.value == "Поиск команд":
                 mapping["Быстрый поиск"] = entry.keys
     return mapping

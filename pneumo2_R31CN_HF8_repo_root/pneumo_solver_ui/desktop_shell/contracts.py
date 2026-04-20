@@ -141,7 +141,7 @@ class DesktopShellToolSpec:
                 "влияние",
                 "чувствительность",
             ),
-            "desktop_diagnostics_center": ("проверка проекта", "архив для отправки", "отправка", "готовность"),
+            "desktop_diagnostics_center": ("проверка проекта", "архив проекта", "сохранить архив", "готовность"),
             "compare_viewer": ("compare", "сравнение прогонов", "окно сравнения"),
             "desktop_animator": ("animator", "аниматор", "трёхмерный вид"),
             "desktop_mnemo": ("mnemo", "мнемосхема", "пневмосхема"),

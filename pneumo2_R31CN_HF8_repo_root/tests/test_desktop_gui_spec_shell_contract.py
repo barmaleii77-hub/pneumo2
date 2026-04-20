@@ -34,7 +34,7 @@ def test_gui_spec_shell_workspace_order_matches_canonical_route() -> None:
         "Оптимизация",
         "Анализ результатов",
         "Анимация",
-        "Проверка и отправка",
+        "Проверка проекта",
         "Параметры приложения",
         "Инструменты",
     ]
@@ -64,19 +64,21 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
 
     assert commands["diagnostics.collect_bundle"].kind == "hosted_action"
     assert commands["diagnostics.collect_bundle"].automation_id == "DG-BTN-COLLECT"
-    assert workspaces["diagnostics"].summary.startswith("Проверка проекта, архив для отправки")
-    assert workspaces["diagnostics"].title == "Проверка и отправка"
-    assert commands["workspace.diagnostics.open"].title == "Перейти к проверке и отправке"
-    assert commands["diagnostics.collect_bundle"].title == "Собрать архив для отправки"
-    assert commands["diagnostics.verify_bundle"].title == "Проверить архив для отправки"
-    assert commands["diagnostics.legacy_center.open"].title == "Открыть проверку и отправку отдельным окном"
-    assert commands["tools.autotest.open"].title == "Открыть проверки"
+    assert workspaces["diagnostics"].summary.startswith("Проверка проекта, сохранение архива проекта")
+    assert workspaces["diagnostics"].title == "Проверка проекта"
+    assert commands["workspace.overview.open"].title == "Перейти к панели проекта"
+    assert commands["workspace.diagnostics.open"].title == "Перейти к проверке проекта"
+    assert commands["diagnostics.collect_bundle"].title == "Сохранить архив проекта"
+    assert commands["diagnostics.verify_bundle"].title == "Проверить архив проекта"
+    assert commands["diagnostics.send_results"].title == "Скопировать архив"
+    assert commands["diagnostics.legacy_center.open"].title == "Расширенная проверка проекта"
+    assert commands["tools.autotest.open"].title == "Проверки проекта"
     assert commands["tools.autotest.open"].route_label == "Окна -> Инструменты -> Проверки"
-    assert commands["input.editor.open"].title == "Открыть исходные данные отдельным окном"
+    assert commands["input.editor.open"].title == "Редактировать исходные данные"
     assert commands["input.editor.open"].route_label == "Окна -> Исходные данные -> Редактор исходных данных"
-    assert commands["optimization.center.open"].title == "Открыть оптимизацию отдельным окном"
+    assert commands["optimization.center.open"].title == "Настроить оптимизацию"
     assert commands["optimization.center.open"].route_label == "Окна -> Оптимизация -> Настройка и запуск"
-    assert commands["results.center.open"].title == "Открыть анализ результатов"
+    assert commands["results.center.open"].title == "Анализировать результаты"
     assert commands["results.center.open"].route_label == "Окна -> Анализ результатов -> Графики и проверка"
     assert commands["baseline.center.open"].kind == "open_workspace"
     assert commands["baseline.center.open"].target_workspace_id == "baseline_run"
@@ -171,7 +173,7 @@ def test_gui_spec_shell_launch_module_commands_do_not_claim_native_workspace_sur
             continue
         assert command.launch_surface in allowed_surfaces, command.command_id
         if command.launch_surface == "legacy_bridge":
-            assert command.status_label in {"Отдельное окно", "Переходное окно", "Резервное окно"}
+            assert command.status_label in {"Рабочее окно", "Переходное окно", "Резервное окно"}
 
 
 def test_gui_spec_shell_covers_shared_desktop_launch_catalog_without_duplicate_gui_modules() -> None:
@@ -220,7 +222,7 @@ def test_gui_spec_shell_search_indexes_migration_aliases_and_visual_routes() -> 
     commands = tuple(build_command_map().values())
     entries = build_search_entries(workspaces, commands)
 
-    diagnostics_hits = search_command_palette(entries, "собрать архив для отправки")
+    diagnostics_hits = search_command_palette(entries, "сохранить архив проекта")
     stiffness_hits = search_command_palette(entries, "жёсткость")
     mnemo_hits = search_command_palette(entries, "пневмосхема")
     baseline_hits = search_command_palette(entries, "активный опорный прогон")
@@ -344,7 +346,7 @@ def test_gui_spec_shell_overview_snapshot_exposes_project_baseline_results_and_d
     assert "Активный опорный прогон" in titles
     assert "Настройки оптимизации" in titles
     assert "Последние результаты" in titles
-    assert "Последний архив для отправки" in titles
+    assert "Последний архив проекта" in titles
     assert "Последний архив диагностики" not in titles
     assert "Последний diagnostics bundle" not in titles
     assert "Проверка готовности" in titles
@@ -352,7 +354,7 @@ def test_gui_spec_shell_overview_snapshot_exposes_project_baseline_results_and_d
     actions = {card.title: card.action_text for card in snapshot.cards}
     assert actions["Текущий проект"] == "Открыть исходные данные"
     assert actions["Активный опорный прогон"] == "Открыть базовый прогон"
-    assert actions["Последний архив для отправки"] == "Собрать архив для отправки"
+    assert actions["Последний архив проекта"] == "Сохранить архив проекта"
 
     visible_text = "\n".join(
         part
@@ -395,7 +397,7 @@ def test_gui_spec_shell_main_window_uses_hosted_hubs_and_single_dispatcher() -> 
 
     assert "class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):" in src
     assert "self.command_search = QtWidgets.QComboBox()" in src
-    assert 'diagnostics_button = QtWidgets.QPushButton("Собрать архив для отправки")' in src
+    assert 'diagnostics_button = QtWidgets.QPushButton("Сохранить архив проекта")' in src
     assert "self.primary_action_button = QtWidgets.QPushButton(" in src
     assert "def _compact_command_title(" in src
     assert "def _primary_command_title(" in src
@@ -410,37 +412,42 @@ def test_gui_spec_shell_main_window_uses_hosted_hubs_and_single_dispatcher() -> 
     assert src.count("def open_workspace(") == 1
     assert src.count("def run_command(") == 1
     for expected in (
-        "PneumoApp - Главное окно приложения",
-        "Сейчас открыт рабочий шаг «Панель проекта»",
-        "Быстрый поиск окон и действий",
+        "PneumoApp - Панель восстановления окон",
+        "Текущий рабочий шаг: Панель проекта",
+        "Быстрый поиск действий",
         "Окна",
         "Цели и ограничения: основные показатели расчёта",
         "Обязательное условие. Происхождение опорного прогона должно быть видимо",
         "Краткая сводка.",
-        "Открыть рабочие окна во вкладках",
+        "Рабочие окна во вкладках",
         "Сравнить прогоны",
-        "Открыть аниматор",
-        "Проверка и отправка",
-        "Собрать архив для отправки",
-        "О главном окне приложения",
+        "Анимировать результат",
+        "Проверка проекта",
+        "Сохранить архив проекта",
+        "О рабочем месте",
         "Фокус перенесён в панель свойств и справки",
-        "Действие пока недоступно в окне",
+        "Действие пока недоступно в рабочем шаге",
         "Окна ->",
-        "Главное окно собирает основные инженерные окна приложения",
+        "Рабочее место собирает основные инженерные окна приложения",
     ):
         assert expected in src
     for forbidden in (
         "PneumoApp Desktop Shell",
         "Рабочее пространство: Панель проекта",
         "Рабочие пространства",
-        "PneumoApp - главное окно",
+        "PneumoApp - главное " "окно",
+        "PneumoApp - Главное " "окно приложения",
         "Раздел: Панель проекта",
         "Сейчас открыт раздел",
-        "Открыто: Панель проекта",
+        "Сейчас открыт рабочий " "шаг",
+        "Открыто: Панель " "проекта",
         "Открыт раздел",
+        "Открыт рабочий " "шаг",
+        "Быстрый поиск окон " "и действий",
+        "Открыть рабочие окна " "во вкладках",
         "Поиск команд, окон и разделов",
         "Фокус региона:",
-        "Открыто окно:",
+        "Открыто " "окно:",
         "Режим:",
         "Сводка окна:",
         "Обязательное условие:",
@@ -450,7 +457,10 @@ def test_gui_spec_shell_main_window_uses_hosted_hubs_and_single_dispatcher() -> 
         "Жёсткое ограничение:",
         "Маршрут: основной поэтапный запуск",
         "Важно: происхождение опорного прогона",
-        "Открыть старое главное окно",
+        "О главном " "окне приложения",
+        "Главное " "окно собирает основные инженерные окна приложения",
+        "Классическое главное " "окно",
+        "Открыть старое главное " "окно",
         "Открыть прежний центр диагностики",
         "Открыть центр диагностики",
         "Открыть резервное окно приложения",
@@ -485,17 +495,17 @@ def test_gui_spec_shell_diagnostics_page_uses_send_bundle_operator_language() ->
     )
 
     for expected in (
-        "Проверка и отправка доступны из текущего окна.",
-        "Собрать архив для отправки",
-        "Проверить архив для отправки",
-        "Папка архива для отправки",
-        "Последний сбор архива",
-        "Архив для отправки будет",
-        "Сбор архива завершён успешно.",
+        "Проверка проекта и архив доступны в текущем рабочем шаге.",
+        "Сохранить архив проекта",
+        "Проверить архив проекта",
+        "Папка архива проекта",
+        "Последнее сохранение архива",
+        "Архив проекта будет",
+        "Архив проекта сохранён.",
     ):
         assert expected in src
-    assert "Последний архив для отправки пока не найден" in runtime_src
-    assert "Собрать архив для отправки или проверить архив" in runtime_src
+    assert "Последний архив проекта пока не найден" in runtime_src
+    assert "Сохранить архив проекта или проверить архив" in runtime_src
 
     for forbidden in (
         "Собрать диагностику",

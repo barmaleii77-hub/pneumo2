@@ -14,13 +14,13 @@ def create_hosted_send_results(parent: tk.Misc) -> SendResultsGUI:
 def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="send_results_gui",
-        title="Отправка результатов",
-        description="Подготовка архива результатов и сопроводительных материалов для передачи.",
+        title="Скопировать архив",
+        description="Копирование сохранённого архива проекта и сопроводительных материалов.",
         group="Встроенные окна",
         mode="hosted",
         menu_section="Инструменты",
         nav_section="Инструменты",
-        details="Подготовка архива результатов, сопроводительных файлов и отправки.",
+        details="Копирование архива проекта и сопроводительных файлов для ручной передачи.",
         menu_order=150,
         nav_order=150,
         standalone_module="pneumo_solver_ui.tools.send_results_gui",

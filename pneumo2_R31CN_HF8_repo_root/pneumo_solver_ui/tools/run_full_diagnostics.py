@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Full diagnostics runner (headless).
+"""Full project check runner (headless).
 
 Цель
 ----
-Сделать максимально комплексный прогон «самопроверок» и ключевых
+Сделать максимально комплексный прогон самопроверок и ключевых
 пайплайнов (baseline-suite / короткий smoke оптимизации / (опционально) NPZ-калибровка)
 и собрать *все артефакты* в одну папку + zip.
 
 Это нужно, чтобы:
-  • вы могли одним файлом присылать мне весь контекст (логи, метрики, окружение,
-    результаты прогона) без пересылки всей папки проекта.
+  • можно было сохранить одним файлом весь контекст (логи, метрики, окружение,
+    результаты прогона) без копирования всей папки проекта.
 
 Важно: скрипт не правит исходники. Он пишет только в diagnostics_runs/.
 
@@ -93,7 +93,7 @@ def _copy_tree(src: Path, dst: Path, ignore_names: Optional[set[str]] = None) ->
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(src, dst, dirs_exist_ok=True, ignore=_ignore)
     except Exception:
-        # Не должно валить диагностику
+        # Не должно валить проверку проекта.
         try:
             _safe_write_text(dst.parent / "copy_tree_error.txt", traceback.format_exc())
         except Exception:
@@ -113,7 +113,7 @@ def _pick_python(repo_root: Path) -> str:
 
 
 def _sys_snapshot() -> dict:
-    """Короткий снимок загрузки CPU/RAM для диагностики."""
+    """Короткий снимок загрузки CPU/RAM для проверки проекта."""
     snap = {"ts": datetime.now().isoformat(timespec="seconds")}
     try:
         import psutil  # type: ignore

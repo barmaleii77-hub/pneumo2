@@ -259,16 +259,16 @@ def test_health_and_inspect_preserve_geometry_acceptance_report_states(tmp_path:
         assert geom["producer_owned"] is True
         assert geom["no_synthetic_geometry"] is True
         assert geom["missing_fields"] == ["road_contact_ЛП_z_м"]
-        assert any(f"geometry acceptance gate={gate}" in str(note) for note in rep.notes)
+        assert any(f"проверка геометрии: {gate}" in str(note) for note in rep.notes)
         assert summary["geometry_acceptance_gate"] == gate
         assert summary["geometry_acceptance_inspection_status"] == inspection_status
         assert summary["geometry_acceptance_missing_fields"] == ["road_contact_ЛП_z_м"]
-        assert f"release_gate: {gate}" in health_md
-        assert f"inspection_status: {inspection_status}" in health_md
-        assert "missing_fields: road_contact_ЛП_z_м" in health_md
-        assert f"release_gate: {gate}" in inspect_md
-        assert f"inspection_status: {inspection_status}" in inspect_md
-        assert "missing_fields: road_contact_ЛП_z_м" in inspect_md
+        assert f"Допуск геометрии: {gate}" in health_md
+        assert f"Состояние проверки: {inspection_status}" in health_md
+        assert "Не хватает полей: road_contact_ЛП_z_м" in health_md
+        assert f"Допуск геометрии: {gate}" in inspect_md
+        assert f"Состояние проверки: {inspection_status}" in inspect_md
+        assert "Не хватает полей: road_contact_ЛП_z_м" in inspect_md
 
 
 def test_health_and_inspector_carry_latest_integrity_and_self_check_snapshot(tmp_path: Path) -> None:
@@ -337,9 +337,9 @@ def test_health_and_inspector_carry_latest_integrity_and_self_check_snapshot(tmp
     assert summary["latest_integrity_proof"]["status"] == "READY"
     assert summary["ok"] is False
     assert summary["self_check_silent_warnings"]["status"] == "READY"
-    assert "Latest integrity proof" in health_md
-    assert "no_release_closure_claim: True" in health_md
-    assert "Self-check silent warnings snapshot" in inspect_md
+    assert "Проверка актуального архива" in health_md
+    assert "Финальное закрытие не заявлено: True" in health_md
+    assert "Тихие предупреждения самопроверки" in inspect_md
 
 
 
@@ -364,8 +364,8 @@ def test_build_health_report_exposes_anim_latest_diagnostics_and_embeds_into_zip
     assert mnemo["severity"] == "critical"
     assert mnemo["current_mode"] == "Регуляторный коридор"
     assert recommendations
-    assert recommendations[0].startswith("Open Desktop Mnemo first")
-    assert any("open ring seam is intentional" in msg for msg in recommendations)
+    assert recommendations[0].startswith("Сначала откройте мнемосхему")
+    assert any("открытый шов кольца ожидаем" in msg for msg in recommendations)
     assert anim["browser_perf_evidence_status"] == "snapshot_only"
     assert anim["browser_perf_bundle_ready"] is False
     assert anim["browser_perf_comparison_status"] == "no_reference"
@@ -375,7 +375,7 @@ def test_build_health_report_exposes_anim_latest_diagnostics_and_embeds_into_zip
     assert ring["severity"] == "warn"
     assert ring["closure_policy"] == "strict_exact"
     assert ring["seam_open"] is True
-    assert "open-seam visuals/exports are acceptable" in ring["red_flags"][0]
+    assert "открытый шов допустим" in ring["red_flags"][0]
     assert artifacts["health_report_embedded"] is False
     assert artifacts["browser_perf_registry_snapshot"] is False
     assert artifacts["browser_perf_previous_snapshot"] is False
@@ -383,18 +383,18 @@ def test_build_health_report_exposes_anim_latest_diagnostics_and_embeds_into_zip
     assert artifacts["browser_perf_evidence_report"] is False
     assert artifacts["browser_perf_comparison_report"] is False
     assert artifacts["browser_perf_trace"] is False
-    assert "visual_cache_token" in md_path.read_text(encoding="utf-8")
+    assert "Токен визуального кэша" in md_path.read_text(encoding="utf-8")
     assert "tok-sidecar" in md_path.read_text(encoding="utf-8")
-    assert "## Desktop Mnemo events" in md_path.read_text(encoding="utf-8")
-    assert "## Ring closure" in md_path.read_text(encoding="utf-8")
-    assert "## Recommended actions" in md_path.read_text(encoding="utf-8")
-    assert "severity: warn" in md_path.read_text(encoding="utf-8")
-    assert "Ring seam is intentionally open under strict_exact closure" in md_path.read_text(encoding="utf-8")
+    assert "## События мнемосхемы" in md_path.read_text(encoding="utf-8")
+    assert "## Замыкание кольца" in md_path.read_text(encoding="utf-8")
+    assert "## Рекомендуемые действия" in md_path.read_text(encoding="utf-8")
+    assert "Важность: warn" in md_path.read_text(encoding="utf-8")
+    assert "Шов кольца намеренно оставлен открытым в режиме strict_exact" in md_path.read_text(encoding="utf-8")
     assert "Большой перепад давлений" in md_path.read_text(encoding="utf-8")
-    assert "browser_perf_evidence_status" in md_path.read_text(encoding="utf-8")
-    assert "browser_perf_comparison_status" in md_path.read_text(encoding="utf-8")
-    assert "ring_closure: policy=strict_exact / applied=False / seam_open=True / seam_max_jump_m=0.012 / raw_seam_max_jump_m=0.015" in md_path.read_text(encoding="utf-8")
-    assert "browser_perf_evidence_report: False" in md_path.read_text(encoding="utf-8")
+    assert "Данные производительности" in md_path.read_text(encoding="utf-8")
+    assert "Состояние сравнения производительности" in md_path.read_text(encoding="utf-8")
+    assert "Замыкание кольца: режим=strict_exact / применено=False / шов открыт=True / скачок шва, м=0.012 / исходный скачок, м=0.015" in md_path.read_text(encoding="utf-8")
+    assert "Отчёт производительности: False" in md_path.read_text(encoding="utf-8")
 
     add_health_report_to_zip(zip_path, json_path, md_path)
     summary = inspect_send_bundle(zip_path)
@@ -408,7 +408,7 @@ def test_build_health_report_exposes_anim_latest_diagnostics_and_embeds_into_zip
     assert summary["has_browser_perf_trace"] is False
     assert summary["anim_latest"]["visual_cache_token"] == "tok-sidecar"
     assert summary["mnemo_event_log"]["severity"] == "critical"
-    assert summary["operator_recommendations"][0].startswith("Open Desktop Mnemo first")
+    assert summary["operator_recommendations"][0].startswith("Сначала откройте мнемосхему")
     assert summary["anim_latest"]["visual_reload_inputs"] == ["npz", "road_csv"]
     assert summary["anim_latest"]["browser_perf_evidence_status"] == "snapshot_only"
     assert summary["anim_latest"]["browser_perf_comparison_status"] == "no_reference"
@@ -425,19 +425,19 @@ def test_build_health_report_exposes_anim_latest_diagnostics_and_embeds_into_zip
     assert summary["anim_latest"]["browser_perf_trace_in_bundle"] is False
     inspect_md = render_inspection_md(summary)
     assert "tok-sidecar" in inspect_md
-    assert "## Desktop Mnemo events" in inspect_md
-    assert "## Ring closure" in inspect_md
-    assert "## Recommended actions" in inspect_md
-    assert "severity: warn" in inspect_md
-    assert "Ring seam is intentionally open under strict_exact closure" in inspect_md
+    assert "## События мнемосхемы" in inspect_md
+    assert "## Замыкание кольца" in inspect_md
+    assert "## Рекомендуемые действия" in inspect_md
+    assert "Важность: warn" in inspect_md
+    assert "Шов кольца намеренно оставлен открытым в режиме strict_exact" in inspect_md
     assert "Регуляторный коридор" in inspect_md
-    assert "browser_perf_evidence_status" in inspect_md
-    assert "browser_perf_comparison_status" in inspect_md
-    assert "ring_closure: policy=strict_exact / applied=False / seam_open=True / seam_max_jump_m=0.012 / raw_seam_max_jump_m=0.015" in inspect_md
-    assert "Browser perf evidence report: False" in inspect_md
-    assert "Browser perf trace: False" in inspect_md
-    assert "browser_perf_artifacts_primary" in inspect_md
-    assert "browser_perf_artifacts_secondary" in inspect_md
+    assert "Данные производительности" in inspect_md
+    assert "Сравнение производительности" in inspect_md
+    assert "Замыкание кольца: режим=strict_exact / применено=False / шов открыт=True / скачок шва, м=0.012 / исходный скачок, м=0.015" in inspect_md
+    assert "Отчёт производительности: False" in inspect_md
+    assert "Трасса производительности: False" in inspect_md
+    assert "Основные данные производительности" in inspect_md
+    assert "Дополнительные данные производительности" in inspect_md
     assert "browser_perf_registry_snapshot.json" in inspect_md
 
 
@@ -454,13 +454,13 @@ def test_health_report_surfaces_anim_latest_mismatch_from_validation(tmp_path: P
     assert anim["pointer_sync_ok"] is False
     assert anim["browser_perf_evidence_status"] == "snapshot_only"
     assert anim["browser_perf_comparison_status"] == "no_reference"
-    assert any("visual_cache_token mismatch" in msg for msg in anim.get("issues") or [])
-    assert any("visual_cache_token mismatch" in msg for msg in notes)
-    assert any("Desktop Mnemo reports 1 active latched event(s)" in msg for msg in notes)
-    assert any("Ring seam remains open under strict_exact" in msg for msg in notes)
-    assert any("Ring seam is intentionally open under strict_exact closure" in msg for msg in notes)
-    assert any("browser perf evidence is not trace_bundle_ready" in msg for msg in notes)
-    assert any("browser perf comparison status: no_reference" in msg for msg in notes)
+    assert any("Токен визуального кэша" in msg for msg in anim.get("issues") or [])
+    assert any("Токен визуального кэша" in msg for msg in notes)
+    assert any("В мнемосхеме есть активные события: 1" in msg for msg in notes)
+    assert any("Шов кольца открыт в режиме strict_exact" in msg for msg in notes)
+    assert any("Шов кольца намеренно оставлен открытым в режиме strict_exact" in msg for msg in notes)
+    assert any("данные производительности анимации не готовы к восстановлению из архива" in msg for msg in notes)
+    assert any("состояние сравнения производительности анимации: no_reference" in msg for msg in notes)
 
 
 
@@ -486,17 +486,17 @@ def test_sources_wire_health_report_and_offline_inspector_into_send_bundle_flow(
     assert 'signals["operator_recommendations"]' in health_text
     assert 'signals["latest_integrity_proof"]' in health_text
     assert 'signals["self_check_silent_warnings"]' in health_text
-    assert '## Distributed optimization' in health_text
-    assert '## Latest integrity proof' in health_text
+    assert '## Оптимизация' in health_text
+    assert '## Проверка актуального архива' in health_text
     assert "scope_sync_ok" in health_text
-    assert '## Desktop Mnemo events' in health_text
-    assert '## Ring closure' in health_text
-    assert '## Recommended actions' in health_text
+    assert '## События мнемосхемы' in health_text
+    assert '## Замыкание кольца' in health_text
+    assert '## Рекомендуемые действия' in health_text
     assert 'browser_perf_evidence_report' in health_text
     assert 'browser_perf_trace' in health_text
 
     assert 'inspect_send_bundle' in inspect_text
-    assert 'embedded health report is missing' in inspect_text
+    assert 'отчёт состояния отсутствует в архиве' in inspect_text
     assert 'mnemo_event_log' in inspect_text
     assert 'ring_closure' in inspect_text
     assert 'optimizer_scope' in inspect_text
@@ -504,15 +504,15 @@ def test_sources_wire_health_report_and_offline_inspector_into_send_bundle_flow(
     assert 'latest_integrity_proof' in inspect_text
     assert 'self_check_silent_warnings' in inspect_text
     assert 'operator_recommendations' in inspect_text
-    assert '## Distributed optimization' in inspect_text
-    assert '## Latest integrity proof' in inspect_text
+    assert '## Оптимизация' in inspect_text
+    assert '## Проверка актуального архива' in inspect_text
     assert "scope_sync_ok" in inspect_text
-    assert "scope_release_risk" in inspect_text
-    assert '## Desktop Mnemo events' in inspect_text
-    assert '## Ring closure' in inspect_text
-    assert '## Recommended actions' in inspect_text
+    assert "Риск выпуска" in inspect_text
+    assert '## События мнемосхемы' in inspect_text
+    assert '## Замыкание кольца' in inspect_text
+    assert '## Рекомендуемые действия' in inspect_text
     assert 'browser_perf_evidence_status' in inspect_text
-    assert 'browser_perf_artifacts_primary' in inspect_text
+    assert 'Основные данные производительности' in inspect_text
     assert 'has_browser_perf_evidence_report' in inspect_text
     assert 'render_inspection_md' in inspect_text
 
@@ -543,18 +543,18 @@ def test_health_report_and_inspector_surface_optimizer_scope_from_triage(tmp_pat
     assert optimizer_scope["problem_hash_short"] == "ph_bundle_sc"
     assert optimizer_scope["problem_hash_mode"] == "legacy"
     assert triage_dist["problem_hash_mode"] == "legacy"
-    assert "## Distributed optimization" in md_text
-    assert "Problem scope: `ph_bundle_sc`" in md_text
-    assert "Hash mode: `legacy`" in md_text
+    assert "## Оптимизация" in md_text
+    assert "Область задачи: `ph_bundle_sc`" in md_text
+    assert "Режим хэша: `legacy`" in md_text
 
     add_health_report_to_zip(zip_path, json_path, md_path)
     summary = inspect_send_bundle(zip_path)
     inspect_md = render_inspection_md(summary)
 
     assert dict(summary.get("optimizer_scope") or {})["problem_hash_mode"] == "legacy"
-    assert "## Distributed optimization" in inspect_md
-    assert "Problem scope: `ph_bundle_sc`" in inspect_md
-    assert "Hash mode: `legacy`" in inspect_md
+    assert "## Оптимизация" in inspect_md
+    assert "Область задачи: `ph_bundle_sc`" in inspect_md
+    assert "Режим хэша: `legacy`" in inspect_md
 
 
 def test_health_report_and_inspector_surface_optimizer_scope_mismatch_between_triage_and_export(tmp_path: Path) -> None:
@@ -599,14 +599,14 @@ def test_health_report_and_inspector_surface_optimizer_scope_mismatch_between_tr
     assert optimizer_scope_gate["release_gate"] == "FAIL"
     assert optimizer_scope_gate["release_risk"] is True
     assert "export:DIST_SCOPE_B" in optimizer_scope["sources"]
-    assert any("optimizer scope problem_hash mismatch" in msg for msg in optimizer_scope.get("issues") or [])
-    assert any("optimizer scope problem_hash_mode mismatch" in msg for msg in optimizer_scope.get("issues") or [])
-    assert any("optimizer scope problem_hash mismatch" in msg for msg in notes)
-    assert any("optimizer scope release risk" in msg for msg in notes)
-    assert "scope_gate: `FAIL`" in md_text
-    assert "scope_release_risk: `True`" in md_text
-    assert "scope_sync_ok: `False`" in md_text
-    assert "scope_issue: optimizer scope problem_hash mismatch" in md_text
+    assert any("поле problem_hash отличается" in msg for msg in optimizer_scope.get("issues") or [])
+    assert any("поле problem_hash_mode отличается" in msg for msg in optimizer_scope.get("issues") or [])
+    assert any("поле problem_hash отличается" in msg for msg in notes)
+    assert any("риск выпуска по области оптимизации" in msg for msg in notes)
+    assert "Допуск области: `FAIL`" in md_text
+    assert "Риск выпуска: `True`" in md_text
+    assert "Синхронизация области: `False`" in md_text
+    assert "Замечание области: область оптимизации: поле problem_hash отличается" in md_text
 
     add_health_report_to_zip(zip_path, json_path, md_path)
     summary = inspect_send_bundle(zip_path)
@@ -614,8 +614,8 @@ def test_health_report_and_inspector_surface_optimizer_scope_mismatch_between_tr
 
     assert dict(summary.get("optimizer_scope") or {})["scope_sync_ok"] is False
     assert dict(summary.get("optimizer_scope_gate") or {})["release_gate"] == "FAIL"
-    assert any("optimizer scope problem_hash mismatch" in msg for msg in (summary.get("notes") or []))
-    assert "scope_gate: `FAIL`" in inspect_md
-    assert "scope_release_risk: `True`" in inspect_md
-    assert "scope_sync_ok: `False`" in inspect_md
-    assert "scope_issue: optimizer scope problem_hash mismatch" in inspect_md
+    assert any("поле problem_hash отличается" in msg for msg in (summary.get("notes") or []))
+    assert "Допуск области: `FAIL`" in inspect_md
+    assert "Риск выпуска: `True`" in inspect_md
+    assert "Синхронизация области: `False`" in inspect_md
+    assert "Замечание области: область оптимизации: поле problem_hash отличается" in inspect_md

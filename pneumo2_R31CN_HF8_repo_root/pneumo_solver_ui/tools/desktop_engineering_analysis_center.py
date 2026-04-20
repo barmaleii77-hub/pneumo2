@@ -24,8 +24,8 @@ from pneumo_solver_ui.release_info import get_release
 ANALYSIS_COMMAND_OPEN_TARGETS: tuple[tuple[str, str], ...] = (
     ("selected_contract", "Открыть описание выбранного прогона"),
     ("run_dir", "Открыть папку прогона"),
-    ("selected_artifact", "Открыть выбранный файл"),
-    ("evidence_manifest", "Открыть материалы проверки и отправки"),
+    ("selected_artifact", "Открыть файл из списка"),
+    ("evidence_manifest", "Открыть материалы проверки проекта"),
     ("analysis_context", "Проверить подготовку анимации"),
     ("animator_link", "Проверить связь с аниматором"),
 )
@@ -67,7 +67,7 @@ def _category_text(value: object) -> str:
     labels = {
         "run": "прогон",
         "contract": "выбранный прогон",
-        "evidence": "проверка и отправка",
+        "evidence": "проверка проекта",
         "validated_artifacts": "проверенные файлы",
         "missing_required_artifact": "не хватает файла",
         "v38_pipeline_section": "раздел",
@@ -83,7 +83,7 @@ def _category_text(value: object) -> str:
         "calibration": "калибровка",
         "influence": "влияние и сравнение",
         "sensitivity_uncertainty": "чувствительность",
-        "handoffs_evidence": "аниматор и отправка",
+        "handoffs_evidence": "аниматор и архив",
         "workspace": "рабочие данные",
     }
     return labels.get(raw, raw.replace("_", " ") if raw else "")
@@ -94,7 +94,7 @@ def _operator_issue_text(value: object) -> str:
     labels = {
         "missing selected run contract": "нет выбранного прогона",
         "selected run contract missing": "нет выбранного прогона",
-        "missing diagnostics evidence manifest": "нет материалов проверки и отправки",
+        "missing diagnostics evidence manifest": "нет материалов проверки проекта",
     }
     return labels.get(raw.lower(), raw or "-")
 
@@ -106,13 +106,13 @@ def _operator_title_text(value: object) -> str:
     exact = {
         "Uncertainty/UQ artifacts": "Файлы чувствительности и неопределённости",
         "HO-008 Animator handoff": "Данные для аниматора",
-        "HO-009 Diagnostics evidence manifest": "Материалы проверки и отправки",
+        "HO-009 Diagnostics evidence manifest": "Материалы проверки проекта",
     }
     if text in exact:
         return exact[text]
     replacements = (
-        ("Diagnostics evidence manifest", "Материалы проверки и отправки"),
-        ("diagnostics evidence manifest", "материалы проверки и отправки"),
+        ("Diagnostics evidence manifest", "Материалы проверки проекта"),
+        ("diagnostics evidence manifest", "материалы проверки проекта"),
         ("Animator handoff", "Данные для аниматора"),
         ("animator handoff", "данные для аниматора"),
         ("selected run contract", "выбранный прогон"),
@@ -179,7 +179,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         self.summary_var = tk.StringVar(master=self, value="Инженерный анализ: ожидание данных.")
         self.contract_var = tk.StringVar(master=self, value="Выбранный прогон: не загружен.")
         self.selected_run_var = tk.StringVar(master=self, value="Прогон: не выбран.")
-        self.evidence_var = tk.StringVar(master=self, value="Материалы проверки и отправки: не подготовлены.")
+        self.evidence_var = tk.StringVar(master=self, value="Материалы проверки проекта: не сохранены.")
         self.status_var = tk.StringVar(master=self, value="Инженерный анализ готов.")
         self.candidate_ready_only_var = tk.BooleanVar(master=self, value=False)
         self.candidate_filter_summary_var = tk.StringVar(master=self, value="Кандидаты для анализа: не загружены.")
@@ -205,15 +205,15 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         actions.pack(side="right", anchor="ne")
         self.btn_refresh = ttk.Button(actions, text="Обновить данные", command=self.refresh)
         self.btn_refresh.pack(side="left")
-        self.btn_open_selected = ttk.Button(actions, text="Открыть выбранный файл", command=self._open_selected)
+        self.btn_open_selected = ttk.Button(actions, text="Открыть файл из списка", command=self._open_selected)
         self.btn_open_selected.pack(side="left", padx=(8, 0))
         self.btn_export_ho007 = ttk.Button(actions, text="Зафиксировать прогон", command=self._export_selected_run_contract_bridge)
         self.btn_export_ho007.pack(side="left", padx=(8, 0))
-        self.btn_export_evidence = ttk.Button(actions, text="Подготовить материалы отправки", command=self._export_diagnostics_evidence)
+        self.btn_export_evidence = ttk.Button(actions, text="Сохранить материалы проверки проекта", command=self._export_diagnostics_evidence)
         self.btn_export_evidence.pack(side="left", padx=(8, 0))
         self.btn_open_evidence_manifest = ttk.Button(
             actions,
-            text="Открыть материалы отправки",
+            text="Открыть материалы проверки проекта",
             command=self._open_evidence_manifest,
         )
         self.btn_open_evidence_manifest.pack(side="left", padx=(8, 0))
@@ -225,7 +225,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         self.btn_full_report.pack(side="left", padx=(8, 0))
         self.btn_param_staging = ttk.Button(actions, text="Диапазоны влияния", command=self._run_param_staging)
         self.btn_param_staging.pack(side="left", padx=(8, 0))
-        self.btn_diagnostics = ttk.Button(actions, text="Открыть проверку и отправку", command=self._launch_full_diagnostics_gui)
+        self.btn_diagnostics = ttk.Button(actions, text="Открыть проверку проекта", command=self._launch_full_diagnostics_gui)
         self.btn_diagnostics.pack(side="left", padx=(8, 0))
 
         workspace = ttk.Panedwindow(self, orient="horizontal")
@@ -252,7 +252,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         self.command_combo.grid(row=0, column=1, sticky="ew", padx=(8, 8))
         self.btn_open_command = ttk.Button(
             command_bar,
-            text="Открыть выбранное",
+            text="Открыть этот источник",
             command=self._run_command_surface_action,
         )
         self.btn_open_command.grid(row=0, column=2, sticky="e")
@@ -399,7 +399,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         self.selected_run_var.set(format_selected_run_summary(snapshot))
         evidence_path = snapshot.diagnostics_evidence_manifest_path
         self.evidence_var.set(
-            f"Материалы проверки и отправки: {_status_text(snapshot.diagnostics_evidence_manifest_status)} | "
+            f"Материалы проверки проекта: {_status_text(snapshot.diagnostics_evidence_manifest_status)} | "
             f"метка: {snapshot.diagnostics_evidence_manifest_hash[:12] or '-'} | "
             f"файл: {'найден' if evidence_path and evidence_path.exists() else 'не подготовлен'}"
         )
@@ -494,7 +494,7 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
             "calibration": "Калибровка",
             "influence": "Влияние и сравнение",
             "sensitivity_uncertainty": "Чувствительность и неопределённость",
-            "handoffs_evidence": "Аниматор и отправка",
+            "handoffs_evidence": "Аниматор и архив",
             "workspace": "Рабочие данные",
         }
         for row in pipeline_rows:
@@ -971,13 +971,13 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
     def _open_selected(self) -> None:
         path = self._selected_tree_path()
         if path is None:
-            messagebox.showinfo("Инженерный анализ", "Выберите файл, материалы проверки и отправки или папку прогона.")
+            messagebox.showinfo("Инженерный анализ", "Выберите файл, материалы проверки проекта или папку прогона.")
             return
         try:
             _open_path(path)
-            self.status_var.set(f"Открыто: {path}")
+            self.status_var.set(f"Открыт файл: {path}")
         except Exception as exc:
-            messagebox.showerror("Инженерный анализ", f"Не удалось открыть:\n{path}\n\n{exc!s}")
+            messagebox.showerror("Инженерный анализ", f"Не удалось показать файл:\n{path}\n\n{exc!s}")
 
     def _command_key_from_label(self, label: str) -> str:
         for key, item_label in ANALYSIS_COMMAND_OPEN_TARGETS:
@@ -1017,29 +1017,29 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
             return
         try:
             _open_path(path)
-            self.status_var.set(f"Открыто: {path}")
+            self.status_var.set(f"Открыт файл: {path}")
         except Exception as exc:
-            messagebox.showerror("Инженерный анализ", f"Не удалось открыть:\n{path}\n\n{exc!s}")
+            messagebox.showerror("Инженерный анализ", f"Не удалось показать файл:\n{path}\n\n{exc!s}")
 
     def _open_evidence_manifest(self) -> None:
         snapshot = self.snapshot_state or self.runtime.snapshot()
         path = snapshot.diagnostics_evidence_manifest_path
         if path is None:
-            self.status_var.set("Материалы проверки и отправки ещё не подготовлены.")
+            self.status_var.set("Материалы проверки проекта ещё не сохранены.")
             messagebox.showinfo(
                 "Инженерный анализ",
-                "Материалы проверки и отправки ещё не созданы. Выполните «Подготовить материалы отправки», затем откройте их.",
+                "Материалы проверки проекта ещё не созданы. Выполните «Сохранить материалы проверки проекта», затем откройте их.",
             )
             return
         if not path.exists():
-            self.status_var.set(f"Файл материалов проверки и отправки не найден: {path}")
-            messagebox.showwarning("Инженерный анализ", f"Материалы проверки и отправки не найдены:\n{path}")
+            self.status_var.set(f"Файл материалов проверки проекта не найден: {path}")
+            messagebox.showwarning("Инженерный анализ", f"Материалы проверки проекта не найдены:\n{path}")
             return
         try:
             _open_path(path)
-            self.status_var.set(f"Материалы проверки и отправки открыты: {path}")
+            self.status_var.set(f"Материалы проверки проекта открыты: {path}")
         except Exception as exc:
-            messagebox.showerror("Инженерный анализ", f"Не удалось открыть материалы проверки и отправки:\n{path}\n\n{exc!s}")
+            messagebox.showerror("Инженерный анализ", f"Не удалось открыть материалы проверки проекта:\n{path}\n\n{exc!s}")
 
     def _on_artifact_select(self, _event: tk.Event | None = None) -> None:
         selected = self.artifact_tree.selection()
@@ -1167,17 +1167,17 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
     def _auto_export_evidence_after_ho007(self) -> None:
         snapshot = self.snapshot_state or self.runtime.snapshot()
         if snapshot.status == "BLOCKED" or snapshot.contract_status in {"MISSING", "INVALID", "BLOCKED"}:
-            self._append_log("Автоподготовка материалов проверки и отправки пропущена: выбранный прогон не готов.")
-            self.status_var.set("Выбранный прогон зафиксирован; материалы проверки и отправки не подготовлены.")
+            self._append_log("Автосохранение материалов проверки проекта пропущено: выбранный прогон не готов.")
+            self.status_var.set("Выбранный прогон зафиксирован; материалы проверки проекта не сохранены.")
             return
         try:
             path = self.runtime.write_diagnostics_evidence_manifest(snapshot)
         except Exception as exc:
-            self._append_log(f"Не удалось автоматически подготовить материалы проверки и отправки: {type(exc).__name__}: {exc!s}")
-            self.status_var.set("Выбранный прогон зафиксирован; материалы проверки и отправки не подготовлены.")
+            self._append_log(f"Не удалось автоматически сохранить материалы проверки проекта: {type(exc).__name__}: {exc!s}")
+            self.status_var.set("Выбранный прогон зафиксирован; материалы проверки проекта не сохранены.")
             return
-        self._append_log(f"Материалы проверки и отправки подготовлены автоматически: {path}")
-        self.status_var.set(f"Выбранный прогон зафиксирован; материалы проверки и отправки подготовлены: {path}")
+        self._append_log(f"Материалы проверки проекта сохранены автоматически: {path}")
+        self.status_var.set(f"Выбранный прогон зафиксирован; материалы проверки проекта сохранены: {path}")
         self.refresh()
 
     def _run_system_influence(self) -> None:
@@ -1250,11 +1250,11 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         try:
             path = self.runtime.write_diagnostics_evidence_manifest(snapshot)
         except Exception as exc:
-            messagebox.showerror("Инженерный анализ", f"Не удалось подготовить материалы проверки и отправки:\n{exc!s}")
-            self.status_var.set("Не удалось подготовить материалы проверки и отправки.")
+            messagebox.showerror("Инженерный анализ", f"Не удалось сохранить материалы проверки проекта:\n{exc!s}")
+            self.status_var.set("Не удалось сохранить материалы проверки проекта.")
             return
-        self._append_log(f"Материалы проверки и отправки подготовлены: {path}")
-        self.status_var.set(f"Материалы проверки и отправки подготовлены: {path}")
+        self._append_log(f"Материалы проверки проекта сохранены: {path}")
+        self.status_var.set(f"Материалы проверки проекта сохранены: {path}")
         self.refresh()
 
     def _export_animator_link(self) -> None:
@@ -1293,11 +1293,11 @@ class DesktopEngineeringAnalysisCenter(ttk.Frame):
         try:
             proc = subprocess.Popen(command, cwd=str(self.runtime.repo_root))
         except Exception as exc:
-            messagebox.showerror("Инженерный анализ", f"Не удалось открыть проверку и отправку:\n{exc!s}")
-            self.status_var.set("Не удалось открыть проверку и отправку.")
+            messagebox.showerror("Инженерный анализ", f"Не удалось открыть проверку проекта:\n{exc!s}")
+            self.status_var.set("Не удалось открыть проверку проекта.")
             return
-        self._append_log("Открыта проверка и отправка.")
-        self.status_var.set("Проверка и отправка открыта в отдельном окне.")
+        self._append_log("Открыта проверка проекта.")
+        self.status_var.set("Проверка проекта открыта в отдельном окне.")
 
 
 def _default_runtime() -> DesktopEngineeringAnalysisRuntime:

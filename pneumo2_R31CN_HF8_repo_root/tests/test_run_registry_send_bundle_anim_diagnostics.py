@@ -338,14 +338,14 @@ def test_sources_wire_anim_diagnostics_into_launcher_and_send_bundle() -> None:
     assert 'ANIM_DIAG_SIDECAR_JSON' in bundle_text
     assert '**anim_diag_event' in bundle_text
     assert 'build_anim_operator_recommendations' in bundle_text
-    assert 'Recommended actions (operator-first):' in bundle_text
+    assert 'Рекомендуемые действия:' in bundle_text
     assert 'anim_latest_mnemo_event_log_state' in bundle_text
     assert 'collect_anim_latest_diagnostics_summary' in launcher_text
     assert 'send_results_gui_spawned' in launcher_text
     assert 'ANIM_DIAG_SIDECAR_JSON' in gui_text
     assert 'load_latest_send_bundle_anim_dashboard' in gui_text
     assert 'format_anim_dashboard_brief_lines' in gui_text
-    assert 'Диагностика последней анимации:' in gui_text
+    assert 'Сведения о последней анимации:' in gui_text
     assert 'Anim pointer diagnostics:' not in gui_text
     assert 'pick_anim_latest_fields' in registry_text
     assert 'validation_release_risks' in registry_text
@@ -353,7 +353,7 @@ def test_sources_wire_anim_diagnostics_into_launcher_and_send_bundle() -> None:
     assert 'ANIM_LATEST_INDEX_FIELDS' in registry_text
     assert 'browser_perf_registry_snapshot_in_bundle' in registry_text
     assert 'ring_closure_policy' in contract_text
-    assert 'Optimizer scope gate:' in contract_text
+    assert 'Допуск области оптимизации:' in contract_text
     assert 'optimizer_scope_problem_hash_mode' in contract_text
     assert 'ring_seam_open' in contract_text
     assert 'in_bundle=' in bundle_text

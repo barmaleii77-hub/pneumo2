@@ -322,7 +322,7 @@ class DesktopMainShell:
         actions.grid(row=0, column=0, sticky="w")
         ttk.Button(
             actions,
-            text="Собрать архив для отправки",
+            text="Сохранить архив проекта",
             command=self._open_global_diagnostics,
         ).pack(side="left")
         ttk.Button(
@@ -332,7 +332,7 @@ class DesktopMainShell:
         ).pack(side="left", padx=(8, 0))
         ttk.Button(
             actions,
-            text="Открыть аниматор",
+            text="Анимировать результат",
             command=self._open_animator,
         ).pack(side="left", padx=(8, 0))
         ttk.Button(
@@ -462,7 +462,7 @@ class DesktopMainShell:
             self.details_title_var.set("Панель проекта")
             self.details_meta_var.set(self.workflow_var.get())
             self.details_body_var.set(
-                "Панель проекта собирает порядок работы, открытые окна и переходы к исходным данным, сценариям, расчёту, оптимизации, результатам, анализу, визуализации, проверке и отправке."
+                "Панель проекта собирает порядок работы, открытые окна и переходы к исходным данным, сценариям, расчёту, оптимизации, результатам, анализу, визуализации и проверке проекта."
             )
             self.details_hint_var.set(
                 "Выбор в списке сразу открывает окно; меню и поиск нужны только для быстрых переходов."
@@ -570,8 +570,8 @@ class DesktopMainShell:
             "PneumoApp",
             "PneumoApp\n\n"
             "Нативное Windows desktop-рабочее место инженера.\n"
-            "Основной порядок работы: исходные данные, сценарии, опорный прогон и оптимизация, анализ, аниматор, проверка и отправка.\n"
-            "Главное окно держит панель команд, быстрый поиск, инспектор и переходы к специализированным окнам.",
+            "Основной порядок работы: исходные данные, сценарии, опорный прогон и оптимизация, анализ, аниматор, проверка проекта.\n"
+            "Рабочее место держит панель команд, быстрый поиск, инспектор и переходы к специализированным окнам.",
         )
 
     def _on_tab_changed(self, _event: object | None = None) -> None:
@@ -637,7 +637,7 @@ class DesktopMainShell:
                 method()
                 self.status_var.set(caption)
                 return
-        self.status_var.set(f"В окне «{session.spec.title}» нет поддерживаемой команды остановки.")
+        self.status_var.set(f"В рабочем разделе «{session.spec.title}» нет поддерживаемой команды остановки.")
 
     def _refresh_command_search_hint(self) -> None:
         query = str(self.command_search_var.get() or "").strip()
@@ -645,7 +645,7 @@ class DesktopMainShell:
         if not ranked:
             if query:
                 self.command_search_hint_var.set(
-                    f"Совпадений по запросу «{query}» нет. Попробуйте название окна, проверку, отправку, аниматор или сравнение."
+                    f"Совпадений по запросу «{query}» нет. Попробуйте название окна, проверку проекта, архив, аниматор или сравнение."
                 )
             else:
                 self.command_search_hint_var.set(
@@ -866,7 +866,7 @@ class DesktopMainShell:
                 return
             except Exception:
                 pass
-        self.runtime_var.set(self._compact_runtime_text(f"Активно окно: {session.spec.title}"))
+        self.runtime_var.set(self._compact_runtime_text(f"Активный рабочий раздел: {session.spec.title}"))
 
     def _focus_next_region(self, *, step: int) -> str:
         widgets = tuple(
@@ -925,7 +925,7 @@ class DesktopMainShell:
             tb = traceback.format_exc()
             messagebox.showerror(
                 "PneumoApp",
-                f"Не удалось открыть окно «{spec.title}»:\n\n{tb}",
+                f"Не удалось показать рабочий раздел «{spec.title}»:\n\n{tb}",
             )
             self.status_var.set(f"Ошибка открытия: {spec.title}")
 
@@ -975,9 +975,9 @@ class DesktopMainShell:
             tb = traceback.format_exc()
             messagebox.showerror(
                 "PneumoApp",
-                f"Не удалось повторно открыть окно:\n\n{tb}",
+                f"Не удалось восстановить рабочее окно:\n\n{tb}",
             )
-            self.status_var.set("Ошибка повторного открытия окна.")
+            self.status_var.set("Ошибка восстановления рабочего окна.")
 
     def quit_app(self) -> None:
         if self._is_closing:

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Единый запуск инженерных окон."""
+"""Панель рабочих мест инженера."""
 
 from __future__ import annotations
 
@@ -38,15 +38,15 @@ def _spawn_module(module: str) -> subprocess.Popen:
 class DesktopControlCenter:
     def __init__(self) -> None:
         self.root = tk.Tk()
-        self.root.title(f"Запуск инженерных окон - {RELEASE}")
+        self.root.title(f"Рабочие места инженера - {RELEASE}")
         self.root.geometry("860x540")
         self.root.minsize(820, 500)
         self.launch_targets = build_desktop_launch_catalog(include_mnemo=False)
         self.target_by_iid: dict[str, DesktopLaunchCatalogItem] = {}
 
-        self.status_var = tk.StringVar(value="Готово. Выберите нужное инженерное окно.")
+        self.status_var = tk.StringVar(value="Готово. Выберите нужное рабочее место.")
         self.details_var = tk.StringVar(
-            value="Слева список инженерных окон, справа описание выбранного окна и журнал запуска."
+            value="Слева список рабочих мест, справа описание выбранного раздела и журнал действий."
         )
         self._build_ui()
 
@@ -60,7 +60,7 @@ class DesktopControlCenter:
         title_box.pack(side="left", fill="x", expand=True)
         ttk.Label(
             title_box,
-            text="Запуск инженерных окон",
+            text="Рабочие места инженера",
             font=("Segoe UI", 16, "bold"),
         ).pack(anchor="w")
         ttk.Label(
@@ -80,7 +80,7 @@ class DesktopControlCenter:
         left = ttk.Frame(workspace, padding=(0, 0, 8, 0))
         right = ttk.Frame(workspace)
 
-        list_box = ttk.LabelFrame(left, text="Инженерные окна", padding=8)
+        list_box = ttk.LabelFrame(left, text="Рабочие места", padding=8)
         list_box.pack(fill="both", expand=True)
         tree_frame, self.tree = build_scrolled_treeview(
             list_box,
@@ -88,8 +88,8 @@ class DesktopControlCenter:
             show="tree headings",
             height=14,
         )
-        self.tree.heading("#0", text="Окно")
-        self.tree.heading("kind", text="Тип")
+        self.tree.heading("#0", text="Рабочее место")
+        self.tree.heading("kind", text="Раздел")
         self.tree.column("#0", width=250, anchor="w")
         self.tree.column("kind", width=90, anchor="w")
         tree_frame.pack(fill="both", expand=True)
@@ -98,7 +98,7 @@ class DesktopControlCenter:
 
         left_actions = ttk.Frame(list_box)
         left_actions.pack(fill="x", pady=(8, 0))
-        ttk.Button(left_actions, text="Открыть окно", command=self._launch_selected_target).pack(side="left")
+        ttk.Button(left_actions, text="Перейти", command=self._launch_selected_target).pack(side="left")
         ttk.Button(left_actions, text="Папка проекта", command=self._open_repo_root).pack(side="left", padx=(8, 0))
 
         right_split = ttk.Panedwindow(right, orient="vertical")
@@ -113,7 +113,7 @@ class DesktopControlCenter:
         ).pack(anchor="w")
         detail_actions = ttk.Frame(detail_box)
         detail_actions.pack(fill="x", pady=(10, 0))
-        ttk.Button(detail_actions, text="Открыть это окно", command=self._launch_selected_target).pack(side="left")
+        ttk.Button(detail_actions, text="Перейти сюда", command=self._launch_selected_target).pack(side="left")
 
         log_frame = ttk.LabelFrame(right_split, text="Журнал запуска", padding=8)
         log_body, self.log = build_scrolled_text(log_frame, height=12, wrap="word")
@@ -142,7 +142,7 @@ class DesktopControlCenter:
         for idx, target in enumerate(self.launch_targets):
             iid = f"target_{idx}"
             self.target_by_iid[iid] = target
-            self.tree.insert("", "end", iid=iid, text=target.title, values=("Окно",))
+            self.tree.insert("", "end", iid=iid, text=target.title, values=("Рабочее место",))
         if self.target_by_iid:
             first_iid = next(iter(self.target_by_iid))
             self.tree.selection_set(first_iid)
@@ -196,21 +196,21 @@ class DesktopControlCenter:
             self.status_var.set(f"Открыта папка проекта: {root}")
             self._append_log(f"Открыта папка проекта: {root}")
         except Exception as exc:
-            messagebox.showerror("Запуск инженерных окон", f"Не удалось открыть папку проекта:\n{exc}")
+            messagebox.showerror("Рабочие места инженера", f"Не удалось открыть папку проекта:\n{exc}")
             self._append_log("Ошибка открытия папки проекта.\n" + traceback.format_exc())
 
     def _launch(self, target: DesktopLaunchCatalogItem) -> None:
         try:
             _spawn_module(target.module)
             self.status_var.set(f"Запущено: {target.title}")
-            self._append_log(f"Окно открыто: {target.title}")
+            self._append_log(f"Переход выполнен: {target.title}")
         except Exception as exc:
             messagebox.showerror(
-                "Запуск инженерных окон",
+                "Рабочие места инженера",
                 f"Не удалось запустить «{target.title}»:\n{exc}",
             )
             self.status_var.set(f"Ошибка запуска: {target.title}")
-            self._append_log("Ошибка запуска окна.\n" + traceback.format_exc())
+            self._append_log("Ошибка перехода.\n" + traceback.format_exc())
 
     def run(self) -> None:
         self.root.mainloop()

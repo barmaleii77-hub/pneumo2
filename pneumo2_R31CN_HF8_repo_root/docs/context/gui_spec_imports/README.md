@@ -31,6 +31,12 @@
   cognitive-visibility, direct-open, dock/window, semantic-label и path-cost
   matrices. Он не заменяет `17/18` и не является `runtime-closure proof`:
   текущие внутренние окна остаются evidence-bound до отдельного runtime evidence;
+- `v12_window_internal_routes/` — current report-only first-screen/internal-route
+  layer из `pneumo_human_gui_report_only_v12_window_internal_routes.zip`.
+  Слой уточняет первые рабочие экраны, direct tree open, dock roles и
+  action-feedback маршруты для поверхности проверки и отправки архива,
+  подробного сравнения результатов, исходных данных проекта и набора испытаний.
+  Это не тот же слой, что `v12_design_recovery`, и не `runtime-closure proof`;
 - `v38_github_kb_commit_ready/` — predecessor import-ready successor
   knowledge-base commit-ready layer из
   `pneumo_codex_tz_spec_connector_reconciled_v38_github_kb_commit_ready.zip`.
@@ -100,6 +106,16 @@
    `DOCK_WINDOW_AND_DOCK_WIDGET_MATRIX_V19.csv` и соответствующие current/optimized
    `SUBGRAPH_*_V19.dot` после `v38_actualized_with_v10`. V19 активен для
    graph/action-feedback refinement, но не является runtime closure proof.
+5. Если задача касается поверхности проверки и отправки архива, подробного
+   сравнения результатов, исходных данных проекта или набора испытаний, после
+   V19 читать `v12_window_internal_routes/README.md`,
+   `WINDOW_FIRST_SCREEN_CONTRACT_V12.md`,
+   `WINDOW_ACTION_FEEDBACK_MATRIX_V12.csv`,
+   `SEMANTIC_REWRITE_MATRIX_V12.csv`,
+   `DIRECT_TREE_OPEN_AND_DOCK_ROLE_V12.csv` and
+   `../release_readiness/HUMAN_GUI_REPORT_ONLY_V12_WINDOW_INTERNAL_ROUTES_2026-04-20.md`.
+   Этот слой уточняет first-screen/internal-route contracts, но не доказывает
+   live runtime acceptance.
 5. Затем читать `v38_github_kb_commit_ready/README.md`,
    `v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md`,
    `v38_github_kb_commit_ready/GUI_SPEC.yaml`, V38 catalog/matrix files and
@@ -166,6 +182,9 @@
   `V38_ACTUALIZED_WITH_V10_KB_IMPORT_AUDIT_2026-04-19.md` as local ambiguity
   resolution, затем у `v19_graph_iteration/*` как graph/action-feedback refinement
   для `WS-INPUTS`, `WS-RING`, `WS-OPTIMIZATION` и `WS-DIAGNOSTICS`, затем у
+  `v12_window_internal_routes/*` как first-screen/internal-route report-only
+  refinement для проверки и отправки архива, подробного сравнения, исходных
+  данных и набора испытаний, затем у
   `v38_github_kb_commit_ready/*` and
   `V38_KB_IMPORT_AUDIT_2026-04-18.md` as predecessor V38 layer, затем у
   `v37_github_kb_supplement/*` as predecessor KB/TZ/spec layer, затем у

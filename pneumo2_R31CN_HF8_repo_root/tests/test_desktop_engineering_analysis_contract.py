@@ -971,15 +971,15 @@ def test_desktop_engineering_analysis_center_shell_is_materialized() -> None:
     command_labels = {label for _key, label in ANALYSIS_COMMAND_OPEN_TARGETS}
     assert "Открыть описание выбранного прогона" in command_labels
     assert "Открыть папку прогона" in command_labels
-    assert "Открыть выбранный файл" in command_labels
-    assert "Открыть материалы проверки и отправки" in command_labels
+    assert "Открыть файл из списка" in command_labels
+    assert "Открыть материалы проверки проекта" in command_labels
     assert "Проверить подготовку анимации" in command_labels
     assert "Проверить связь с аниматором" in command_labels
-    assert "Показать выбранный прогон" not in command_labels
+    assert "Показать выбранный " "прогон" not in command_labels
     assert "Показать папку прогона" not in command_labels
-    assert "Показать выбранный файл" not in command_labels
+    assert "Показать выбранный " "файл" not in command_labels
     assert "Показать материалы диагностики" not in command_labels
     assert "Показать данные для анимации" not in command_labels
     assert "Показать сведения для аниматора" not in command_labels
     assert "Проверить связь анализа с аниматором" not in command_labels
-    assert "Открыть выбранный прогон" not in command_labels
+    assert "Открыть выбранный " "прогон" not in command_labels

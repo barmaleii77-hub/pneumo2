@@ -645,7 +645,7 @@ class DesktopInputEditor:
         items: list[tuple[str, str]] = []
         seen: set[str] = set()
         for candidate, relation in (
-            *[(candidate, "тот же контекст") for candidate in same_context],
+            *[(candidate, "та же схема") for candidate in same_context],
             *[(candidate, "тот же раздел") for candidate in same_section],
         ):
             if candidate.key in seen:
@@ -1629,7 +1629,7 @@ class DesktopInputEditor:
             side="left",
             padx=(8, 0),
         )
-        ttk.Button(quick_actions, text="Собрать архив для отправки", command=self._open_diagnostics_center).pack(
+        ttk.Button(quick_actions, text="Сохранить архив проекта", command=self._open_diagnostics_center).pack(
             side="left",
             padx=(8, 0),
         )
@@ -2023,7 +2023,7 @@ class DesktopInputEditor:
         ).grid(row=3, column=0, columnspan=3, sticky="w", pady=(8, 0))
         ttk.Button(
             run_setup_frame,
-            text="Открыть отдельное окно настройки расчёта",
+            text="Перейти к настройке расчёта",
             command=self._open_run_setup_center,
         ).grid(row=4, column=0, sticky="w", pady=(10, 0))
 
@@ -2172,7 +2172,7 @@ class DesktopInputEditor:
 
         ttk.Label(
             actions,
-            text="Для полного порядка запуска, результатов и журналов используйте отдельное окно настроек расчёта.",
+            text="Для полного порядка запуска, результатов и журналов перейдите к настройке расчёта.",
             foreground="#555555",
         ).grid(row=5, column=0, columnspan=6, sticky="w", pady=(12, 0))
 
@@ -3540,7 +3540,7 @@ class DesktopInputEditor:
         existing = self._diagnostics_center
         try:
             if existing is not None and self._focus_toplevel_controller(existing):
-                self._set_status("Проверка и отправка открыты.")
+                self._set_status("Проверка проекта открыта.")
                 return
         except Exception:
             pass
@@ -3549,7 +3549,7 @@ class DesktopInputEditor:
 
         window = tk.Toplevel(self.root)
         self._diagnostics_center = DesktopDiagnosticsCenter(window, hosted=True, initial_tab="restore")
-        self._set_status("Проверка и отправка открыты.")
+        self._set_status("Проверка проекта открыта.")
 
     def _notify_run_setup_center_closed(self) -> None:
         self._run_setup_center = None

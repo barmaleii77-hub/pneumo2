@@ -155,7 +155,7 @@ class App:
         lvl.pack(side="left", padx=(6, 16))
 
         ttk.Checkbutton(top, text="Не создавать архив", variable=self.no_zip).pack(side="left", padx=(0, 16))
-        ttk.Checkbutton(top, text="После завершения открыть подготовку отправки", variable=self.open_send_gui).pack(
+        ttk.Checkbutton(top, text="После завершения открыть сохранение архива проекта", variable=self.open_send_gui).pack(
             side="left", padx=(0, 16)
         )
         ttk.Checkbutton(top, text="Открыть папку результата", variable=self.auto_open_folder).pack(side="left")
@@ -323,7 +323,7 @@ class App:
             msg_lines.extend(format_anim_dashboard_brief_lines(load_latest_send_bundle_anim_dashboard(out_dir)))
             diag_json = out_dir / ANIM_DIAG_SIDECAR_JSON
             if diag_json.exists():
-                msg_lines.append(f"Диагностика последней анимации: {diag_json}")
+                msg_lines.append(f"Сведения о последней анимации: {diag_json}")
 
         messagebox.showinfo("Автотесты", "\n".join(msg_lines))
 
@@ -337,7 +337,7 @@ class App:
                 script = repo / "pneumo_solver_ui" / "tools" / "send_results_gui.py"
                 subprocess.Popen([py, str(script)], cwd=str(repo))
             except Exception as e:
-                messagebox.showwarning("Подготовка отправки", f"Не удалось открыть подготовку отправки: {e}")
+                messagebox.showwarning("Архив проекта", f"Не удалось открыть сохранение архива проекта: {e}")
 
     def run(self) -> None:
         if self._owns_root:

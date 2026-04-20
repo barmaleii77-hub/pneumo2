@@ -683,7 +683,7 @@ def describe_active_baseline_state(
             "suite_snapshot_hash": str(payload.get("suite_snapshot_hash") or ""),
             "stale_reasons": stale_reasons,
             "banner": (
-                "Активный опорный прогон устарел для текущего контекста: "
+                "Активный опорный прогон устарел для текущих исходных данных: "
                 + _baseline_stale_reason_labels(stale_reasons)
                 + ". Требуется явное действие пользователя; молчаливая подмена запрещена."
             ),
@@ -914,7 +914,7 @@ def compare_active_and_historical_baseline(
             "required_action": "review_and_adopt_explicitly",
             "mismatch_fields": mismatch_fields,
             "banner": (
-                "Исторический опорный прогон собран на другом контексте: "
+                "Исторический опорный прогон собран на другом наборе данных: "
                 + _baseline_context_labels(mismatch_fields)
                 + ". Молчаливая подмена запрещена."
             ),
@@ -936,7 +936,7 @@ def compare_active_and_historical_baseline(
         "required_action": "restore_or_adopt_explicitly",
         "mismatch_fields": tuple(),
         "banner": (
-            "Открыт исторический опорный прогон из того же контекста. "
+            "Выбран исторический опорный прогон из того же набора данных. "
             "Восстановление или принятие возможно только явным действием пользователя."
         ),
     }

@@ -146,7 +146,7 @@ def eval_fast_kpi_worldroad(model_module, params: Dict[str, Any], test: Dict[str
     stroke_C1 = _stroke_vector(ctx, params, 'stroke_C1_m')
     stroke_C2 = _stroke_vector(ctx, params, 'stroke_C2_m')
 
-    # Диагностика «нулевой позы»: ускорения RHS на t=0
+    # Отладочный снимок нулевой позы: ускорения RHS на t=0.
     dst0 = np.asarray(rhs(state, float(time_grid[0])), dtype=float)
     z_ddot0 = float(dst0[7])
     phi_ddot0 = float(dst0[8])

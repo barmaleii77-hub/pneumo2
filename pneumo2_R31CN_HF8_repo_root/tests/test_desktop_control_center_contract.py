@@ -26,11 +26,14 @@ def test_desktop_control_center_targets_core_desktop_tools_without_mnemo() -> No
     assert "Идентификатор процесса" not in src
     assert "Метка процесса" not in src
     assert "pid" not in src
-    assert "Запуск инженерных окон" in src
+    assert "Рабочие места инженера" in src
+    assert "Запуск инженерных " "окон" not in src
     assert "Центр запуска инженерных окон" not in src
     assert "Центр запуска готов" not in src
-    assert 'text="Открыть окно"' in src
-    assert 'text="Открыть это окно"' in src
+    assert 'text="Перейти"' in src
+    assert 'text="Перейти сюда"' in src
+    assert 'text="Открыть ' "окно\"" not in src
+    assert 'text="Открыть это ' "окно\"" not in src
     assert "web-интерфейс" not in src
 
 
@@ -86,7 +89,7 @@ def test_desktop_control_center_uses_list_detail_workspace_instead_of_cards() ->
     )
 
     assert 'workspace = ttk.Panedwindow(outer, orient="horizontal")' in src
-    assert 'list_box = ttk.LabelFrame(left, text="Инженерные окна", padding=8)' in src
+    assert 'list_box = ttk.LabelFrame(left, text="Рабочие места", padding=8)' in src
     assert 'right_split = ttk.Panedwindow(right, orient="vertical")' in src
     assert 'tree_frame, self.tree = build_scrolled_treeview(' in src
     assert "def _launch_selected_target(self) -> None:" in src

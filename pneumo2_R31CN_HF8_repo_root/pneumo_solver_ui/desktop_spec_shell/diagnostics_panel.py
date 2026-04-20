@@ -274,7 +274,7 @@ class DiagnosticsShellController(QtCore.QObject):
         self._current_run_record: DesktopDiagnosticsRunRecord | None = None
         self._current_bundle: DesktopDiagnosticsBundleRecord | None = None
         self._current_snapshot: DiagnosticsWorkspaceSnapshot | None = None
-        self._status_text = "Готово. Проверка и отправка доступны из текущего окна."
+        self._status_text = "Готово. Проверка проекта и архив доступны в текущем рабочем шаге."
 
     @property
     def current_snapshot(self) -> DiagnosticsWorkspaceSnapshot | None:
@@ -322,11 +322,11 @@ class DiagnosticsShellController(QtCore.QObject):
             center_state_path=path_str(Path(bundle.out_dir) / "latest_desktop_diagnostics_center_state.json"),
             summary_md_path=path_str(Path(bundle.out_dir) / "latest_desktop_diagnostics_summary.md"),
             recommended_next_step=(
-                "Проверьте базовый прогон перед отправкой результатов."
+                "Проверьте базовый прогон перед копированием архива."
                 if baseline_attention
-                else "Если архив для отправки уже собран, проверьте состав и состояние, затем переходите к отправке."
+                else "Если архив проекта уже сохранён, проверьте состав и состояние, затем скопируйте его вручную."
                 if bundle.latest_zip_path
-                else "Сначала соберите архив для отправки, чтобы получить свежую проверку состава и состояния."
+                else "Сначала сохраните архив проекта, чтобы получить свежую проверку состава и состояния."
             ),
             baseline_evidence=baseline_evidence,
             baseline_attention_required=baseline_attention,
@@ -355,7 +355,7 @@ class DiagnosticsShellController(QtCore.QObject):
 
     def start_collect(self) -> None:
         if self.is_busy():
-            self._set_status("Сбор архива уже выполняется.", busy=True)
+            self._set_status("Сохранение архива проекта уже выполняется.", busy=True)
             return
 
         bundle = self._current_bundle or load_desktop_diagnostics_bundle_record(self.repo_root)
@@ -388,37 +388,37 @@ class DiagnosticsShellController(QtCore.QObject):
         self._process.setProgram(cmd[0])
         self._process.setArguments(cmd[1:])
         self._process.start()
-        self._set_status("Идёт сбор архива для отправки...", busy=True)
+        self._set_status("Идёт сохранение архива проекта...", busy=True)
         self.refresh(regenerate_reports=False)
 
     def verify_bundle(self) -> None:
         bundle = self._current_bundle or load_desktop_diagnostics_bundle_record(self.repo_root)
         if not bundle.latest_zip_path:
-            self._set_status("Проверка архива недоступна: сначала соберите архив для отправки.", busy=False)
+            self._set_status("Проверка архива недоступна: сначала сохраните архив проекта.", busy=False)
             self.refresh(regenerate_reports=False)
             return
-        self._set_status("Обновляю проверку состава и состояния архива для отправки...", busy=True)
+        self._set_status("Обновляю проверку состава и состояния архива проекта...", busy=True)
         self.refresh(regenerate_reports=True)
-        self._set_status("Проверка архива для отправки обновлена.", busy=False)
+        self._set_status("Проверка архива проекта обновлена.", busy=False)
 
     def send_results(self) -> None:
         bundle = self._current_bundle or load_desktop_diagnostics_bundle_record(self.repo_root)
         if not bundle.latest_zip_path:
-            self._set_status("Отправка результатов недоступна: архив для отправки ещё не готов.", busy=False)
+            self._set_status("Копирование архива недоступно: архив проекта ещё не сохранён.", busy=False)
             self.refresh(regenerate_reports=False)
             return
         self.spawn_module_fn("pneumo_solver_ui.tools.send_results_gui")
-        self._set_status("Открыто окно отправки результатов.", busy=False)
+        self._set_status("Копирование архива открыто.", busy=False)
         self.refresh(regenerate_reports=False)
 
     def open_bundle_folder(self) -> None:
         bundle = self._current_bundle or load_desktop_diagnostics_bundle_record(self.repo_root)
         self.open_path_fn(Path(bundle.out_dir).expanduser().resolve())
-        self._set_status("Открыта папка архива для отправки.", busy=False)
+        self._set_status("Открыта папка архива проекта.", busy=False)
 
     def open_legacy_center(self) -> None:
         self.spawn_module_fn("pneumo_solver_ui.tools.desktop_diagnostics_center")
-        self._set_status("Проверка и отправка открыты отдельным окном.", busy=False)
+        self._set_status("Расширенная проверка проекта открыта.", busy=False)
 
     def _set_status(self, text: str, *, busy: bool) -> None:
         self._status_text = text
@@ -461,7 +461,7 @@ class DiagnosticsShellController(QtCore.QObject):
     def _on_finished(self, exit_code: int, _exit_status: QtCore.QProcess.ExitStatus) -> None:
         request = self._current_request
         if request is None:
-            self._set_status("Сбор архива завершился, но сведения о запуске не найдены.", busy=False)
+            self._set_status("Сохранение архива проекта завершилось, но сведения о запуске не найдены.", busy=False)
             self.refresh(regenerate_reports=False)
             return
 
@@ -487,7 +487,7 @@ class DiagnosticsShellController(QtCore.QObject):
             log_text="",
         )
         self._set_status(
-            "Сбор архива завершён успешно." if exit_code == 0 else f"Сбор архива завершился с кодом {exit_code}.",
+            "Архив проекта сохранён." if exit_code == 0 else f"Сохранение архива проекта завершилось с кодом {exit_code}.",
             busy=False,
         )
         self.refresh(regenerate_reports=exit_code == 0)
@@ -495,16 +495,16 @@ class DiagnosticsShellController(QtCore.QObject):
     def _on_process_error(self, error: QtCore.QProcess.ProcessError) -> None:
         if self.is_busy():
             return
-        self._set_status(f"Ошибка запуска сбора архива: {error!s}", busy=False)
+        self._set_status(f"Ошибка запуска сохранения архива проекта: {error!s}", busy=False)
         self.refresh(regenerate_reports=False)
 
     def _persist_center_state(self, snapshot: DiagnosticsWorkspaceSnapshot) -> None:
         summary_text = "\n".join(
             [
-                "# Сводка проверки и отправки",
+                "# Сводка проверки проекта и архива",
                 "",
                 f"- Состояние: {snapshot.status_text}",
-                f"- Архив для отправки: {_safe_path_text(snapshot.bundle.latest_zip_path)}",
+                f"- Архив проекта: {_safe_path_text(snapshot.bundle.latest_zip_path)}",
                 f"- Состав архива: {_safe_path_text(snapshot.bundle.latest_inspection_md_path)}",
                 f"- Состояние проекта: {_safe_path_text(snapshot.bundle.latest_health_md_path)}",
                 f"- Проверка результата: {_safe_path_text(snapshot.bundle.latest_validation_md_path)}",
@@ -589,8 +589,22 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         self.status_label.setStyleSheet("padding: 8px; background: #f4f7fb; border: 1px solid #d7e3f4;")
         layout.addWidget(self.status_label)
 
+        progress_box = QtWidgets.QGroupBox("Ход действия")
+        progress_layout = QtWidgets.QVBoxLayout(progress_box)
+        self.progress_bar = QtWidgets.QProgressBar()
+        self.progress_bar.setTextVisible(True)
+        self.progress_bar.setFormat("Готово")
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(100)
+        self.progress_note = QtWidgets.QLabel("Длительные действия показываются здесь же, в проверке проекта и архива.")
+        self.progress_note.setWordWrap(True)
+        self.progress_note.setStyleSheet("color: #405060;")
+        progress_layout.addWidget(self.progress_bar)
+        progress_layout.addWidget(self.progress_note)
+        layout.addWidget(progress_box)
+
         self.source_label = QtWidgets.QLabel(
-            "Данные берутся из состояния проверки проекта и подготовки архива для отправки."
+            "Данные берутся из состояния проверки проекта и сохранения архива проекта."
         )
         self.source_label.setWordWrap(True)
         self.source_label.setStyleSheet("color: #405060;")
@@ -600,7 +614,7 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         if v19_box is not None:
             layout.addWidget(v19_box)
 
-        self.bundle_box = QtWidgets.QGroupBox("Текущее состояние архива для отправки")
+        self.bundle_box = QtWidgets.QGroupBox("Текущее состояние архива проекта")
         bundle_layout = QtWidgets.QFormLayout(self.bundle_box)
         self.bundle_zip_value = QtWidgets.QLabel("")
         self.bundle_out_dir_value = QtWidgets.QLabel("")
@@ -614,12 +628,12 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         ):
             label.setWordWrap(True)
         bundle_layout.addRow("Последний архив", self.bundle_zip_value)
-        bundle_layout.addRow("Папка архива для отправки", self.bundle_out_dir_value)
+        bundle_layout.addRow("Папка архива проекта", self.bundle_out_dir_value)
         bundle_layout.addRow("Буфер обмена", self.bundle_clipboard_value)
         bundle_layout.addRow("Связанные пути", self.bundle_paths_value)
         layout.addWidget(self.bundle_box)
 
-        self.run_box = QtWidgets.QGroupBox("Последний сбор архива")
+        self.run_box = QtWidgets.QGroupBox("Последнее сохранение архива")
         run_layout = QtWidgets.QFormLayout(self.run_box)
         self.run_state_value = QtWidgets.QLabel("")
         self.run_started_value = QtWidgets.QLabel("")
@@ -641,7 +655,7 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         run_layout.addRow("Параметры запуска", self.request_value)
         layout.addWidget(self.run_box)
 
-        self.check_box = QtWidgets.QGroupBox("Проверка архива для отправки")
+        self.check_box = QtWidgets.QGroupBox("Проверка архива проекта")
         check_layout = QtWidgets.QFormLayout(self.check_box)
         self.inspection_value = QtWidgets.QLabel("")
         self.health_value = QtWidgets.QLabel("")
@@ -677,12 +691,12 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
 
         self.actions_box = QtWidgets.QGroupBox("Действия")
         actions_layout = QtWidgets.QGridLayout(self.actions_box)
-        self.collect_button = QtWidgets.QPushButton("Собрать архив для отправки")
-        self.verify_button = QtWidgets.QPushButton("Проверить архив для отправки")
-        self.send_button = QtWidgets.QPushButton("Отправить результаты")
+        self.collect_button = QtWidgets.QPushButton("Сохранить архив проекта")
+        self.verify_button = QtWidgets.QPushButton("Проверить архив проекта")
+        self.send_button = QtWidgets.QPushButton("Скопировать архив")
         self.open_dir_button = QtWidgets.QPushButton("Открыть каталог")
         self.refresh_button = QtWidgets.QPushButton("Обновить состояние")
-        self.legacy_button = QtWidgets.QPushButton("Открыть проверку и отправку отдельным окном")
+        self.legacy_button = QtWidgets.QPushButton("Расширенная проверка проекта")
         _apply_action_contract(self.collect_button, "DG-BTN-COLLECT")
         self.collect_button.clicked.connect(lambda: self.handle_command("diagnostics.collect_bundle"))
         self.verify_button.clicked.connect(lambda: self.handle_command("diagnostics.verify_bundle"))
@@ -726,14 +740,26 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
     def open_baseline_center(self) -> None:
         if self.on_command is not None:
             self.on_command("baseline.center.open")
-            self.status_label.setText("Открыт базовый прогон из окна проверки и отправки.")
+            self.status_label.setText("Переход к базовому прогону выполнен из проверки проекта и архива.")
             return
-        self.status_label.setText("Базовый прогон доступен из основного окна приложения.")
+        self.status_label.setText("Базовый прогон доступен из рабочего места инженера.")
 
     def _on_controller_status(self, text: str, busy: bool) -> None:
         self.status_label.setText(text)
+        self._set_progress_state(busy=busy, status_text=text)
         if self.on_shell_status is not None:
             self.on_shell_status(text, busy)
+
+    def _set_progress_state(self, *, busy: bool, status_text: str) -> None:
+        if busy:
+            self.progress_bar.setRange(0, 0)
+            self.progress_bar.setFormat("Выполняется")
+            self.progress_note.setText(status_text)
+            return
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(100)
+        self.progress_bar.setFormat("Готово")
+        self.progress_note.setText(status_text or "Готово к следующему действию.")
 
     def _apply_snapshot(self, payload: object) -> None:
         snapshot = payload if isinstance(payload, DiagnosticsWorkspaceSnapshot) else None
@@ -741,6 +767,7 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
             return
 
         self.status_label.setText(snapshot.status_text)
+        self._set_progress_state(busy=snapshot.is_busy, status_text=snapshot.status_text)
         self.bundle_zip_value.setText(_safe_path_text(snapshot.bundle.latest_zip_path))
         self.bundle_out_dir_value.setText(_safe_path_text(snapshot.bundle.out_dir))
         self.bundle_clipboard_value.setText(
@@ -758,7 +785,7 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
 
         run_record = snapshot.run_record
         if run_record is None:
-            self.run_state_value.setText("Архив для отправки ещё не собирался в текущей папке.")
+            self.run_state_value.setText("Архив проекта ещё не сохранялся в текущей папке.")
             self.run_started_value.setText("нет данных")
             self.run_finished_value.setText("нет данных")
             self.run_dir_value.setText("нет данных")
@@ -772,7 +799,7 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         self.request_value.setText(
             f"Объём проверки - {_request_level_text(snapshot.request.level)}. "
             f"Проверка окна будет {'пропущена' if snapshot.request.skip_ui_smoke else 'выполнена'}. "
-            f"Архив для отправки будет {'не собран' if snapshot.request.no_zip else 'собран'}. "
+            f"Архив проекта будет {'не сохранён' if snapshot.request.no_zip else 'сохранён'}. "
             f"Проверка оптимизации будет {'выполнена' if snapshot.request.run_opt_smoke else 'пропущена'}. "
             f"Лимит проверки оптимизации {snapshot.request.opt_minutes} мин. Задач {snapshot.request.opt_jobs}."
         )
@@ -800,3 +827,4 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         self.verify_button.setEnabled(not busy)
         self.send_button.setEnabled(not busy)
         self.refresh_button.setEnabled(not busy)
+        self.legacy_button.setEnabled(not busy)

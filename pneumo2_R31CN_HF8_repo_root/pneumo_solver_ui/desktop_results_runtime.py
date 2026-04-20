@@ -175,15 +175,15 @@ def _operator_text(value: Any) -> str:
     text = str(value or "").strip()
     replacements = {
         "Open Desktop Animator first and inspect Mnemo red flags before send.": (
-            "Сначала откройте аниматор и проверьте красные флаги мнемосхемы перед отправкой."
+    "Сначала откройте аниматор и проверьте красные флаги мнемосхемы перед сохранением архива проекта."
         ),
         "Open Desktop Animator first": "Сначала откройте аниматор",
-        "Then inspect Compare Viewer": "Затем проверьте окно сравнения",
-        "Open Compare Viewer next": "Откройте окно сравнения следующим шагом",
-        "Открыть Compare Viewer следующим шагом": "Открыть окно сравнения следующим шагом",
+        "Then inspect Compare Viewer": "Затем проверьте сравнение прогонов",
+        "Open Compare Viewer next": "Перейдите к сравнению прогонов",
+        "Открыть Compare Viewer " "следующим шагом": "Перейти к сравнению прогонов",
         "Desktop Mnemo recent:": "Недавнее событие мнемосхемы:",
         "Pointer drift": "Расхождение данных сопровождения",
-        "Compare Viewer": "окно сравнения",
+        "Compare Viewer": "сравнение прогонов",
         "Desktop Animator": "аниматор",
         "Desktop Mnemo": "мнемосхема",
         "Open ": "Открыть ",
@@ -228,11 +228,11 @@ def _dedupe_text_items(items: list[str] | tuple[str, ...]) -> tuple[str, ...]:
 
 _OPERATOR_RECOMMENDATION_TRANSLATIONS_RU: dict[str, str] = {
     "Open Desktop Animator first and inspect Mnemo red flags before send.": (
-        "Сначала откройте аниматор и проверьте красные флаги мнемосхемы перед отправкой."
+        "Сначала откройте аниматор и проверьте красные флаги мнемосхемы перед сохранением архива проекта."
     ),
     "Open Desktop Animator first": "Сначала откройте аниматор.",
-    "Then inspect Compare Viewer": "Затем проверьте окно сравнения.",
-    "Open Compare Viewer next": "Откройте окно сравнения следующим шагом.",
+    "Then inspect Compare Viewer": "Затем проверьте сравнение прогонов.",
+    "Open Compare Viewer next": "Перейдите к сравнению прогонов.",
 }
 
 
@@ -255,7 +255,7 @@ _CONTEXT_FIELD_TITLES: dict[str, str] = {
     "selected_test_id": "Номер выбранного испытания",
     "selected_npz_path": "Файл выбранной анимации",
     "compare_contract_hash": "Метка сравнения",
-    "evidence_manifest_hash": "Метка материалов диагностики",
+        "evidence_manifest_hash": "Метка материалов проверки проекта",
     "objective_contract_hash": "Метка целевого профиля",
     "hard_gate_key": "Ограничение",
     "hard_gate_tolerance": "Допуск ограничения",
@@ -622,7 +622,7 @@ def _extract_result_context(
         state = "STALE"
         banner = "Текущая постановка отличается от результатов расчёта."
         detail = "Различаются поля: " + ", ".join(mismatches)
-        action = "Откройте окно сравнения или переключите выбранные данные; сохранение материалов диагностики оставит оба набора данных."
+        action = "Откройте окно сравнения или переключите выбранные данные; сохранение материалов проверки проекта оставит оба набора данных."
     elif explicit_state in {"CURRENT", "HISTORICAL", "STALE"}:
         state = explicit_state
         banner = {
@@ -636,7 +636,7 @@ def _extract_result_context(
         state = "CURRENT"
         banner = "Результаты расчёта соответствуют текущим данным."
         detail = "Совпали опубликованные поля данных и метки результатов расчёта."
-        action = "Можно переходить к сравнению, аниматору или сохранению материалов диагностики."
+        action = "Можно переходить к сравнению, аниматору или сохранению материалов проверки проекта."
     elif selected_has_signal:
         state = "HISTORICAL"
         banner = "Открыты исторические результаты расчёта с закреплёнными данными."
@@ -646,7 +646,7 @@ def _extract_result_context(
         state = "MISSING"
         banner = "Результаты расчёта отсутствуют."
         detail = "Отчёт проверки не опубликовал метки прогона и результатов расчёта."
-        action = "Запустите диагностику или подготовьте архив отправки со свежими результатами расчёта."
+        action = "Запустите проверку проекта или сохраните архив проекта со свежими результатами расчёта."
 
     return {
         "state": state,
@@ -706,7 +706,7 @@ def _suggested_next_step(
 
     if gate and gate not in {"PASS", "OK", "READY"}:
         return (
-            "Перед отправкой проверьте ограничения оптимизации.",
+            "Перед сохранением архива проекта проверьте ограничения оптимизации.",
             gate_reason or f"Ограничение оптимизации: {_status_ru(gate)}",
             "open_artifact",
             "validation_json",
@@ -778,14 +778,14 @@ def _suggested_next_step(
 
     if latest_zip_path is not None:
         return (
-            "Откройте центр отправки и проверьте свежие материалы архива.",
+            "Откройте проверку проекта и проверьте свежие материалы архива.",
             latest_zip_path.name,
             "open_send_center",
             "send_bundle_zip",
         )
 
     return (
-        "Сначала запустите диагностику или подготовьте архив отправки.",
+            "Сначала запустите проверку проекта или сохраните архив проекта.",
         "Свежие материалы проверки и результатов пока не появились.",
         "open_diagnostics_gui",
         "",
@@ -899,7 +899,7 @@ class DesktopResultsRuntime:
         )
 
         items: list[DesktopResultsArtifact] = []
-        _append_artifact(items, key="send_bundle_zip", title="Последний архив отправки", category="bundle", path=latest_zip_path)
+        _append_artifact(items, key="send_bundle_zip", title="Последний архив проекта", category="bundle", path=latest_zip_path)
         _append_artifact(items, key="validation_json", title="Данные проверки", category="validation", path=validation_json_path)
         _append_artifact(items, key="validation_md", title="Отчёт проверки", category="validation", path=validation_md_path)
         _append_artifact(items, key="triage_json", title="Данные разбора замечаний", category="triage", path=triage_json_path)
@@ -918,14 +918,14 @@ class DesktopResultsRuntime:
         )
         _append_artifact(items, key="mnemo_event_log", title="Журнал событий мнемосхемы", category="results", path=latest_mnemo_event_log_path)
         _append_artifact(items, key="autotest_run", title="Последний каталог автотеста", category="runs", path=latest_autotest_run_dir)
-        _append_artifact(items, key="diagnostics_run", title="Последний каталог диагностики", category="runs", path=latest_diagnostics_run_dir)
+        _append_artifact(items, key="diagnostics_run", title="Последняя папка проверки проекта", category="runs", path=latest_diagnostics_run_dir)
         _append_artifact(
             items,
             key="diagnostics_evidence_manifest",
-            title="Материалы диагностики",
+            title="Материалы проверки проекта",
             category="evidence",
             path=diagnostics_evidence_manifest_path,
-            detail="Материалы для связи анализа и диагностики.",
+            detail="Материалы для связи анализа и проверки проекта.",
         )
         _append_artifact(
             items,
@@ -933,7 +933,7 @@ class DesktopResultsRuntime:
             title="Данные для окна сравнения",
             category="evidence",
             path=compare_current_context_sidecar_path,
-            detail="Материалы для открытия результатов расчёта в окне сравнения.",
+            detail="Материалы для сравнения результатов расчёта.",
         )
         _append_artifact(
             items,
@@ -1008,13 +1008,13 @@ class DesktopResultsRuntime:
         overview_rows: list[DesktopResultsOverviewRow] = [
             DesktopResultsOverviewRow(
                 key="send_bundle_validation",
-                title="Проверка архива отправки",
+                title="Проверка архива проекта",
                 status=validation_status,
                 detail=(
                     f"ошибок: {len(validation_payload.get('errors') or [])}; "
                     f"предупреждений: {len(validation_payload.get('warnings') or [])}"
                 ),
-                next_action="Открыть отчёт проверки" if validation_json_path is not None else "Сначала запустить диагностику",
+                next_action="Открыть отчёт проверки" if validation_json_path is not None else "Сначала запустить проверку проекта",
                 evidence_path=validation_json_path or validation_md_path,
                 action_key="open_artifact",
                 artifact_key="validation_json" if validation_json_path is not None else "validation_md",
@@ -1059,7 +1059,7 @@ class DesktopResultsRuntime:
                 title="Данные результатов расчёта",
                 status=str(context.get("state") or "MISSING"),
                 detail=str(context.get("banner") or ""),
-                next_action=str(context.get("action") or "Сохранить материалы диагностики"),
+                next_action=str(context.get("action") or "Сохранить материалы проверки проекта"),
                 evidence_path=diagnostics_evidence_manifest_path,
                 action_key="export_diagnostics_evidence",
                 artifact_key="diagnostics_evidence_manifest",
@@ -1079,7 +1079,7 @@ class DesktopResultsRuntime:
                 next_action=(
                     "Показать файл выбранного прогона"
                     if optimizer_contract_info.get("contract_path") is not None
-                    else "Выбрать прогон в окне оптимизации"
+                    else "Выбрать прогон в оптимизации"
                 ),
                 evidence_path=optimizer_contract_info.get("contract_path"),
                 action_key=(
@@ -1094,7 +1094,7 @@ class DesktopResultsRuntime:
                 title="Последний результат анимации",
                 status="READY" if latest_npz_path is not None else "MISSING",
                 detail=str(latest_npz_path.name if latest_npz_path is not None else "Файл последней анимации недоступен."),
-                next_action="Открыть сравнение" if latest_npz_path is not None else "Запустить автотест или диагностику",
+                next_action="Открыть сравнение" if latest_npz_path is not None else "Запустить автотест или проверку проекта",
                 evidence_path=latest_npz_path,
                 action_key="open_compare_viewer" if latest_npz_path is not None else "open_diagnostics_gui",
                 artifact_key="latest_npz",
@@ -1151,7 +1151,7 @@ class DesktopResultsRuntime:
             ),
             DesktopResultsOverviewRow(
                 key="bundle_sidecars",
-                title="Материалы архива отправки",
+                title="Материалы архива проекта",
                 status=(
                     "READY"
                     if latest_zip_path is not None and triage_md_path is not None and dashboard_html_path is not None
@@ -1162,7 +1162,7 @@ class DesktopResultsRuntime:
                     f"разбор: {'есть' if triage_md_path is not None else 'нет'}; "
                     f"панель: {'есть' if dashboard_html_path is not None else 'нет'}"
                 ),
-                next_action="Открыть отправку результатов" if latest_zip_path is not None else "Подготовить архив отправки",
+                next_action="Скопировать архив" if latest_zip_path is not None else "Сохранить архив проекта",
                 evidence_path=latest_zip_path or triage_md_path or dashboard_html_path,
                 action_key="open_send_center" if latest_zip_path is not None else "open_send_bundles",
                 artifact_key=(
@@ -1404,7 +1404,7 @@ class DesktopResultsRuntime:
         )
         append_current(
             "session_diagnostics_run",
-            "Папка диагностики текущего прогона",
+            "Папка проверки проекта текущего прогона",
             handoff.diagnostics_run_dir,
             category="runs",
         )
@@ -1834,7 +1834,7 @@ class DesktopResultsRuntime:
                     selected = obj.get("selected_artifact_list") or []
                     mismatch = dict(obj.get("mismatch_summary") or {})
                     lines = [
-                        "Тип: материалы диагностики",
+                    "Тип: материалы проверки проекта",
                         f"Состояние данных: {_status_ru(mismatch.get('state'))}",
                         f"Материалов: {len(selected) if isinstance(selected, list) else 0}",
                     ]

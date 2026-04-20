@@ -79,6 +79,12 @@ Operational note:
 20. [docs/context/gui_spec_imports/v19_graph_iteration/COGNITIVE_VISIBILITY_MATRIX_V19.csv](./context/gui_spec_imports/v19_graph_iteration/COGNITIVE_VISIBILITY_MATRIX_V19.csv)
 21. [docs/context/gui_spec_imports/v19_graph_iteration/TREE_DIRECT_OPEN_MATRIX_V19.csv](./context/gui_spec_imports/v19_graph_iteration/TREE_DIRECT_OPEN_MATRIX_V19.csv)
 22. [docs/context/gui_spec_imports/v19_graph_iteration/DOCK_WINDOW_AND_DOCK_WIDGET_MATRIX_V19.csv](./context/gui_spec_imports/v19_graph_iteration/DOCK_WINDOW_AND_DOCK_WIDGET_MATRIX_V19.csv)
+23. [docs/context/gui_spec_imports/v12_window_internal_routes/README.md](./context/gui_spec_imports/v12_window_internal_routes/README.md)
+24. [docs/context/gui_spec_imports/v12_window_internal_routes/WINDOW_FIRST_SCREEN_CONTRACT_V12.md](./context/gui_spec_imports/v12_window_internal_routes/WINDOW_FIRST_SCREEN_CONTRACT_V12.md)
+25. [docs/context/gui_spec_imports/v12_window_internal_routes/WINDOW_ACTION_FEEDBACK_MATRIX_V12.csv](./context/gui_spec_imports/v12_window_internal_routes/WINDOW_ACTION_FEEDBACK_MATRIX_V12.csv)
+26. [docs/context/gui_spec_imports/v12_window_internal_routes/SEMANTIC_REWRITE_MATRIX_V12.csv](./context/gui_spec_imports/v12_window_internal_routes/SEMANTIC_REWRITE_MATRIX_V12.csv)
+27. [docs/context/gui_spec_imports/v12_window_internal_routes/DIRECT_TREE_OPEN_AND_DOCK_ROLE_V12.csv](./context/gui_spec_imports/v12_window_internal_routes/DIRECT_TREE_OPEN_AND_DOCK_ROLE_V12.csv)
+28. [docs/context/release_readiness/HUMAN_GUI_REPORT_ONLY_V12_WINDOW_INTERNAL_ROUTES_2026-04-20.md](./context/release_readiness/HUMAN_GUI_REPORT_ONLY_V12_WINDOW_INTERNAL_ROUTES_2026-04-20.md)
 14. [docs/context/gui_spec_imports/v38_github_kb_commit_ready/README.md](./context/gui_spec_imports/v38_github_kb_commit_ready/README.md)
 15. [docs/context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md](./context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md)
 16. [docs/context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml](./context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml)
@@ -192,10 +198,11 @@ Operational note:
 - локальные digests и snapshots AI-контекста;
 - current imported V38 actualized with V10 GUI/TZ/spec knowledge-base layer,
   with previous V38/V10 layers retained as provenance and evidence;
-- human GUI simulation/report-only audits V5/V6 as evidence-first and
-  route-hierarchy clarification layers for launcher hierarchy, first-class
-  `Редактор кольца`, diagnostics route, compare differentiation, truth-state
-  markers and under-proven window internals;
+- human GUI simulation/report-only audits V5/V6/V10/V12 as evidence-first,
+  route-hierarchy and first-screen/action-feedback clarification layers for
+  launcher hierarchy, first-class `Редактор кольца`, archive check/send route,
+  compare differentiation, truth-state markers, direct tree open and
+  under-proven window internals;
 - connector-reconciled GUI/TZ digest v33, with v32 retained as previous
   workstream/release-gate evidence layer;
 - внешние архивы и Google Drive как контекст и история;

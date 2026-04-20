@@ -1,4 +1,4 @@
-"""Запуск классического модульного desktop-окна."""
+"""Запуск классического модульного рабочего места."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from pneumo_solver_ui.desktop_shell.registry import build_desktop_shell_specs
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="desktop_main_shell",
-        description="Классическое Windows-окно для встроенных и внешних рабочих окон PneumoApp.",
+        description="Классическое Windows-рабочее место для встроенных и внешних рабочих окон PneumoApp.",
     )
     parser.add_argument(
         "--open",
@@ -20,7 +20,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         metavar="KEY",
-        help="Открыть рабочее окно по ключу реестра при запуске. Можно указать несколько раз.",
+        help="Перейти к рабочему разделу по ключу реестра при запуске. Можно указать несколько раз.",
     )
     parser.add_argument(
         "--list-tools",

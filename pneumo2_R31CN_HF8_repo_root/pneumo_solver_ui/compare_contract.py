@@ -554,7 +554,7 @@ def format_compare_contract_summary(contract: Mapping[str, Any] | None) -> str:
     mode = str(payload.get("compare_mode") or "-").replace("_", " ")
     warning_text = "-"
     if dims:
-        warning_text = f"контекст отличается: {', '.join(_human_compare_dimension(dim) for dim in dims[:6])}"
+        warning_text = f"расчётные данные отличаются: {', '.join(_human_compare_dimension(dim) for dim in dims[:6])}"
     lines = [
         f"Хэш правил сравнения: {_short(payload.get('compare_contract_hash'), 16)}",
         f"Режим: {mode} | Выбранных расчётов: {len(refs)}",

@@ -163,13 +163,13 @@ def main() -> int:
             errs.append(f"паспорт: файл не найден: {pj} -> {ppath}")
 
     if errs:
-        print("\nПроблемы контрактов параметров:")
+        print("\nПроблемы условий параметров:")
         for e in errs:
             print(" -", e)
         print("\nИТОГ: FAIL")
         return 1
 
-    print("Контракты параметров: OK")
+    print("Условия параметров: OK")
     return 0
 
 

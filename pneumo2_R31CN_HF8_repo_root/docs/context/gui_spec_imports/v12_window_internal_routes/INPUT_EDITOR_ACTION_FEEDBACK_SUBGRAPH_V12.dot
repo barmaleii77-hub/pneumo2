@@ -1,0 +1,34 @@
+digraph G {
+  rankdir=LR;
+  node [shape=box, fontsize=10];
+  TREE_INPUTS [label="Дерево: Исходные данные проекта"];
+  WIN_INPUTS [label="Окно: Исходные данные проекта"];
+  TREE_GROUPS [label="Дерево групп параметров"];
+  FORM_GROUP [label="Форма выбранной группы"];
+  VISUAL_TWIN [label="Графический двойник"];
+  CARD_TWO_SPRINGS [label="Карточка: На угол установлены две пружины"];
+  CARD_LEVELING [label="Карточка: Выравнивание пружинами активно"];
+  VALUE_LEVEL_DELTA [label="Показатель: Остаточная разница, мм"];
+  CARD_SYMM [label="Карточка: Зеркальная симметрия
+включена / отключена"];
+  BTN_VALIDATE [label="Кнопка: Проверить"];
+  BTN_SAVE [label="Кнопка: Сохранить"];
+  FEEDBACK_DIRTY [label="Feedback: Есть несохранённые изменения"];
+  FEEDBACK_VALID [label="Feedback: Проверка пройдена"];
+  FEEDBACK_WARN [label="Feedback: Есть предупреждения"];
+  TREE_INPUTS -> WIN_INPUTS [label="прямое открытие из дерева"];
+  WIN_INPUTS -> TREE_GROUPS;
+  TREE_GROUPS -> FORM_GROUP;
+  FORM_GROUP -> VISUAL_TWIN [label="изменение поля
+обновляет графику"];
+  FORM_GROUP -> CARD_TWO_SPRINGS;
+  FORM_GROUP -> CARD_LEVELING;
+  CARD_LEVELING -> VALUE_LEVEL_DELTA;
+  FORM_GROUP -> CARD_SYMM;
+  FORM_GROUP -> FEEDBACK_DIRTY [label="редактирование"];
+  FEEDBACK_DIRTY -> BTN_VALIDATE;
+  BTN_VALIDATE -> FEEDBACK_VALID [label="если всё корректно"];
+  BTN_VALIDATE -> FEEDBACK_WARN [label="если есть предупреждения"];
+  FEEDBACK_VALID -> BTN_SAVE;
+  FEEDBACK_WARN -> BTN_SAVE [label="если сохранение допустимо"];
+}

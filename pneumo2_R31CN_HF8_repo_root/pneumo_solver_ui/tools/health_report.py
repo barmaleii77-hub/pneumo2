@@ -174,15 +174,15 @@ def _collect_geometry_acceptance_best_effort(raw_npz: bytes) -> Tuple[Optional[D
         mod = importlib.import_module("pneumo_solver_ui.geometry_acceptance_contract")
         collect = getattr(mod, "collect_geometry_acceptance_from_npz")
     except Exception as e:
-        return None, f"geometry acceptance helper unavailable: {type(e).__name__}: {e!s}"
+        return None, f"проверка геометрии недоступна: {type(e).__name__}: {e!s}"
 
     try:
         rep = collect(raw_npz)
         if isinstance(rep, dict):
             return dict(rep), None
-        return None, "geometry acceptance helper returned non-dict result"
+        return None, "проверка геометрии вернула неожиданный формат результата"
     except Exception as e:
-        return None, f"failed to inspect anim_latest geometry acceptance: {type(e).__name__}: {e!s}"
+        return None, f"не удалось проверить геометрию последней анимации: {type(e).__name__}: {e!s}"
 
 
 def _normalize_geometry_acceptance_payload(
@@ -253,11 +253,11 @@ def _geometry_acceptance_note(geom: Dict[str, Any], *, source_label: str) -> tup
     reason = str(geom.get("release_gate_reason") or "").strip()
     suffix = f": {reason}" if reason else ""
     if gate == "FAIL":
-        return False, f"geometry acceptance gate=FAIL for {source_label}{suffix}"
+        return False, f"проверка геометрии: FAIL для {source_label}{suffix}"
     if gate == "WARN":
-        return True, f"geometry acceptance gate=WARN for {source_label}{suffix}"
+        return True, f"проверка геометрии: WARN для {source_label}{suffix}"
     if gate == "MISSING":
-        return True, f"geometry acceptance gate=MISSING for {source_label}{suffix}"
+        return True, f"проверка геометрии: MISSING для {source_label}{suffix}"
     return True, ""
 
 
@@ -265,18 +265,18 @@ def _format_geometry_acceptance_summary_lines_best_effort(geom: Dict[str, Any]) 
     gate = str(geom.get("release_gate") or "MISSING")
     reason = str(geom.get("release_gate_reason") or geom.get("error") or "—")
     lines = [
-        f"- inspection_status: {geom.get('inspection_status') or 'missing'}",
-        f"- release_gate: {gate}",
-        f"- release_gate_reason: {reason}",
-        f"- producer_owned: {geom.get('producer_owned')}",
-        f"- no_synthetic_geometry: {geom.get('no_synthetic_geometry')}",
+        f"- Состояние проверки: {geom.get('inspection_status') or 'missing'}",
+        f"- Допуск геометрии: {gate}",
+        f"- Причина допуска: {reason}",
+        f"- Данные получены из расчёта: {geom.get('producer_owned')}",
+        f"- Без синтетической геометрии: {geom.get('no_synthetic_geometry')}",
     ]
     missing = [str(x) for x in (geom.get("missing_fields") or []) if str(x).strip()]
     if missing:
-        lines.append(f"- missing_fields: {', '.join(missing[:8])}")
+        lines.append(f"- Не хватает полей: {', '.join(missing[:8])}")
     warnings = [str(x) for x in (geom.get("warnings") or []) if str(x).strip()]
     for warning in warnings[:5]:
-        lines.append(f"- warning: {warning}")
+        lines.append(f"- Предупреждение: {warning}")
     try:
         mod = importlib.import_module("pneumo_solver_ui.geometry_acceptance_contract")
         fmt = getattr(mod, "format_geometry_acceptance_summary_lines")
@@ -343,7 +343,7 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                     if msg not in notes:
                         notes.append(msg)
             except Exception as exc:
-                notes.append(f"failed to inspect evidence manifest: {type(exc).__name__}: {exc!s}")
+                notes.append(f"не удалось проверить состав данных: {type(exc).__name__}: {exc!s}")
 
             self_check_snapshot = _read_json_from_zip(z, "reports/SELF_CHECK_SILENT_WARNINGS.json")
             signals["self_check_silent_warnings"] = _summarize_self_check_silent_warnings_snapshot(
@@ -352,7 +352,7 @@ def collect_health_report(zip_path: Path) -> HealthReport:
             )
             if signals["self_check_silent_warnings"].get("status") == "WARN":
                 notes.append(
-                    "self_check silent warnings snapshot has WARN/FAIL entries; snapshot-only evidence does not close producer gaps."
+                    "Снимок тихих предупреждений самопроверки содержит WARN/FAIL; этого снимка недостаточно для закрытия предупреждений источника."
                 )
 
             if zip_path.name == "latest_send_bundle.zip":
@@ -394,7 +394,7 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                     engineering_summary = summarize_engineering_analysis_evidence(
                         {},
                         source_path=engineering_name,
-                        read_warnings=(f"{engineering_name} is not valid JSON",),
+                        read_warnings=(f"{engineering_name}: некорректный JSON",),
                     )
                 signals["engineering_analysis_evidence"] = engineering_summary
                 for item in engineering_summary.get("warnings") or []:
@@ -459,7 +459,7 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                         optimizer_scope_sources[str(triage_scope.get("source") or "triage")] = triage_scope
                 try:
                     if int(sev.get("critical", 0)) > 0:
-                        notes.append("triage reports CRITICAL entries")
+                        notes.append("в разборе замечаний есть критические записи")
                 except Exception:
                     pass
 
@@ -592,11 +592,11 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                         geom_acc = {
                             "inspection_status": "missing",
                             "release_gate": "MISSING",
-                            "release_gate_reason": str(geom_err or "geometry acceptance helper unavailable"),
+                            "release_gate_reason": str(geom_err or "проверка геометрии недоступна"),
                             "available": False,
                             "producer_owned": False,
                             "no_synthetic_geometry": False,
-                            "error": str(geom_err or "geometry acceptance helper unavailable"),
+                            "error": str(geom_err or "проверка геометрии недоступна"),
                             "source_path": ANIM_LOCAL_NPZ,
                             "source_kind": "npz_recomputed",
                         }
@@ -607,11 +607,11 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                     geom_acc = {
                         "inspection_status": "missing",
                         "release_gate": "MISSING",
-                        "release_gate_reason": f"failed to inspect anim_latest geometry acceptance: {type(e).__name__}: {e!s}",
+                        "release_gate_reason": f"не удалось проверить геометрию последней анимации: {type(e).__name__}: {e!s}",
                         "available": False,
                         "producer_owned": False,
                         "no_synthetic_geometry": False,
-                        "error": f"failed to inspect anim_latest geometry acceptance: {type(e).__name__}: {e!s}",
+                        "error": f"не удалось проверить геометрию последней анимации: {type(e).__name__}: {e!s}",
                         "source_path": ANIM_LOCAL_NPZ,
                         "source_kind": "npz_recomputed",
                     }
@@ -628,8 +628,8 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                         notes.append(smsg)
                 if optimizer_scope_gate.get("release_risk"):
                     risk_msg = (
-                        "optimizer scope release risk: "
-                        f"{optimizer_scope_gate.get('release_gate_reason') or 'mismatch detected'}"
+                        "риск выпуска по области оптимизации: "
+                        f"{optimizer_scope_gate.get('release_gate_reason') or 'обнаружено расхождение'}"
                     )
                     if risk_msg not in notes:
                         notes.append(risk_msg)
@@ -644,8 +644,8 @@ def collect_health_report(zip_path: Path) -> HealthReport:
                     if str(item).strip()
                 ]
                 recommendation = (
-                    "Resolve Engineering Analysis / HO-007 open gap(s) before claiming SEND readiness: "
-                    + (", ".join(reasons[:4]) if reasons else "readiness is not clear")
+                    "Закройте открытые вопросы инженерного анализа перед подтверждением готовности архива проекта: "
+                    + (", ".join(reasons[:4]) if reasons else "готовность неясна")
                     + "."
                 )
                 if recommendation not in operator_recommendations:
@@ -654,7 +654,7 @@ def collect_health_report(zip_path: Path) -> HealthReport:
             perf_evidence_status = str(anim_summary.get("browser_perf_evidence_status") or "").strip()
             if perf_evidence_status and perf_evidence_status != "trace_bundle_ready":
                 perf_note = (
-                    "browser perf evidence is not trace_bundle_ready: "
+                    "данные производительности анимации не готовы к восстановлению из архива: "
                     f"{perf_evidence_status}"
                 )
                 if perf_note not in notes:
@@ -662,7 +662,7 @@ def collect_health_report(zip_path: Path) -> HealthReport:
             perf_compare_status = str(anim_summary.get("browser_perf_comparison_status") or "").strip()
             if perf_compare_status and perf_compare_status != "unchanged":
                 perf_compare_note = (
-                    "browser perf comparison status: "
+                    "состояние сравнения производительности анимации: "
                     f"{perf_compare_status}"
                 )
                 if perf_compare_note not in notes:
@@ -696,7 +696,7 @@ def collect_health_report(zip_path: Path) -> HealthReport:
 
     except Exception as e:
         ok = False
-        notes.append(f"failed to read zip: {type(e).__name__}: {e!s}")
+        notes.append(f"не удалось прочитать ZIP: {type(e).__name__}: {e!s}")
 
     return HealthReport(
         schema="health_report",
@@ -724,60 +724,60 @@ def render_health_report_md(rep: HealthReport) -> str:
     optimizer_scope_gate = dict(rep.signals.get("optimizer_scope_gate") or {})
     reload_inputs = list(anim.get("visual_reload_inputs") or [])
     lines = [
-        "# Health report",
+        "# Отчёт о состоянии проекта",
         "",
-        f"- Created: {rep.created_at}",
-        f"- ZIP: `{Path(rep.zip_path).name}`",
-        f"- OK: **{rep.ok}**",
+        f"- Сформировано: {rep.created_at}",
+        f"- Архив: `{Path(rep.zip_path).name}`",
+        f"- Успешно: **{rep.ok}**",
         "",
-        "## Artifacts",
-        f"- validation_report: {artifacts.get('validation_report')}",
-        f"- dashboard_report: {artifacts.get('dashboard_report')}",
-        f"- triage_report: {artifacts.get('triage_report')}",
-        f"- anim_diagnostics: {artifacts.get('anim_diagnostics')}",
-        f"- evidence_manifest: {artifacts.get('evidence_manifest')}",
-        f"- engineering_analysis_evidence: {artifacts.get('engineering_analysis_evidence')}",
-        f"- health_report_embedded: {artifacts.get('health_report_embedded')}",
-        f"- browser_perf_registry_snapshot: {artifacts.get('browser_perf_registry_snapshot')}",
-        f"- browser_perf_previous_snapshot: {artifacts.get('browser_perf_previous_snapshot')}",
-        f"- browser_perf_contract: {artifacts.get('browser_perf_contract')}",
-        f"- browser_perf_evidence_report: {artifacts.get('browser_perf_evidence_report')}",
-        f"- browser_perf_comparison_report: {artifacts.get('browser_perf_comparison_report')}",
-        f"- browser_perf_trace: {artifacts.get('browser_perf_trace')}",
-        f"- self_check_silent_warnings: {artifacts.get('self_check_silent_warnings')}",
+        "## Состав архива",
+        f"- Отчёт проверки: {artifacts.get('validation_report')}",
+        f"- Сводный HTML-отчёт: {artifacts.get('dashboard_report')}",
+        f"- Разбор замечаний: {artifacts.get('triage_report')}",
+        f"- Данные последней анимации: {artifacts.get('anim_diagnostics')}",
+        f"- Состав данных: {artifacts.get('evidence_manifest')}",
+        f"- Данные инженерного анализа: {artifacts.get('engineering_analysis_evidence')}",
+        f"- Отчёт состояния внутри архива: {artifacts.get('health_report_embedded')}",
+        f"- Снимок производительности анимации: {artifacts.get('browser_perf_registry_snapshot')}",
+        f"- Предыдущий снимок производительности: {artifacts.get('browser_perf_previous_snapshot')}",
+        f"- Условия проверки производительности: {artifacts.get('browser_perf_contract')}",
+        f"- Отчёт производительности: {artifacts.get('browser_perf_evidence_report')}",
+        f"- Сравнение производительности: {artifacts.get('browser_perf_comparison_report')}",
+        f"- Трасса производительности: {artifacts.get('browser_perf_trace')}",
+        f"- Тихие предупреждения самопроверки: {artifacts.get('self_check_silent_warnings')}",
     ]
 
     if latest_proof:
         lines += [
             "",
-            "## Latest integrity proof",
-            f"- status: `{latest_proof.get('status') or 'MISSING'}`",
-            f"- final_latest_zip_sha256: `{latest_proof.get('final_latest_zip_sha256') or '—'}`",
-            f"- final_original_zip_sha256: `{latest_proof.get('final_original_zip_sha256') or '—'}`",
-            f"- latest_sha_sidecar_matches: {latest_proof.get('latest_sha_sidecar_matches')}",
-            f"- latest_pointer_matches_original: {latest_proof.get('latest_pointer_matches_original')}",
-            f"- embedded_manifest_zip_sha256_scope: `{latest_proof.get('embedded_manifest_zip_sha256_scope') or '—'}`",
-            f"- embedded_manifest_stage: `{latest_proof.get('embedded_manifest_stage') or '—'}`",
-            f"- trigger: `{latest_proof.get('trigger') or '—'}`",
-            f"- collection_mode: `{latest_proof.get('collection_mode') or '—'}`",
-            f"- producer_warning_count: {latest_proof.get('producer_warning_count')}",
-            f"- warning_only_gaps_present: {latest_proof.get('warning_only_gaps_present')}",
-            f"- no_release_closure_claim: {latest_proof.get('no_release_closure_claim')}",
+            "## Проверка актуального архива",
+            f"- Состояние: `{latest_proof.get('status') or 'MISSING'}`",
+            f"- SHA актуального архива: `{latest_proof.get('final_latest_zip_sha256') or '—'}`",
+            f"- SHA исходного архива: `{latest_proof.get('final_original_zip_sha256') or '—'}`",
+            f"- SHA-файл совпадает: {latest_proof.get('latest_sha_sidecar_matches')}",
+            f"- Указатель ведёт на исходный архив: {latest_proof.get('latest_pointer_matches_original')}",
+            f"- Область SHA состава данных: `{latest_proof.get('embedded_manifest_zip_sha256_scope') or '—'}`",
+            f"- Этап состава данных: `{latest_proof.get('embedded_manifest_stage') or '—'}`",
+            f"- Причина запуска: `{latest_proof.get('trigger') or '—'}`",
+            f"- Режим сбора: `{latest_proof.get('collection_mode') or '—'}`",
+            f"- Предупреждений источников данных: {latest_proof.get('producer_warning_count')}",
+            f"- Есть предупреждающие разрывы: {latest_proof.get('warning_only_gaps_present')}",
+            f"- Финальное закрытие не заявлено: {latest_proof.get('no_release_closure_claim')}",
         ]
         for msg in [str(x) for x in (latest_proof.get("warnings") or []) if str(x).strip()][:5]:
-            lines.append(f"- warning: {msg}")
+            lines.append(f"- предупреждение: {msg}")
 
     if self_check_snapshot:
         lines += [
             "",
-            "## Self-check silent warnings snapshot",
-            f"- status: `{self_check_snapshot.get('status') or 'MISSING'}`",
-            f"- snapshot_only: {self_check_snapshot.get('snapshot_only')}",
-            f"- does_not_close_producer_warnings: {self_check_snapshot.get('does_not_close_producer_warnings')}",
-            f"- source_path: `{self_check_snapshot.get('source_path') or '—'}`",
+            "## Тихие предупреждения самопроверки",
+            f"- Состояние: `{self_check_snapshot.get('status') or 'MISSING'}`",
+            f"- Только снимок: {self_check_snapshot.get('snapshot_only')}",
+            f"- Не закрывает предупреждения источников: {self_check_snapshot.get('does_not_close_producer_warnings')}",
+            f"- Источник: `{self_check_snapshot.get('source_path') or '—'}`",
             f"- rc: {self_check_snapshot.get('rc')}",
-            f"- fail_count: {self_check_snapshot.get('fail_count')}",
-            f"- warn_count: {self_check_snapshot.get('warn_count')}",
+            f"- Ошибок: {self_check_snapshot.get('fail_count')}",
+            f"- Предупреждений: {self_check_snapshot.get('warn_count')}",
         ]
 
     if evidence_manifest:
@@ -785,43 +785,43 @@ def render_health_report_md(rep: HealthReport) -> str:
         missing_warnings = [str(x) for x in (evidence_manifest.get("missing_warnings") or []) if str(x).strip()]
         lines += [
             "",
-            "## Evidence manifest",
-            f"- collection_mode: `{evidence_manifest.get('collection_mode') or '—'}`",
-            f"- trigger: `{evidence_manifest.get('trigger') or '—'}`",
-            f"- evidence_manifest_hash: `{evidence_manifest.get('evidence_manifest_hash') or '—'}`",
-            f"- stage: `{evidence_manifest.get('finalization_stage') or evidence_manifest.get('stage') or '—'}`",
+            "## Состав данных",
+            f"- Режим сбора: `{evidence_manifest.get('collection_mode') or '—'}`",
+            f"- Причина запуска: `{evidence_manifest.get('trigger') or '—'}`",
+            f"- Метка состава данных: `{evidence_manifest.get('evidence_manifest_hash') or '—'}`",
+            f"- Этап: `{evidence_manifest.get('finalization_stage') or evidence_manifest.get('stage') or '—'}`",
             f"- zip_sha256: `{evidence_manifest.get('zip_sha256') or '—'}`",
-            f"- pb002_missing_required_count: `{evidence_manifest.get('pb002_missing_required_count')}`",
-            f"- missing_required_count: `{evidence_manifest.get('missing_required_count')}`",
-            f"- missing_optional_count: `{evidence_manifest.get('missing_optional_count')}`",
-            f"- analysis_handoff: `{analysis_handoff.get('status') or 'MISSING'}` / context=`{analysis_handoff.get('result_context_state') or 'MISSING'}`",
+            f"- Не хватает обязательных данных PB002: `{evidence_manifest.get('pb002_missing_required_count')}`",
+            f"- Не хватает обязательных данных: `{evidence_manifest.get('missing_required_count')}`",
+            f"- Не хватает необязательных данных: `{evidence_manifest.get('missing_optional_count')}`",
+            f"- Передача результата анализа: `{analysis_handoff.get('status') or 'MISSING'}` / данные=`{analysis_handoff.get('result_context_state') or 'MISSING'}`",
         ]
         for msg in missing_warnings[:10]:
-            lines.append(f"- missing_evidence: {msg}")
+            lines.append(f"- Нет данных: {msg}")
 
     if val:
         lines += [
             "",
-            "## Validation",
-            f"- ok: {val.get('ok')}",
-            f"- errors_count: {val.get('errors_count')}",
-            f"- warnings_count: {val.get('warnings_count')}",
+            "## Проверка архива",
+            f"- Успешно: {val.get('ok')}",
+            f"- Ошибок: {val.get('errors_count')}",
+            f"- Предупреждений: {val.get('warnings_count')}",
         ]
 
     if engineering:
         lines += [
             "",
-            "## Engineering analysis evidence",
-            f"- status: {engineering.get('status') or 'MISSING'}",
-            f"- readiness_status: {engineering.get('readiness_status') or 'MISSING'}",
-            f"- open_gap_status: {engineering.get('open_gap_status') or 'MISSING'}",
-            f"- no_release_closure_claim: {engineering.get('no_release_closure_claim')}",
-            f"- source_path: {engineering.get('source_path') or '—'}",
-            f"- evidence_manifest_hash: {engineering.get('evidence_manifest_hash') or '—'}",
-            f"- analysis_status: {engineering.get('analysis_status') or '—'}",
-            f"- influence_status: {engineering.get('influence_status') or '—'}",
-            f"- calibration_status: {engineering.get('calibration_status') or '—'}",
-            f"- sensitivity_row_count: {engineering.get('sensitivity_row_count')}",
+            "## Данные инженерного анализа",
+            f"- Состояние: {engineering.get('status') or 'MISSING'}",
+            f"- Готовность: {engineering.get('readiness_status') or 'MISSING'}",
+            f"- Открытые вопросы: {engineering.get('open_gap_status') or 'MISSING'}",
+            f"- Финальное закрытие не заявлено: {engineering.get('no_release_closure_claim')}",
+            f"- Источник: {engineering.get('source_path') or '—'}",
+            f"- Метка состава данных: {engineering.get('evidence_manifest_hash') or '—'}",
+            f"- Анализ: {engineering.get('analysis_status') or '—'}",
+            f"- Влияние: {engineering.get('influence_status') or '—'}",
+            f"- Калибровка: {engineering.get('calibration_status') or '—'}",
+            f"- Строк чувствительности: {engineering.get('sensitivity_row_count')}",
         ]
         open_gap_reasons = [
             str(item).strip()
@@ -829,120 +829,120 @@ def render_health_report_md(rep: HealthReport) -> str:
             if str(item).strip()
         ]
         if open_gap_reasons:
-            lines.append(f"- open_gap_reasons: {', '.join(open_gap_reasons[:8])}")
+            lines.append(f"- Причины открытых вопросов: {', '.join(open_gap_reasons[:8])}")
         requirements = dict(engineering.get("handoff_requirements") or {})
         if requirements:
             lines += [
-                f"- handoff_contract_status: {requirements.get('contract_status') or '—'}",
-                f"- handoff_required_path: `{requirements.get('required_contract_path') or '—'}`",
-                f"- handoff_missing_fields: {', '.join(str(x) for x in (requirements.get('missing_fields') or [])) or '—'}",
+                f"- Состояние передачи данных: {requirements.get('contract_status') or '—'}",
+                f"- Обязательный файл передачи: `{requirements.get('required_contract_path') or '—'}`",
+                f"- Не хватает полей передачи: {', '.join(str(x) for x in (requirements.get('missing_fields') or [])) or '—'}",
             ]
         readiness = dict(engineering.get("selected_run_candidate_readiness") or {})
         if readiness:
             lines += [
-                f"- selected_run_candidate_count: {engineering.get('selected_run_candidate_count')}",
-                f"- selected_run_ready_candidate_count: {engineering.get('selected_run_ready_candidate_count')}",
-                f"- selected_run_missing_inputs_candidate_count: {engineering.get('selected_run_missing_inputs_candidate_count')}",
+                f"- Кандидатов выбранного запуска: {engineering.get('selected_run_candidate_count')}",
+                f"- Готовых кандидатов: {engineering.get('selected_run_ready_candidate_count')}",
+                f"- Кандидатов без входных данных: {engineering.get('selected_run_missing_inputs_candidate_count')}",
             ]
 
     if optimizer_scope:
         lines += [
             "",
-            "## Distributed optimization",
-            f"- status: {optimizer_scope.get('status') or '—'}",
-            f"- scope_gate: `{optimizer_scope_gate.get('release_gate') or '—'}`",
-            f"- scope_gate_reason: `{optimizer_scope_gate.get('release_gate_reason') or '—'}`",
-            f"- scope_release_risk: `{optimizer_scope_gate.get('release_risk')}`",
+            "## Оптимизация",
+            f"- Состояние: {optimizer_scope.get('status') or '—'}",
+            f"- Допуск области: `{optimizer_scope_gate.get('release_gate') or '—'}`",
+            f"- Причина допуска: `{optimizer_scope_gate.get('release_gate_reason') or '—'}`",
+            f"- Риск выпуска: `{optimizer_scope_gate.get('release_risk')}`",
             (
-                f"- progress: completed={optimizer_scope.get('completed')} / in_flight={optimizer_scope.get('in_flight')} "
-                f"/ cached={optimizer_scope.get('cached_hits')} / duplicates={optimizer_scope.get('duplicates_skipped')}"
+                f"- Ход расчёта: завершено={optimizer_scope.get('completed')} / выполняется={optimizer_scope.get('in_flight')} "
+                f"/ из кэша={optimizer_scope.get('cached_hits')} / пропущено дублей={optimizer_scope.get('duplicates_skipped')}"
             ),
-            f"- Problem scope: `{optimizer_scope.get('problem_hash_short') or optimizer_scope.get('problem_hash') or '—'}`",
-            f"- Hash mode: `{optimizer_scope.get('problem_hash_mode') or '—'}`",
+            f"- Область задачи: `{optimizer_scope.get('problem_hash_short') or optimizer_scope.get('problem_hash') or '—'}`",
+            f"- Режим хэша: `{optimizer_scope.get('problem_hash_mode') or '—'}`",
         ]
         full_problem_hash = str(optimizer_scope.get("problem_hash") or "")
         short_problem_hash = str(optimizer_scope.get("problem_hash_short") or "")
         if full_problem_hash and short_problem_hash and full_problem_hash != short_problem_hash:
-            lines.append(f"- problem_hash: `{full_problem_hash}`")
-        lines.append(f"- scope_sync_ok: `{optimizer_scope.get('scope_sync_ok')}`")
+            lines.append(f"- Полный ключ области: `{full_problem_hash}`")
+        lines.append(f"- Синхронизация области: `{optimizer_scope.get('scope_sync_ok')}`")
         for issue in list(optimizer_scope.get("issues") or [])[:5]:
-            lines.append(f"- scope_issue: {issue}")
+            lines.append(f"- Замечание области: {issue}")
 
     if anim:
         lines += [
             "",
-            "## Anim latest diagnostics",
-            f"- source: {anim.get('source') or '—'}",
-            f"- available: {anim.get('available')}",
-            f"- visual_cache_token: `{anim.get('visual_cache_token') or '—'}`",
-            f"- visual_reload_inputs: {', '.join(str(x) for x in reload_inputs) if reload_inputs else '—'}",
-            f"- pointer_sync_ok: {anim.get('pointer_sync_ok')}",
-            f"- reload_inputs_sync_ok: {anim.get('reload_inputs_sync_ok')}",
-            f"- npz_path_sync_ok: {anim.get('npz_path_sync_ok')}",
-            f"- npz_path: `{anim.get('npz_path') or '—'}`",
-            f"- updated_utc: {anim.get('updated_utc') or '—'}",
-            f"- scenario_kind: {anim.get('scenario_kind') or '—'}",
-            f"- ring_closure: policy={anim.get('ring_closure_policy') or '—'} / applied={anim.get('ring_closure_applied')} / seam_open={anim.get('ring_seam_open')} / seam_max_jump_m={anim.get('ring_seam_max_jump_m')} / raw_seam_max_jump_m={anim.get('ring_raw_seam_max_jump_m')}",
-            f"- usable_from_bundle: {anim.get('usable_from_bundle')}",
-            f"- pointer_json_in_bundle: {anim.get('pointer_json_in_bundle')}",
-            f"- npz_path_in_bundle: {anim.get('npz_path_in_bundle')}",
-            f"- browser_perf_status: {anim.get('browser_perf_status') or '—'} / level={anim.get('browser_perf_level') or '—'}",
-            f"- browser_perf_evidence_status: {anim.get('browser_perf_evidence_status') or '—'} / level={anim.get('browser_perf_evidence_level') or '—'}",
-            f"- browser_perf_bundle_ready: {anim.get('browser_perf_bundle_ready')}",
-            f"- browser_perf_snapshot_contract_match: {anim.get('browser_perf_snapshot_contract_match')}",
-            f"- browser_perf_comparison_status: {anim.get('browser_perf_comparison_status') or '—'} / level={anim.get('browser_perf_comparison_level') or '—'}",
-            f"- browser_perf_comparison_ready: {anim.get('browser_perf_comparison_ready')}",
-            f"- browser_perf_comparison_changed: {anim.get('browser_perf_comparison_changed')}",
-            f"- browser_perf_comparison_delta_total_wakeups: {anim.get('browser_perf_comparison_delta_total_wakeups')}",
-            f"- browser_perf_comparison_delta_total_duplicate_guard_hits: {anim.get('browser_perf_comparison_delta_total_duplicate_guard_hits')}",
+            "## Последняя анимация",
+            f"- Источник: {anim.get('source') or '—'}",
+            f"- Доступна: {anim.get('available')}",
+            f"- Токен визуального кэша: `{anim.get('visual_cache_token') or '—'}`",
+            f"- Входные данные перезагрузки: {', '.join(str(x) for x in reload_inputs) if reload_inputs else '—'}",
+            f"- Указатель синхронизирован: {anim.get('pointer_sync_ok')}",
+            f"- Входные данные синхронизированы: {anim.get('reload_inputs_sync_ok')}",
+            f"- Файл анимации синхронизирован: {anim.get('npz_path_sync_ok')}",
+            f"- Файл анимации: `{anim.get('npz_path') or '—'}`",
+            f"- Обновлено UTC: {anim.get('updated_utc') or '—'}",
+            f"- Тип сценария: {anim.get('scenario_kind') or '—'}",
+            f"- Замыкание кольца: режим={anim.get('ring_closure_policy') or '—'} / применено={anim.get('ring_closure_applied')} / шов открыт={anim.get('ring_seam_open')} / скачок шва, м={anim.get('ring_seam_max_jump_m')} / исходный скачок, м={anim.get('ring_raw_seam_max_jump_m')}",
+            f"- Восстанавливается из архива: {anim.get('usable_from_bundle')}",
+            f"- Указатель есть в архиве: {anim.get('pointer_json_in_bundle')}",
+            f"- Файл анимации есть в архиве: {anim.get('npz_path_in_bundle')}",
+            f"- Состояние производительности: {anim.get('browser_perf_status') or '—'} / уровень={anim.get('browser_perf_level') or '—'}",
+            f"- Данные производительности: {anim.get('browser_perf_evidence_status') or '—'} / уровень={anim.get('browser_perf_evidence_level') or '—'}",
+            f"- Данные производительности в архиве: {anim.get('browser_perf_bundle_ready')}",
+            f"- Снимок производительности совпадает с условиями: {anim.get('browser_perf_snapshot_contract_match')}",
+            f"- Состояние сравнения производительности: {anim.get('browser_perf_comparison_status') or '—'} / уровень={anim.get('browser_perf_comparison_level') or '—'}",
+            f"- Сравнение производительности готово: {anim.get('browser_perf_comparison_ready')}",
+            f"- Сравнение изменилось: {anim.get('browser_perf_comparison_changed')}",
+            f"- Изменение пробуждений: {anim.get('browser_perf_comparison_delta_total_wakeups')}",
+            f"- Изменение защиты от дублей: {anim.get('browser_perf_comparison_delta_total_duplicate_guard_hits')}",
         ]
         anim_issues = list(anim.get("issues") or [])
         if anim_issues:
-            lines += ["", "### Anim latest issues"] + [f"- {x}" for x in anim_issues]
+            lines += ["", "### Замечания по последней анимации"] + [f"- {x}" for x in anim_issues]
     if ring_closure:
         lines += [
             "",
-            "## Ring closure",
-            f"- severity: {ring_closure.get('severity') or 'missing'}",
-            f"- summary: {ring_closure.get('headline') or '—'}",
-            f"- policy: {ring_closure.get('closure_policy') or '—'} / applied={ring_closure.get('closure_applied')} / seam_open={ring_closure.get('seam_open')}",
-            f"- seam_jump_m: cooked={ring_closure.get('seam_max_jump_m')} / raw={ring_closure.get('raw_seam_max_jump_m')}",
+            "## Замыкание кольца",
+            f"- Важность: {ring_closure.get('severity') or 'missing'}",
+            f"- Сводка: {ring_closure.get('headline') or '—'}",
+            f"- Режим: {ring_closure.get('closure_policy') or '—'} / применено={ring_closure.get('closure_applied')} / шов открыт={ring_closure.get('seam_open')}",
+            f"- Скачок шва, м: обработанный={ring_closure.get('seam_max_jump_m')} / исходный={ring_closure.get('raw_seam_max_jump_m')}",
         ]
         for flag in list(ring_closure.get("red_flags") or [])[:3]:
-            lines.append(f"- red_flag: {flag}")
+            lines.append(f"- Предупреждение: {flag}")
 
     if mnemo:
         lines += [
             "",
-            "## Desktop Mnemo events",
-            f"- severity: {mnemo.get('severity') or 'missing'}",
-            f"- summary: {mnemo.get('headline') or '—'}",
-            f"- event_log: {mnemo.get('ref') or '—'} / exists={mnemo.get('exists')} / schema={mnemo.get('schema_version') or '—'} / updated_utc={mnemo.get('updated_utc') or '—'}",
-            f"- current_mode: {mnemo.get('current_mode') or '—'}",
-            f"- event_state: total={mnemo.get('event_count')} / active={mnemo.get('active_latch_count')} / acked={mnemo.get('acknowledged_latch_count')}",
+            "## События мнемосхемы",
+            f"- Важность: {mnemo.get('severity') or 'missing'}",
+            f"- Сводка: {mnemo.get('headline') or '—'}",
+            f"- Журнал событий: {mnemo.get('ref') or '—'} / есть={mnemo.get('exists')} / схема={mnemo.get('schema_version') or '—'} / обновлено UTC={mnemo.get('updated_utc') or '—'}",
+            f"- Текущий режим: {mnemo.get('current_mode') or '—'}",
+            f"- Состояние событий: всего={mnemo.get('event_count')} / активно={mnemo.get('active_latch_count')} / принято={mnemo.get('acknowledged_latch_count')}",
         ]
         recent_titles = [str(x) for x in (mnemo.get("recent_titles") or []) if str(x).strip()]
         if recent_titles:
-            lines.append(f"- recent_titles: {' | '.join(recent_titles[:3])}")
+            lines.append(f"- Последние события: {' | '.join(recent_titles[:3])}")
         for flag in list(mnemo.get("red_flags") or [])[:3]:
-            lines.append(f"- red_flag: {flag}")
+            lines.append(f"- Предупреждение: {flag}")
 
     if operator_recommendations:
-        lines += ["", "## Recommended actions"] + [f"{idx}. {item}" for idx, item in enumerate(operator_recommendations, start=1)]
+        lines += ["", "## Рекомендуемые действия"] + [f"{idx}. {item}" for idx, item in enumerate(operator_recommendations, start=1)]
 
     geom = dict(rep.signals.get("geometry_acceptance") or {})
     if geom:
-        lines += ["", "## Geometry acceptance"] + _format_geometry_acceptance_summary_lines_best_effort(geom)
+        lines += ["", "## Проверка геометрии"] + _format_geometry_acceptance_summary_lines_best_effort(geom)
 
     lines += [
         "",
-        "## Signals",
+        "## Машиночитаемые данные",
         "```json",
         json.dumps(rep.signals, ensure_ascii=False, indent=2),
         "```",
     ]
     if rep.notes:
-        lines += ["", "## Notes"] + [f"- {n}" for n in rep.notes]
+        lines += ["", "## Примечания"] + [f"- {n}" for n in rep.notes]
     return "\n".join(lines) + "\n"
 
 

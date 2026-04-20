@@ -2009,9 +2009,9 @@ class DesktopEngineeringAnalysisRuntime:
             EngineeringAnalysisPipelineRow(
                 key="handoff_ho009_diagnostics",
                 section="handoffs_evidence",
-                title="Материалы проверки и отправки",
+                title="Материалы проверки проекта",
                 status=snapshot.diagnostics_evidence_manifest_status,
-                detail="Актуальность материалов инженерного анализа для проверки проекта и отправки.",
+                detail="Актуальность материалов инженерного анализа для проверки проекта.",
                 path=snapshot.diagnostics_evidence_manifest_path or (
                     self.send_bundles_dir / LATEST_ENGINEERING_ANALYSIS_EVIDENCE_MANIFEST
                 ),

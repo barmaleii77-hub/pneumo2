@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Точка входа desktop-отправки результатов.
+"""Точка входа desktop-копирования архива проекта.
 
 Совместимость оставлена намеренно:
 - hosted shell по-прежнему импортирует `SendResultsGUI`;
-- сценарий отправки по-прежнему держит одно главное действие копирования архива;
+- сценарий по-прежнему держит одно главное действие копирования архива;
 - состояние буфера обмена сохраняется в `latest_send_bundle_clipboard_status.json`.
 
-Реальное окно живёт в едином desktop-окне диагностики и отправки, чтобы
+Реальное окно живёт в едином desktop-окне проверки проекта и архива, чтобы
 оператор собирал архив, читал сводку, проверял архив, смотрел состояние проекта
-и отправлял результаты из одного последовательного сценария.
+и копировал готовый архив вручную из одного последовательного сценария.
 """
 
 from __future__ import annotations
@@ -84,9 +84,9 @@ def _is_full_file_clipboard_success(ok: bool, msg: str) -> bool:
 
 
 class SendResultsGUI(DesktopDiagnosticsCenter):
-    READY_COPIED_TITLE = "Архив для отправки в чат готов и уже скопирован в буфер."
+    READY_COPIED_TITLE = "Архив проекта готов и уже скопирован в буфер обмена."
     CLIPBOARD_STATUS_JSON = "latest_send_bundle_clipboard_status.json"
-    ANIM_POINTER_CAPTION = "Диагностика последней анимации:"
+    ANIM_POINTER_CAPTION = "Данные последней анимации:"
 
     def __init__(self, root: tk.Misc, hosted: bool = False) -> None:
         reuse_latest = str(os.environ.get("PNEUMO_SEND_RESULTS_REUSE_LATEST", "0")).strip() == "1"
@@ -98,7 +98,7 @@ class SendResultsGUI(DesktopDiagnosticsCenter):
             auto_build_bundle=(not reuse_latest) or (not bundle_state.latest_zip_path),
         )
         if not self._hosted:
-            self.root.title(f"Отправка результатов — PneumoApp ({RELEASE})")
+            self.root.title(f"Сохранение архива проекта - PneumoApp ({RELEASE})")
 
         self.send_title_var.set(self.READY_COPIED_TITLE if self._clipboard_ok else self.send_title_var.get())
 
@@ -127,7 +127,7 @@ class SendResultsGUI(DesktopDiagnosticsCenter):
     def _on_bundle_build_finished(self, ok: bool, zip_path: str, message: str) -> None:
         if not ok:
             try:
-                _safe_write_text(_log_dir() / "send_results_gui_error.log", str(message or "Не удалось собрать архив отправки"))
+                _safe_write_text(_log_dir() / "send_results_gui_error.log", str(message or "Не удалось сохранить архив проекта"))
             except Exception:
                 pass
         super()._on_bundle_build_finished(ok, zip_path, message)

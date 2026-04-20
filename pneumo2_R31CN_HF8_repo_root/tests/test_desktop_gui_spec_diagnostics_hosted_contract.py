@@ -30,12 +30,17 @@ def test_hosted_diagnostics_workspace_page_builds_offscreen_and_refreshes() -> N
         page.refresh_view()
         app.processEvents()
 
-        assert page.bundle_box.title() == "Текущее состояние архива для отправки"
-        assert page.run_box.title() == "Последний сбор архива"
-        assert page.check_box.title() == "Проверка архива для отправки"
+        assert page.bundle_box.title() == "Текущее состояние архива проекта"
+        assert page.run_box.title() == "Последнее сохранение архива"
+        assert page.check_box.title() == "Проверка архива проекта"
         assert page.baseline_box.title() == "Опорный прогон"
         assert page.actions_box.title() == "Действия"
         assert page.log_box.title() == "Журнал / последние сообщения"
+        assert page.progress_bar.format() == "Готово"
+        assert page.progress_bar.minimum() == 0
+        assert page.progress_bar.maximum() == 100
+        assert page.progress_bar.value() == 100
+        assert page.send_button.text() == "Скопировать архив"
         assert "Данные берутся из состояния проверки проекта" in page.source_label.text()
     finally:
         page.close()
@@ -64,6 +69,34 @@ def test_hosted_diagnostics_page_routes_send_and_legacy_actions_through_panel() 
 
         assert "pneumo_solver_ui.tools.send_results_gui" in spawns
         assert "pneumo_solver_ui.tools.desktop_diagnostics_center" in spawns
+    finally:
+        page.close()
+        page.deleteLater()
+        app.processEvents()
+
+
+def test_hosted_diagnostics_page_shows_long_action_progress_on_same_surface() -> None:
+    app = _app()
+    workspace = build_workspace_map()["diagnostics"]
+    page = DiagnosticsWorkspacePage(workspace, repo_root=ROOT)
+    try:
+        page._on_controller_status("Идёт сохранение архива проекта...", True)
+        app.processEvents()
+
+        assert page.status_label.text() == "Идёт сохранение архива проекта..."
+        assert page.progress_bar.minimum() == 0
+        assert page.progress_bar.maximum() == 0
+        assert page.progress_bar.format() == "Выполняется"
+        assert page.progress_note.text() == "Идёт сохранение архива проекта..."
+
+        page._on_controller_status("Архив проекта сохранён.", False)
+        app.processEvents()
+
+        assert page.progress_bar.minimum() == 0
+        assert page.progress_bar.maximum() == 100
+        assert page.progress_bar.value() == 100
+        assert page.progress_bar.format() == "Готово"
+        assert page.progress_note.text() == "Архив проекта сохранён."
     finally:
         page.close()
         page.deleteLater()
@@ -156,11 +189,13 @@ def test_main_window_routes_diagnostics_baseline_link_to_restore_guard(
 
 def test_diagnostics_fallback_command_remains_available() -> None:
     commands = build_command_map()
+    assert commands["diagnostics.send_results"].title == "Скопировать архив"
     assert commands["diagnostics.legacy_center.open"].kind == "launch_module"
     assert commands["diagnostics.legacy_center.open"].module == "pneumo_solver_ui.tools.desktop_diagnostics_center"
-    assert commands["diagnostics.legacy_center.open"].title == "Открыть проверку и отправку отдельным окном"
+    assert commands["diagnostics.legacy_center.open"].title == "Расширенная проверка проекта"
     assert "центр диагностики" not in commands["diagnostics.legacy_center.open"].title.lower()
     assert "диагностику" not in commands["diagnostics.legacy_center.open"].title.lower()
+    assert "отдельным окном" not in commands["diagnostics.legacy_center.open"].title.lower()
 
 
 def test_hosted_diagnostics_visible_text_avoids_stale_center_labels() -> None:

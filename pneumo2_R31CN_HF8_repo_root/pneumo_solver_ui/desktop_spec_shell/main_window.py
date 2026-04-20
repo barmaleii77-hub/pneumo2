@@ -37,6 +37,7 @@ from .workspace_pages import (
     InputWorkspacePage,
     OptimizationWorkspacePage,
     ResultsWorkspacePage,
+    SuiteWorkspacePage,
 )
 
 try:
@@ -275,7 +276,7 @@ class OverviewPage(QtWidgets.QWidget):
         layout.addWidget(title)
 
         subtitle = QtWidgets.QLabel(
-            "Главное окно ведёт по последовательности: исходные данные -> сценарии -> набор испытаний -> опорный прогон -> оптимизация -> анализ -> анимация -> проверка и отправка."
+            "Порядок работы: исходные данные -> сценарии -> набор испытаний -> опорный прогон -> оптимизация -> анализ -> анимация -> проверка проекта."
         )
         subtitle.setWordWrap(True)
         layout.addWidget(subtitle)
@@ -357,7 +358,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
             point_size = self.font().pointSize()
             self.setFont(QtGui.QFont(self._operator_font_family, point_size if point_size > 0 else 10))
 
-        self.setWindowTitle(f"PneumoApp - Главное окно приложения ({RELEASE})")
+        self.setWindowTitle(f"PneumoApp - Панель восстановления окон ({RELEASE})")
         self.resize(1680, 980)
         self.setMinimumSize(1320, 840)
         self._build_ui()
@@ -391,7 +392,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         self.project_label = QtWidgets.QLabel(str(self.repo_root))
         self.project_label.setStyleSheet("color: #576574;")
         row1.addWidget(self.project_label, 1)
-        self.workspace_badge = QtWidgets.QLabel("Сейчас открыт рабочий шаг «Панель проекта»")
+        self.workspace_badge = QtWidgets.QLabel("Текущий рабочий шаг: Панель проекта")
         row1.addWidget(self.workspace_badge)
         header_layout.addLayout(row1)
 
@@ -405,7 +406,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
             QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon
         )
         self.command_search.lineEdit().setPlaceholderText(
-            "Быстрый поиск окон и действий"
+            "Быстрый поиск действий"
         )
         self.command_search.lineEdit().textEdited.connect(self._refresh_search_results)
         self.command_search.lineEdit().returnPressed.connect(
@@ -415,20 +416,20 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         _apply_element_contract(self.command_search, "SH-CMD-SEARCH")
         self.command_search.setAccessibleName("Быстрый поиск")
         self.command_search.setAccessibleDescription(
-            "Поиск по рабочим шагам, действиям, проверке, отправке и файлам."
+            "Поиск по рабочим шагам, действиям, проверке проекта, архиву и файлам."
         )
         self.command_search.setToolTip(
-            "Ctrl+K. Найдите окно, действие, проверку, отправку или файл."
+            "Ctrl+K. Найдите окно, действие, проверку проекта, архив или файл."
         )
         self.command_search.setWhatsThis("")
         row2.addWidget(self.command_search, 1)
 
-        self.primary_action_button = QtWidgets.QPushButton("Главное действие")
+        self.primary_action_button = QtWidgets.QPushButton("Действие шага")
         self.primary_action_button.clicked.connect(self._run_primary_action)
         _apply_element_contract(self.primary_action_button, "SH-PRIMARY-ACTION")
         row2.addWidget(self.primary_action_button)
 
-        self.diagnostics_button = QtWidgets.QPushButton("Собрать архив для отправки")
+        self.diagnostics_button = QtWidgets.QPushButton("Сохранить архив проекта")
         self.diagnostics_button.clicked.connect(
             lambda: self.run_command("diagnostics.collect_bundle")
         )
@@ -439,7 +440,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         compare_button.clicked.connect(lambda: self.run_command("results.compare.open"))
         row2.addWidget(compare_button)
 
-        animator_button = QtWidgets.QPushButton("Открыть аниматор")
+        animator_button = QtWidgets.QPushButton("Анимировать результат")
         animator_button.clicked.connect(
             lambda: self.run_command("animation.animator.open")
         )
@@ -451,7 +452,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         info_layout.setContentsMargins(0, 0, 0, 0)
         info_layout.setSpacing(4)
         self.contract_label = QtWidgets.QLabel(
-            "Цели и ограничения: основные показатели расчёта | проверка и отправка всегда видимы"
+            "Цели и ограничения: основные показатели расчёта | проверка проекта всегда видима"
         )
         self.contract_label.setWordWrap(True)
         self.contract_label.setMinimumHeight(30)
@@ -479,7 +480,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
 
     def _build_menu(self) -> None:
         file_menu = self.menuBar().addMenu("Файл")
-        open_legacy = file_menu.addAction("Открыть рабочие окна во вкладках")
+        open_legacy = file_menu.addAction("Рабочие окна во вкладках")
         open_legacy.triggered.connect(lambda: self.run_command("tools.legacy_shell.open"))
         file_menu.addSeparator()
         exit_action = file_menu.addAction("Выход")
@@ -492,7 +493,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
                 lambda _checked=False, wid=workspace.workspace_id: self.open_workspace(wid)
             )
 
-        diagnostics_menu = self.menuBar().addMenu("Проверка и отправка")
+        diagnostics_menu = self.menuBar().addMenu("Проверка проекта")
         for command_id in (
             "diagnostics.collect_bundle",
             "diagnostics.verify_bundle",
@@ -504,13 +505,14 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
                 lambda _checked=False, cid=command.command_id: self.run_command(cid)
             )
         diagnostics_menu.addSeparator()
-        legacy_action = diagnostics_menu.addAction("Открыть проверку и отправку отдельным окном")
+        legacy_command = self.command_by_id["diagnostics.legacy_center.open"]
+        legacy_action = diagnostics_menu.addAction(legacy_command.title)
         legacy_action.triggered.connect(
             lambda: self.run_command("diagnostics.legacy_center.open")
         )
 
         help_menu = self.menuBar().addMenu("Справка")
-        about_action = help_menu.addAction("О главном окне приложения")
+        about_action = help_menu.addAction("О рабочем месте")
         about_action.triggered.connect(self._show_about_dialog)
 
     def _build_left_dock(self) -> None:
@@ -565,7 +567,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         status.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.setStatusBar(status)
         self.status_primary_label = QtWidgets.QLabel("Готово")
-        self.status_mode_label = QtWidgets.QLabel("Классическое главное окно")
+        self.status_mode_label = QtWidgets.QLabel("Панель восстановления окон")
         self.status_progress = QtWidgets.QProgressBar()
         self.status_progress.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.status_progress.setRange(0, 100)
@@ -640,7 +642,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
             self._run_primary_action,
         )
         self._register_shortcut(
-            self._keyboard_shortcut_by_name.get("Собрать архив для отправки", "Ctrl+Shift+D"),
+            self._keyboard_shortcut_by_name.get("Сохранить архив проекта", "Ctrl+Shift+D"),
             lambda: self.run_command("diagnostics.collect_bundle"),
         )
         self._register_shortcut(
@@ -753,7 +755,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         if command.kind == "open_workspace" and command.target_workspace_id:
             workspace = self.workspace_by_id.get(command.target_workspace_id)
             if workspace is not None:
-                return f"Открыть: {workspace.title}"
+                return f"Перейти: {workspace.title}"
         return command.title
 
     def _populate_pinned_actions(self) -> None:
@@ -812,6 +814,13 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
             )
         if workspace.workspace_id == "baseline_run":
             return BaselineWorkspacePage(
+                workspace,
+                actions,
+                self.run_command,
+                repo_root=self.repo_root,
+            )
+        if workspace.workspace_id == "test_matrix":
+            return SuiteWorkspacePage(
                 workspace,
                 actions,
                 self.run_command,
@@ -924,7 +933,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
     def _update_primary_action(self, workspace: DesktopWorkspaceSpec) -> None:
         self._primary_command_id = None
         self.primary_action_button.setEnabled(False)
-        self.primary_action_button.setText("Главное действие")
+        self.primary_action_button.setText("Действие шага")
         for command_id in workspace.quick_action_ids:
             command = self.command_by_id.get(command_id)
             if command is None:
@@ -951,7 +960,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         workspace = self.workspace_by_id.get(command.workspace_id)
         workspace_title = workspace.title if workspace is not None else command.workspace_id
         self.set_shell_status(
-            f"Действие пока недоступно в окне: {workspace_title}",
+                f"Действие пока недоступно в рабочем шаге: {workspace_title}",
             busy=False,
             state_id="STATE-ERROR",
         )
@@ -966,11 +975,11 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         refresh = getattr(page, "refresh_view", None)
         if callable(refresh):
             refresh()
-        self.workspace_badge.setText(f"Сейчас открыт рабочий шаг «{workspace.title}»")
+        self.workspace_badge.setText(f"Текущий рабочий шаг: {workspace.title}")
         self.contract_label.setText(f"Краткая сводка. {workspace.summary}")
         self.warning_label.setText(f"Обязательное условие. {workspace.hard_gate}")
         self.set_shell_status(
-            f"Открыт рабочий шаг «{workspace.title}»",
+            f"Текущий рабочий шаг: {workspace.title}",
             busy=False,
             state_id="STATE-VALID",
         )
@@ -1041,9 +1050,9 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
     def _show_about_dialog(self) -> None:
         QtWidgets.QMessageBox.information(
             self,
-            "О главном окне приложения",
+            "О рабочем месте",
             (
-                "Главное окно собирает основные инженерные окна приложения в одном классическом интерфейсе.\n\n"
+                "Рабочее место собирает основные инженерные окна приложения в одном классическом интерфейсе.\n\n"
                 "Рабочие участки открываются из общего меню и остаются доступными без скрытых шагов."
             ),
         )

@@ -9,7 +9,7 @@ import sys
 
 def _show_missing_pyside6_message(exc: Exception) -> int:
     message = (
-        "PySide6 не установлен. Главное окно приложения требует PySide6.\n\n"
+        "PySide6 не установлен. Панель восстановления окон требует PySide6.\n\n"
         "Установите зависимость и повторите запуск.\n"
         f"Подробность: {exc}"
     )

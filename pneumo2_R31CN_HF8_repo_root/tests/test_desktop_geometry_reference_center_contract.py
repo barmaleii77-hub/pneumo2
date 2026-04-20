@@ -1205,10 +1205,10 @@ def test_desktop_geometry_reference_center_keeps_tabbed_desktop_workspace_contra
     assert 'text="Выбрать файл..."' in tool_src
     assert 'text="Актуальность файла:"' in tool_src
     assert "Актуальность файла анимации: последний файл ещё не проверен." in tool_src
-    assert 'text="Подготовить данные для отправки"' in tool_src
-    assert "Подготовить данные справочника для диагностики и отправки." in tool_src
+    assert 'text="Сохранить данные для проверки проекта"' in tool_src
+    assert "Сохранить данные справочника для проверки проекта." in tool_src
     assert "Справочник передаёт краткую сводку по данным" in tool_src
-    assert "не собирает архив отправки" in tool_src
+    assert "не сохраняет архив проекта" in tool_src
     assert "def _browse_artifact_path(self) -> None:" in tool_src
     assert "def _use_latest_artifact(self) -> None:" in tool_src
     assert "def _artifact_context(self):" in tool_src

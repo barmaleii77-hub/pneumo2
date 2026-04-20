@@ -326,7 +326,7 @@ def seed_default_chat_knowledge_base() -> dict[str, Any]:
         ),
         (
             "Главные операторские сценарии должны жить в GUI.",
-            "Состав: главное окно приложения; ввод исходных данных; настройка расчёта; редактор и генератор сценариев колец; compare viewer; desktop mnemo; desktop animator; optimizer center; diagnostics/send bundle; validation/results/test center; geometry/reference center; engineering analysis/calibration/influence.",
+            "Состав: рабочее место инженера; ввод исходных данных; настройка расчёта; редактор и генератор сценариев колец; Compare Viewer; Desktop Mnemo; Desktop Animator; центр оптимизации; проверка проекта и архив проекта; центр испытаний и результатов; справочники геометрии; инженерный анализ, калибровка и влияние.",
         ),
         (
             "Архитектура GUI должна быть модульной и пригодной для параллельной разработки разными чатами без пересечения по тем же файлам.",
@@ -364,7 +364,7 @@ def seed_default_chat_knowledge_base() -> dict[str, Any]:
         ("GUI_MIGRATION_CHAT_PROMPTS.md", "GUI-only пакет миграции из WEB в desktop GUI по отдельным направлениям.", "GUI_MIGRATION_CHAT_PROMPTS.md", "актуален"),
         ("PARALLEL_CHAT_PROMPTS_GUI_AND_WEB_2026-04-12.md", "Исторический пакет параллельной разработки GUI и WEB. После решения о GUI-first WEB-часть использовать только как reference.", "PARALLEL_CHAT_PROMPTS_GUI_AND_WEB_2026-04-12.md", "частично актуален"),
         ("gui_chat_prompts/00_INDEX.md", "Индекс prompt-файлов для параллельных GUI-чатов.", "gui_chat_prompts/00_INDEX.md", "актуален"),
-        ("gui_chat_prompts/01_MAIN_WINDOW.md", "Главное окно приложения.", "gui_chat_prompts/01_MAIN_WINDOW.md", "актуален"),
+        ("gui_chat_prompts/01_MAIN_WINDOW.md", "Рабочее место инженера.", "gui_chat_prompts/01_MAIN_WINDOW.md", "актуален"),
         ("gui_chat_prompts/02_INPUT_DATA.md", "Ввод исходных данных.", "gui_chat_prompts/02_INPUT_DATA.md", "актуален"),
         ("gui_chat_prompts/03_RUN_SETUP.md", "Настройка расчёта.", "gui_chat_prompts/03_RUN_SETUP.md", "актуален"),
         ("gui_chat_prompts/04_RING_EDITOR.md", "Редактор и генератор сценариев колец.", "gui_chat_prompts/04_RING_EDITOR.md", "актуален"),
@@ -372,7 +372,7 @@ def seed_default_chat_knowledge_base() -> dict[str, Any]:
         ("gui_chat_prompts/06_DESKTOP_MNEMO.md", "Desktop mnemo.", "gui_chat_prompts/06_DESKTOP_MNEMO.md", "актуален"),
         ("gui_chat_prompts/07_DESKTOP_ANIMATOR.md", "Desktop animator.", "gui_chat_prompts/07_DESKTOP_ANIMATOR.md", "актуален"),
         ("gui_chat_prompts/08_OPTIMIZER_CENTER.md", "Optimizer center со всеми настройками.", "gui_chat_prompts/08_OPTIMIZER_CENTER.md", "актуален"),
-        ("gui_chat_prompts/09_DIAGNOSTICS_SEND_BUNDLE.md", "Diagnostics и send bundle.", "gui_chat_prompts/09_DIAGNOSTICS_SEND_BUNDLE.md", "актуален"),
+        ("gui_chat_prompts/09_DIAGNOSTICS_SEND_BUNDLE.md", "Проверка проекта и архив проекта.", "gui_chat_prompts/09_DIAGNOSTICS_SEND_BUNDLE.md", "актуален"),
         ("gui_chat_prompts/10_TEST_VALIDATION_RESULTS.md", "Test, validation, results center.", "gui_chat_prompts/10_TEST_VALIDATION_RESULTS.md", "актуален"),
         ("gui_chat_prompts/11_GEOMETRY_REFERENCE.md", "Geometry, catalogs, reference.", "gui_chat_prompts/11_GEOMETRY_REFERENCE.md", "актуален"),
         ("gui_chat_prompts/12_ENGINEERING_ANALYSIS.md", "Engineering analysis, calibration, influence.", "gui_chat_prompts/12_ENGINEERING_ANALYSIS.md", "актуален"),

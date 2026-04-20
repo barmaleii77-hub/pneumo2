@@ -167,12 +167,12 @@ def run_script_page(target: str, *, auto_bundle: bool = False, title: Optional[s
     Why:
     - `page_registry.py` stores absolute paths for discovered pages.
     - Some wrappers still reference legacy filenames (incl. ORIGINAL_FILENAME mapping).
-    - In WIP/BROKEN mode we want to *attempt* running the script, but also capture a
-      diagnostics bundle on exception (best-effort).
+    - In WIP/BROKEN mode we want to attempt running the script and also save
+      a project archive on exception (best-effort).
 
     Parameters:
     - target: absolute path or filename
-    - auto_bundle: if True, try to autosave SEND bundle when execution fails
+    - auto_bundle: if True, try to autosave the project archive when execution fails
     - title: optional title to render (no set_page_config here!)
     """
     target_str = str(target)
@@ -220,9 +220,9 @@ def run_script_page(target: str, *, auto_bundle: bool = False, title: Optional[s
                 clipboard_ok = False
                 clipboard_msg = ""
 
-        st.error("❌ Ошибка выполнения страницы")
+        st.error("Ошибка выполнения страницы")
         if saved_path:
-            st.caption(f"Диагностика сохранена: {saved_path}")
+            st.caption(f"Архив проекта сохранён: {saved_path}")
             bundle_dir = Path(saved_path).parent
             anim_summary = load_latest_send_bundle_anim_dashboard(bundle_dir)
             anim_lines = format_anim_dashboard_brief_lines(anim_summary)
@@ -230,11 +230,11 @@ def run_script_page(target: str, *, auto_bundle: bool = False, title: Optional[s
                 st.markdown("\n".join(f"- {line}" for line in anim_lines))
             diag_json = bundle_dir / ANIM_DIAG_SIDECAR_JSON
             if diag_json.exists():
-                st.caption(f"Anim pointer diagnostics: {diag_json}")
+                st.caption(f"Данные последней анимации: {diag_json}")
             if clipboard_ok:
-                st.success("ZIP диагностики уже скопирован в буфер обмена.")
+                st.success("Архив проекта скопирован в буфер обмена.")
             elif clipboard_msg:
-                st.warning(f"ZIP сохранён, но файловый clipboard не подтвердился: {clipboard_msg}")
+                st.warning(f"Архив проекта сохранён, но копирование в буфер обмена не подтвердилось: {clipboard_msg}")
         with st.expander("Технические детали"):
             st.exception(e)
         return

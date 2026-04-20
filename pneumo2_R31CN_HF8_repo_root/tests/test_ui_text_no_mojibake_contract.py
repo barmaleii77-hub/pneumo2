@@ -48,6 +48,120 @@ DESKTOP_MOJIBAKE_GUARDED_FILES = [
     *DESKTOP_OPERATOR_TEXT_FILES,
 ]
 
+VISIBLE_GUI_TERMINOLOGY_FILES = [
+    ROOT / "pneumo_solver_ui" / "desktop_shell" / "launcher_catalog.py",
+    ROOT / "pneumo_solver_ui" / "desktop_shell" / "command_search.py",
+    ROOT / "pneumo_solver_ui" / "desktop_shell" / "home_view.py",
+    ROOT / "pneumo_solver_ui" / "desktop_shell" / "main_window.py",
+    ROOT / "pneumo_solver_ui" / "desktop_shell" / "toolbar.py",
+    ROOT / "pneumo_solver_ui" / "desktop_shell" / "workspace.py",
+    ROOT / "pneumo_solver_ui" / "desktop_shell" / "adapters" / "compare_viewer_adapter.py",
+    ROOT / "pneumo_solver_ui" / "desktop_shell" / "adapters" / "desktop_mnemo_adapter.py",
+    ROOT / "pneumo_solver_ui" / "desktop_qt_shell" / "main_window.py",
+    ROOT / "pneumo_solver_ui" / "desktop_qt_shell" / "pipeline_surfaces.py",
+    ROOT / "pneumo_solver_ui" / "desktop_results_runtime.py",
+    ROOT / "pneumo_solver_ui" / "desktop_spec_shell" / "main_window.py",
+    ROOT / "pneumo_solver_ui" / "desktop_spec_shell" / "catalogs.py",
+    ROOT / "pneumo_solver_ui" / "desktop_spec_shell" / "registry.py",
+    ROOT / "pneumo_solver_ui" / "pages" / "00_Setup.py",
+    ROOT / "pneumo_solver_ui" / "pages" / "07_CompareNPZ_QT.py",
+    ROOT / "pneumo_solver_ui" / "pages" / "97_Settings.py",
+    ROOT / "pneumo_solver_ui" / "pages" / "98_BuildBundle_ZIP.py",
+    ROOT / "pneumo_solver_ui" / "pages" / "98_SelfCheck.py",
+    ROOT / "pneumo_solver_ui" / "pages" / "99_Diagnostics.py",
+    ROOT / "pneumo_solver_ui" / "pages" / "99_EnvDiagnostics.py",
+    ROOT / "pneumo_solver_ui" / "pages" / "_page_runner.py",
+    ROOT / "pneumo_solver_ui" / "tools" / "desktop_diagnostics_center.py",
+    ROOT / "pneumo_solver_ui" / "tools" / "desktop_engineering_analysis_center.py",
+    ROOT / "pneumo_solver_ui" / "tools" / "desktop_gui_spec_shell.py",
+    ROOT / "pneumo_solver_ui" / "tools" / "desktop_control_center.py",
+    ROOT / "pneumo_solver_ui" / "tools" / "desktop_main_shell_qt.py",
+    ROOT / "pneumo_solver_ui" / "tools" / "desktop_main_shell.py",
+    ROOT / "pneumo_solver_ui" / "tools" / "desktop_results_center.py",
+    ROOT / "pneumo_solver_ui" / "tools" / "desktop_ring_scenario_editor.py",
+    ROOT / "pneumo_solver_ui" / "tools" / "test_center_gui.py",
+    ROOT / "pneumo_solver_ui" / "tools" / "send_results_gui.py",
+    ROOT / "pneumo_solver_ui" / "tools" / "run_full_diagnostics_gui.py",
+]
+
+FORBIDDEN_VISIBLE_GUI_TERMINOLOGY = (
+    "Отправка " "результатов",
+    "архив для " "отправки",
+    "SEND " "bundle",
+    "Send " "Bundle",
+    "send " "bundle",
+    "for " "chat",
+    "Статус " "мигра" "ции",
+    "статус " "мигра" "ции",
+    "Открыть " "выбранный этап",
+    "Открыть " "выбранный файл",
+    "Открыть " "выбран" "ное",
+    "Показать " "выбранный файл",
+    "Показать " "выбран" "ное",
+    "Открыть окно " "выбранного",
+    "Запустить " "выбранный этап",
+    "Открыть " "аниматор",
+    "Запуск отдельного " "окна",
+    "Активно " "окно:",
+    "В окне ",
+    "Окно уже " "открыто:",
+    "Открыто " "окно:",
+    "Повторно открыто " "окно:",
+    "Быстро " "открыть:",
+    "Открыть: ",
+    "Открыть рабочие окна " "во вкладках",
+    "Действие пока недоступно " "в окне",
+    "из текущего " "окна",
+    "из окна ",
+    "в окне Аниматор",
+    "согласованного " "контекста",
+    "Зафиксированный " "контекст",
+    "контекст " "устарел",
+    "контекст " "не совпадает",
+    "состояние " "контекста",
+    "нет состояния " "контекста анализа результатов",
+    "контекст " "отличается",
+    "требует " "контекста",
+    "основной " "контекст",
+    "самый широкий " "контекст",
+    "тот же " "контекст",
+    "другой " "контекст",
+    "из контекста " "результата",
+    "из контекста " "результатов",
+    "понятном " "контексте",
+    "отдельным " "окном",
+    "отдельное " "окно",
+    "Отдельное " "окно",
+    "Открыть исходные данные " "отдельным окном",
+    "Открыть проверку проекта " "отдельным окном",
+    "Открыть оптимизацию " "отдельным окном",
+    "Открыть отдельное " "окно настройки расчёта",
+    "Открыть Compare Viewer " "следующим шагом",
+    "Открыть окно сравнения " "следующим шагом",
+    'text="Открыть ' "окно",
+    'text="Открыть это ' "окно",
+    "Запуск инженерных " "окон",
+    "Данные " "машины",
+    "Проверочное " "рабочее место",
+    "проверочное " "рабочее место",
+    "Главное " "окно приложения",
+    "главное " "окно приложения",
+    "PneumoApp - Главное " "окно",
+    "Главное " "окно /",
+    "главного " "окна",
+    "главное " "окно",
+    "Классическое главное " "окно",
+    "О главном " "окне приложения",
+    "Главное " "окно собирает",
+    "Основная работа идёт через это главное " "окно",
+    "Главное " "окно держит",
+    "Главное " "окно отслеживает",
+    "Инструменты → " "Диаг" "ностика",
+    "Установка и " "диаг" "ностика",
+    "Диаг" "ностик",
+    "диаг" "ностик",
+)
+
 STRONG_MOJIBAKE_MARKERS = (
     "Р В Р’В Р РЋРЎСџР В Р’В ",
     "Р В Р’В Р РЋРІР‚в„ўР В Р’В ",
@@ -132,6 +246,18 @@ def test_desktop_operator_text_does_not_expose_service_labels() -> None:
         bad = [snippet for snippet in FORBIDDEN_OPERATOR_TEXT_SNIPPETS if snippet in text]
         if bad:
             offenders.append(f"{path.name}: {', '.join(bad)}")
+
+    assert not offenders, "\n".join(offenders)
+
+
+def test_visible_gui_archive_and_project_check_terms_are_operator_language() -> None:
+    offenders: list[str] = []
+
+    for path in VISIBLE_GUI_TERMINOLOGY_FILES:
+        text = path.read_text(encoding="utf-8")
+        bad = [snippet for snippet in FORBIDDEN_VISIBLE_GUI_TERMINOLOGY if snippet in text]
+        if bad:
+            offenders.append(f"{path.relative_to(ROOT)}: {', '.join(bad)}")
 
     assert not offenders, "\n".join(offenders)
 

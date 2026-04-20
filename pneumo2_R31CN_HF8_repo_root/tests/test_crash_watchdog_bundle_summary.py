@@ -25,9 +25,9 @@ def test_crash_guard_autosave_emits_shared_bundle_summary_event(tmp_path: Path, 
             message="OK",
             meta={
                 "summary_lines": [
-                    "Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True",
-                    "Browser perf comparison: regression_checked / PASS / ready=True",
-                    "Ring seam: closure=strict_exact / open=True / seam_max_m=0.012 / raw_seam_max_m=0.015",
+                    "Данные производительности анимации: trace_bundle_ready / PASS / готовы_в_архиве=True",
+                    "Сравнение производительности анимации: regression_checked / PASS / готово=True",
+                    "Шов кольца: замыкание=strict_exact / открыт=True / скачок_м=0.012 / исходный_скачок_м=0.015",
                 ],
                 "anim_latest_summary": {
                     "scenario_kind": "ring",
@@ -56,7 +56,7 @@ def test_crash_guard_autosave_emits_shared_bundle_summary_event(tmp_path: Path, 
     assert event == "autosave_bundle"
     assert fields["where"] == "exit"
     assert fields["bundle_ok"] is True
-    assert fields["summary_lines"][0].startswith("Browser perf evidence:")
+    assert fields["summary_lines"][0].startswith("Данные производительности анимации:")
     assert fields["scenario_kind"] == "ring"
     assert fields["ring_closure_policy"] == "strict_exact"
     assert fields["ring_seam_open"] is True
@@ -82,9 +82,9 @@ def test_postmortem_watchdog_logs_and_emits_bundle_summary(tmp_path: Path, monke
             message="OK",
             meta={
                 "summary_lines": [
-                    "Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True",
-                    "Browser perf comparison: regression_checked / PASS / ready=True",
-                    "Ring seam: closure=strict_exact / open=True / seam_max_m=0.012 / raw_seam_max_m=0.015",
+                    "Данные производительности анимации: trace_bundle_ready / PASS / готовы_в_архиве=True",
+                    "Сравнение производительности анимации: regression_checked / PASS / готово=True",
+                    "Шов кольца: замыкание=strict_exact / открыт=True / скачок_м=0.012 / исходный_скачок_м=0.015",
                 ],
                 "anim_latest_summary": {
                     "scenario_kind": "ring",
@@ -114,14 +114,16 @@ def test_postmortem_watchdog_logs_and_emits_bundle_summary(tmp_path: Path, monke
 
     assert rc == 0
     log_text = log_path.read_text(encoding="utf-8", errors="replace")
-    assert "bundle OK" in log_text
-    assert "Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True" in log_text
-    assert "Browser perf comparison: regression_checked / PASS / ready=True" in log_text
-    assert "Ring seam: closure=strict_exact / open=True / seam_max_m=0.012 / raw_seam_max_m=0.015" in log_text
-    assert "Диагностика указателя анимации:" in log_text
+    assert "архив проекта сохранён:" in log_text
+    assert "Данные производительности анимации: trace_bundle_ready / PASS / готовы_в_архиве=True" in log_text
+    assert "Сравнение производительности анимации: regression_checked / PASS / готово=True" in log_text
+    assert "Шов кольца: замыкание=strict_exact / открыт=True / скачок_м=0.012 / исходный_скачок_м=0.015" in log_text
+    assert "Данные последней анимации:" in log_text
+    assert "bundle OK" not in log_text
+    assert "Сведения указателя анимации:" not in log_text
     assert "Anim pointer diagnostics:" not in log_text
     assert captured_events
-    assert captured_events[-1]["summary_lines"][0].startswith("Browser perf evidence:")
+    assert captured_events[-1]["summary_lines"][0].startswith("Данные производительности анимации:")
     assert captured_events[-1]["scenario_kind"] == "ring"
     assert captured_events[-1]["ring_closure_policy"] == "strict_exact"
     assert captured_events[-1]["ring_seam_open"] is True

@@ -680,40 +680,40 @@ def generate_triage_report(
 
     # ---- Markdown ----
     def _fmt_path(p: Optional[str]) -> str:
-        return p if p else "(not found)"
+        return p if p else "(не найдено)"
 
     lines: List[str] = []
-    lines.append(f"# Triage report ({RELEASE})")
+    lines.append(f"# Разбор замечаний ({RELEASE})")
     lines.append("")
-    lines.append(f"Created: **{summary['created_at']}**")
+    lines.append(f"Сформировано: **{summary['created_at']}**")
     lines.append("")
-    lines.append("## Quick pointers")
-    lines.append(f"- Repo root: `{repo_root}`")
-    lines.append(f"- UI session dir: `{_fmt_path(summary['paths']['session_dir'])}`")
-    lines.append(f"- Autotest run dir: `{_fmt_path(summary['paths']['autotest_dir'])}`")
-    lines.append(f"- Diagnostics run dir: `{_fmt_path(summary['paths']['diagnostics_dir'])}`")
-    lines.append(f"- Distributed opt dir: `{_fmt_path(summary['paths'].get('dist_dir'))}`")
-    lines.append(f"- Run Registry: `{_fmt_path(summary['paths']['run_registry'])}`")
-    lines.append(f"- Latest send bundle path: `{_fmt_path(summary['paths']['latest_send_bundle_path'])}`")
-    lines.append(f"- Latest send bundle validation: `{_fmt_path(summary['paths'].get('latest_send_bundle_validation_md'))}`")
-    lines.append(f"- Latest anim diagnostics json: `{_fmt_path(summary['paths'].get('latest_anim_pointer_diagnostics_json'))}`")
-    lines.append(f"- Latest anim diagnostics md: `{_fmt_path(summary['paths'].get('latest_anim_pointer_diagnostics_md'))}`")
+    lines.append("## Быстрые ссылки")
+    lines.append(f"- Корень проекта: `{repo_root}`")
+    lines.append(f"- Сессия интерфейса: `{_fmt_path(summary['paths']['session_dir'])}`")
+    lines.append(f"- Прогон автотестов: `{_fmt_path(summary['paths']['autotest_dir'])}`")
+    lines.append(f"- Прогон проверок: `{_fmt_path(summary['paths']['diagnostics_dir'])}`")
+    lines.append(f"- Папка оптимизации: `{_fmt_path(summary['paths'].get('dist_dir'))}`")
+    lines.append(f"- Журнал запусков: `{_fmt_path(summary['paths']['run_registry'])}`")
+    lines.append(f"- Актуальный архив проекта: `{_fmt_path(summary['paths']['latest_send_bundle_path'])}`")
+    lines.append(f"- Проверка актуального архива: `{_fmt_path(summary['paths'].get('latest_send_bundle_validation_md'))}`")
+    lines.append(f"- Данные последней анимации, JSON: `{_fmt_path(summary['paths'].get('latest_anim_pointer_diagnostics_json'))}`")
+    lines.append(f"- Данные последней анимации, Markdown: `{_fmt_path(summary['paths'].get('latest_anim_pointer_diagnostics_md'))}`")
 
     # Distributed optimization summary (latest)
     if summary.get("dist_progress"):
         dp = summary["dist_progress"]
         lines.append("")
-        lines.append("## Distributed optimization (latest)")
-        lines.append(f"Status: **{dp.get('status')}**")
+        lines.append("## Оптимизация")
+        lines.append(f"Состояние: **{dp.get('status')}**")
         lines.append(
-            f"Completed: {dp.get('completed')}  In-flight: {dp.get('in_flight')}  Cached: {dp.get('cached_hits')}  Duplicates: {dp.get('duplicates_skipped')}"
+            f"Завершено: {dp.get('completed')}  Выполняется: {dp.get('in_flight')}  Из кэша: {dp.get('cached_hits')}  Пропущено дублей: {dp.get('duplicates_skipped')}"
         )
         if dp.get("problem_hash"):
-            lines.append(f"Problem scope: `{dp.get('problem_hash_short') or dp.get('problem_hash')}`")
+            lines.append(f"Область задачи: `{dp.get('problem_hash_short') or dp.get('problem_hash')}`")
             if dp.get("problem_hash_short") and dp.get("problem_hash_short") != dp.get("problem_hash"):
-                lines.append(f"problem_hash: `{dp.get('problem_hash')}`")
+                lines.append(f"Полный ключ области: `{dp.get('problem_hash')}`")
         if dp.get("problem_hash_mode"):
-            lines.append(f"Hash mode: `{dp.get('problem_hash_mode')}`")
+            lines.append(f"Режим хэша: `{dp.get('problem_hash_mode')}`")
         if dp.get("hv") is not None:
             lines.append(f"HV: {dp.get('hv')}")
         if (dp.get("best_obj1") is not None) or (dp.get("best_obj2") is not None):
@@ -759,67 +759,67 @@ def generate_triage_report(
         if rr_brief.get("last_send_bundle_mismatch"):
             mm = rr_brief.get("last_send_bundle_mismatch") or {}
             lines.append(
-                f"- Mismatch note: latest_send_bundle_path=`{_fmt_path(mm.get('latest_send_bundle_path'))}` but registry picked zip=`{_fmt_path(mm.get('registry_zip_path'))}`"
+                f"- Несовпадение архива: latest_send_bundle_path=`{_fmt_path(mm.get('latest_send_bundle_path'))}`, а журнал выбрал zip=`{_fmt_path(mm.get('registry_zip_path'))}`"
             )
 
     # R51: Validation summary (from latest sidecar)
     if sb_validation is not None:
         lines.append("")
-        lines.append("## Send bundle validation (latest sidecar)")
-        lines.append(f"OK: **{sb_validation.get('ok')}**")
+        lines.append("## Проверка актуального архива проекта")
+        lines.append(f"Успешно: **{sb_validation.get('ok')}**")
         stt = sb_validation.get('stats') or {}
         try:
             lines.append(
-                f"Entries: zip={stt.get('zip_entries')} manifest_checked={stt.get('manifest_checked')} sha_mismatch={stt.get('manifest_sha_mismatch')} size_mismatch={stt.get('manifest_size_mismatch')}"
+                f"Состав: zip={stt.get('zip_entries')} проверено={stt.get('manifest_checked')} sha_расхождений={stt.get('manifest_sha_mismatch')} size_расхождений={stt.get('manifest_size_mismatch')}"
             )
         except Exception:
             pass
         if sb_validation.get('errors'):
-            lines.append("Errors (tail):")
+            lines.append("Ошибки:")
             for e in (sb_validation.get('errors') or [])[:10]:
                 lines.append(f"- {e}")
         if sb_validation.get('warnings'):
-            lines.append("Warnings (tail):")
+            lines.append("Предупреждения:")
             for w in (sb_validation.get('warnings') or [])[:10]:
                 lines.append(f"- {w}")
 
     lines.append("")
-    lines.append("## Desktop Mnemo events")
+    lines.append("## События мнемосхемы")
     mnemo = summary.get("mnemo_event_log") or {}
-    lines.append(f"- severity: `{mnemo.get('severity') or 'missing'}`")
-    lines.append(f"- summary: `{mnemo.get('headline') or '—'}`")
+    lines.append(f"- Важность: `{mnemo.get('severity') or 'missing'}`")
+    lines.append(f"- Сводка: `{mnemo.get('headline') or '—'}`")
     if mnemo.get("ref") or mnemo.get("path"):
         lines.append(
-            f"- event_log: `{mnemo.get('ref') or '—'}` → `{_fmt_path(mnemo.get('path'))}` exists=`{mnemo.get('exists')}` schema=`{mnemo.get('schema_version') or '—'}` updated_utc=`{mnemo.get('updated_utc') or '—'}`"
+            f"- Журнал событий: `{mnemo.get('ref') or '—'}` → `{_fmt_path(mnemo.get('path'))}` есть=`{mnemo.get('exists')}` схема=`{mnemo.get('schema_version') or '—'}` обновлено UTC=`{mnemo.get('updated_utc') or '—'}`"
         )
     if mnemo.get("current_mode"):
-        lines.append(f"- current_mode: `{mnemo.get('current_mode')}`")
+        lines.append(f"- Текущий режим: `{mnemo.get('current_mode')}`")
     if mnemo.get("event_count") is not None:
         lines.append(
-            f"- event_state: total=`{mnemo.get('event_count')}` active=`{mnemo.get('active_latch_count')}` acked=`{mnemo.get('acknowledged_latch_count')}`"
+            f"- Состояние событий: всего=`{mnemo.get('event_count')}` активно=`{mnemo.get('active_latch_count')}` принято=`{mnemo.get('acknowledged_latch_count')}`"
         )
     recent_titles = [str(x) for x in (mnemo.get("recent_titles") or []) if str(x).strip()]
     if recent_titles:
-        lines.append(f"- recent_titles: {' | '.join(recent_titles[:3])}")
+        lines.append(f"- Последние события: {' | '.join(recent_titles[:3])}")
     for flag in list(mnemo.get("red_flags") or [])[:3]:
-        lines.append(f"- red_flag: `{flag}`")
+        lines.append(f"- Предупреждение: `{flag}`")
 
     if operator_recommendations:
         lines.append("")
-        lines.append("## Recommended actions")
+        lines.append("## Рекомендуемые действия")
         for idx, item in enumerate(operator_recommendations, start=1):
             lines.append(f"{idx}. {item}")
 
     lines.append("")
-    lines.append("## Anim latest diagnostics")
+    lines.append("## Последняя анимация")
     anim = summary.get("anim_latest") or {}
-    lines.append(f"- Source: {anim.get('source') or '—'}")
-    lines.append(f"- anim_latest_available: {bool(anim.get('anim_latest_available'))}")
+    lines.append(f"- Источник: {anim.get('source') or '—'}")
+    lines.append(f"- Доступна: {bool(anim.get('anim_latest_available'))}")
     if anim.get("scenario_kind"):
-        lines.append(f"- scenario_kind: `{anim.get('scenario_kind')}`")
-    lines.append(f"- anim_latest_global_pointer_json: `{_fmt_path(anim.get('anim_latest_global_pointer_json'))}`")
-    lines.append(f"- anim_latest_pointer_json: `{_fmt_path(anim.get('anim_latest_pointer_json'))}`")
-    lines.append(f"- anim_latest_npz_path: `{_fmt_path(anim.get('anim_latest_npz_path'))}`")
+        lines.append(f"- Тип сценария: `{anim.get('scenario_kind')}`")
+    lines.append(f"- Общий указатель: `{_fmt_path(anim.get('anim_latest_global_pointer_json'))}`")
+    lines.append(f"- Указатель: `{_fmt_path(anim.get('anim_latest_pointer_json'))}`")
+    lines.append(f"- Файл анимации: `{_fmt_path(anim.get('anim_latest_npz_path'))}`")
     if anim.get('anim_latest_road_csv_ref') or anim.get('anim_latest_road_csv_path'):
         lines.append(f"- anim_latest_road_csv: `{anim.get('anim_latest_road_csv_ref') or '—'}` → `{_fmt_path(anim.get('anim_latest_road_csv_path'))}` exists=`{anim.get('anim_latest_road_csv_exists')}`")
     if anim.get('anim_latest_axay_csv_ref') or anim.get('anim_latest_axay_csv_path'):
@@ -873,11 +873,11 @@ def generate_triage_report(
     )
     if any(anim.get(key) not in (None, "", [], {}) for key in ("ring_closure_policy", "ring_closure_applied", "ring_seam_open", "ring_seam_max_jump_m", "ring_raw_seam_max_jump_m")):
         lines.append(
-            f"- ring_closure: policy=`{anim.get('ring_closure_policy') or '—'}`"
-            f" / applied=`{anim.get('ring_closure_applied')}`"
-            f" / seam_open=`{anim.get('ring_seam_open')}`"
-            f" / seam_max_jump_m=`{anim.get('ring_seam_max_jump_m') if anim.get('ring_seam_max_jump_m') is not None else '—'}`"
-            f" / raw_seam_max_jump_m=`{anim.get('ring_raw_seam_max_jump_m') if anim.get('ring_raw_seam_max_jump_m') is not None else '—'}`"
+            f"- Замыкание кольца: режим=`{anim.get('ring_closure_policy') or '—'}`"
+            f" / применено=`{anim.get('ring_closure_applied')}`"
+            f" / шов открыт=`{anim.get('ring_seam_open')}`"
+            f" / скачок шва, м=`{anim.get('ring_seam_max_jump_m') if anim.get('ring_seam_max_jump_m') is not None else '—'}`"
+            f" / исходный скачок, м=`{anim.get('ring_raw_seam_max_jump_m') if anim.get('ring_raw_seam_max_jump_m') is not None else '—'}`"
         )
     lines.append(f"- anim_latest_updated_utc: `{anim.get('anim_latest_updated_utc') or '—'}`")
     if anim.get('anim_latest_usable') is not None:

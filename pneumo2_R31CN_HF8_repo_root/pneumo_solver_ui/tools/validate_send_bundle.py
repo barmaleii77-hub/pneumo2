@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 """validate_send_bundle.py
 
-R53: Валидация send bundle ZIP (quality gate)
-=============================================
+R53: Проверка ZIP архива проекта
+================================
 
 Зачем
 -----
-Send Bundle — это "единый артефакт" для отправки в чат после закрытия UI.
+Архив проекта — единый файл для разбора состояния приложения после закрытия UI.
 Чтобы повышать надёжность, недостаточно просто *создать* ZIP: нужно автоматически
 проверить, что он:
 
@@ -15,7 +15,7 @@ Send Bundle — это "единый артефакт" для отправки �
 - содержит triage (или хотя бы файл с ошибкой triage),
 - не содержит битого JSON,
 - не имеет несоответствий SHA256/size для файлов из manifest,
-- не теряет anim_latest reload diagnostics в финальном bundle.
+- не теряет данные последней анимации в финальном архиве.
 
 Скрипт делает best-effort валидацию и генерирует:
 - validation_report.json (машиночитаемо)
@@ -213,12 +213,12 @@ class ValidationResult:
 
 
 def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) -> ValidationResult:
-    """Validate a send bundle ZIP.
+    """Проверить ZIP архива проекта.
 
-    Notes:
-      - We validate only files tracked by bundle/manifest.json.
-      - z.writestr()-based files (meta/triage/...) are validated by presence+JSON parse.
-      - anim_latest diagnostics are best-effort but must be surfaced explicitly.
+    Примечания:
+      - Проверяются только файлы, перечисленные в bundle/manifest.json.
+      - Файлы из z.writestr() (meta/triage/...) проверяются по наличию и разбору JSON.
+      - Данные последней анимации проверяются настолько полно, насколько позволяет архив.
     """
     zp = Path(zip_path).expanduser().resolve()
     t0 = time.time()
@@ -322,7 +322,7 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
 
             missing_required = [p for p in required if p not in name_set]
             if missing_required:
-                errors.append("Missing required files: " + ", ".join(missing_required))
+                errors.append("Не найдены обязательные файлы: " + ", ".join(missing_required))
 
             # R59 contract: UI autosave state must be included in the bundle.
             # Honest payload means JSON autosave files; marker files alone are not enough.
@@ -337,9 +337,9 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
             ui_autosave["persistent_state_marker_files"] = ps_markers[:12]
             ui_autosave["workspace_ui_state_marker_files"] = ui_markers[:12]
             if not (ps_json or ui_json):
-                msg = "Missing UI autosave state JSON (expected persistent_state/*.json or workspace/ui_state/*.json)"
+                msg = "Нет JSON состояния интерфейса (ожидались persistent_state/*.json или workspace/ui_state/*.json)"
                 if ps_markers or ui_markers:
-                    msg += "; bundle contains only empty/missing markers"
+                    msg += "; в архиве есть только пустые маркеры отсутствующих данных"
                 errors.append(msg)
                 ui_autosave["issues"].append(msg)
 
@@ -354,14 +354,14 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
             ]
             for pref, label in required_prefixes:
                 if not any(n.startswith(pref) for n in name_set):
-                    errors.append(f"Missing {label} (required by diagnostics bundle contract)")
+                    errors.append(f"Нет {label} (требуется для проверки архива проекта)")
 
             # Convenience/compat: root MANIFEST.json is expected (bundle/manifest.json is canonical).
             if "MANIFEST.json" not in name_set and "manifest.json" not in name_set:
-                warnings.append("Missing MANIFEST.json at ZIP root (bundle/manifest.json is present)")
+                warnings.append("Нет MANIFEST.json в корне ZIP (bundle/manifest.json найден)")
 
             if not any(p in name_set for p in recommended_any):
-                warnings.append("Missing triage report files (triage_report*.md or triage_failed.txt)")
+                warnings.append("Нет файлов отчёта проверки (triage_report*.md или triage_failed.txt)")
 
             def _read_json(path: str) -> Any:
                 try:
@@ -372,19 +372,19 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
 
             meta_obj = _read_json("bundle/meta.json")
             if meta_obj is None:
-                errors.append("bundle/meta.json is not valid JSON")
+                errors.append("bundle/meta.json не является корректным JSON")
 
             summary_obj = _read_json("bundle/summary.json")
             if summary_obj is None:
-                errors.append("bundle/summary.json is not valid JSON")
+                errors.append("bundle/summary.json не является корректным JSON")
 
             skips_obj = _read_json("bundle/skips.json")
             if skips_obj is None:
-                errors.append("bundle/skips.json is not valid JSON")
+                errors.append("bundle/skips.json не является корректным JSON")
 
             manifest_obj = _read_json("bundle/manifest.json")
             if not isinstance(manifest_obj, dict):
-                errors.append("bundle/manifest.json is not a JSON object")
+                errors.append("bundle/manifest.json не является JSON-объектом")
                 manifest_obj = {}
 
             evidence_obj = load_evidence_manifest_from_zip(z)
@@ -397,7 +397,7 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
                     if msg not in errors:
                         errors.append(msg)
             else:
-                warnings.append(f"Missing {EVIDENCE_MANIFEST_ARCNAME} (merged diagnostics evidence manifest)")
+                warnings.append(f"Нет {EVIDENCE_MANIFEST_ARCNAME} (сводный состав данных проверки)")
 
             engineering_name = ""
             if ENGINEERING_ANALYSIS_EVIDENCE_ARCNAME in name_set:
@@ -415,7 +415,7 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
                     engineering_summary = summarize_engineering_analysis_evidence(
                         {},
                         source_path=engineering_name,
-                        read_warnings=(f"{engineering_name} is not valid JSON",),
+                        read_warnings=(f"{engineering_name} не является корректным JSON",),
                     )
                 rep["engineering_analysis_evidence"] = engineering_summary
                 for item in engineering_summary.get("warnings") or []:
@@ -441,7 +441,7 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
                         if msg and msg not in warnings:
                             warnings.append(msg)
                 else:
-                    warnings.append(f"{geometry_reference_name} is not valid JSON")
+                    warnings.append(f"{geometry_reference_name} не является корректным JSON")
 
             optimizer_scope_sources: Dict[str, Dict[str, Any]] = {}
             triage_scope = extract_optimizer_scope_from_triage(_read_json("triage/triage_report.json"))
@@ -480,8 +480,8 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
                 rep["optimizer_scope_gate"] = optimizer_scope_gate
                 if optimizer_scope_gate.get("release_risk"):
                     risk_msg = (
-                        "optimizer scope release risk: "
-                        f"{optimizer_scope_gate.get('release_gate_reason') or 'mismatch detected'}"
+                        "риск выпуска по области оптимизации: "
+                        f"{optimizer_scope_gate.get('release_gate_reason') or 'обнаружено расхождение'}"
                     )
                     rep["release_risks"].append(risk_msg)
                     if risk_msg not in warnings:
@@ -502,11 +502,11 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
             anim_latest["global_pointer_valid"] = isinstance(global_obj, dict) if anim_latest["global_pointer_present"] else None
 
             if anim_latest["diagnostics_json_present"] and not isinstance(diag_obj, dict):
-                warnings.append(f"{ANIM_DIAG_JSON} is not valid JSON")
+                warnings.append(f"{ANIM_DIAG_JSON} не является корректным JSON")
             if anim_latest["local_pointer_present"] and not isinstance(local_obj, dict):
-                warnings.append(f"{ANIM_LOCAL_POINTER} is not valid JSON")
+                warnings.append(f"{ANIM_LOCAL_POINTER} не является корректным JSON")
             if anim_latest["global_pointer_present"] and not isinstance(global_obj, dict):
-                warnings.append(f"{ANIM_GLOBAL_POINTER} is not valid JSON")
+                warnings.append(f"{ANIM_GLOBAL_POINTER} не является корректным JSON")
 
             source_states = {
                 "diagnostics": annotate_anim_source_for_bundle(
@@ -531,13 +531,13 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
             anim_latest["contract_expected"] = anim_latest_expected
 
             if not anim_latest["diagnostics_json_present"] and anim_latest_expected:
-                warnings.append(f"Missing {ANIM_DIAG_JSON} (anim_latest diagnostics sidecar)")
+                warnings.append(f"Нет {ANIM_DIAG_JSON} (данные последней анимации)")
             if not anim_latest["diagnostics_md_present"] and anim_latest_expected:
-                warnings.append(f"Missing {ANIM_DIAG_MD} (anim_latest diagnostics sidecar)")
+                warnings.append(f"Нет {ANIM_DIAG_MD} (отчёт по последней анимации)")
             if not anim_latest["global_pointer_present"] and anim_latest_expected:
-                warnings.append(f"Missing {ANIM_GLOBAL_POINTER} (global anim_latest pointer)")
+                warnings.append(f"Нет {ANIM_GLOBAL_POINTER} (общий указатель последней анимации)")
             if not anim_latest["local_pointer_present"] and anim_latest_expected:
-                warnings.append(f"Missing {ANIM_LOCAL_POINTER} (local anim_latest pointer)")
+                warnings.append(f"Нет {ANIM_LOCAL_POINTER} (локальный указатель последней анимации)")
 
             canonical = choose_anim_snapshot(
                 {k: v for k, v in source_states.items() if isinstance(v, dict)},
@@ -626,7 +626,7 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
                 should_exist = anim_latest.get(exists_key)
                 in_bundle = anim_latest.get(in_bundle_key)
                 if ref_text and should_exist and in_bundle is False:
-                    msg = f"{label} referenced by anim_latest diagnostics but missing in bundle: {Path(ref_text).name}"
+                    msg = f"{label} указан в данных последней анимации, но отсутствует в архиве: {Path(ref_text).name}"
                     warnings.append(msg)
                     issues.append(msg)
 
@@ -637,7 +637,7 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
             }
             if len(set(token_values.values())) > 1:
                 parts = ", ".join(f"{src}={tok}" for src, tok in token_values.items())
-                msg = f"anim_latest visual_cache_token mismatch between sources: {parts}"
+                msg = f"токен визуального кэша последней анимации не совпадает между источниками: {parts}"
                 warnings.append(msg)
                 issues.append(msg)
                 anim_latest["pointer_sync_ok"] = False
@@ -652,7 +652,7 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
             reload_sets = {tuple(v) for v in reload_values.values()}
             if len(reload_sets) > 1:
                 parts = ", ".join(f"{src}={vals}" for src, vals in reload_values.items())
-                msg = f"anim_latest visual_reload_inputs mismatch between sources: {parts}"
+                msg = f"входные данные перезагрузки последней анимации не совпадают между источниками: {parts}"
                 warnings.append(msg)
                 issues.append(msg)
                 anim_latest["reload_inputs_sync_ok"] = False
@@ -668,7 +668,7 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
             }
             if len(set(npz_values.values())) > 1:
                 parts = ", ".join(f"{src}={path}" for src, path in npz_values.items())
-                msg = f"anim_latest npz_path mismatch between sources: {parts}"
+                msg = f"путь к файлу последней анимации не совпадает между источниками: {parts}"
                 warnings.append(msg)
                 issues.append(msg)
                 anim_latest["npz_path_sync_ok"] = False
@@ -676,19 +676,19 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
                 anim_latest["npz_path_sync_ok"] = True
 
             if anim_latest["available"] and not anim_latest["visual_cache_token"]:
-                msg = "anim_latest is marked available but visual_cache_token is empty"
+                msg = "последняя анимация отмечена как доступная, но токен визуального кэша пуст"
                 warnings.append(msg)
                 issues.append(msg)
             if anim_latest["available"] and not anim_latest["npz_path"]:
-                msg = "anim_latest is marked available but npz_path is empty"
+                msg = "последняя анимация отмечена как доступная, но путь к файлу анимации пуст"
                 warnings.append(msg)
                 issues.append(msg)
             if anim_latest["available"] and not anim_latest["visual_reload_inputs"]:
-                msg = "anim_latest is marked available but visual_reload_inputs are empty"
+                msg = "последняя анимация отмечена как доступная, но входные данные перезагрузки пусты"
                 warnings.append(msg)
                 issues.append(msg)
             if anim_latest["available"] and anim_latest.get("usable_from_bundle") is False:
-                msg = "anim_latest diagnostics exist but are not reproducible from this bundle"
+                msg = "данные последней анимации найдены, но из этого архива они не восстанавливаются"
                 warnings.append(msg)
                 issues.append(msg)
 
@@ -702,20 +702,20 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
 
             if len(manifest_obj) > int(max_manifest_files):
                 warnings.append(
-                    f"manifest has too many entries ({len(manifest_obj)}), integrity check truncated to {max_manifest_files}"
+                    f"в manifest слишком много записей ({len(manifest_obj)}), проверка целостности ограничена {max_manifest_files}"
                 )
 
             for arcname, info in list(manifest_obj.items())[: int(max_manifest_files)]:
                 checked += 1
                 if arcname not in name_set:
                     missing_in_zip += 1
-                    errors.append(f"manifest entry missing in ZIP: {arcname}")
+                    errors.append(f"файл из manifest отсутствует в ZIP: {arcname}")
                     continue
 
                 try:
                     b = z.read(arcname)
                 except Exception:
-                    errors.append(f"failed to read from ZIP: {arcname}")
+                    errors.append(f"не удалось прочитать из ZIP: {arcname}")
                     mismatched += 1
                     continue
 
@@ -728,15 +728,15 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
 
                 if exp_sha and str(exp_sha) != sha:
                     mismatched += 1
-                    errors.append(f"sha256 mismatch: {arcname} expected={exp_sha} got={sha}")
+                    errors.append(f"sha256 не совпадает: {arcname} expected={exp_sha} got={sha}")
                 if exp_size is not None:
                     try:
                         exp_size_i = int(exp_size)
                         if exp_size_i != len(b):
                             size_mismatch += 1
-                            errors.append(f"size mismatch: {arcname} expected={exp_size_i} got={len(b)}")
+                            errors.append(f"размер не совпадает: {arcname} expected={exp_size_i} got={len(b)}")
                     except Exception:
-                        warnings.append(f"invalid size_bytes for {arcname}: {exp_size}")
+                        warnings.append(f"некорректный size_bytes для {arcname}: {exp_size}")
 
             rep["stats"] = {
                 "zip_entries": len(names),
@@ -749,9 +749,9 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
             }
 
     except zipfile.BadZipFile:
-        errors.append("BadZipFile: archive is corrupted or not a zip")
+        errors.append("BadZipFile: архив повреждён или не является ZIP")
     except Exception as e:
-        errors.append(f"Exception while validating zip: {e}")
+        errors.append(f"Ошибка при проверке ZIP: {e}")
 
     if zp.name == "latest_send_bundle.zip":
         latest_evidence_path = zp.parent / EVIDENCE_MANIFEST_SIDECAR_NAME
@@ -770,13 +770,13 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
                 rep["latest_integrity_proof"] = proof
                 if proof.get("final_latest_zip_sha256_matches_actual") is False:
                     msg = (
-                        "latest integrity error: latest_evidence_manifest.json final_latest_zip_sha256 "
-                        "does not match latest_send_bundle.zip bytes"
+                        "ошибка целостности latest: latest_evidence_manifest.json final_latest_zip_sha256 "
+                        "не совпадает с байтами latest_send_bundle.zip"
                     )
                     if msg not in errors:
                         errors.append(msg)
                 if (proof.get("final_latest_sha256_sidecar") or "") and proof.get("latest_sha_sidecar_matches") is False:
-                    msg = "latest integrity error: latest_send_bundle.sha256 does not match latest_send_bundle.zip bytes"
+                    msg = "ошибка целостности latest: latest_send_bundle.sha256 не совпадает с latest_send_bundle.zip"
                     if msg not in errors:
                         errors.append(msg)
                 for item in proof.get("warnings") or []:
@@ -784,7 +784,7 @@ def validate_send_bundle(zip_path: Path, *, max_manifest_files: int = 50_000) ->
                     if msg and msg not in warnings and not msg.startswith("latest_send_bundle.sha256 mismatch"):
                         warnings.append(msg)
             else:
-                warnings.append(f"{EVIDENCE_MANIFEST_SIDECAR_NAME} is not valid JSON")
+                warnings.append(f"{EVIDENCE_MANIFEST_SIDECAR_NAME} не является корректным JSON")
 
     rep["errors"] = errors
     rep["warnings"] = warnings
@@ -814,31 +814,31 @@ def _render_md(rep: Dict[str, Any]) -> str:
     ui_autosave = rep.get("ui_autosave") or {}
     latest_proof = rep.get("latest_integrity_proof") or {}
 
-    title = "✅ SEND BUNDLE VALIDATION: OK" if ok else "❌ SEND BUNDLE VALIDATION: FAIL"
+    title = "Проверка архива проекта: успешно" if ok else "Проверка архива проекта: ошибка"
 
     lines = [
         "# " + title,
         "",
-        f"- checked_at: `{rep.get('checked_at')}`",
-        f"- zip_path: `{rep.get('zip_path')}`",
-        f"- release: `{rep.get('release')}`",
+        f"- Проверено: `{rep.get('checked_at')}`",
+        f"- Архив: `{rep.get('zip_path')}`",
+        f"- Выпуск: `{rep.get('release')}`",
         "",
-        "## Evidence manifest",
+        "## Состав данных",
         "",
-        f"- present: `{bool(evidence)}`",
-        f"- collection_mode: `{evidence.get('collection_mode') or 'n/a'}`",
-        f"- finalization_stage: `{evidence.get('finalization_stage') or 'n/a'}`",
+        f"- Найден: `{bool(evidence)}`",
+        f"- Режим сбора: `{evidence.get('collection_mode') or 'n/a'}`",
+        f"- Этап завершения: `{evidence.get('finalization_stage') or 'n/a'}`",
         f"- zip_sha256: `{evidence.get('zip_sha256') or 'n/a'}`",
-        f"- pb002_missing_required_count: `{evidence.get('pb002_missing_required_count')}`",
-        f"- missing_required_count: `{evidence.get('missing_required_count')}`",
-        f"- missing_optional_count: `{evidence.get('missing_optional_count')}`",
-        f"- analysis_handoff: `{analysis_handoff.get('status') or 'MISSING'}` / context=`{analysis_handoff.get('result_context_state') or 'MISSING'}` / run=`{analysis_handoff.get('run_id') or '-'}`",
-        f"- analysis_handoff_mismatches: `{analysis_handoff.get('mismatch_count') or 0}`",
+        f"- Не хватает обязательных данных PB002: `{evidence.get('pb002_missing_required_count')}`",
+        f"- Не хватает обязательных данных: `{evidence.get('missing_required_count')}`",
+        f"- Не хватает необязательных данных: `{evidence.get('missing_optional_count')}`",
+        f"- Передача результата анализа: `{analysis_handoff.get('status') or 'MISSING'}` / данные=`{analysis_handoff.get('result_context_state') or 'MISSING'}` / запуск=`{analysis_handoff.get('run_id') or '-'}`",
+        f"- Расхождения передачи результата анализа: `{analysis_handoff.get('mismatch_count') or 0}`",
         "",
-        "## Latest integrity proof",
+        "## Проверка актуального архива",
         "",
-        f"- present: `{bool(latest_proof)}`",
-        f"- status: `{latest_proof.get('status') or 'n/a'}`",
+        f"- Найдена: `{bool(latest_proof)}`",
+        f"- Состояние: `{latest_proof.get('status') or 'n/a'}`",
         f"- final_latest_zip_sha256: `{latest_proof.get('final_latest_zip_sha256') or 'n/a'}`",
         f"- final_original_zip_sha256: `{latest_proof.get('final_original_zip_sha256') or 'n/a'}`",
         f"- latest_sha_sidecar_matches: `{latest_proof.get('latest_sha_sidecar_matches')}`",
@@ -849,26 +849,26 @@ def _render_md(rep: Dict[str, Any]) -> str:
         f"- warning_only_gaps_present: `{latest_proof.get('warning_only_gaps_present')}`",
         f"- no_release_closure_claim: `{latest_proof.get('no_release_closure_claim')}`",
         "",
-        "### Latest integrity warnings",
+        "### Предупреждения по актуальному архиву",
         "",
         _md_list([str(x) for x in (latest_proof.get('warnings') or [])]),
         "",
-        "### Missing evidence warnings",
+        "### Предупреждения по отсутствующим данным",
         "",
         _md_list([str(x) for x in (evidence.get('missing_warnings') or [])]),
         "",
-        "## Stats",
+        "## Статистика",
         "",
         "```json",
         json.dumps(stats, ensure_ascii=False, indent=2),
         "```",
         "",
-        "## Engineering analysis evidence",
+        "## Данные инженерного анализа",
         "",
-        f"- present: `{bool(engineering)}`",
-        f"- status: `{engineering.get('status') or 'MISSING'}`",
-        f"- readiness_status: `{engineering.get('readiness_status') or 'MISSING'}`",
-        f"- open_gap_status: `{engineering.get('open_gap_status') or 'MISSING'}`",
+        f"- Найдены: `{bool(engineering)}`",
+        f"- Состояние: `{engineering.get('status') or 'MISSING'}`",
+        f"- Готовность: `{engineering.get('readiness_status') or 'MISSING'}`",
+        f"- Открытые вопросы: `{engineering.get('open_gap_status') or 'MISSING'}`",
         f"- no_release_closure_claim: `{engineering.get('no_release_closure_claim')}`",
         f"- source_path: `{engineering.get('source_path') or '-'}`",
         f"- evidence_manifest_hash: `{engineering.get('evidence_manifest_hash') or '-'}`",
@@ -887,45 +887,45 @@ def _render_md(rep: Dict[str, Any]) -> str:
         f"- selected_run_missing_inputs_candidate_count: `{engineering.get('selected_run_missing_inputs_candidate_count')}`",
         f"- open_gap_reasons: `{', '.join(str(x) for x in (engineering.get('open_gap_reasons') or [])) or '-'}`",
         "",
-        "## Optimizer scope",
+        "## Область оптимизации",
         "",
-        f"- available: `{optimizer_scope.get('available')}`",
-        f"- release_gate: `{optimizer_scope_gate.get('release_gate') or 'n/a'}`",
-        f"- release_gate_reason: `{optimizer_scope_gate.get('release_gate_reason') or 'n/a'}`",
-        f"- release_risk: `{optimizer_scope_gate.get('release_risk')}`",
-        f"- canonical_source: `{optimizer_scope.get('canonical_source') or '-'}`",
-        f"- scope_sync_ok: `{optimizer_scope.get('scope_sync_ok')}`",
-        f"- Problem scope: `{optimizer_scope.get('problem_hash_short') or optimizer_scope.get('problem_hash') or '-'}`",
-        f"- Hash mode: `{optimizer_scope.get('problem_hash_mode') or '-'}`",
+        f"- Доступна: `{optimizer_scope.get('available')}`",
+        f"- Допуск выпуска: `{optimizer_scope_gate.get('release_gate') or 'n/a'}`",
+        f"- Причина допуска выпуска: `{optimizer_scope_gate.get('release_gate_reason') or 'n/a'}`",
+        f"- Риск выпуска: `{optimizer_scope_gate.get('release_risk')}`",
+        f"- Основной источник: `{optimizer_scope.get('canonical_source') or '-'}`",
+        f"- Синхронизация области: `{optimizer_scope.get('scope_sync_ok')}`",
+        f"- Область задачи: `{optimizer_scope.get('problem_hash_short') or optimizer_scope.get('problem_hash') or '-'}`",
+        f"- Режим хэша: `{optimizer_scope.get('problem_hash_mode') or '-'}`",
         f"- objective_keys: `{', '.join(str(x) for x in (optimizer_scope.get('objective_keys') or [])) or '-'}`",
         f"- penalty_key: `{optimizer_scope.get('penalty_key') or '-'}`",
         f"- penalty_tol: `{optimizer_scope.get('penalty_tol')}`",
         "",
-        "### Optimizer scope issues",
+        "### Замечания по области оптимизации",
         "",
         _md_list([str(x) for x in (optimizer_scope.get('issues') or [])]),
         "",
-        "### Optimizer scope sources",
+        "### Источники области оптимизации",
         "",
         "```json",
         json.dumps(optimizer_scope.get("sources") or {}, ensure_ascii=False, indent=2),
         "```",
         "",
-        "## Anim latest diagnostics",
+        "## Последняя анимация",
         "",
-        f"- available: `{anim.get('available')}`",
-        f"- visual_cache_token: `{anim.get('visual_cache_token') or '—'}`",
-        f"- visual_reload_inputs: `{', '.join(str(x) for x in (anim.get('visual_reload_inputs') or [])) or '—'}`",
-        f"- pointer_json: `{anim.get('pointer_json') or '—'}`",
-        f"- global_pointer_json: `{anim.get('global_pointer_json') or '—'}`",
-        f"- npz_path: `{anim.get('npz_path') or '—'}`",
-        f"- updated_utc: `{anim.get('updated_utc') or '—'}`",
-        f"- usable_from_bundle: `{anim.get('usable_from_bundle')}`",
-        f"- pointer_json_in_bundle: `{anim.get('pointer_json_in_bundle')}`",
-        f"- npz_path_in_bundle: `{anim.get('npz_path_in_bundle')}`",
-        f"- pointer_sync_ok: `{anim.get('pointer_sync_ok')}`",
-        f"- reload_inputs_sync_ok: `{anim.get('reload_inputs_sync_ok')}`",
-        f"- npz_path_sync_ok: `{anim.get('npz_path_sync_ok')}`",
+        f"- Доступна: `{anim.get('available')}`",
+        f"- Токен визуального кэша: `{anim.get('visual_cache_token') or '—'}`",
+        f"- Входные данные перезагрузки: `{', '.join(str(x) for x in (anim.get('visual_reload_inputs') or [])) or '—'}`",
+        f"- Указатель: `{anim.get('pointer_json') or '—'}`",
+        f"- Общий указатель: `{anim.get('global_pointer_json') or '—'}`",
+        f"- Файл анимации: `{anim.get('npz_path') or '—'}`",
+        f"- Обновлено UTC: `{anim.get('updated_utc') or '—'}`",
+        f"- Восстанавливается из архива: `{anim.get('usable_from_bundle')}`",
+        f"- Указатель есть в архиве: `{anim.get('pointer_json_in_bundle')}`",
+        f"- Файл анимации есть в архиве: `{anim.get('npz_path_in_bundle')}`",
+        f"- Указатель синхронизирован: `{anim.get('pointer_sync_ok')}`",
+        f"- Входные данные синхронизированы: `{anim.get('reload_inputs_sync_ok')}`",
+        f"- Файл анимации синхронизирован: `{anim.get('npz_path_sync_ok')}`",
         f"- browser_perf_status: `{anim.get('browser_perf_status') or '—'}` / level=`{anim.get('browser_perf_level') or '—'}`",
         f"- browser_perf_artifacts_primary: snapshot=`{anim.get('browser_perf_registry_snapshot_ref') or '—'}` / exists=`{anim.get('browser_perf_registry_snapshot_exists')}` / in_bundle=`{anim.get('browser_perf_registry_snapshot_in_bundle')}` ; contract=`{anim.get('browser_perf_contract_ref') or '—'}` / exists=`{anim.get('browser_perf_contract_exists')}` / in_bundle=`{anim.get('browser_perf_contract_in_bundle')}`",
         f"- browser_perf_artifacts_secondary: evidence=`{anim.get('browser_perf_evidence_report_ref') or '—'}` / exists=`{anim.get('browser_perf_evidence_report_exists')}` / in_bundle=`{anim.get('browser_perf_evidence_report_in_bundle')}` ; comparison=`{anim.get('browser_perf_comparison_report_ref') or '—'}` / exists=`{anim.get('browser_perf_comparison_report_exists')}` / in_bundle=`{anim.get('browser_perf_comparison_report_in_bundle')}` ; trace=`{anim.get('browser_perf_trace_ref') or '—'}` / exists=`{anim.get('browser_perf_trace_exists')}` / in_bundle=`{anim.get('browser_perf_trace_in_bundle')}`",
@@ -933,17 +933,17 @@ def _render_md(rep: Dict[str, Any]) -> str:
         f"- browser_perf_comparison_status: `{anim.get('browser_perf_comparison_status') or '—'}` / level=`{anim.get('browser_perf_comparison_level') or '—'}` / ready=`{anim.get('browser_perf_comparison_ready')}` / changed=`{anim.get('browser_perf_comparison_changed')}`",
         f"- browser_perf_comparison_delta: wakeups=`{anim.get('browser_perf_comparison_delta_total_wakeups')}` / dup=`{anim.get('browser_perf_comparison_delta_total_duplicate_guard_hits')}` / render=`{anim.get('browser_perf_comparison_delta_total_render_count')}` / max_idle_poll_ms=`{anim.get('browser_perf_comparison_delta_max_idle_poll_ms')}`",
         "",
-        "### Anim latest issues",
+        "### Замечания по последней анимации",
         "",
         _md_list([str(x) for x in (anim.get('issues') or [])]),
         "",
-        "### Anim latest sources",
+        "### Источники последней анимации",
         "",
         "```json",
         json.dumps(anim.get("sources") or {}, ensure_ascii=False, indent=2),
         "```",
         "",
-        "## UI autosave state",
+        "## Сохранение состояния интерфейса",
         "",
         f"- persistent_state_json_present: `{ui_autosave.get('persistent_state_json_present')}`",
         f"- workspace_ui_state_json_present: `{ui_autosave.get('workspace_ui_state_json_present')}`",
@@ -952,38 +952,38 @@ def _render_md(rep: Dict[str, Any]) -> str:
         f"- persistent_state_marker_files: `{', '.join(ui_autosave.get('persistent_state_marker_files') or []) or '—'}`",
         f"- workspace_ui_state_marker_files: `{', '.join(ui_autosave.get('workspace_ui_state_marker_files') or []) or '—'}`",
         "",
-        "### UI autosave issues",
+        "### Замечания по сохранению состояния интерфейса",
         "",
         _md_list([str(x) for x in (ui_autosave.get('issues') or [])]),
         "",
-        "## Errors",
+        "## Ошибки",
         "",
         _md_list([str(x) for x in errors]),
         "",
-        "## Release risks",
+        "## Риски выпуска",
         "",
         _md_list([str(x) for x in release_risks]),
         "",
-        "## Warnings",
+        "## Предупреждения",
         "",
         _md_list([str(x) for x in warnings]),
         "",
-        "## Notes",
+        "## Примечания",
         "",
-        "- Manifest integrity is checked by sha256/size of decompressed bytes for files listed in bundle/manifest.json.",
-        "- Files written via z.writestr (meta/triage/etc) are checked by presence and JSON parse (when applicable).",
-        "- anim_latest diagnostics are compared across triage sidecar, local pointer and global pointer when these sources are present.",
-        "- optimizer scope is compared across triage/health/export surfaces when scope artifacts are present in the bundle.",
+        "- Целостность состава проверяется по sha256 и размеру распакованных файлов из bundle/manifest.json.",
+        "- Файлы, записанные через z.writestr (meta/triage/etc), проверяются по наличию и разбору JSON, где это применимо.",
+        "- Последняя анимация сопоставляется по боковому отчёту, локальному указателю и общему указателю, если эти источники есть.",
+        "- Область оптимизации сопоставляется между отчётами проверки, состояния и экспорта, если нужные файлы есть в архиве.",
     ]
     return "\n".join(lines) + "\n"
 
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Validate a SEND bundle zip and produce a report")
-    ap.add_argument("--zip", required=True, help="Path to send bundle zip")
-    ap.add_argument("--out_dir", default=None, help="Write reports to this directory (optional)")
-    ap.add_argument("--print_summary", action="store_true", help="Print OK/FAIL + counts")
+    ap = argparse.ArgumentParser(description="Проверить ZIP архива проекта и подготовить отчёт")
+    ap.add_argument("--zip", required=True, help="Путь к ZIP архива проекта")
+    ap.add_argument("--out_dir", default=None, help="Папка для отчётов (необязательно)")
+    ap.add_argument("--print_summary", action="store_true", help="Напечатать итог и счётчики")
     ns = ap.parse_args()
 
     res = validate_send_bundle(Path(ns.zip))

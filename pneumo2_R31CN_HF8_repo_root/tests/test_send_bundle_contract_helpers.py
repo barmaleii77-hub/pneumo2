@@ -103,7 +103,7 @@ def test_choose_anim_snapshot_prefers_requested_source_and_reports_mismatch() ->
     assert chosen["source"] == "diagnostics"
     assert chosen["visual_cache_token"] == "tok-sidecar"
     assert chosen["pointer_sync_ok"] is False
-    assert any("visual_cache_token mismatch" in msg for msg in chosen["issues"])
+    assert any("Токен визуального кэша" in msg for msg in chosen["issues"])
 
 
 def test_dashboard_normalization_and_rendering_use_shared_contract() -> None:
@@ -139,9 +139,9 @@ def test_dashboard_normalization_and_rendering_use_shared_contract() -> None:
     assert norm["ring_closure_policy"] == "strict_exact"
     assert norm["ring_seam_open"] is True
     assert "tok-123" in md
-    assert "ring_closure: policy=strict_exact / applied=None / seam_open=True / seam_max_jump_m=0.012 / raw_seam_max_jump_m=0.015" in md
-    assert "mnemo_event_log_state: mode=Регуляторный коридор / total=5 / active=1 / acked=2" in md
-    assert "usable_from_bundle: True" in md
+    assert "Замыкание кольца: режим=strict_exact / применено=None / шов открыт=True / скачок шва, м=0.012 / исходный скачок, м=0.015" in md
+    assert "Состояние событий мнемосхемы: режим=Регуляторный коридор / всего=5 / активно=1 / принято=2" in md
+    assert "Восстанавливается из архива: True" in md
 
 
 def test_pick_anim_latest_fields_copies_selected_lists_and_ignores_unknowns() -> None:
@@ -266,19 +266,19 @@ def test_load_latest_send_bundle_anim_dashboard_merges_validation_bundle_flags(t
     assert anim["optimizer_scope_problem_hash_short"] == "ph_scope_12"
     assert anim["optimizer_scope_problem_hash_mode"] == "stable"
     assert any(
-        "Optimizer scope gate: FAIL / release_risk=True / reason=problem_hash mismatch between sources" == line
+        "Допуск области оптимизации: FAIL / риск выпуска=True / причина=problem_hash mismatch between sources" == line
         for line in lines
     )
     assert any(
-        "Optimizer scope: scope=ph_scope_12 / mode=stable / source=triage / sync=False / mismatches=problem_hash, problem_hash_mode" == line
+        "Область оптимизации: ключ=ph_scope_12 / режим=stable / источник=triage / синхронизация=False / расхождения=problem_hash, problem_hash_mode" == line
         for line in lines
     )
-    assert any("Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True" == line for line in lines)
-    assert any("Browser perf comparison: regression_checked / PASS / ready=True" == line for line in lines)
-    assert any("Ring seam: closure=strict_exact / open=True / seam_max_m=0.012 / raw_seam_max_m=0.015" == line for line in lines)
-    assert any("Browser perf bundle artifacts:" in line and "trace=True" in line for line in lines)
-    assert any("Desktop Mnemo events: exists=True / total=4 / active=1 / acked=2 / mode=Регуляторный коридор" == line for line in lines)
-    assert any("Desktop Mnemo recent: Большой перепад давлений | Смена режима" == line for line in lines)
+    assert any("Данные производительности анимации: trace_bundle_ready / PASS / готовы_в_архиве=True" == line for line in lines)
+    assert any("Сравнение производительности анимации: regression_checked / PASS / готово=True" == line for line in lines)
+    assert any("Шов кольца: замыкание=strict_exact / открыт=True / скачок_м=0.012 / исходный_скачок_м=0.015" == line for line in lines)
+    assert any("Данные производительности в архиве:" in line and "трасса=True" in line for line in lines)
+    assert any("События мнемосхемы: есть=True / всего=4 / активно=1 / принято=2 / режим=Регуляторный коридор" == line for line in lines)
+    assert any("Недавние события мнемосхемы: Большой перепад давлений | Смена режима" == line for line in lines)
 
 
 def test_build_anim_operator_recommendations_prioritizes_mnemo_and_perf_actions() -> None:
@@ -304,11 +304,11 @@ def test_build_anim_operator_recommendations_prioritizes_mnemo_and_perf_actions(
     )
 
     assert recommendations
-    assert recommendations[0].startswith("Open Desktop Mnemo first")
-    assert any("refresh the trace" in item for item in recommendations)
-    assert any("reference snapshot" in item for item in recommendations)
-    assert any("Re-export anim_latest" in item for item in recommendations)
-    assert any("Rebuild the send-bundle" in item for item in recommendations)
+    assert recommendations[0].startswith("Сначала откройте мнемосхему")
+    assert any("Обновите данные производительности" in item for item in recommendations)
+    assert any("эталонный снимок производительности" in item for item in recommendations)
+    assert any("Повторно экспортируйте последнюю анимацию" in item for item in recommendations)
+    assert any("Пересоберите архив" in item for item in recommendations)
 
 
 def test_ring_closure_summary_and_recommendations_surface_strict_exact_open_seam() -> None:
@@ -330,4 +330,4 @@ def test_ring_closure_summary_and_recommendations_surface_strict_exact_open_seam
     assert ring["severity"] == "warn"
     assert ring["closure_policy"] == "strict_exact"
     assert ring["seam_open"] is True
-    assert any("open ring seam is intentional" in item for item in recommendations)
+    assert any("открытый шов кольца ожидаем" in item for item in recommendations)

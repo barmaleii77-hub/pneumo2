@@ -17,6 +17,7 @@ from pneumo_solver_ui.desktop_spec_shell.workspace_pages import (
     InputWorkspacePage,
     OptimizationWorkspacePage,
     ResultsWorkspacePage,
+    SuiteWorkspacePage,
     _operator_catalog_text,
 )
 from pneumo_solver_ui.desktop_spec_shell.v19_guidance_widgets import V19_ACTION_FEEDBACK_TITLE
@@ -175,13 +176,56 @@ def test_gui_spec_main_window_uses_hosted_pages_for_runtime_and_control_hubs_for
     try:
         assert isinstance(window._page_widget_by_workspace_id["input_data"], InputWorkspacePage)
         assert isinstance(window._page_widget_by_workspace_id["ring_editor"], ControlHubWorkspacePage)
-        assert isinstance(window._page_widget_by_workspace_id["test_matrix"], ControlHubWorkspacePage)
+        assert isinstance(window._page_widget_by_workspace_id["test_matrix"], SuiteWorkspacePage)
         assert isinstance(window._page_widget_by_workspace_id["animation"], ControlHubWorkspacePage)
         assert isinstance(window._page_widget_by_workspace_id["baseline_run"], BaselineWorkspacePage)
         assert isinstance(window._page_widget_by_workspace_id["optimization"], OptimizationWorkspacePage)
         assert isinstance(window._page_widget_by_workspace_id["results_analysis"], ResultsWorkspacePage)
         assert isinstance(window._page_widget_by_workspace_id["diagnostics"], DiagnosticsWorkspacePage)
         assert callable(getattr(window._page_widget_by_workspace_id["overview"], "refresh_view", None))
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_suite_workspace_page_shows_test_rows_without_launcher_shell() -> None:
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        page = window._page_widget_by_workspace_id["test_matrix"]
+        assert isinstance(page, SuiteWorkspacePage)
+        page.refresh_view()
+        app.processEvents()
+
+        headers = [
+            page.suite_table.horizontalHeaderItem(column).text()
+            for column in range(page.suite_table.columnCount())
+        ]
+        assert headers == [
+            "Включено",
+            "Название",
+            "Тип испытания",
+            "Первый вход",
+            "Шаг, с",
+            "Длительность, с",
+            "Связанные файлы",
+        ]
+        assert page.suite_table.rowCount() > 0
+        visible_text = "\n".join(
+            [
+                *(label.text() for label in page.findChildren(QtWidgets.QLabel)),
+                *(box.title() for box in page.findChildren(QtWidgets.QGroupBox)),
+                *(button.text() for button in page.findChildren(QtWidgets.QPushButton)),
+                *headers,
+            ]
+        )
+        assert "Связано с редактором циклического сценария" in visible_text
+        assert "Смысл и правила окна" not in visible_text
+        assert "Открытие:" not in visible_text
+        assert "stage" not in visible_text
+        assert "suite" not in visible_text
+        assert "sidecar" not in visible_text
     finally:
         window.close()
         window.deleteLater()
@@ -229,7 +273,7 @@ def test_gui_spec_main_window_visible_text_hides_internal_service_terms() -> Non
         r"\b(Open .*refresh|current evidence status|Review|Adopt|Restore)\b|"
         r"готово=|состояние=|строк=|включено=|level=|skip_ui_smoke|действие=|статус=|пакет готов=|"
         r"(?-i:контроль:|сверка:|выбрано:|строк:|включено:|режим:|Режим:|"
-        r"Открыто:|Открыто окно:|Сводка окна:|Подсказка:|Обязательное условие:|"
+        r"Открыто:|Открыто " r"окно:|Сводка окна:|Подсказка:|Обязательное условие:|"
         r"Почему это важно:|Где виден результат:|пояснение:|Ограничение:|"
         r"Опорный прогон:|Идентификатор прогона:|Метка прогона:|Состояние опорного прогона:|"
         r"Набор испытаний:|Исходные данные:|Сценарий:|Доступен оптимизатору:|"
@@ -349,15 +393,15 @@ def test_control_hub_pages_render_catalog_surface_summary_and_actions() -> None:
     app = _app()
     window = DesktopGuiSpecMainWindow()
     try:
-        page = window._page_widget_by_workspace_id["test_matrix"]
+        page = window._page_widget_by_workspace_id["ring_editor"]
         assert isinstance(page, ControlHubWorkspacePage)
         page.refresh_view()
         app.processEvents()
 
         assert page.surface_box.title() == "Ключевые элементы рабочего шага"
         assert page.actions_box.title() == "Основные действия"
-        assert page.workspace.automation_id == "TS-TABLE"
-        assert len(page.action_commands) >= 2
+        assert page.workspace.workspace_id == "ring_editor"
+        assert len(page.action_commands) >= 1
     finally:
         window.close()
         window.deleteLater()

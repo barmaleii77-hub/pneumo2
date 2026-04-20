@@ -926,8 +926,8 @@ def test_desktop_input_editor_is_wired_into_desktop_control_center() -> None:
     assert "Загрузить файл данных..." in editor_src
     assert "Вернуть исходный шаблон" in editor_src
     assert "Сохранить рабочую копию" in editor_src
-    assert "Собрать архив для отправки" in editor_src
-    assert "Проверка и отправка открыты." in editor_src
+    assert "Сохранить архив проекта" in editor_src
+    assert "Проверка проекта открыта." in editor_src
     assert "Собрать диагностику" not in editor_src
     assert "Диагностика и отправка открыты." not in editor_src
     assert "Рабочие профили" in editor_src
@@ -1211,7 +1211,8 @@ def test_desktop_input_editor_promotes_classic_desktop_workspace_with_navigation
     assert "build_desktop_profile_diff" in editor_src
     assert "Проверить конфигурацию" in editor_src
     assert "Быстрый расчёт" in editor_src
-    assert "Открыть отдельное окно настройки расчёта" in editor_src
+    assert "Перейти к настройке расчёта" in editor_src
+    assert "Открыть отдельное " "окно настройки расчёта" not in editor_src
     assert "_open_run_setup_center" in editor_src
     assert "DesktopRunSetupCenter" in editor_src
     assert "run_launch_summary_var" in editor_src

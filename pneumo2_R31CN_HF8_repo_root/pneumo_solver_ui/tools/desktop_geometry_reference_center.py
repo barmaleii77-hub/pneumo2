@@ -73,7 +73,7 @@ class DesktopGeometryReferenceCenter:
         )
         self.evidence_export_summary_var = tk.StringVar(
             master=self.root,
-            value="Данные для диагностики: ещё не подготовлены.",
+            value="Данные для проверки проекта: ещё не сохранены.",
         )
         self.dw_min_var = tk.DoubleVar(master=self.root, value=-100.0)
         self.dw_max_var = tk.DoubleVar(master=self.root, value=100.0)
@@ -170,7 +170,7 @@ class DesktopGeometryReferenceCenter:
             wraplength=980,
             justify="left",
         ).grid(row=2, column=1, columnspan=4, sticky="ew", padx=8, pady=(8, 0))
-        export_btn = ttk.Button(source, text="Подготовить данные для отправки", command=self._export_evidence_for_send)
+        export_btn = ttk.Button(source, text="Сохранить данные для проверки проекта", command=self._export_evidence_for_send)
         export_btn.grid(row=3, column=0, sticky="w", pady=(8, 0))
         ttk.Label(
             source,
@@ -189,8 +189,8 @@ class DesktopGeometryReferenceCenter:
         ).grid(row=4, column=0, columnspan=5, sticky="ew", pady=(8, 0))
         self._attach_tooltip(
             export_btn,
-            "Подготовить данные справочника для диагностики и отправки. "
-            "Справочник передаёт краткую сводку по данным и не собирает архив отправки.",
+            "Сохранить данные справочника для проверки проекта. "
+            "Справочник передаёт краткую сводку по данным и не сохраняет архив проекта.",
         )
         source.pack(fill="x", expand=False)
 
@@ -1067,19 +1067,19 @@ class DesktopGeometryReferenceCenter:
             missing_text = ", ".join(missing) if missing else "нет"
             producer_text = self._producer_readiness_text(payload)
             self.evidence_export_summary_var.set(
-                "Данные для диагностики: "
+                "Данные для проверки проекта: "
                 f"{self._status_label(status)}; подтверждение={self._status_label(payload.get('geometry_acceptance_gate'))}; "
                 f"актуальность={self._status_label(freshness.get('status'))}/{self._status_label(freshness.get('relation'))}; "
                 f"ширина дороги={self._status_label(payload.get('road_width_status'))}; "
                 f"размещение={self._status_label(payload.get('packaging_status'))}; "
-                f"{producer_text}; рабочая копия: {workspace_path}; файл отправки: {sidecar_path}; не хватает: {missing_text}."
+                f"{producer_text}; рабочая копия: {workspace_path}; файл проверки проекта: {sidecar_path}; не хватает: {missing_text}."
             )
             self.status_var.set(
-                "Данные справочника геометрии подготовлены для диагностики и отправки: "
+                "Данные справочника геометрии сохранены для проверки проекта: "
                 f"{workspace_path.name} и {sidecar_path.name}."
             )
         except Exception as exc:
-            self.evidence_export_summary_var.set(f"Данные для диагностики: ошибка: {exc}")
+            self.evidence_export_summary_var.set(f"Данные для проверки проекта: ошибка: {exc}")
             self.status_var.set(f"Не удалось подготовить данные справочника геометрии: {exc}")
 
     def refresh_all(self) -> None:
@@ -1864,7 +1864,7 @@ class DesktopGeometryReferenceCenter:
             f"Паспорт размещения цилиндров: {axis_only} из {len(package_rows)} семейств остаются осевыми или несогласованными. "
             f"данные экспорта: {packaging_evidence.packaging_status or 'missing'} "
             f"({packaging_evidence.mismatch_status}), контрольная отметка: {packaging_evidence.packaging_contract_hash or '—'}. "
-            f"Данные для диагностики: {self._producer_readiness_text(diagnostics_handoff)}; "
+            f"Данные для проверки проекта: {self._producer_readiness_text(diagnostics_handoff)}; "
             f"не хватает: {diagnostics_handoff.get('evidence_missing') or []}. "
             "Эти паспорта являются справочными данными; это окно не строит сетки аниматора."
             + ((" Предупреждения: " + "; ".join(packaging_evidence.warnings)) if packaging_evidence.warnings else "")

@@ -301,7 +301,7 @@ def test_make_send_bundle_embeds_v32_evidence_manifest_and_final_latest_pointer(
     assert latest_inspection_payload["has_embedded_health_report"] is True
     latest_inspection_text = latest_inspection_md.read_text(encoding="utf-8")
     assert "ZIP SHA256" in latest_inspection_text
-    assert "Evidence manifest" in latest_inspection_text
+    assert "Состав данных" in latest_inspection_text
 
     validation = validate_send_bundle(zip_path)
     assert validation.ok is True, json.dumps(validation.report_json, ensure_ascii=False, indent=2)
@@ -311,7 +311,7 @@ def test_make_send_bundle_embeds_v32_evidence_manifest_and_final_latest_pointer(
     assert latest_validation.ok is True, json.dumps(latest_validation.report_json, ensure_ascii=False, indent=2)
     assert latest_validation.report_json["latest_integrity_proof"]["status"] == "READY"
     assert latest_validation.report_json["latest_integrity_proof"]["embedded_manifest_stage_scoped"] is True
-    assert "Latest integrity proof" in latest_validation.report_md
+    assert "Проверка актуального архива" in latest_validation.report_md
 
     text_for_encoding = (
         json.dumps(meta, ensure_ascii=False)
@@ -509,7 +509,7 @@ def test_make_send_bundle_embeds_engineering_analysis_evidence_for_validation_an
     assert validation_engineering["missing_required_artifact_keys"] == []
     assert "validated_artifacts_status" in validation.report_md
     assert "ready_required_artifact_count" in validation.report_md
-    assert "open_gap_status" in validation.report_md
+    assert "Открытые вопросы" in validation.report_md
     assert validation_engineering["selected_run_candidate_count"] == 2
     assert validation_engineering["selected_run_ready_candidate_count"] == 1
     assert validation_engineering["selected_run_missing_inputs_candidate_count"] == 1
@@ -525,11 +525,11 @@ def test_make_send_bundle_embeds_engineering_analysis_evidence_for_validation_an
     assert inspection_engineering["selected_run_ready_candidate_count"] == 1
     assert inspection_engineering["validated_artifacts_status"] == "READY"
     assert inspection_engineering["ready_required_artifact_count"] == 3
-    assert "Engineering analysis evidence" in inspection_md
+    assert "Данные инженерного анализа" in inspection_md
     assert "engineering-hash-001" in inspection_md
     assert "validated_artifacts_status" in inspection_md
     assert "ready_required_artifact_count" in inspection_md
-    assert "handoff_contract_status" in inspection_md
+    assert "Состояние передачи данных" in inspection_md
     assert "selected_run_ready_candidate_count" in inspection_md
     assert "open_gap_status" in inspection_md
 
@@ -1137,6 +1137,6 @@ def test_missing_evidence_warnings_reach_validation_and_health(tmp_path: Path) -
     md_text = Path(health_md).read_text(encoding="utf-8", errors="replace")
     assert any("Missing evidence BND-007" in msg for msg in notes)
     assert any("Analysis evidence / HO-009 context is STALE" in msg for msg in notes)
-    assert "## Evidence manifest" in md_text
-    assert "missing_evidence: Missing evidence BND-007" in md_text
-    assert "missing_evidence: Analysis evidence / HO-009 context is STALE" in md_text
+    assert "## Состав данных" in md_text
+    assert "Нет данных: Missing evidence BND-007" in md_text
+    assert "Нет данных: Analysis evidence / HO-009 context is STALE" in md_text

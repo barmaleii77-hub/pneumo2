@@ -1,4 +1,4 @@
-"""Запуск главного desktop-окна с проверочным Tk-вариантом."""
+"""Запуск рабочего места инженера с проверочным Tk-вариантом."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from pneumo_solver_ui.desktop_shell.registry import build_desktop_shell_specs
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="desktop_main_shell_qt",
-        description="Главное Windows-окно для управления рабочими окнами PneumoApp.",
+        description="Windows-рабочее место для управления инженерными окнами PneumoApp.",
     )
     parser.add_argument(
         "--open",
@@ -22,7 +22,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         metavar="KEY",
-        help="Открыть рабочее окно по ключу реестра при запуске. Можно указать несколько раз.",
+        help="Перейти к рабочему разделу по ключу реестра при запуске. Можно указать несколько раз.",
     )
     parser.add_argument(
         "--list-tools",
@@ -32,12 +32,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--legacy-tk-shell",
         action="store_true",
-        help="Запустить проверочное Tk-окно вместо текущего главного desktop-окна.",
+        help="Запустить проверочный Tk-вариант вместо текущего рабочего места.",
     )
     parser.add_argument(
         "--runtime-proof",
         metavar="DIR",
-        help="Записать JSON/MD-подтверждение работы главного окна и выйти без запуска доменных окон.",
+        help="Записать JSON/MD-подтверждение работы рабочего места и выйти без запуска доменных окон.",
     )
     parser.add_argument(
         "--runtime-proof-offscreen",
@@ -60,7 +60,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--runtime-proof-validate",
         metavar="JSON",
-        help="Проверить существующий JSON-пруф главного окна и выйти.",
+        help="Проверить существующий JSON-пруф рабочего места и выйти.",
     )
     parser.add_argument(
         "--runtime-proof-require-manual-pass",
@@ -160,7 +160,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         from pneumo_solver_ui.desktop_qt_shell.main_window import main as run_qt_shell_main
     except Exception as exc:
         print(
-            f"[desktop_main_shell_qt] текущее главное окно недоступно, запускаю проверочное Tk-окно: {exc}",
+            f"[desktop_main_shell_qt] рабочее место инженера недоступно, запускаю запасной оконный режим: {exc}",
             file=sys.stderr,
         )
         return _run_legacy_shell(startup_tool_keys=startup_tool_keys)

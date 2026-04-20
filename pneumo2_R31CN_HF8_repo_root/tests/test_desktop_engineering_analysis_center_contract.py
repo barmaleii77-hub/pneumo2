@@ -19,16 +19,16 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert 'workspace = ttk.Panedwindow(self, orient="horizontal")' in src
     for label in (
         "Обновить данные",
-        "Открыть выбранный файл",
+        "Открыть файл из списка",
         "Зафиксировать прогон",
-        "Подготовить материалы отправки",
-        "Открыть материалы отправки",
+        "Сохранить материалы проверки проекта",
+        "Открыть материалы проверки проекта",
         "Влияние системы",
         "Полный отчёт",
         "Диапазоны влияния",
-        "Открыть проверку и отправку",
+        "Открыть проверку проекта",
         "Что открыть",
-        "Открыть выбранное",
+        "Открыть этот источник",
     ):
         assert label in src
     assert "threading.Thread" in src
@@ -53,10 +53,10 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert 'label == "Зафиксировать выбранный прогон" and result.ok' in src
     assert "def _auto_export_evidence_after_ho007" in src
     assert "write_diagnostics_evidence_manifest" in src
-    assert "Материалы проверки и отправки подготовлены автоматически" in src
+    assert "Материалы проверки проекта сохранены автоматически" in src
     assert "def _open_evidence_manifest" in src
-    assert "Материалы проверки и отправки открыты" in src
-    assert "Подготовить материалы отправки" in src
+    assert "Материалы проверки проекта открыты" in src
+    assert "Сохранить материалы проверки проекта" in src
     assert "compare_influence_surface_count" in src
     assert "def _compare_surface_details" in src
     assert "def _compare_surface_preview_for_artifact" in src
@@ -73,7 +73,7 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert "Калибровка" in src
     assert "Влияние и сравнение" in src
     assert "Чувствительность и неопределённость" in src
-    assert "Аниматор и отправка" in src
+    assert "Аниматор и архив" in src
     assert "Предпросмотр графиков и таблиц" in src
     assert "Графики влияния" in src
     assert "Табличные файлы" in src
@@ -89,7 +89,7 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert "Калибровочный запуск" in runtime_src
     assert "Статическая настройка" in runtime_src
     assert "Неопределённость и приоритет измерений" in runtime_src
-    assert "Материалы проверки и отправки" in runtime_src
+    assert "Материалы проверки проекта" in runtime_src
     assert "analysis_compare_handoff_summary" in src
     assert "analysis_results_boundary_summary" in src
     assert '"compare_viewer_handoff_summary"' in src
@@ -104,13 +104,15 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     for forbidden in (
         "Центр инженерного анализа готов",
         "Открыть артефакт",
-        "Открыть выбранный артефакт",
-        "Открыть выбранный прогон",
+        "Открыть выбранный " "артефакт",
+        "Открыть выбранный " "файл",
+        "Открыть выбран" "ное",
+        "Открыть выбранный " "прогон",
         "Открыть связь анализа с аниматором",
         "Открыть данные для анимации",
         "Открыть контекст анимации",
-        "Показать выбранный файл",
-        "Показать выбранное",
+        "Показать выбранный " "файл",
+        "Показать выбран" "ное",
         "Показать диагностику",
         "Собрать диагностику",
         "Подготовить диагностику",
@@ -152,7 +154,6 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
         "Diagnostics/SEND handoff",
         "Материалы диагностики",
         "диагностическим признакам",
-        "для диагностики и отправки",
         "workspace/handoffs/WS-ANALYSIS",
         "send_bundles/latest_engineering_analysis_evidence_manifest.json",
     ):

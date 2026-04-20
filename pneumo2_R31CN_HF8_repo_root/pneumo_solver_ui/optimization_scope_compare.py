@@ -268,6 +268,7 @@ def compare_optimizer_scope_sources(
     canonical = dict(normalized_sources.get(canonical_name) or {})
 
     issues: list[str] = []
+    mismatch_fields: list[str] = []
     compared_fields: list[str] = []
     for field in _SCOPE_COMPARE_FIELDS:
         present: Dict[str, Any] = {}
@@ -285,18 +286,15 @@ def compare_optimizer_scope_sources(
             f"{source_name}={_display_value(field, normalized_sources[source_name])}"
             for source_name in sorted(present, key=lambda item: _source_sort_key(item, preferred_order))
         )
-        issues.append(f"optimizer scope {field} mismatch between sources: {parts}")
+        issues.append(f"область оптимизации: поле {field} отличается между источниками: {parts}")
+        mismatch_fields.append(field)
 
     canonical["available"] = True
     canonical["canonical_source"] = canonical_name
     canonical["source_count"] = len(normalized_sources)
     canonical["sources"] = normalized_sources
     canonical["compared_fields"] = list(compared_fields)
-    canonical["mismatch_fields"] = [
-        field
-        for field in _SCOPE_COMPARE_FIELDS
-        if any(f"optimizer scope {field} mismatch" in str(issue) for issue in issues)
-    ]
+    canonical["mismatch_fields"] = list(dict.fromkeys(mismatch_fields))
     canonical["issues"] = list(issues)
     canonical["scope_sync_ok"] = False if issues else (True if compared_fields else None)
     return canonical
@@ -320,12 +318,16 @@ def evaluate_optimizer_scope_gate(scope_summary: Mapping[str, Any] | None) -> Di
         mismatch_fields = [
             str(field).strip()
             for field in _SCOPE_COMPARE_FIELDS
-            if any(f"optimizer scope {field} mismatch" in str(issue) for issue in (scope.get("issues") or []))
+            if any(
+                f"optimizer scope {field} mismatch" in str(issue)
+                or f"область оптимизации: поле {field} отличается" in str(issue)
+                for issue in (scope.get("issues") or [])
+            )
         ]
 
     gate: Dict[str, Any] = {
         "release_gate": "MISSING",
-        "release_gate_reason": "optimizer scope artifacts are missing",
+        "release_gate_reason": "данные области оптимизации отсутствуют",
         "dominant_kind": "missing",
         "release_risk": False,
         "canonical_source": str(scope.get("canonical_source") or ""),
@@ -342,19 +344,19 @@ def evaluate_optimizer_scope_gate(scope_summary: Mapping[str, Any] | None) -> Di
         gate["dominant_kind"] = "hard_mismatch" if any(field in _HARD_SCOPE_MISMATCH_FIELDS for field in mismatch_fields) else "soft_mismatch"
         gate["release_gate"] = "FAIL" if gate["dominant_kind"] == "hard_mismatch" else "WARN"
         gate["release_gate_reason"] = (
-            f"optimizer scope mismatch across {int(source_count or 0)} sources: {', '.join(mismatch_fields)}"
+            f"область оптимизации отличается между источниками ({int(source_count or 0)}): {', '.join(mismatch_fields)}"
         )
         return gate
 
     if scope.get("scope_sync_ok") is True:
         gate["release_gate"] = "PASS"
-        gate["release_gate_reason"] = f"optimizer scope consistent across {int(source_count or 0)} sources"
+        gate["release_gate_reason"] = f"область оптимизации согласована между источниками ({int(source_count or 0)})"
         gate["dominant_kind"] = "pass"
         return gate
 
     if source_count > 0:
         gate["release_gate"] = "MISSING"
-        gate["release_gate_reason"] = f"optimizer scope sync not verifiable from {int(source_count)} source(s)"
+        gate["release_gate_reason"] = f"синхронизацию области оптимизации нельзя проверить по {int(source_count)} источнику(ам)"
         gate["dominant_kind"] = "single_source"
         return gate
 

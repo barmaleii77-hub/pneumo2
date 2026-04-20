@@ -219,7 +219,7 @@ def main() -> int:
             if kpi in row and _isfinite(row.get(kpi)):
                 out_row[kpi] = float(row.get(kpi))
 
-        # Сохраним worst по группам (это удобно для диагностики)
+        # Сохраним worst по группам: это удобно для разбора проверки.
         for g, pv in sorted(per_group.items()):
             out_row[f"group__{g}__robust"] = float(pv)
 

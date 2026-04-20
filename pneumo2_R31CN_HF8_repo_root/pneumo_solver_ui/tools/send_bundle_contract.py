@@ -233,6 +233,39 @@ def _basename_or_empty(value: Any) -> str:
         return ""
 
 
+def _user_anim_issue(text: Any) -> str:
+    msg = str(text).strip()
+    if not msg:
+        return ""
+    lowered = msg.lower()
+    if "visual_cache_token mismatch" in lowered:
+        if ":" in msg:
+            return "Токен визуального кэша отличается между источниками:" + msg.split(":", 1)[1]
+        return "Токен визуального кэша отличается между источниками"
+    if "visual_reload_inputs mismatch" in lowered:
+        if ":" in msg:
+            return "Входные данные перезагрузки отличаются между источниками:" + msg.split(":", 1)[1]
+        return "Входные данные перезагрузки отличаются между источниками"
+    if "npz_path mismatch" in lowered:
+        if ":" in msg:
+            return "Файл последней анимации отличается между источниками:" + msg.split(":", 1)[1]
+        return "Файл последней анимации отличается между источниками"
+    if "anim_latest diagnostics is not usable from this bundle" in lowered:
+        return "Данные последней анимации не восстанавливаются из архива"
+    if "anim_latest diagnostics exist but are not reproducible from this bundle" in lowered:
+        return "Данные последней анимации есть, но не восстанавливаются из архива"
+    if "is not usable from this bundle" in lowered and "anim_latest" in lowered:
+        return msg.replace("anim_latest", "последняя анимация").replace("is not usable from this bundle", "не восстанавливается из архива")
+    if "external / not mirrored in bundle" in lowered:
+        return (
+            msg.replace("anim_latest", "последняя анимация")
+            .replace("pointer_json", "указатель")
+            .replace("npz_path", "файл анимации")
+            .replace("is external / not mirrored in bundle", "находится вне архива")
+        )
+    return msg
+
+
 def extract_anim_snapshot(obj: Any, *, source: str) -> Optional[Dict[str, Any]]:
     if not isinstance(obj, dict):
         return None
@@ -258,7 +291,8 @@ def extract_anim_snapshot(obj: Any, *, source: str) -> Optional[Dict[str, Any]]:
     )
 
     issues_src = obj.get("issues") or obj.get("anim_latest_issues") or []
-    issues = list(issues_src) if isinstance(issues_src, list) else []
+    issues = [_user_anim_issue(x) for x in issues_src] if isinstance(issues_src, list) else []
+    issues = [x for x in issues if x]
 
     out = {
         "source": str(source),
@@ -321,14 +355,14 @@ def annotate_anim_source_for_bundle(state: Optional[Dict[str, Any]], *, name_set
     out["pointer_json_in_bundle"] = pointer_in_bundle if pointer_json else None
     out["npz_path_in_bundle"] = npz_in_bundle if npz_path else None
     out["usable_from_bundle"] = bool(out.get("visual_cache_token") and npz_in_bundle)
-    issues = [str(x) for x in (out.get("issues") or []) if str(x).strip()]
+    issues = [_user_anim_issue(x) for x in (out.get("issues") or []) if str(x).strip()]
     src = str(out.get("source") or "source")
     if pointer_json and not pointer_in_bundle:
-        issues.append(f"anim_latest {src} pointer_json is external / not mirrored in bundle: {pointer_json}")
+        issues.append(f"последняя анимация {src}: указатель находится вне архива: {pointer_json}")
     if npz_path and not npz_in_bundle:
-        issues.append(f"anim_latest {src} npz_path is external / not mirrored in bundle: {npz_path}")
+        issues.append(f"последняя анимация {src}: файл анимации находится вне архива: {npz_path}")
     if (out.get("available") or out.get("visual_cache_token")) and not out["usable_from_bundle"]:
-        issues.append(f"anim_latest {src} is not usable from this bundle")
+        issues.append(f"последняя анимация {src} не восстанавливается из архива")
     out["issues"] = list(dict.fromkeys(issues))
     return out
 
@@ -405,24 +439,24 @@ def choose_anim_snapshot(
 
     if len(set(token_map.values())) > 1:
         parts = ", ".join(f"{k}={v}" for k, v in token_map.items())
-        issues.append(f"anim_latest visual_cache_token mismatch between sources: {parts}")
+        issues.append(f"Токен визуального кэша последней анимации отличается между источниками: {parts}")
     if len(set(reload_map.values())) > 1:
         parts = ", ".join(f"{k}={list(v)}" for k, v in reload_map.items())
-        issues.append(f"anim_latest visual_reload_inputs mismatch between sources: {parts}")
+        issues.append(f"Входные данные перезагрузки последней анимации отличаются между источниками: {parts}")
     if len(set(npz_map.values())) > 1:
         parts = ", ".join(f"{k}={v}" for k, v in npz_map.items())
-        issues.append(f"anim_latest npz_path mismatch between sources: {parts}")
+        issues.append(f"Файл последней анимации отличается между источниками: {parts}")
 
     for snap in sources.values():
         for msg in list(snap.get("issues") or []):
-            smsg = str(msg).strip()
+            smsg = _user_anim_issue(msg)
             if smsg and smsg not in issues:
                 issues.append(smsg)
 
     if chosen.get("available") and not str(chosen.get("visual_cache_token") or ""):
-        issues.append("anim_latest is marked available but visual_cache_token is empty")
+        issues.append("Последняя анимация отмечена как доступная, но токен визуального кэша пустой")
     if chosen.get("available") and chosen.get("usable_from_bundle") is False:
-        issues.append("anim_latest diagnostics exist but are not reproducible from this bundle")
+        issues.append("Данные последней анимации есть, но не восстанавливаются из архива")
 
     chosen["issues"] = list(dict.fromkeys(issues))
     if chosen.get("pointer_sync_ok") is None:
@@ -461,7 +495,7 @@ def summarize_mnemo_event_log(anim: Any) -> Dict[str, Any]:
             "acknowledged_latch_count": None,
             "recent_titles": [],
             "severity": "missing",
-            "headline": "Desktop Mnemo event-log not available",
+            "headline": "Журнал событий мнемосхемы недоступен",
             "red_flags": [],
         }
 
@@ -480,28 +514,28 @@ def summarize_mnemo_event_log(anim: Any) -> Dict[str, Any]:
     if (active_latch_count or 0) > 0:
         severity = "critical"
         headline = (
-            f"Desktop Mnemo reports {active_latch_count} active latched event(s)"
-            + (f" in mode {current_mode}" if current_mode else "")
+            f"В мнемосхеме есть активные события: {active_latch_count}"
+            + (f"; режим: {current_mode}" if current_mode else "")
         )
         red_flags.append(headline)
     elif (acknowledged_latch_count or 0) > 0:
         severity = "warn"
         headline = (
-            f"Desktop Mnemo retains {acknowledged_latch_count} acknowledged latch(es)"
-            + (f" after mode {current_mode}" if current_mode else "")
+            f"В мнемосхеме остались подтверждённые события: {acknowledged_latch_count}"
+            + (f"; режим: {current_mode}" if current_mode else "")
         )
     elif recent_titles:
         severity = "warn"
-        headline = "Desktop Mnemo recorded recent events"
+        headline = "В мнемосхеме есть недавние события"
     elif exists:
         severity = "ok"
-        headline = "Desktop Mnemo event-log available"
+        headline = "Журнал событий мнемосхемы доступен"
     else:
         severity = "missing"
-        headline = "Desktop Mnemo event-log not available"
+        headline = "Журнал событий мнемосхемы недоступен"
 
     if recent_titles and severity == "critical":
-        red_flags.append("Desktop Mnemo recent: " + " | ".join(recent_titles[:3]))
+        red_flags.append("Недавние события мнемосхемы: " + " | ".join(recent_titles[:3]))
 
     return {
         "exists": exists,
@@ -531,7 +565,7 @@ def summarize_ring_closure(anim: Any) -> Dict[str, Any]:
             "seam_max_jump_m": None,
             "raw_seam_max_jump_m": None,
             "severity": "missing",
-            "headline": "Ring closure diagnostics not available",
+            "headline": "Проверка замыкания кольца недоступна",
             "red_flags": [],
         }
 
@@ -545,25 +579,25 @@ def summarize_ring_closure(anim: Any) -> Dict[str, Any]:
 
     if scenario_kind != "ring" and not closure_policy:
         severity = "missing"
-        headline = "Ring closure diagnostics not applicable"
+        headline = "Проверка замыкания кольца не требуется"
     elif seam_open is True and closure_policy == "strict_exact":
         severity = "warn"
-        headline = "Ring seam is intentionally open under strict_exact closure"
+        headline = "Шов кольца намеренно оставлен открытым в режиме strict_exact"
         red_flags.append(
-            "Ring seam remains open under strict_exact; verify that open-seam visuals/exports are acceptable for this run."
+            "Шов кольца открыт в режиме strict_exact; проверьте, что открытый шов допустим для просмотра и экспорта этого расчёта."
         )
     elif seam_open is True:
         severity = "critical"
-        headline = "Ring seam remains open"
+        headline = "Шов кольца остаётся открытым"
         red_flags.append(
-            f"Ring seam is open under closure policy {closure_policy or '—'}; looped viewers/export may not be trustworthy."
+            f"Шов кольца открыт при режиме замыкания {closure_policy or '—'}; просмотр и экспорт замкнутого кольца могут быть недостоверны."
         )
     elif seam_open is False:
         severity = "ok"
-        headline = "Ring seam closed"
+        headline = "Шов кольца замкнут"
     else:
         severity = "info"
-        headline = "Ring closure policy present, seam state unresolved"
+        headline = "Режим замыкания кольца задан, но состояние шва не определено"
 
     return {
         "scenario_kind": scenario_kind,
@@ -587,29 +621,29 @@ def build_anim_operator_recommendations(anim: Any) -> List[str]:
     ring = summarize_ring_closure(norm)
     recommendations: List[str] = []
     current_mode = str(mnemo.get("current_mode") or "").strip()
-    current_mode_text = f" in mode {current_mode}" if current_mode else ""
+    current_mode_text = f" в режиме {current_mode}" if current_mode else ""
 
     if str(mnemo.get("severity") or "") == "critical":
         recommendations.append(
-            f"Open Desktop Mnemo first and inspect active latched events{current_mode_text} before ACK/reset."
+            f"Сначала откройте мнемосхему и проверьте активные события{current_mode_text} перед подтверждением или сбросом."
         )
     elif str(mnemo.get("severity") or "") == "warn":
         recommendations.append(
-            f"Review Desktop Mnemo acknowledged/recent events{current_mode_text} before closing pneumatic triage."
+            f"Проверьте подтверждённые и недавние события мнемосхемы{current_mode_text} перед закрытием проверки пневматики."
         )
     elif norm.get("available") and mnemo.get("exists") is not True:
         recommendations.append(
-            "Generate a Desktop Mnemo event-log from the current anim_latest run so pneumatic history is present in triage."
+            "Сформируйте журнал событий мнемосхемы для текущей анимации, чтобы история пневматики была сохранена в проверке."
         )
 
     ring_policy = str(ring.get("closure_policy") or "").strip()
     if str(ring.get("severity") or "") == "critical":
         recommendations.append(
-            f"Review ring closure before sign-off; current policy is {ring_policy or '—'} and seam_open={ring.get('seam_open')}."
+            f"Проверьте замыкание кольца перед выпуском результата: режим {ring_policy or '—'}, шов открыт={ring.get('seam_open')}."
         )
     elif str(ring.get("severity") or "") == "warn":
         recommendations.append(
-            f"Confirm that the open ring seam is intentional for policy {ring_policy or '—'} before treating looped viewers/export as closed."
+            f"Подтвердите, что открытый шов кольца ожидаем для режима {ring_policy or '—'}, прежде чем считать просмотр и экспорт замкнутыми."
         )
 
     perf_evidence_status = str(norm.get("browser_perf_evidence_status") or "").strip()
@@ -617,7 +651,7 @@ def build_anim_operator_recommendations(anim: Any) -> List[str]:
     perf_bundle_ready = norm.get("browser_perf_bundle_ready")
     if perf_evidence_status and perf_evidence_status != "trace_bundle_ready":
         recommendations.append(
-            f"Open browser perf evidence artifacts and refresh the trace; current evidence status is {perf_evidence_status}"
+            f"Обновите данные производительности анимации и трассу; текущее состояние: {perf_evidence_status}"
             + (f" ({perf_evidence_level})" if perf_evidence_level else "")
             + f", bundle_ready={perf_bundle_ready}."
         )
@@ -628,7 +662,7 @@ def build_anim_operator_recommendations(anim: Any) -> List[str]:
     perf_compare_changed = norm.get("browser_perf_comparison_changed")
     if perf_compare_status == "no_reference":
         recommendations.append(
-            "Create or refresh a browser perf reference snapshot before marking performance review complete."
+            "Создайте или обновите эталонный снимок производительности перед завершением проверки производительности."
         )
     elif (
         perf_compare_status
@@ -639,18 +673,18 @@ def build_anim_operator_recommendations(anim: Any) -> List[str]:
         )
     ):
         recommendations.append(
-            f"Review the browser perf comparison report before sign-off; status={perf_compare_status}"
+            f"Проверьте сравнение производительности перед выпуском результата: состояние={perf_compare_status}"
             + (f", level={perf_compare_level}" if perf_compare_level else "")
             + f", ready={perf_compare_ready}, changed={perf_compare_changed}."
         )
 
     if norm.get("pointer_sync_ok") is False:
         recommendations.append(
-            "Re-export anim_latest from the current workspace to resync pointer/token state across diagnostics sources."
+            "Повторно экспортируйте последнюю анимацию из текущей рабочей области, чтобы синхронизировать указатели и токены."
         )
     if norm.get("usable_from_bundle") is False:
         recommendations.append(
-            "Rebuild the send-bundle after re-export so anim_latest is reproducible directly from the archive."
+            "Пересоберите архив после повторного экспорта, чтобы последняя анимация восстанавливалась напрямую из архива."
         )
 
     deduped: List[str] = []
@@ -805,74 +839,74 @@ def format_anim_dashboard_brief_lines(anim: Any) -> List[str]:
     ]
 
     if token:
-        lines.append(f"Anim latest token: {token}")
+        lines.append(f"Токен последней анимации: {token}")
     if reload_inputs:
-        lines.append("Anim reload inputs: " + ", ".join(str(x) for x in reload_inputs))
+        lines.append("Входные данные перезагрузки анимации: " + ", ".join(str(x) for x in reload_inputs))
     if optimizer_scope_gate:
-        gate_line = f"Optimizer scope gate: {optimizer_scope_gate}"
-        gate_line += f" / release_risk={optimizer_scope_release_risk}"
+        gate_line = f"Допуск области оптимизации: {optimizer_scope_gate}"
+        gate_line += f" / риск выпуска={optimizer_scope_release_risk}"
         if optimizer_scope_gate_reason:
-            gate_line += f" / reason={optimizer_scope_gate_reason}"
+            gate_line += f" / причина={optimizer_scope_gate_reason}"
         lines.append(gate_line)
     if optimizer_scope_problem_hash or optimizer_scope_problem_hash_mode or optimizer_scope_canonical_source:
         scope_line = (
-            "Optimizer scope: "
-            f"scope={optimizer_scope_problem_hash or 'вЂ”'}"
-            f" / mode={optimizer_scope_problem_hash_mode or 'вЂ”'}"
-            f" / source={optimizer_scope_canonical_source or 'вЂ”'}"
-            f" / sync={optimizer_scope_sync_ok}"
+            "Область оптимизации: "
+            f"ключ={optimizer_scope_problem_hash or '—'}"
+            f" / режим={optimizer_scope_problem_hash_mode or '—'}"
+            f" / источник={optimizer_scope_canonical_source or '—'}"
+            f" / синхронизация={optimizer_scope_sync_ok}"
         )
         if optimizer_scope_mismatch_fields:
-            scope_line += " / mismatches=" + ", ".join(optimizer_scope_mismatch_fields)
+            scope_line += " / расхождения=" + ", ".join(optimizer_scope_mismatch_fields)
         lines.append(scope_line)
     if ring_kind == "ring" or ring_closure_policy:
         lines.append(
-            "Ring seam: "
-            f"closure={ring_closure_policy or '—'}"
-            f" / open={ring_seam_open}"
-            f" / seam_max_m={ring_seam_max if ring_seam_max is not None else '—'}"
-            f" / raw_seam_max_m={ring_raw_seam_max if ring_raw_seam_max is not None else '—'}"
+            "Шов кольца: "
+            f"замыкание={ring_closure_policy or '—'}"
+            f" / открыт={ring_seam_open}"
+            f" / скачок_м={ring_seam_max if ring_seam_max is not None else '—'}"
+            f" / исходный_скачок_м={ring_raw_seam_max if ring_raw_seam_max is not None else '—'}"
         )
     if any(value not in (None, "", []) for value in (mnemo_event_exists, mnemo_event_total, mnemo_event_active, mnemo_event_ack, mnemo_event_mode)):
         lines.append(
-            "Desktop Mnemo events: "
-            f"exists={mnemo_event_exists}"
-            f" / total={mnemo_event_total if mnemo_event_total is not None else '—'}"
-            f" / active={mnemo_event_active if mnemo_event_active is not None else '—'}"
-            f" / acked={mnemo_event_ack if mnemo_event_ack is not None else '—'}"
-            f" / mode={mnemo_event_mode or '—'}"
+            "События мнемосхемы: "
+            f"есть={mnemo_event_exists}"
+            f" / всего={mnemo_event_total if mnemo_event_total is not None else '—'}"
+            f" / активно={mnemo_event_active if mnemo_event_active is not None else '—'}"
+            f" / принято={mnemo_event_ack if mnemo_event_ack is not None else '—'}"
+            f" / режим={mnemo_event_mode or '—'}"
         )
     if mnemo_event_recent:
-        lines.append("Desktop Mnemo recent: " + " | ".join(mnemo_event_recent[:3]))
+        lines.append("Недавние события мнемосхемы: " + " | ".join(mnemo_event_recent[:3]))
     if perf_evidence_status or perf_evidence_level:
         lines.append(
-            "Browser perf evidence: "
+            "Данные производительности анимации: "
             f"{perf_evidence_status or '—'}"
             f"{' / ' + perf_evidence_level if perf_evidence_level else ''}"
-            f" / bundle_ready={perf_bundle_ready}"
+            f" / готовы_в_архиве={perf_bundle_ready}"
         )
     if perf_compare_status or perf_compare_level:
         lines.append(
-            "Browser perf comparison: "
+            "Сравнение производительности анимации: "
             f"{perf_compare_status or '—'}"
             f"{' / ' + perf_compare_level if perf_compare_level else ''}"
-            f" / ready={perf_compare_ready}"
+            f" / готово={perf_compare_ready}"
         )
 
     bundle_bits = []
     for label, key in (
-        ("snapshot", "browser_perf_registry_snapshot_in_bundle"),
-        ("previous", "browser_perf_previous_snapshot_in_bundle"),
-        ("contract", "browser_perf_contract_in_bundle"),
-        ("evidence", "browser_perf_evidence_report_in_bundle"),
-        ("comparison", "browser_perf_comparison_report_in_bundle"),
-        ("trace", "browser_perf_trace_in_bundle"),
+        ("снимок", "browser_perf_registry_snapshot_in_bundle"),
+        ("предыдущий", "browser_perf_previous_snapshot_in_bundle"),
+        ("условия", "browser_perf_contract_in_bundle"),
+        ("отчёт", "browser_perf_evidence_report_in_bundle"),
+        ("сравнение", "browser_perf_comparison_report_in_bundle"),
+        ("трасса", "browser_perf_trace_in_bundle"),
     ):
         value = norm.get(key)
         if value is not None:
             bundle_bits.append(f"{label}={value}")
     if bundle_bits:
-        lines.append("Browser perf bundle artifacts: " + ", ".join(bundle_bits))
+        lines.append("Данные производительности в архиве: " + ", ".join(bundle_bits))
 
     return lines
 
@@ -890,36 +924,36 @@ def anim_has_signal(anim: Any) -> bool:
 
 def render_anim_latest_md(anim: Any) -> str:
     if not isinstance(anim, dict):
-        return "(anim_latest diagnostics not found)"
+        return "(данные последней анимации не найдены)"
     norm = normalize_anim_dashboard_obj(anim)
     lines = [
-        "# Anim latest diagnostics",
+        "# Последняя анимация",
         "",
-        f"- available: {bool(norm.get('available'))}",
-        f"- visual_cache_token: {norm.get('visual_cache_token') or '—'}",
-        f"- visual_reload_inputs: {', '.join(str(x) for x in (norm.get('visual_reload_inputs') or [])) or '—'}",
-        f"- pointer_json: {norm.get('pointer_json') or '—'}",
-        f"- global_pointer_json: {norm.get('global_pointer_json') or '—'}",
-        f"- npz_path: {norm.get('npz_path') or '—'}",
-        f"- updated_utc: {norm.get('updated_utc') or '—'}",
+        f"- Доступна: {bool(norm.get('available'))}",
+        f"- Токен визуального кэша: {norm.get('visual_cache_token') or '—'}",
+        f"- Входные данные перезагрузки: {', '.join(str(x) for x in (norm.get('visual_reload_inputs') or [])) or '—'}",
+        f"- Указатель: {norm.get('pointer_json') or '—'}",
+        f"- Общий указатель: {norm.get('global_pointer_json') or '—'}",
+        f"- Файл анимации: {norm.get('npz_path') or '—'}",
+        f"- Обновлено UTC: {norm.get('updated_utc') or '—'}",
     ]
     if norm.get("scenario_kind") or norm.get("scenario_json"):
-        lines.append(f"- scenario_kind: {norm.get('scenario_kind') or '—'}")
-        lines.append(f"- scenario_json: {norm.get('scenario_json') or '—'}")
+        lines.append(f"- Тип сценария: {norm.get('scenario_kind') or '—'}")
+        lines.append(f"- Файл сценария: {norm.get('scenario_json') or '—'}")
     if any(norm.get(key) not in (None, "", [], {}) for key in ("ring_v0_kph", "ring_nominal_speed_min_mps", "ring_nominal_speed_max_mps")):
         lines.append(
-            f"- ring_speed_profile: v0_kph={norm.get('ring_v0_kph') if norm.get('ring_v0_kph') is not None else '—'}"
-            f" / min_mps={norm.get('ring_nominal_speed_min_mps') if norm.get('ring_nominal_speed_min_mps') is not None else '—'}"
-            f" / max_mps={norm.get('ring_nominal_speed_max_mps') if norm.get('ring_nominal_speed_max_mps') is not None else '—'}"
-            f" / mean_mps={norm.get('ring_nominal_speed_mean_mps') if norm.get('ring_nominal_speed_mean_mps') is not None else '—'}"
+            f"- Профиль скорости кольца: v0, км/ч={norm.get('ring_v0_kph') if norm.get('ring_v0_kph') is not None else '—'}"
+            f" / мин, м/с={norm.get('ring_nominal_speed_min_mps') if norm.get('ring_nominal_speed_min_mps') is not None else '—'}"
+            f" / макс, м/с={norm.get('ring_nominal_speed_max_mps') if norm.get('ring_nominal_speed_max_mps') is not None else '—'}"
+            f" / средн, м/с={norm.get('ring_nominal_speed_mean_mps') if norm.get('ring_nominal_speed_mean_mps') is not None else '—'}"
         )
     if any(norm.get(key) not in (None, "", [], {}) for key in ("ring_closure_policy", "ring_closure_applied", "ring_seam_open", "ring_seam_max_jump_m", "ring_raw_seam_max_jump_m")):
         lines.append(
-            f"- ring_closure: policy={norm.get('ring_closure_policy') or '—'}"
-            f" / applied={norm.get('ring_closure_applied')}"
-            f" / seam_open={norm.get('ring_seam_open')}"
-            f" / seam_max_jump_m={norm.get('ring_seam_max_jump_m') if norm.get('ring_seam_max_jump_m') is not None else '—'}"
-            f" / raw_seam_max_jump_m={norm.get('ring_raw_seam_max_jump_m') if norm.get('ring_raw_seam_max_jump_m') is not None else '—'}"
+            f"- Замыкание кольца: режим={norm.get('ring_closure_policy') or '—'}"
+            f" / применено={norm.get('ring_closure_applied')}"
+            f" / шов открыт={norm.get('ring_seam_open')}"
+            f" / скачок шва, м={norm.get('ring_seam_max_jump_m') if norm.get('ring_seam_max_jump_m') is not None else '—'}"
+            f" / исходный скачок, м={norm.get('ring_raw_seam_max_jump_m') if norm.get('ring_raw_seam_max_jump_m') is not None else '—'}"
         )
     if any(
         norm.get(key) not in (None, "", [], {})
@@ -933,33 +967,33 @@ def render_anim_latest_md(anim: Any) -> str:
         )
     ):
         lines.append(
-            f"- mnemo_event_log: {norm.get('anim_latest_mnemo_event_log_ref') or '—'} / exists={norm.get('anim_latest_mnemo_event_log_exists')} / schema={norm.get('anim_latest_mnemo_event_log_schema_version') or '—'} / updated_utc={norm.get('anim_latest_mnemo_event_log_updated_utc') or '—'}"
+            f"- Журнал событий мнемосхемы: {norm.get('anim_latest_mnemo_event_log_ref') or '—'} / есть={norm.get('anim_latest_mnemo_event_log_exists')} / схема={norm.get('anim_latest_mnemo_event_log_schema_version') or '—'} / обновлено UTC={norm.get('anim_latest_mnemo_event_log_updated_utc') or '—'}"
         )
         lines.append(
-            f"- mnemo_event_log_state: mode={norm.get('anim_latest_mnemo_event_log_current_mode') or '—'} / total={norm.get('anim_latest_mnemo_event_log_event_count')} / active={norm.get('anim_latest_mnemo_event_log_active_latch_count')} / acked={norm.get('anim_latest_mnemo_event_log_acknowledged_latch_count')}"
+            f"- Состояние событий мнемосхемы: режим={norm.get('anim_latest_mnemo_event_log_current_mode') or '—'} / всего={norm.get('anim_latest_mnemo_event_log_event_count')} / активно={norm.get('anim_latest_mnemo_event_log_active_latch_count')} / принято={norm.get('anim_latest_mnemo_event_log_acknowledged_latch_count')}"
         )
         recent_titles = [str(x) for x in (norm.get("anim_latest_mnemo_event_log_recent_titles") or []) if str(x).strip()]
         if recent_titles:
-            lines.append(f"- mnemo_event_log_recent: {' | '.join(recent_titles[:3])}")
+            lines.append(f"- Недавние события мнемосхемы: {' | '.join(recent_titles[:3])}")
     if norm.get("usable_from_bundle") is not None:
-        lines.append(f"- usable_from_bundle: {norm.get('usable_from_bundle')}")
+        lines.append(f"- Восстанавливается из архива: {norm.get('usable_from_bundle')}")
     if norm.get("pointer_json_in_bundle") is not None:
-        lines.append(f"- pointer_json_in_bundle: {norm.get('pointer_json_in_bundle')}")
+        lines.append(f"- Указатель есть в архиве: {norm.get('pointer_json_in_bundle')}")
     if norm.get("npz_path_in_bundle") is not None:
-        lines.append(f"- npz_path_in_bundle: {norm.get('npz_path_in_bundle')}")
+        lines.append(f"- Файл анимации есть в архиве: {norm.get('npz_path_in_bundle')}")
     if norm.get("pointer_sync_ok") is not None:
-        lines.append(f"- pointer_sync_ok: {norm.get('pointer_sync_ok')}")
+        lines.append(f"- Указатель синхронизирован: {norm.get('pointer_sync_ok')}")
     if norm.get("reload_inputs_sync_ok") is not None:
-        lines.append(f"- reload_inputs_sync_ok: {norm.get('reload_inputs_sync_ok')}")
+        lines.append(f"- Входные данные синхронизированы: {norm.get('reload_inputs_sync_ok')}")
     if norm.get("npz_path_sync_ok") is not None:
-        lines.append(f"- npz_path_sync_ok: {norm.get('npz_path_sync_ok')}")
+        lines.append(f"- Файл анимации синхронизирован: {norm.get('npz_path_sync_ok')}")
     if norm.get("browser_perf_status") or norm.get("browser_perf_level"):
         lines.append(
-            f"- browser_perf_status: {norm.get('browser_perf_status') or '—'} / level={norm.get('browser_perf_level') or '—'}"
+            f"- Состояние производительности: {norm.get('browser_perf_status') or '—'} / уровень={norm.get('browser_perf_level') or '—'}"
         )
     if norm.get("browser_perf_evidence_status") or norm.get("browser_perf_evidence_level"):
         lines.append(
-            f"- browser_perf_evidence_status: {norm.get('browser_perf_evidence_status') or '—'} / level={norm.get('browser_perf_evidence_level') or '—'} / bundle_ready={norm.get('browser_perf_bundle_ready')} / snapshot_contract_match={norm.get('browser_perf_snapshot_contract_match')}"
+            f"- Данные производительности: {norm.get('browser_perf_evidence_status') or '—'} / уровень={norm.get('browser_perf_evidence_level') or '—'} / готовы в архиве={norm.get('browser_perf_bundle_ready')} / снимок совпадает с условиями={norm.get('browser_perf_snapshot_contract_match')}"
         )
     if any(
         norm.get(key) not in (None, "", [], {})
@@ -977,23 +1011,23 @@ def render_anim_latest_md(anim: Any) -> str:
         )
     ):
         lines.append(
-            f"- browser_perf_artifacts_primary: snapshot={norm.get('browser_perf_registry_snapshot_ref') or '—'} / exists={norm.get('browser_perf_registry_snapshot_exists')} / in_bundle={norm.get('browser_perf_registry_snapshot_in_bundle')} ; contract={norm.get('browser_perf_contract_ref') or '—'} / exists={norm.get('browser_perf_contract_exists')} / in_bundle={norm.get('browser_perf_contract_in_bundle')}"
+            f"- Основные данные производительности: снимок={norm.get('browser_perf_registry_snapshot_ref') or '—'} / есть={norm.get('browser_perf_registry_snapshot_exists')} / в архиве={norm.get('browser_perf_registry_snapshot_in_bundle')} ; условия={norm.get('browser_perf_contract_ref') or '—'} / есть={norm.get('browser_perf_contract_exists')} / в архиве={norm.get('browser_perf_contract_in_bundle')}"
         )
         lines.append(
-            f"- browser_perf_artifacts_secondary: previous={norm.get('browser_perf_previous_snapshot_ref') or '—'} / exists={norm.get('browser_perf_previous_snapshot_exists')} / in_bundle={norm.get('browser_perf_previous_snapshot_in_bundle')} ; evidence={norm.get('browser_perf_evidence_report_ref') or '—'} / exists={norm.get('browser_perf_evidence_report_exists')} / in_bundle={norm.get('browser_perf_evidence_report_in_bundle')} ; comparison={norm.get('browser_perf_comparison_report_ref') or '—'} / exists={norm.get('browser_perf_comparison_report_exists')} / in_bundle={norm.get('browser_perf_comparison_report_in_bundle')} ; trace={norm.get('browser_perf_trace_ref') or '—'} / exists={norm.get('browser_perf_trace_exists')} / in_bundle={norm.get('browser_perf_trace_in_bundle')}"
+            f"- Дополнительные данные производительности: предыдущий снимок={norm.get('browser_perf_previous_snapshot_ref') or '—'} / есть={norm.get('browser_perf_previous_snapshot_exists')} / в архиве={norm.get('browser_perf_previous_snapshot_in_bundle')} ; отчёт={norm.get('browser_perf_evidence_report_ref') or '—'} / есть={norm.get('browser_perf_evidence_report_exists')} / в архиве={norm.get('browser_perf_evidence_report_in_bundle')} ; сравнение={norm.get('browser_perf_comparison_report_ref') or '—'} / есть={norm.get('browser_perf_comparison_report_exists')} / в архиве={norm.get('browser_perf_comparison_report_in_bundle')} ; трасса={norm.get('browser_perf_trace_ref') or '—'} / есть={norm.get('browser_perf_trace_exists')} / в архиве={norm.get('browser_perf_trace_in_bundle')}"
         )
     if norm.get("browser_perf_component_count") is not None:
         lines.append(
-            f"- browser_perf_component_count: {norm.get('browser_perf_component_count')} / total_wakeups={norm.get('browser_perf_total_wakeups')} / total_duplicate_guard_hits={norm.get('browser_perf_total_duplicate_guard_hits')} / max_idle_poll_ms={norm.get('browser_perf_max_idle_poll_ms')}"
+            f"- Компоненты производительности: {norm.get('browser_perf_component_count')} / пробуждений={norm.get('browser_perf_total_wakeups')} / срабатываний защиты от дублей={norm.get('browser_perf_total_duplicate_guard_hits')} / max idle poll ms={norm.get('browser_perf_max_idle_poll_ms')}"
         )
     if norm.get("browser_perf_comparison_status") or norm.get("browser_perf_comparison_level"):
         lines.append(
-            f"- browser_perf_comparison_status: {norm.get('browser_perf_comparison_status') or '—'} / level={norm.get('browser_perf_comparison_level') or '—'} / ready={norm.get('browser_perf_comparison_ready')} / changed={norm.get('browser_perf_comparison_changed')}"
+            f"- Сравнение производительности: {norm.get('browser_perf_comparison_status') or '—'} / уровень={norm.get('browser_perf_comparison_level') or '—'} / готово={norm.get('browser_perf_comparison_ready')} / изменилось={norm.get('browser_perf_comparison_changed')}"
         )
         lines.append(
-            f"- browser_perf_comparison_delta: wakeups={norm.get('browser_perf_comparison_delta_total_wakeups')} / dup={norm.get('browser_perf_comparison_delta_total_duplicate_guard_hits')} / render={norm.get('browser_perf_comparison_delta_total_render_count')} / max_idle_poll_ms={norm.get('browser_perf_comparison_delta_max_idle_poll_ms')}"
+            f"- Изменение производительности: пробуждения={norm.get('browser_perf_comparison_delta_total_wakeups')} / дубли={norm.get('browser_perf_comparison_delta_total_duplicate_guard_hits')} / отрисовка={norm.get('browser_perf_comparison_delta_total_render_count')} / max idle poll ms={norm.get('browser_perf_comparison_delta_max_idle_poll_ms')}"
         )
     issues = [str(x) for x in (norm.get("issues") or []) if str(x).strip()]
     if issues:
-        lines.extend(["", "## Issues", *[f"- {x}" for x in issues]])
+        lines.extend(["", "## Замечания", *[f"- {x}" for x in issues]])
     return "\n".join(lines).rstrip() + "\n"

@@ -129,14 +129,14 @@ def test_make_send_bundle_health_sees_final_triage_and_latest_copy(tmp_path: Pat
     assert artifacts.get("validation_report") is True
     assert artifacts.get("anim_diagnostics") is True
     assert triage_json["mnemo_event_log"]["severity"] == "critical"
-    assert triage_json["operator_recommendations"][0].startswith("Open Desktop Mnemo first")
+    assert triage_json["operator_recommendations"][0].startswith("Сначала откройте мнемосхему")
     assert mnemo["severity"] == "critical"
     assert mnemo["current_mode"] == "Регуляторный коридор"
-    assert recommendations[0].startswith("Open Desktop Mnemo first")
+    assert recommendations[0].startswith("Сначала откройте мнемосхему")
     assert latest_triage_md.read_text(encoding="utf-8") == triage_md_text
     assert json.loads(latest_triage_json.read_text(encoding="utf-8")) == triage_json
-    assert "triage/latest_send_bundle_path.txt" in triage_md_text
-    assert "triage/latest_send_bundle_validation.md" in triage_md_text
+    assert "Актуальный архив проекта" in triage_md_text
+    assert "Проверка актуального архива" in triage_md_text
 
     with zipfile.ZipFile(latest_zip, "r") as z:
         latest_names = set(z.namelist())

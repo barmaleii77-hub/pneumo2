@@ -17,6 +17,10 @@ knowledge-base слоями.
   в правильную каноническую ветку.
 - `v13` — специализированный design addendum для `WS-RING` и handoff
   `WS-RING -> WS-SUITE`.
+- `v12_window_internal_routes` — отдельный более поздний report-only слой с
+  совпадающим номером V12. Он не входит в линейку `v1…v13` как replacement для
+  `v12_design_recovery`; его роль - уточнить first-screen/internal-route
+  contracts четырех текущих окон.
 - `v37` — predecessor import-ready GitHub KB/TZ/spec supplement. Он поднимает
   consolidated technical specification, workspace/parameter/acceptance
   matrices и open gaps в repo-local knowledge-base layer, но не является
@@ -135,6 +139,23 @@ knowledge-base слоями.
 - Статус: historical design-recovery layer, импортирован в
   `docs/context/gui_spec_imports/v12_design_recovery/`.
 
+### v12_window_internal_routes
+
+- Роль: report-only addendum по первому рабочему экрану и внутренним маршрутам
+  окон.
+- Архив:
+  `pneumo_human_gui_report_only_v12_window_internal_routes.zip`.
+- Что добавил: first-screen contracts, action-feedback matrix,
+  direct-tree-open/dock-role matrix, semantic rewrite matrix and current vs
+  canonical notes для поверхности проверки и отправки архива, подробного
+  сравнения результатов, исходных данных проекта и набора испытаний.
+- Статус: current report-only refinement в
+  `docs/context/gui_spec_imports/v12_window_internal_routes/` с локальной
+  KB-сводкой
+  `docs/context/release_readiness/HUMAN_GUI_REPORT_ONLY_V12_WINDOW_INTERNAL_ROUTES_2026-04-20.md`.
+- Ограничение: не runtime-closure proof и не доказательство визуальной приемки
+  live current-окон.
+
 ### v13
 
 - Роль: специализированный ring-editor migration addendum.
@@ -187,6 +208,8 @@ knowledge-base слоями.
 3. `docs/context/gui_spec_imports/foundations/*`
 4. `docs/context/gui_spec_imports/v38_github_kb_commit_ready/*`
 5. `docs/context/release_readiness/V38_KB_IMPORT_AUDIT_2026-04-18.md`
+6. `docs/context/gui_spec_imports/v12_window_internal_routes/*` для
+   first-screen/internal-route уточнений четырех окон
 6. `docs/context/gui_spec_imports/v37_github_kb_supplement/*`
 7. `docs/context/gui_spec_imports/v3/*`
 8. `docs/context/gui_spec_imports/v13_ring_editor_migration/*` для `WS-RING`
@@ -203,6 +226,9 @@ knowledge-base слоями.
 - Для ring editor и suite handoff обязательно добавляем `v13`.
 - Для requirements, параметров, workspace coverage, acceptance и open gaps
   обязательно сверяемся с `v38`, но не выдаём его за runtime acceptance.
+- Для surface проверки/отправки архива, подробного сравнения результатов,
+  исходных данных проекта и набора испытаний дополнительно читаем
+  `v12_window_internal_routes`, но не выдаём его за runtime acceptance.
 - Для спорных вопросов о происхождении канона, design/recovery decisions и
   границе между design и implementation-pass читаем `v12` и lineage
   `PROMPT_V2 + v1…v13 + v37 + v38`.

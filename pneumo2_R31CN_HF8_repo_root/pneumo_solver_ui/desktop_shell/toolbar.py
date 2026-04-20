@@ -170,7 +170,7 @@ def build_shell_toolbar(
 
     ttk.Separator(frame, orient="vertical").pack(side="left", fill="y", padx=12)
 
-    ttk.Label(frame, text="Быстро открыть:").pack(side="left")
+    ttk.Label(frame, text="Быстрый переход:").pack(side="left")
     specs = hosted_specs + external_specs
     title_to_key = {
         f"{spec.group}: {spec.title}": spec.key

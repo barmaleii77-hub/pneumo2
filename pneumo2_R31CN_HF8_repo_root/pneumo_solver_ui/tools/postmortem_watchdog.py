@@ -15,8 +15,8 @@
 - опционально мониторит PID launcher процесса
 - если Streamlit остановился, а launcher уже мёртв, watchdog:
     1) проверяет marker-файл UI-сессии ("_send_bundle_done.json")
-    2) если marker отсутствует — строит Send Bundle
-    3) (опционально) открывает 1-кнопочное окно Copy ZIP
+    2) если marker отсутствует — сохраняет архив проекта
+    3) (опционально) открывает окно отправки результата
 
 Важно
 ------
@@ -140,15 +140,15 @@ def _log_bundle_summary(path: Path, meta: object) -> None:
         _log(path, f"[watchdog] {line}")
     diag_path = str(summary.get("anim_pointer_diagnostics_path") or "").strip()
     if diag_path:
-        _log(path, f"[watchdog] Диагностика указателя анимации: {diag_path}")
+        _log(path, f"[watchdog] Данные последней анимации: {diag_path}")
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Postmortem watchdog: ensure Send Bundle after crash/kill")
+    ap = argparse.ArgumentParser(description="Postmortem watchdog: сохранить архив проекта после аварийного завершения")
     ap.add_argument("--target_pid", type=int, required=True, help="PID streamlit/python процесса")
     ap.add_argument("--launcher_pid", type=int, default=None, help="PID launcher процесса (если жив — watchdog не вмешивается)")
     ap.add_argument("--session_dir", default=None, help="UI session dir (runs/ui_sessions/UI_*)")
-    ap.add_argument("--out_dir", default="send_bundles", help="Каталог send bundles (относительно repo root)")
+    ap.add_argument("--out_dir", default="send_bundles", help="Каталог архивов проекта (относительно repo root)")
     ap.add_argument("--poll_s", type=float, default=0.5, help="Период опроса PID")
     ap.add_argument("--grace_s", type=float, default=1.0, help="Пауза после остановки target перед действиями")
     ap.add_argument("--open_send_gui", action="store_true", help="Открыть send_results_gui при вмешательстве")
@@ -235,7 +235,7 @@ def main() -> int:
     except Exception:
         _log(log_path, "[watchdog] marker check failed:\n" + traceback.format_exc())
 
-    # Build send bundle (unified entrypoint)
+    # Build the project archive through the unified entrypoint.
     try:
         # Respect autosave toggle (if config loaded). Default: enabled.
         if cfg is not None and hasattr(cfg, "autosave_on_watchdog"):
@@ -278,10 +278,10 @@ def main() -> int:
         )
 
         if res.ok and res.zip_path:
-            _log(log_path, f"[watchdog] bundle OK: {res.zip_path}")
+            _log(log_path, f"[watchdog] архив проекта сохранён: {res.zip_path}")
             _log_bundle_summary(log_path, getattr(res, "meta", {}))
         else:
-            _log(log_path, "[watchdog] bundle FAILED: " + (res.message or "unknown"))
+            _log(log_path, "[watchdog] архив проекта не сохранён: " + (res.message or "причина неизвестна"))
             _log_bundle_summary(log_path, getattr(res, "meta", {}))
             try:
                 tb = (res.meta or {}).get("traceback")

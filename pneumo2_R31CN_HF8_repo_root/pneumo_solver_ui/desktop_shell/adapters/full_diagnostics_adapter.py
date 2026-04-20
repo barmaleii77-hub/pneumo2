@@ -15,7 +15,7 @@ def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="full_diagnostics_gui",
         title="Расширенная проверка проекта",
-        description="Проверка архива для отправки, прогонов и сборки расширенной технической информации.",
+        description="Проверка архива проекта, прогонов и расширенной технической информации.",
         group="Встроенные окна",
         mode="hosted",
         menu_section="Инструменты",

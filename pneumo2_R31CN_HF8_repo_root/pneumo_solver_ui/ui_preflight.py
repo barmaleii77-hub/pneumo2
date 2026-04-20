@@ -294,19 +294,22 @@ def _last_send_bundle_info(st_mod: Any, app_dir: Path) -> Tuple[bool, str]:
     out_dir = _resolve_diag_out_dir(st_mod, app_dir)
     meta = summarize_last_bundle_meta(read_last_meta_from_out_dir(out_dir))
     if not meta.get("zip_name"):
-        return False, f"Последний SEND bundle ещё не создан. Каталог: {out_dir}"
+        return False, f"Архив проекта ещё не создан. Папка: {out_dir}"
 
+    ok = bool(meta.get("ok"))
     lines = [
-        f"Последний ZIP: {meta.get('zip_name')}",
-        f"ok={meta.get('ok')} trigger={meta.get('trigger')} ts={meta.get('ts')}",
+        f"Последний архив: {meta.get('zip_name')}",
+        f"Состояние: {'готов' if ok else 'требует проверки'}",
     ]
     if meta.get("zip_size_mb") is not None:
-        lines.append(f"size_mb={meta.get('zip_size_mb'):.1f}")
+        lines.append(f"Размер: {meta.get('zip_size_mb'):.1f} МБ")
+    if meta.get("ts"):
+        lines.append(f"Время сохранения: {meta.get('ts')}")
     for line in list(meta.get("summary_lines") or []):
         lines.append(str(line))
     if meta.get("anim_pointer_diagnostics_path"):
-        lines.append(f"Диагностика указателя анимации: {meta.get('anim_pointer_diagnostics_path')}")
-    return bool(meta.get("ok")), "\n".join(lines)
+        lines.append(f"Данные последней анимации: {meta.get('anim_pointer_diagnostics_path')}")
+    return ok, "\n".join(lines)
 
 
 def collect_steps(st_mod: Any, app_dir: Path) -> Dict[str, _Step]:
@@ -354,75 +357,75 @@ def collect_steps(st_mod: Any, app_dir: Path) -> Dict[str, _Step]:
     detail_lines = []
     if obj is None:
         ok = False
-        detail_lines.append("anim_latest.json не найден. Запустите детальный прогон с авто‑экспортом anim_latest.")
+        detail_lines.append("Данные последней анимации не найдены. Запустите расчёт с экспортом анимации.")
     else:
         if npz_path is not None and npz_path.exists():
             try:
                 mb = npz_path.stat().st_size / 1024.0 / 1024.0
-                detail_lines.append(f"Pointer OK. NPZ: {npz_path.name} ({mb:.2f} MB).")
+                detail_lines.append(f"Файл анимации найден: {npz_path.name} ({mb:.2f} МБ).")
             except Exception:
-                detail_lines.append(f"Pointer OK. NPZ: {npz_path.name}.")
+                detail_lines.append(f"Файл анимации найден: {npz_path.name}.")
             ok = True
         else:
             ok = False
-            detail_lines.append("anim_latest.json найден, но NPZ не найден по указанному пути.")
+            detail_lines.append("Описание последней анимации найдено, но файл анимации отсутствует.")
 
-    detail_lines.append(f"Папка exports: {exports_dir}")
-    detail_lines.append(f"visual_cache_token: {_short_token(local_token or global_token)}")
+    detail_lines.append(f"Папка экспорта: {exports_dir}")
+    detail_lines.append(f"Токен визуальных данных: {_short_token(local_token or global_token)}")
     if reload_inputs:
-        detail_lines.append("reload inputs: " + ", ".join(str(x) for x in reload_inputs))
+        detail_lines.append("Исходные данные для перезагрузки: " + ", ".join(str(x) for x in reload_inputs))
     if global_pointer_path is not None:
-        detail_lines.append(f"global pointer: {global_pointer_path}")
+        detail_lines.append(f"Общий указатель анимации: {global_pointer_path}")
         if global_obj is None:
-            detail_lines.append("global pointer status: отсутствует или не читается")
+            detail_lines.append("Состояние общего указателя: отсутствует или не читается")
         elif local_token and global_token:
-            detail_lines.append("global token sync: OK" if local_token == global_token else "global token sync: MISMATCH")
+            detail_lines.append("Синхронизация визуальных данных: совпадает" if local_token == global_token else "Синхронизация визуальных данных: расходится")
         elif global_token:
-            detail_lines.append("global token sync: only global token available")
+            detail_lines.append("Синхронизация визуальных данных: доступен только общий токен")
 
-    detail_lines.append("Bundle используется обоими desktop-инструментами: Desktop Mnemo и Desktop Animator.")
+    detail_lines.append("Эти данные используются мнемосхемой и аниматором.")
 
     steps["export"] = _Step(
         key="export",
-        title="Экспорт для Desktop Mnemo / Animator",
+        title="Экспорт для мнемосхемы и аниматора",
         ok=ok,
         level="ok" if ok else "warn",
         detail="\n".join(detail_lines),
         page=DESKTOP_MNEMO_PAGE,
-        action_label="Открыть Desktop Mnemo",
+        action_label="Открыть мнемосхему",
     )
 
     ok, detail = _desktop_mnemo_deps_info()
     steps["mnemo"] = _Step(
         key="mnemo",
-        title="Зависимости Desktop Mnemo",
+        title="Зависимости мнемосхемы",
         ok=ok,
         level="ok" if ok else "warn",
         detail=detail,
         page=DESKTOP_MNEMO_PAGE,
-        action_label="Открыть Desktop Mnemo",
+        action_label="Открыть мнемосхему",
     )
 
     ok, detail = _desktop_deps_info()
     steps["desktop"] = _Step(
         key="desktop",
-        title="Зависимости Desktop Animator",
+        title="Зависимости аниматора",
         ok=ok,
         level="ok" if ok else "warn",
         detail=detail,
         page=DESKTOP_ANIMATOR_PAGE,
-        action_label="Открыть Desktop Animator",
+        action_label="Открыть аниматор",
     )
 
     ok, detail = _last_send_bundle_info(st_mod, app_dir)
     steps["send_bundle"] = _Step(
         key="send_bundle",
-        title="Последний SEND bundle",
+        title="Последний архив проекта",
         ok=ok,
         level="ok" if ok else "warn",
         detail=detail,
         page=ENV_DIAGNOSTICS_PAGE,
-        action_label="Диагностика среды",
+        action_label="Проверка проекта",
     )
 
     # Небольшая подсказка про окружение
@@ -433,7 +436,7 @@ def collect_steps(st_mod: Any, app_dir: Path) -> Dict[str, _Step]:
         level="ok",
         detail=f"OS: {platform.system()} | Python: {platform.python_version()}",
         page=ENV_DIAGNOSTICS_PAGE,
-        action_label="Диагностика",
+        action_label="Проверка",
     )
 
     return steps
@@ -450,9 +453,9 @@ def _pick_next_page(steps: Dict[str, _Step]) -> Tuple[str, str]:
     if not steps.get("export", _Step("", "", True, "ok", "")).ok:
         return "pneumo_solver_ui/pneumo_ui_app.py", "Сделать детальный прогон + экспорт anim_latest"
     if not steps.get("mnemo", _Step("", "", True, "ok", "")).ok:
-        return "pneumo_solver_ui/pages/08_DesktopMnemo.py", "Установить/запустить Desktop Mnemo"
+        return "pneumo_solver_ui/pages/08_DesktopMnemo.py", "Установить или запустить мнемосхему"
     if not steps.get("desktop", _Step("", "", True, "ok", "")).ok:
-        return "pneumo_solver_ui/pages/08_DesktopMnemo.py", "Открыть Desktop Mnemo и при желании проверить Desktop Animator"
+        return "pneumo_solver_ui/pages/08_DesktopMnemo.py", "Открыть мнемосхему и при необходимости аниматор"
 
     return "pneumo_solver_ui/pages/09_Validation_Web.py", "Перейти к Валидации (Web)"
 

@@ -7,4 +7,4 @@ from pneumo_solver_ui.pages._page_runner import run_page
 bootstrap(st)
 autosave_if_enabled(st)
 
-run_page('99_Диагностика_среды.py')
+run_page("99_EnvDiagnostics.py")

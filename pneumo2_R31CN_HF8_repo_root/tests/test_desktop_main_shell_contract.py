@@ -89,10 +89,10 @@ def test_desktop_main_shell_registry_separates_hosted_and_external_tools() -> No
     assert "опорн" not in test_center_text.casefold()
     assert "базовый прогон" not in test_center_text.casefold()
     assert "Настройка расчёта и запуск базового прогона" in by_key["desktop_run_setup_center"].description
-    assert "Отдельное окно для подробного сравнения нескольких прогонов" in by_key["compare_viewer"].description
+    assert "Подробное сравнение нескольких прогонов" in by_key["compare_viewer"].description
     assert "не заменяет встроенную сводку результатов расчёта" in by_key["compare_viewer"].details
-    assert "Отдельное окно пневматической схемы" in by_key["desktop_mnemo"].description
-    assert "движение и геометрию смотрите в окне Аниматор" in by_key["desktop_mnemo"].details
+    assert "Пневматическая схема показывает состояние контуров" in by_key["desktop_mnemo"].description
+    assert "движение и геометрию смотрите в аниматоре" in by_key["desktop_mnemo"].details
 
 
 def test_desktop_main_shell_registry_exposes_shared_standalone_launch_catalog() -> None:
@@ -109,8 +109,8 @@ def test_desktop_main_shell_registry_exposes_shared_standalone_launch_catalog() 
     assert "pneumo_solver_ui.qt_compare_viewer" in modules
     assert "pneumo_solver_ui.desktop_animator.app" in modules
     assert "pneumo_solver_ui.desktop_mnemo.main" in modules
-    assert by_key["desktop_gui_spec_shell"].title == "Проверочное рабочее место"
-    assert by_key["desktop_gui_spec_shell"].group == "Инструменты восстановления"
+    assert by_key["desktop_gui_spec_shell"].title == "Панель восстановления окон"
+    assert by_key["desktop_gui_spec_shell"].group == "Восстановление окон"
 
 
 def test_desktop_main_shell_catalog_visible_text_hides_service_jargon() -> None:
@@ -148,6 +148,8 @@ def test_desktop_main_shell_catalog_visible_text_hides_service_jargon() -> None:
         "контекстный переход",
         "маршрут",
         "маршрутов",
+        "Проверочное " "рабочее место",
+        "проверочное " "рабочее место",
     )
 
     visible_parts: list[str] = []
@@ -327,7 +329,7 @@ def test_desktop_main_shell_keeps_classic_menu_and_workspace_shell() -> None:
     assert "self._rebuild_navigation_tree()" in src
     assert "self._refresh_details_panel()" in src
     assert "self._open_selected_navigation_item()" in src
-    assert 'ttk.Button(panel, text="Открыть окно", command=self._open_selected_navigation_item)' not in src
+    assert 'ttk.Button(panel, text="Открыть ' "окно\", command=self._open_selected_navigation_item)" not in src
     assert 'text="Открыть в рабочей области"' in src
     assert "отдельная кнопка" not in src
     assert "self.toolbar.frame.pack(fill=\"x\", before=body)" in src
@@ -440,16 +442,16 @@ def test_desktop_main_shell_extracts_workspace_manager_for_hosted_tabs() -> None
     assert "def reopen_last_closed_tab(self) -> bool:" in src
     assert '"Закрывать остальные можно только для встроенного окна."' in src
     assert '"Других встроенных окон нет."' in src
-    assert '"Нет недавно закрытых встроенных окон."' in src
+    assert '"Нет недавно закрытых рабочих разделов."' in src
     assert '"Окна основного порядка работы пока не открыты."' in src
-    assert '"Недавно закрытое окно #{index} недоступно."' in src
+    assert '"Недавно закрытый рабочий раздел #{index} недоступен."' in src
     assert "return tuple(reversed(self._recently_closed_specs))" in src
     assert "history_index = len(self._recently_closed_specs) - index" in src
     assert "return self.reopen_recently_closed_at_index(1)" in src
     assert "ordered_open_workflow_sessions(self.hosted_sessions, self.workflow_specs)" in src
     assert "find_neighbor_workflow_session(" in src
-    assert 'self._set_status(f"Повторно открыто окно: {spec.title}")' in src
-    assert 'self._set_status(f"Встроенное окно #{index} пока не открыто.")' in src
+    assert 'self._set_status(f"Рабочий раздел восстановлен: {spec.title}")' in src
+    assert 'self._set_status(f"Рабочий раздел #{index} пока не открыт.")' in src
     assert "describe_workspace_state" in src
     assert "hosted_session_at_index" in src
     assert "home_tab_title" in src
@@ -508,7 +510,7 @@ def test_desktop_main_shell_extracts_home_view_builder() -> None:
     assert "class ShellHomeViewController" in src
     assert "def build_shell_home_view(" in src
     assert 'text="Pneumo: рабочее место инженера"' in src
-    assert '"Классическое главное окно показывает один порядок первого запуска. "' in src
+    assert '"Классическое рабочее место показывает один порядок первого запуска. "' in src
     assert "V10_FIRST_PATH_TEXT" in src
     assert "Что делать сначала: исходные данные; сценарии; набор испытаний; базовый прогон" in src
     assert 'text="Основной порядок работы"' in src
@@ -581,13 +583,13 @@ def test_desktop_main_shell_extracts_home_view_builder() -> None:
     assert '"Открыто в рабочей области" if key in open_keys else "Готов к переходу"' in src
     assert "button.configure(text=_action_button_text(spec))" in src
     assert 'status_var = tk.StringVar(value="Готов к переходу")' in src
-    assert '"Проверка и отправка"' in src
+    assert '"Проверка проекта"' in src
     assert '"Справочники, проверка и анализ"' in src
     assert '"Анимация результата"' in src
     assert '"Расширенное сравнение и пневмосхема"' in src
-    assert '"Один понятный порядок работы: проверить проект и подготовить архив для отправки' in src
+    assert '"Один понятный порядок работы: проверить проект и сохранить архив проекта' in src
     assert 'primary_key="desktop_diagnostics_center"' in src
-    assert 'primary_button_text="Собрать архив для отправки"' in src
+    assert 'primary_button_text="Сохранить архив проекта"' in src
     assert 'secondary_title="Дополнительные действия после проверки"' in src
     assert "def _build_tool_card(" in src
     assert "primary_specs = tuple(spec for spec in specs if primary_key and spec.key == primary_key)" in src
@@ -604,7 +606,7 @@ def test_desktop_main_shell_extracts_home_view_builder() -> None:
     assert 'text=_action_button_text(spec)' in src
     assert 'button_text=primary_button_text or _action_button_text(spec)' in src
     assert 'button_text=_action_button_text(spec)' in src
-    assert 'text="Открыть окно"' not in src
+    assert 'text="Открыть ' "окно\"" not in src
     assert "Показать окно" not in src
     assert "Открыть:" not in src
     assert 'text="Открыть"' not in src
@@ -623,9 +625,9 @@ def test_desktop_main_shell_extracts_classic_toolbar_builder() -> None:
     assert 'text="Следующее"' in src
     assert 'text="Перезагрузить"' in src
     assert 'text="Закрыть"' in src
-    assert 'text="Быстро открыть:"' in src
+    assert 'text="Быстрый переход:"' in src
     assert 'picker.bind("<<ComboboxSelected>>", lambda _event: _open_selected())' in src
-    assert 'ttk.Button(frame, text="Открыть окно", command=_open_selected)' not in src
+    assert 'ttk.Button(frame, text="Открыть ' "окно\", command=_open_selected)" not in src
     assert 'text="Окна:"' in src
     assert 'text="Перейти"' in src
     assert 'text="Продолжить работу"' in src
@@ -894,8 +896,8 @@ def test_desktop_shell_adapter_text_avoids_center_wording_for_diagnostics_and_se
         assert forbidden not in joined
     assert "Единое окно проверки проекта" in diag_adapter_src
     assert "одно рабочее окно" in diag_adapter_src
-    assert "Подготовка архива результатов" in send_adapter_src
-    assert "Не удалось открыть подготовку отправки" in autotest_src
+    assert "Копирование сохранённого архива" in send_adapter_src
+    assert "Не удалось открыть сохранение архива проекта" in autotest_src
 
 
 def test_root_desktop_main_shell_wrappers_delegate_to_shell_launcher() -> None:
@@ -1037,14 +1039,14 @@ def test_navigation_helpers_keep_primary_workflow_order_and_progress_text() -> N
         key="send_results_gui",
         spec=DesktopShellToolSpec(
             key="send_results_gui",
-            title="Отправка результатов",
+        title="Скопировать архив",
             description="",
             group="Встроенные окна",
             mode="hosted",
         ),
     )
     assert numbered_session_label(workflow_session, 3) == "3. (Шаг 6) Результаты и анализ"
-    assert numbered_session_label(non_workflow_session, 2) == "2. Отправка результатов"
+    assert numbered_session_label(non_workflow_session, 2) == "2. Скопировать архив"
     assert (
         numbered_recently_closed_label(workflow_session.spec, 1)
         == "1. (Шаг 6) Результаты и анализ"
@@ -1087,7 +1089,7 @@ def test_navigation_helpers_cover_full_user_gui_graph() -> None:
         "Результаты",
         "Анализ",
         "Визуализация",
-        "Проверка и отправка",
+        "Проверка проекта",
     ]
     assert navigation_section_label(
         next(spec for spec in specs if spec.key == "desktop_geometry_reference_center")
@@ -1099,7 +1101,7 @@ def test_navigation_helpers_cover_full_user_gui_graph() -> None:
     assert "compare_viewer" in specs_by_section["Анализ"]
     assert {"desktop_animator", "desktop_mnemo"} <= specs_by_section["Визуализация"]
     assert {"desktop_diagnostics_center", "autotest_gui"} <= specs_by_section[
-        "Проверка и отправка"
+        "Проверка проекта"
     ]
 
 

@@ -166,7 +166,7 @@ def test_chat_knowledge_base_renderers_emit_operator_facing_logs() -> None:
                 "created_at": "2026-04-13T00:00:00+00:00",
                 "source": "chat",
                 "title": "gui_chat_prompts/01_MAIN_WINDOW.md",
-                "details": "Главное окно приложения.",
+                "details": "Рабочее место инженера.",
                 "artifact_path": "gui_chat_prompts/01_MAIN_WINDOW.md",
                 "status": "актуален",
             }

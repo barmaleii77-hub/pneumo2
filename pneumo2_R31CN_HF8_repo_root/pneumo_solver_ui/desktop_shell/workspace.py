@@ -129,46 +129,46 @@ class DesktopWorkspaceManager:
     def handle_tab_changed(self) -> HostedToolSession | None:
         session = self.current_session()
         if session is None:
-            self._set_status("Открыта стартовая страница.")
+            self._set_status("Показана панель проекта.")
             self._notify_state_changed()
             return None
-        self._set_status(f"Активно окно: {session.spec.title}")
+        self._set_status(f"Активный рабочий раздел: {session.spec.title}")
         self._notify_state_changed()
         return session
 
     def select_home_tab(self) -> None:
         self.notebook.select(self.home_tab)
-        self._set_status("Открыта стартовая страница.")
+        self._set_status("Показана панель проекта.")
         self._notify_state_changed()
 
     def open_hosted_tool(self, spec: DesktopShellToolSpec) -> HostedToolSession:
         existing = self.hosted_sessions.get(spec.key)
         if existing is not None and int(existing.frame.winfo_exists()):
             self.notebook.select(existing.frame)
-            self._set_status(f"Окно уже открыто: {spec.title}")
+            self._set_status(f"Рабочий раздел уже доступен: {spec.title}")
             return existing
 
         session = create_hosted_session(self.notebook, spec)
         self.hosted_sessions[spec.key] = session
         self.notebook.select(session.frame)
-        self._set_status(f"Открыто окно: {spec.title}")
+        self._set_status(f"Рабочий раздел открыт: {spec.title}")
         self._notify_state_changed()
         return session
 
     def select_hosted_session(self, key: str) -> bool:
         session = self.hosted_sessions.get(key)
         if session is None or not int(session.frame.winfo_exists()):
-            self._set_status("Окно уже закрыто или ещё не открыто.")
+            self._set_status("Рабочий раздел уже закрыт или ещё не открыт.")
             return False
         self.notebook.select(session.frame)
-        self._set_status(f"Активно окно: {session.spec.title}")
+        self._set_status(f"Активный рабочий раздел: {session.spec.title}")
         self._notify_state_changed()
         return True
 
     def select_hosted_session_at_index(self, index: int) -> bool:
         session = hosted_session_at_index(self.notebook, self.hosted_sessions, index)
         if session is None:
-            self._set_status(f"Встроенное окно #{index} пока не открыто.")
+            self._set_status(f"Рабочий раздел #{index} пока не открыт.")
             return False
         return self.select_hosted_session(session.key)
 
@@ -316,17 +316,17 @@ class DesktopWorkspaceManager:
 
     def reopen_recently_closed_at_index(self, index: int) -> bool:
         if index < 1 or index > len(self._recently_closed_specs):
-            self._set_status(f"Недавно закрытое окно #{index} недоступно.")
+            self._set_status(f"Недавно закрытый рабочий раздел #{index} недоступен.")
             return False
 
         history_index = len(self._recently_closed_specs) - index
         spec = self._recently_closed_specs.pop(history_index)
         self.open_hosted_tool(spec)
-        self._set_status(f"Повторно открыто окно: {spec.title}")
+        self._set_status(f"Рабочий раздел восстановлен: {spec.title}")
         return True
 
     def reopen_last_closed_tab(self) -> bool:
         if not self._recently_closed_specs:
-            self._set_status("Нет недавно закрытых встроенных окон.")
+            self._set_status("Нет недавно закрытых рабочих разделов.")
             return False
         return self.reopen_recently_closed_at_index(1)

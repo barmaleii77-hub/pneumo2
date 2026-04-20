@@ -166,9 +166,9 @@ def test_validate_and_health_report_surface_unusable_external_anim_pointer(tmp_p
     assert anim["usable_from_bundle"] is False
     assert anim["pointer_json_in_bundle"] is False
     assert anim["npz_path_in_bundle"] is False
-    assert any("not reproducible from this bundle" in msg for msg in anim["issues"])
-    assert any("external / not mirrored in bundle" in msg for msg in anim["issues"])
-    assert any("not reproducible from this bundle" in msg for msg in warnings)
+    assert any("не восстанавливаются из архива" in msg or "не восстанавливается из архива" in msg for msg in anim["issues"])
+    assert any("находится вне архива" in msg for msg in anim["issues"])
+    assert any("из этого архива они не восстанавливаются" in msg for msg in warnings)
 
     json_path, _md_path = build_health_report(zip_path, out_dir=tmp_path)
     rep = json.loads(Path(json_path).read_text(encoding="utf-8"))
@@ -176,7 +176,7 @@ def test_validate_and_health_report_surface_unusable_external_anim_pointer(tmp_p
 
     assert health_anim["visual_cache_token"] == "tok-global"
     assert health_anim["usable_from_bundle"] is False
-    assert any("not reproducible from this bundle" in msg for msg in health_anim["issues"])
+    assert any("не восстанавливаются из архива" in msg or "не восстанавливается из архива" in msg for msg in health_anim["issues"])
 
     repo_root = tmp_path / "repo"
     repo_root.mkdir(parents=True, exist_ok=True)
@@ -213,8 +213,8 @@ def test_sources_wire_bundle_usability_diagnostics_everywhere() -> None:
     assert "scope_sync_ok" in health_text
     assert 'signals["optimizer_scope_gate"]' in health_text
     assert "usable_from_bundle" in dashboard_text
-    assert "optimizer.scope_sync" in dashboard_text
-    assert "optimizer.gate" in dashboard_text
+    assert "Синхронизация оптимизации" in dashboard_text
+    assert "Допуск оптимизации" in dashboard_text
     assert "anim_latest_usable" in triage_text
 
 
@@ -242,5 +242,5 @@ def test_validate_send_bundle_keeps_missing_pointer_warnings_when_anim_contract_
     assert res.ok is True
     assert anim["available"] is True
     assert anim["contract_expected"] is True
-    assert any("global anim_latest pointer" in msg for msg in warnings)
-    assert any("local anim_latest pointer" in msg for msg in warnings)
+    assert any("общий указатель последней анимации" in msg for msg in warnings)
+    assert any("локальный указатель последней анимации" in msg for msg in warnings)

@@ -58,8 +58,8 @@ _TEXT_REPLACEMENTS: tuple[tuple[str, str], ...] = (
     ("bundle_ready", "архив готов"),
     ("legacy workspace surface", "отдельное рабочее окно"),
     ("Legacy workspace surface", "Отдельное рабочее окно"),
-    ("contract", "контекст"),
-    ("Contract", "Контекст"),
+    ("contract", "условия"),
+    ("Contract", "Условия"),
     ("контрактов", "условий"),
     ("Контрактов", "Условий"),
     ("контракта", "условий"),
@@ -79,8 +79,8 @@ _TEXT_REPLACEMENTS: tuple[tuple[str, str], ...] = (
     ("Workspace", "Окно"),
     ("surface", "окно"),
     ("Surface", "Окно"),
-    ("bundle", "архив для отправки"),
-    ("Bundle", "Архив для отправки"),
+    ("bundle", "архив проекта"),
+    ("Bundle", "Архив проекта"),
     ("legacy", "отдельный"),
     ("Legacy", "Отдельный"),
     ("Baseline Center", "базовый прогон"),
@@ -119,7 +119,7 @@ def _looks_like_generic_help(raw: str) -> bool:
 def _workspace_specific_result_location(workspace_title: str) -> str:
     return (
         f"Результат виден в рабочем шаге «{workspace_title}» и в связанных окнах, "
-        "которые открываются из главного окна."
+        "которые открываются из рабочего места инженера."
     )
 
 

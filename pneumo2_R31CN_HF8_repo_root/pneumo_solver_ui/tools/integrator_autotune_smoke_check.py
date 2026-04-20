@@ -176,7 +176,7 @@ def run_check(
         e_coarse_err = float(np.max(np.abs(arr - y_fine)))
         ratio_err = float(e_coarse / (e_coarse_err + 1e-12))
 
-    # Дополнительная диагностика: сколько подшагов реально сделал интегратор и какие h использовал.
+    # Дополнительная проверка: сколько подшагов реально сделал интегратор и какие h использовал.
     diag = None
     s_fine = _stats_from_df(df_fine)
     s_mid = _stats_from_df(df_mid)

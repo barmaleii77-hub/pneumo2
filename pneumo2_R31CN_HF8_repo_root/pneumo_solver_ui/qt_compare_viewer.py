@@ -3674,7 +3674,7 @@ class CompareViewer(QtWidgets.QMainWindow):
             return f"{target_ref} удерживает один целевой сигнал и сравнивает конкурирующие факторы"
         if mode == "all_to_all":
             return f"{target_ref} лучше всего подходит для поиска общей структуры и событийных кластеров"
-        return "полный обзор даёт самый широкий контекст"
+        return "полный обзор даёт самое широкое сопоставление"
 
     def _workspace_should_follow_analysis_focus(self, previous_analysis_mode: str, current_focus_mode: str) -> bool:
         current_focus = str(current_focus_mode or "all")

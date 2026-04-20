@@ -265,16 +265,16 @@ def test_validate_send_bundle_exposes_anim_latest_diagnostics_and_dashboard_rend
     assert dash_anim["ring_seam_max_jump_m"] == 0.012
     assert dash_anim["ring_raw_seam_max_jump_m"] == 0.015
     assert rep["sections"]["anim_latest"]["json_zip_path"] == "triage/latest_anim_pointer_diagnostics.json"
-    assert "Anim latest diagnostics" in html
+    assert "Последняя анимация" in html
     assert "tok-123" in html
     assert "ring_closure" in html
     assert "strict_exact" in html
-    assert "seam_open=True" in html
-    assert "browser_perf.evidence" in html
+    assert "шов открыт=True" in html
+    assert "Данные производительности" in html
     assert "snapshot_only / WARN" in html
-    assert "browser_perf.comparison" in html
+    assert "Сравнение производительности" in html
     assert "no_reference / WARN" in html
-    assert "browser_perf_artifacts_primary" in html
+    assert "Основные данные производительности" in html
 
 
 
@@ -290,9 +290,9 @@ def test_validate_send_bundle_warns_when_browser_perf_reports_are_missing_from_b
     assert anim["browser_perf_contract_in_bundle"] is False
     assert anim["browser_perf_evidence_report_in_bundle"] is False
     assert anim["browser_perf_comparison_report_in_bundle"] is False
-    assert any("browser_perf_registry_snapshot" in msg and "missing in bundle" in msg for msg in warnings)
-    assert any("browser_perf_evidence_report" in msg and "missing in bundle" in msg for msg in warnings)
-    assert any("browser_perf_comparison_report" in msg and "missing in bundle" in msg for msg in warnings)
+    assert any("browser_perf_registry_snapshot" in msg and "отсутствует в архиве" in msg for msg in warnings)
+    assert any("browser_perf_evidence_report" in msg and "отсутствует в архиве" in msg for msg in warnings)
+    assert any("browser_perf_comparison_report" in msg and "отсутствует в архиве" in msg for msg in warnings)
 
 
 def test_validate_send_bundle_warns_on_anim_latest_token_mismatch(tmp_path: Path) -> None:
@@ -306,7 +306,7 @@ def test_validate_send_bundle_warns_on_anim_latest_token_mismatch(tmp_path: Path
     assert anim["available"] is True
     assert anim["visual_cache_token"] == "tok-sidecar"
     assert anim["pointer_sync_ok"] is False
-    assert any("visual_cache_token mismatch" in w for w in warnings)
+    assert any("токен визуального кэша последней анимации не совпадает" in w for w in warnings)
     assert anim["sources"]["global_pointer"]["visual_cache_token"] == "tok-global"
     assert anim["sources"]["local_pointer"]["visual_cache_token"] == "tok-local"
     assert anim["sources"]["diagnostics"]["visual_cache_token"] == "tok-sidecar"
@@ -351,14 +351,14 @@ def test_validate_and_dashboard_surface_optimizer_scope_mismatch_between_triage_
     assert optimizer_scope_gate["release_risk"] is True
     assert "triage" in optimizer_scope["sources"]
     assert "export:DIST_SCOPE_A" in optimizer_scope["sources"]
-    assert any("optimizer scope problem_hash mismatch" in msg for msg in warnings)
-    assert any("optimizer scope problem_hash_mode mismatch" in msg for msg in warnings)
-    assert any("optimizer scope release risk" in msg for msg in warnings)
-    assert any("optimizer scope release risk" in msg for msg in release_risks)
-    assert "## Optimizer scope" in res.report_md
-    assert "release_gate: `FAIL`" in res.report_md
-    assert "release_risk: `True`" in res.report_md
-    assert "scope_sync_ok" in res.report_md
+    assert any("поле problem_hash отличается" in msg for msg in warnings)
+    assert any("поле problem_hash_mode отличается" in msg for msg in warnings)
+    assert any("риск выпуска по области оптимизации" in msg for msg in warnings)
+    assert any("риск выпуска по области оптимизации" in msg for msg in release_risks)
+    assert "## Область оптимизации" in res.report_md
+    assert "Допуск выпуска: `FAIL`" in res.report_md
+    assert "Риск выпуска: `True`" in res.report_md
+    assert "Синхронизация области" in res.report_md
     assert "export:DIST_SCOPE_A" in res.report_md
 
     repo_root = tmp_path / "repo"
@@ -390,12 +390,12 @@ def test_validate_and_dashboard_surface_optimizer_scope_mismatch_between_triage_
     assert dash_scope["scope_sync_ok"] is False
     assert dash_gate["release_gate"] == "FAIL"
     assert dash_gate["release_risk"] is True
-    assert any("optimizer scope problem_hash mismatch" in msg for msg in rep.get("warnings") or [])
-    assert any("optimizer scope release risk" in msg for msg in rep.get("warnings") or [])
-    assert "optimizer.problem_hash" in html
-    assert "optimizer.gate" in html
-    assert "optimizer.hash_mode" in html
-    assert "optimizer.scope_sync" in html
+    assert any("поле problem_hash отличается" in msg for msg in rep.get("warnings") or [])
+    assert any("риск выпуска по области оптимизации" in msg for msg in rep.get("warnings") or [])
+    assert "Область задачи" in html
+    assert "Допуск оптимизации" in html
+    assert "Режим хэша" in html
+    assert "Синхронизация оптимизации" in html
     assert "ph_triage_sc" in html
     assert "stable" in html
     assert "FAIL" in html
@@ -408,14 +408,14 @@ def test_sources_wire_optimizer_scope_compare_in_validation_and_dashboard() -> N
     helper_text = (root / "pneumo_solver_ui" / "optimization_scope_compare.py").read_text(encoding="utf-8")
 
     assert 'rep["optimizer_scope"]' in validate_text
-    assert "## Optimizer scope" in validate_text
-    assert "optimizer.problem_hash" in dashboard_text
-    assert "optimizer.gate" in dashboard_text
-    assert "optimizer.scope_sync" in dashboard_text
+    assert "## Область оптимизации" in validate_text
+    assert "Область задачи" in dashboard_text
+    assert "Допуск оптимизации" in dashboard_text
+    assert "Синхронизация оптимизации" in dashboard_text
     assert 'rep["optimizer_scope_gate"]' in dashboard_text
     assert 'rep["optimizer_scope"]' in dashboard_text
     assert "compare_optimizer_scope_sources" in helper_text
     assert "evaluate_optimizer_scope_gate" in helper_text
     assert "release_risk" in helper_text
-    assert "optimizer scope " in helper_text
-    assert " mismatch between sources" in helper_text
+    assert "область оптимизации: поле" in helper_text
+    assert "отличается между источниками" in helper_text

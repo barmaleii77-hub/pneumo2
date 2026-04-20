@@ -102,10 +102,10 @@ def test_build_full_diagnostics_bundle_returns_shared_summary_lines(tmp_path: Pa
     assert res.meta["anim_latest_summary"]["ring_closure_policy"] == "strict_exact"
     assert res.meta["anim_latest_summary"]["ring_seam_open"] is True
     assert res.meta["anim_latest_summary"]["optimizer_scope_release_gate"] == "FAIL"
-    assert any("Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True" == line for line in res.meta["summary_lines"])
-    assert any("Optimizer scope gate: FAIL / release_risk=True / reason=problem_hash mismatch between sources" == line for line in res.meta["summary_lines"])
-    assert any("Optimizer scope: scope=ph_diag_12 / mode=stable / source=triage / sync=False / mismatches=problem_hash, problem_hash_mode" == line for line in res.meta["summary_lines"])
-    assert any("Ring seam: closure=strict_exact / open=True / seam_max_m=0.012 / raw_seam_max_m=0.015" == line for line in res.meta["summary_lines"])
+    assert any("Данные производительности анимации: trace_bundle_ready / PASS / готовы_в_архиве=True" == line for line in res.meta["summary_lines"])
+    assert any("Допуск области оптимизации: FAIL / риск выпуска=True / причина=problem_hash mismatch between sources" == line for line in res.meta["summary_lines"])
+    assert any("Область оптимизации: ключ=ph_diag_12 / режим=stable / источник=triage / синхронизация=False / расхождения=problem_hash, problem_hash_mode" == line for line in res.meta["summary_lines"])
+    assert any("Шов кольца: замыкание=strict_exact / открыт=True / скачок_м=0.012 / исходный_скачок_м=0.015" == line for line in res.meta["summary_lines"])
     assert str(out_dir / "latest_anim_pointer_diagnostics.json") == res.meta["anim_pointer_diagnostics_path"]
 
     last_meta = summarize_last_bundle_meta(read_last_meta_from_out_dir(out_dir))
@@ -113,9 +113,9 @@ def test_build_full_diagnostics_bundle_returns_shared_summary_lines(tmp_path: Pa
     assert last_meta["anim_latest_summary"]["ring_closure_policy"] == "strict_exact"
     assert last_meta["ring_seam_open"] is True
     assert last_meta["anim_latest_summary"]["optimizer_scope_release_gate"] == "FAIL"
-    assert any("Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True" == line for line in last_meta["summary_lines"])
-    assert any("Optimizer scope gate: FAIL / release_risk=True / reason=problem_hash mismatch between sources" == line for line in last_meta["summary_lines"])
-    assert any("Ring seam: closure=strict_exact / open=True / seam_max_m=0.012 / raw_seam_max_m=0.015" == line for line in last_meta["summary_lines"])
+    assert any("Данные производительности анимации: trace_bundle_ready / PASS / готовы_в_архиве=True" == line for line in last_meta["summary_lines"])
+    assert any("Допуск области оптимизации: FAIL / риск выпуска=True / причина=problem_hash mismatch between sources" == line for line in last_meta["summary_lines"])
+    assert any("Шов кольца: замыкание=strict_exact / открыт=True / скачок_м=0.012 / исходный_скачок_м=0.015" == line for line in last_meta["summary_lines"])
     assert last_meta["anim_pointer_diagnostics_path"].endswith("latest_anim_pointer_diagnostics.json")
 
 
@@ -140,9 +140,9 @@ def test_build_unified_diagnostics_returns_shared_summary_lines(tmp_path: Path, 
     assert res.details["anim_latest_summary"]["ring_closure_policy"] == "strict_exact"
     assert res.details["anim_latest_summary"]["ring_seam_open"] is True
     assert res.details["anim_latest_summary"]["optimizer_scope_release_gate"] == "FAIL"
-    assert any("Browser perf comparison: regression_checked / PASS / ready=True" == line for line in res.details["summary_lines"])
-    assert any("Optimizer scope gate: FAIL / release_risk=True / reason=problem_hash mismatch between sources" == line for line in res.details["summary_lines"])
-    assert any("Ring seam: closure=strict_exact / open=True / seam_max_m=0.012 / raw_seam_max_m=0.015" == line for line in res.details["summary_lines"])
+    assert any("Сравнение производительности анимации: regression_checked / PASS / готово=True" == line for line in res.details["summary_lines"])
+    assert any("Допуск области оптимизации: FAIL / риск выпуска=True / причина=problem_hash mismatch between sources" == line for line in res.details["summary_lines"])
+    assert any("Шов кольца: замыкание=strict_exact / открыт=True / скачок_м=0.012 / исходный_скачок_м=0.015" == line for line in res.details["summary_lines"])
     assert str(out_dir / "latest_anim_pointer_diagnostics.json") == res.details["anim_pointer_diagnostics_path"]
 
 
@@ -179,6 +179,6 @@ def test_summarize_last_bundle_meta_rebuilds_summary_lines_from_anim_latest_summ
 
     assert meta["anim_latest_summary"]["ring_closure_policy"] == "strict_exact"
     assert meta["ring_seam_open"] is True
-    assert any("Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True" == line for line in meta["summary_lines"])
-    assert any("Optimizer scope gate: FAIL / release_risk=True / reason=problem_hash mismatch between sources" == line for line in meta["summary_lines"])
-    assert any("Ring seam: closure=strict_exact / open=True / seam_max_m=0.012 / raw_seam_max_m=0.015" == line for line in meta["summary_lines"])
+    assert any("Данные производительности анимации: trace_bundle_ready / PASS / готовы_в_архиве=True" == line for line in meta["summary_lines"])
+    assert any("Допуск области оптимизации: FAIL / риск выпуска=True / причина=problem_hash mismatch between sources" == line for line in meta["summary_lines"])
+    assert any("Шов кольца: замыкание=strict_exact / открыт=True / скачок_м=0.012 / исходный_скачок_м=0.015" == line for line in meta["summary_lines"])

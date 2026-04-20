@@ -4,7 +4,7 @@
 
 Цель
 ----
-Сделать *один* ZIP-файл, который можно отправить в чат после закрытия приложения.
+    Сделать *один* ZIP-файл, который пользователь сохраняет и при необходимости передаёт вручную.
 
 Это "сборщик контекста" для отладки и воспроизводимости:
 
@@ -428,7 +428,7 @@ def _collect_anim_latest_bundle_diagnostics(out_dir: Path) -> Tuple[Dict[str, An
 
 
 def _build_send_bundle_readme(anim_diag: Optional[Dict[str, Any]] = None) -> str:
-    """Human-readable README for the final send bundle.
+    """Human-readable README for the final project archive.
 
     The README must expose the active anim_latest reload reason so the recipient
     does not need to open separate sidecars just to see which bundle/token was active.
@@ -470,35 +470,35 @@ def _build_send_bundle_readme(anim_diag: Optional[Dict[str, Any]] = None) -> str
     browser_perf_evidence_ref = diag.get("browser_perf_evidence_report_ref") or "—"
     browser_perf_comparison_ref = diag.get("browser_perf_comparison_report_ref") or "—"
     return (
-        "SEND BUNDLE (for chat)\n"
-        "======================\n\n"
-        "Этот ZIP сформирован автоматически и предназначен для отправки в чат\n"
+        "АРХИВ ПРОЕКТА\n"
+        "=============\n\n"
+        "Этот ZIP сформирован автоматически и сохранён как архив проекта\n"
         "после закрытия приложения.\n\n"
-        "Содержимое (best-effort):\n"
-        "- triage/: короткий triage-отчёт (md+json) по последним запускам\n"
-        "- health/: сводный health-report по bundle (json+md)\n"
-        "- diagnostics/evidence_manifest.json: manifest of expected SEND evidence classes\n"
+        "Содержимое:\n"
+        "- triage/: краткий разбор замечаний (md+json) по последним запускам\n"
+        "- health/: сводный отчёт состояния архива (json+md)\n"
+        "- diagnostics/evidence_manifest.json: описание ожидаемых подтверждающих данных\n"
         "- ui_logs/: логи UI (jsonl + .log)\n- root_logs/: логи запуска Streamlit/скриптов (repo_root/logs, напр. streamlit.log)\n- reports/: отчёты качества логов (loglint/logstats, автогенерация)\n"
         "- autotest/: последние прогоны run_autotest (если запускались)\n"
         "- diagnostics_runs/: последние прогоны run_full_diagnostics (если запускались)\n- ui_sessions/: последние UI-сессии (runs/ui_sessions)\n- runs/: run_registry.jsonl и index.json (если есть)\n- workspace/: exports/uploads/road_profiles/maneuvers/opt_runs/ui_state (+ marker если пусто)\n"
         "- config/: default_*.json + component_passport.json\n"
         "- env/: pip_freeze / pip_check / версии\n"
         "- manifest.json: SHA256 по каждому добавленному файлу\n\n"
-        "Anim latest diagnostics (canonical):\n"
-        f"- anim_latest_available: {bool(diag.get('anim_latest_available'))}\n"
-        f"- anim_latest_visual_cache_token: {diag.get('anim_latest_visual_cache_token') or '—'}\n"
-        f"- anim_latest_visual_reload_inputs: {', '.join(str(x) for x in reload_inputs) if reload_inputs else '—'}\n"
-        f"- anim_latest_usable: {diag.get('anim_latest_usable')}\n"
-        f"- anim_latest_pointer_json_exists: {diag.get('anim_latest_pointer_json_exists')}\n"
-        f"- anim_latest_npz_exists: {diag.get('anim_latest_npz_exists')}\n"
-        f"- anim_latest_global_pointer_json: {diag.get('anim_latest_global_pointer_json') or '—'}\n"
-        f"- anim_latest_pointer_json: {diag.get('anim_latest_pointer_json') or '—'}\n"
-        f"- anim_latest_npz_path: {diag.get('anim_latest_npz_path') or '—'}\n"
-        f"- scenario_kind: {scenario_kind}\n"
+        "Последняя анимация:\n"
+        f"- Доступна: {bool(diag.get('anim_latest_available'))}\n"
+        f"- Токен визуального кэша: {diag.get('anim_latest_visual_cache_token') or '—'}\n"
+        f"- Входные данные перезагрузки: {', '.join(str(x) for x in reload_inputs) if reload_inputs else '—'}\n"
+        f"- Восстанавливается из архива: {diag.get('anim_latest_usable')}\n"
+        f"- Указатель найден: {diag.get('anim_latest_pointer_json_exists')}\n"
+        f"- Файл анимации найден: {diag.get('anim_latest_npz_exists')}\n"
+        f"- Общий указатель: {diag.get('anim_latest_global_pointer_json') or '—'}\n"
+        f"- Указатель: {diag.get('anim_latest_pointer_json') or '—'}\n"
+        f"- Файл анимации: {diag.get('anim_latest_npz_path') or '—'}\n"
+        f"- Тип сценария: {scenario_kind}\n"
         f"- anim_latest_road_csv_ref: {road_ref}\n"
         f"- anim_latest_axay_csv_ref: {axay_ref}\n"
         f"- anim_latest_scenario_json_ref: {scenario_ref}\n"
-        f"- ring_closure: policy={ring_closure_policy} / applied={ring_closure_applied} / seam_open={ring_seam_open} / seam_max_jump_m={ring_seam_max if ring_seam_max is not None else '—'} / raw_seam_max_jump_m={ring_raw_seam_max if ring_raw_seam_max is not None else '—'}\n"
+        f"- Замыкание кольца: режим={ring_closure_policy} / применено={ring_closure_applied} / шов открыт={ring_seam_open} / скачок шва, м={ring_seam_max if ring_seam_max is not None else '—'} / исходный скачок, м={ring_raw_seam_max if ring_raw_seam_max is not None else '—'}\n"
         f"- anim_latest_contract_sidecar_ref: {diag.get('anim_latest_contract_sidecar_ref') or '—'}\n"
         f"- anim_latest_contract_validation_json_ref: {diag.get('anim_latest_contract_validation_json_ref') or '—'}\n"
         f"- anim_latest_contract_validation_md_ref: {diag.get('anim_latest_contract_validation_md_ref') or '—'}\n"
@@ -510,22 +510,22 @@ def _build_send_bundle_readme(anim_diag: Optional[Dict[str, Any]] = None) -> str
         f"- anim_latest_road_contract_desktop_ref: {diag.get('anim_latest_road_contract_desktop_ref') or '—'}\n"
         f"- anim_latest_capture_export_manifest_ref: {diag.get('anim_latest_capture_export_manifest_ref') or '—'}\n"
         f"- anim_latest_frame_budget_evidence_ref: {diag.get('anim_latest_frame_budget_evidence_ref') or '—'}\n"
-        f"- browser_perf_status: {browser_perf_status} / level={browser_perf_level}\n"
-        f"- browser_perf_snapshot_ref: {browser_perf_snapshot_ref}\n"
-        f"- browser_perf_previous_snapshot_ref: {browser_perf_prev_snapshot_ref}\n"
-        f"- browser_perf_evidence_ref: {browser_perf_evidence_ref}\n"
-        f"- browser_perf_evidence_status: {browser_perf_evidence_status} / level={browser_perf_evidence_level}\n"
-        f"- browser_perf_comparison_ref: {browser_perf_comparison_ref}\n"
-        f"- browser_perf_comparison_status: {browser_perf_comparison_status} / level={browser_perf_comparison_level}\n"
-        f"- browser_perf_trace_ref: {browser_perf_trace_ref}\n"
-        f"- anim_latest_updated_utc: {diag.get('anim_latest_updated_utc') or '—'}\n"
-        f"- anim_latest_issues: {issues_preview}\n"
-        "Recommended actions (operator-first):\n"
+        f"- Состояние производительности: {browser_perf_status} / уровень={browser_perf_level}\n"
+        f"- Снимок производительности: {browser_perf_snapshot_ref}\n"
+        f"- Предыдущий снимок производительности: {browser_perf_prev_snapshot_ref}\n"
+        f"- Отчёт производительности: {browser_perf_evidence_ref}\n"
+        f"- Данные производительности: {browser_perf_evidence_status} / уровень={browser_perf_evidence_level}\n"
+        f"- Сравнение производительности: {browser_perf_comparison_ref}\n"
+        f"- Состояние сравнения производительности: {browser_perf_comparison_status} / уровень={browser_perf_comparison_level}\n"
+        f"- Трасса производительности: {browser_perf_trace_ref}\n"
+        f"- Обновлено UTC: {diag.get('anim_latest_updated_utc') or '—'}\n"
+        f"- Замечания: {issues_preview}\n"
+        "Рекомендуемые действия:\n"
         f"{recommendations_preview}"
-        f"- In bundle: {ANIM_DIAG_JSON}\n"
-        f"- In bundle: {ANIM_DIAG_MD}\n"
-        "- In bundle: health/health_report.json\n"
-        "- In bundle: health/health_report.md\n\n"
+        f"- В архиве: {ANIM_DIAG_JSON}\n"
+        f"- В архиве: {ANIM_DIAG_MD}\n"
+        "- В архиве: health/health_report.json\n"
+        "- В архиве: health/health_report.md\n\n"
         "Если каких-то папок нет, они не будут включены.\n"
     )
 
@@ -2937,8 +2937,8 @@ def make_send_bundle(
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Create a send-to-chat bundle ZIP (logs + test artifacts)")
-    ap.add_argument("--out_dir", default="send_bundles", help="Куда складывать send bundle (относительно repo root)")
+    ap = argparse.ArgumentParser(description="Создать архив проекта ZIP (логи и проверочные материалы)")
+    ap.add_argument("--out_dir", default="send_bundles", help="Куда сохранять архив проекта (относительно repo root)")
     ap.add_argument("--keep_last_n", type=int, default=3, help="Сколько последних прогонов autotest/diagnostics включать")
     ap.add_argument("--max_file_mb", type=int, default=80, help="Пропускать файлы больше этого размера (МБ)")
     ap.add_argument("--include_workspace_osc", action="store_true", help="Включать workspace/osc (может быть большим)")

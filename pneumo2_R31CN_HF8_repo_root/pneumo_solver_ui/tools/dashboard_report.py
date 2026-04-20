@@ -2,35 +2,28 @@
 # -*- coding: utf-8 -*-
 """dashboard_report.py
 
-R53: Unified HTML Dashboard (triage + validation + sqlite metrics + run registry)
-==============================================================================
+R53: единый HTML-отчёт по проверке проекта.
 
-Goal
-----
-Provide a *single* human-friendly entry point after a run. The dashboard is
-intended to be included into the Send Bundle ZIP and also written as a sidecar
-file next to bundles.
+Цель: дать человеку одну понятную точку входа после запуска. Отчёт кладётся в
+архив проекта и сохраняется рядом с ним.
 
-The dashboard shows (best-effort):
-- Triage (md + json)
-- Send bundle validation (md + json)
-- Anim latest diagnostics (md + json)
-- SQLite metrics report (md + json) if generated
-- Run registry tail / index
+Отчёт показывает, если данные доступны:
+- разбор замечаний;
+- проверку архива проекта;
+- сведения о последней анимации;
+- отчёт SQLite-метрик;
+- реестр запусков.
 
-Usage
------
-CLI:
+Запуск:
   python -m pneumo_solver_ui.tools.dashboard_report --out_dir send_bundles --print_paths
 
-From make_send_bundle.py:
-  - embed dashboard into ZIP: dashboard/index.html, dashboard/dashboard.json
-  - write sidecars: send_bundles/latest_dashboard.html / .json
+Из make_send_bundle.py:
+  - положить отчёт в ZIP: dashboard/index.html, dashboard/dashboard.json;
+  - записать рядом: send_bundles/latest_dashboard.html / .json.
 
-Design notes
-------------
-- Best-effort: failures MUST NOT break bundle creation.
-- No external template deps: pure Python string formatting.
+Правила:
+- сбой отчёта не должен ломать создание архива;
+- без внешних шаблонов: обычное форматирование строк Python.
 
 """
 
@@ -211,7 +204,7 @@ def generate_dashboard_report(
             from pneumo_solver_ui.tools.triage_report import generate_triage_report
 
             triage_md, triage_json = generate_triage_report(repo_root, keep_last_n=int(keep_last_n))
-            rep["warnings"].append("triage sidecar not found; generated on the fly")
+            rep["warnings"].append("файл разбора замечаний не найден; сформирован заново")
         except Exception:
             rep["errors"].append("failed to load/generate triage")
             triage_md = "(triage not available)\n" + traceback.format_exc()
@@ -243,7 +236,7 @@ def generate_dashboard_report(
             vres = validate_send_bundle(Path(zip_path))
             val_md = vres.report_md
             val_json = vres.report_json
-            rep["warnings"].append("validation sidecar not found; validated zip on the fly")
+            rep["warnings"].append("файл проверки архива не найден; ZIP проверен заново")
         except Exception:
             rep["errors"].append("failed to load/generate validation")
             val_md = "(validation not available)\n" + traceback.format_exc()
@@ -282,7 +275,7 @@ def generate_dashboard_report(
                     if export_scope:
                         optimizer_scope_sources[str(export_scope.get("source") or arcname)] = export_scope
         except Exception:
-            rep["warnings"].append("failed to inspect optimizer scope artifacts from ZIP")
+            rep["warnings"].append("не удалось проверить файлы области оптимизации из ZIP")
 
     optimizer_scope = compare_optimizer_scope_sources(
         optimizer_scope_sources,
@@ -298,8 +291,8 @@ def generate_dashboard_report(
                 rep["warnings"].append(msg)
         if optimizer_scope_gate.get("release_risk"):
             risk_msg = (
-                "optimizer scope release risk: "
-                f"{optimizer_scope_gate.get('release_gate_reason') or 'mismatch detected'}"
+                "риск выпуска по области оптимизации: "
+                f"{optimizer_scope_gate.get('release_gate_reason') or 'обнаружено расхождение'}"
             )
             if risk_msg not in rep["warnings"]:
                 rep["warnings"].append(risk_msg)
@@ -318,19 +311,19 @@ def generate_dashboard_report(
     elif zip_path is not None:
         anim_md = _safe_zip_read_text(zip_path, ANIM_DIAG_MD)
         if anim_md:
-            rep["warnings"].append("anim_latest markdown sidecar not found next to bundle; using ZIP copy")
+            rep["warnings"].append("отчёт последней анимации рядом с архивом не найден; используется копия из ZIP")
 
     if anim_json_path.exists():
         anim_json = _safe_json_load(anim_json_path)
     elif zip_path is not None:
         anim_json = _safe_zip_json_load(zip_path, ANIM_DIAG_JSON)
         if anim_json is not None:
-            rep["warnings"].append("anim_latest json sidecar not found next to bundle; using ZIP copy")
+            rep["warnings"].append("данные последней анимации рядом с архивом не найдены; используется копия из ZIP")
 
     if anim_json is None and isinstance(val_json, dict):
         anim_json = val_json.get("anim_latest")
         if isinstance(anim_json, dict):
-            rep["warnings"].append("anim_latest diagnostics sidecar not found; using validation summary")
+            rep["warnings"].append("данные последней анимации не найдены; используется сводка проверки архива")
 
     val_anim_json = val_json.get("anim_latest") if isinstance(val_json, dict) else None
     anim_norm = normalize_anim_dashboard_obj(anim_json)
@@ -467,13 +460,13 @@ def generate_dashboard_report(
     if anim_pointer_sync is True:
         anim_pointer_sync_html = '<span class="ok">OK</span>'
     elif anim_pointer_sync is False:
-        anim_pointer_sync_html = '<span class="bad">MISMATCH</span>'
+        anim_pointer_sync_html = '<span class="bad">РАСХОЖДЕНИЕ</span>'
     else:
         anim_pointer_sync_html = '<span class="warn">n/a</span>'
     if optimizer_scope_sync is True:
         optimizer_scope_sync_html = '<span class="ok">OK</span>'
     elif optimizer_scope_sync is False:
-        optimizer_scope_sync_html = '<span class="bad">MISMATCH</span>'
+        optimizer_scope_sync_html = '<span class="bad">РАСХОЖДЕНИЕ</span>'
     else:
         optimizer_scope_sync_html = '<span class="warn">n/a</span>'
     if optimizer_scope_gate_name == "PASS":
@@ -513,93 +506,93 @@ def generate_dashboard_report(
   <h1>{_html_escape(title)}</h1>
   <div class=\"meta\">
     <div class=\"grid\">
-      <div class=\"k\">generated_at</div><div>{_html_escape(rep.get('generated_at',''))}</div>
-      <div class=\"k\">release</div><div>{_html_escape(RELEASE)}</div>
-      <div class=\"k\">zip_path</div><div>{_html_escape(rep.get('zip_path') or '')}</div>
-      <div class=\"k\">PNEUMO_RUN_ID</div><div>{_html_escape(env_run_id)}</div>
-      <div class=\"k\">validation.ok</div><div>{'<span class="ok">OK</span>' if val_ok is True else ('<span class="bad">FAIL</span>' if val_ok is False else '<span class="warn">n/a</span>')}</div>
-      <div class=\"k\">anim_latest.available</div><div>{'<span class="ok">YES</span>' if anim_available else '<span class="warn">NO / n-a</span>'}</div>
-      <div class=\"k\">anim_latest.token</div><div>{_html_escape(_short_token(anim_token) or '—')}</div>
-      <div class=\"k\">anim_latest.pointer_sync</div><div>{anim_pointer_sync_html}</div>
-      <div class=\"k\">anim_latest.reload_inputs</div><div>{_html_escape(', '.join(str(x) for x in anim_reload_inputs) if anim_reload_inputs else '—')}</div>
-      <div class=\"k\">anim_latest.bundle_usable</div><div>{'<span class="ok">YES</span>' if anim_bundle_usable is True else ('<span class="bad">NO</span>' if anim_bundle_usable is False else '<span class="warn">n/a</span>')}</div>
-      <div class=\"k\">browser_perf.status</div><div>{_html_escape((anim_browser_perf_status or '—') + (f' / {anim_browser_perf_level}' if anim_browser_perf_level else ''))}</div>
-      <div class=\"k\">browser_perf.evidence</div><div>{_html_escape((anim_browser_perf_evidence_status or '—') + (f' / {anim_browser_perf_evidence_level}' if anim_browser_perf_evidence_level else ''))}</div>
-      <div class=\"k\">browser_perf.bundle_ready</div><div>{'<span class="ok">YES</span>' if anim_browser_perf_bundle_ready is True else ('<span class="bad">NO</span>' if anim_browser_perf_bundle_ready is False else '<span class="warn">n/a</span>')}</div>
-      <div class=\"k\">browser_perf.comparison</div><div>{_html_escape((anim_browser_perf_comparison_status or '—') + (f' / {anim_browser_perf_comparison_level}' if anim_browser_perf_comparison_level else ''))}</div>
-      <div class=\"k\">browser_perf.comparison_ready</div><div>{'<span class="ok">YES</span>' if anim_browser_perf_comparison_ready is True else ('<span class="bad">NO</span>' if anim_browser_perf_comparison_ready is False else '<span class="warn">n/a</span>')}</div>
-      <div class=\"k\">optimizer.problem_hash</div><div>{_html_escape(optimizer_problem_scope or 'вЂ”')}</div>
-      <div class=\"k\">optimizer.hash_mode</div><div>{_html_escape(optimizer_hash_mode or 'вЂ”')}</div>
-      <div class=\"k\">optimizer.gate</div><div>{optimizer_scope_gate_html}</div>
-      <div class=\"k\">optimizer.scope_sync</div><div>{optimizer_scope_sync_html}</div>
-      <div class=\"k\">optimizer.scope_source</div><div>{_html_escape(optimizer_scope_source or 'вЂ”')}</div>
+      <div class=\"k\">Сформировано</div><div>{_html_escape(rep.get('generated_at',''))}</div>
+      <div class=\"k\">Версия</div><div>{_html_escape(RELEASE)}</div>
+      <div class=\"k\">Архив</div><div>{_html_escape(rep.get('zip_path') or '')}</div>
+      <div class=\"k\">Идентификатор запуска</div><div>{_html_escape(env_run_id)}</div>
+      <div class=\"k\">Проверка архива</div><div>{'<span class="ok">успешно</span>' if val_ok is True else ('<span class="bad">ошибка</span>' if val_ok is False else '<span class="warn">нет данных</span>')}</div>
+      <div class=\"k\">Последняя анимация</div><div>{'<span class="ok">доступна</span>' if anim_available else '<span class="warn">нет данных</span>'}</div>
+      <div class=\"k\">Токен анимации</div><div>{_html_escape(_short_token(anim_token) or '—')}</div>
+      <div class=\"k\">Синхронизация указателя</div><div>{anim_pointer_sync_html}</div>
+      <div class=\"k\">Входные данные анимации</div><div>{_html_escape(', '.join(str(x) for x in anim_reload_inputs) if anim_reload_inputs else '—')}</div>
+      <div class=\"k\">Восстановление из архива</div><div>{'<span class="ok">да</span>' if anim_bundle_usable is True else ('<span class="bad">нет</span>' if anim_bundle_usable is False else '<span class="warn">нет данных</span>')}</div>
+      <div class=\"k\">Производительность анимации</div><div>{_html_escape((anim_browser_perf_status or '—') + (f' / {anim_browser_perf_level}' if anim_browser_perf_level else ''))}</div>
+      <div class=\"k\">Данные производительности</div><div>{_html_escape((anim_browser_perf_evidence_status or '—') + (f' / {anim_browser_perf_evidence_level}' if anim_browser_perf_evidence_level else ''))}</div>
+      <div class=\"k\">Производительность в архиве</div><div>{'<span class="ok">да</span>' if anim_browser_perf_bundle_ready is True else ('<span class="bad">нет</span>' if anim_browser_perf_bundle_ready is False else '<span class="warn">нет данных</span>')}</div>
+      <div class=\"k\">Сравнение производительности</div><div>{_html_escape((anim_browser_perf_comparison_status or '—') + (f' / {anim_browser_perf_comparison_level}' if anim_browser_perf_comparison_level else ''))}</div>
+      <div class=\"k\">Сравнение готово</div><div>{'<span class="ok">да</span>' if anim_browser_perf_comparison_ready is True else ('<span class="bad">нет</span>' if anim_browser_perf_comparison_ready is False else '<span class="warn">нет данных</span>')}</div>
+      <div class=\"k\">Область задачи</div><div>{_html_escape(optimizer_problem_scope or '—')}</div>
+      <div class=\"k\">Режим хэша</div><div>{_html_escape(optimizer_hash_mode or '—')}</div>
+      <div class=\"k\">Допуск оптимизации</div><div>{optimizer_scope_gate_html}</div>
+      <div class=\"k\">Синхронизация оптимизации</div><div>{optimizer_scope_sync_html}</div>
+      <div class=\"k\">Источник оптимизации</div><div>{_html_escape(optimizer_scope_source or '—')}</div>
     </div>
   </div>
 
   <details open>
-    <summary>📌 Triage report (markdown)</summary>
+    <summary>Разбор замечаний</summary>
     <pre>{_html_escape(triage_md)}</pre>
   </details>
 
   <details>
-    <summary>рџ§­ Optimizer scope</summary>
+    <summary>Область оптимизации</summary>
     <div class=\"grid\">
-      <div class=\"k\">problem_hash</div><div>{_html_escape(optimizer_problem_scope or 'вЂ”')}</div>
-      <div class=\"k\">problem_hash_mode</div><div>{_html_escape(optimizer_hash_mode or 'вЂ”')}</div>
-      <div class=\"k\">release_gate</div><div>{optimizer_scope_gate_html}</div>
-      <div class=\"k\">release_risk</div><div>{_html_escape(str(optimizer_scope_release_risk))}</div>
-      <div class=\"k\">gate_reason</div><div>{_html_escape(optimizer_scope_gate_reason or 'вЂ”')}</div>
-      <div class=\"k\">scope_sync_ok</div><div>{optimizer_scope_sync_html}</div>
-      <div class=\"k\">canonical_source</div><div>{_html_escape(optimizer_scope_source or 'вЂ”')}</div>
-      <div class=\"k\">objective_keys</div><div>{_html_escape(', '.join(str(x) for x in optimizer_objective_keys) if optimizer_objective_keys else 'вЂ”')}</div>
+      <div class=\"k\">Область задачи</div><div>{_html_escape(optimizer_problem_scope or '—')}</div>
+      <div class=\"k\">Режим хэша</div><div>{_html_escape(optimizer_hash_mode or '—')}</div>
+      <div class=\"k\">Допуск выпуска</div><div>{optimizer_scope_gate_html}</div>
+      <div class=\"k\">Риск выпуска</div><div>{_html_escape(str(optimizer_scope_release_risk))}</div>
+      <div class=\"k\">Причина допуска</div><div>{_html_escape(optimizer_scope_gate_reason or '—')}</div>
+      <div class=\"k\">Синхронизация области</div><div>{optimizer_scope_sync_html}</div>
+      <div class=\"k\">Основной источник</div><div>{_html_escape(optimizer_scope_source or '—')}</div>
+      <div class=\"k\">Цели расчёта</div><div>{_html_escape(', '.join(str(x) for x in optimizer_objective_keys) if optimizer_objective_keys else '—')}</div>
     </div>
-    <pre>{_html_escape(_pretty_json(optimizer_scope) if optimizer_scope else '(optimizer scope not found)')}</pre>
+    <pre>{_html_escape(_pretty_json(optimizer_scope) if optimizer_scope else '(область оптимизации не найдена)')}</pre>
   </details>
 
   <details>
-    <summary>🎞️ Anim latest diagnostics</summary>
+    <summary>Последняя анимация</summary>
     <div class=\"grid\">
-      <div class=\"k\">available</div><div>{_html_escape(str(anim_available))}</div>
-      <div class=\"k\">visual_cache_token</div><div>{_html_escape(anim_token or '—')}</div>
-      <div class=\"k\">visual_reload_inputs</div><div>{_html_escape(', '.join(str(x) for x in anim_reload_inputs) if anim_reload_inputs else '—')}</div>
-      <div class=\"k\">pointer_sync_ok</div><div>{anim_pointer_sync_html}</div>
-      <div class=\"k\">usable_from_bundle</div><div>{_html_escape(str(anim_bundle_usable))}</div>
-      <div class=\"k\">browser_perf_status</div><div>{_html_escape(anim_browser_perf_status or '—')}</div>
-      <div class=\"k\">browser_perf_evidence_status</div><div>{_html_escape(anim_browser_perf_evidence_status or '—')}</div>
-      <div class=\"k\">browser_perf_bundle_ready</div><div>{_html_escape(str(anim_browser_perf_bundle_ready))}</div>
-      <div class=\"k\">browser_perf_comparison_status</div><div>{_html_escape(anim_browser_perf_comparison_status or '—')}</div>
-      <div class=\"k\">browser_perf_comparison_ready</div><div>{_html_escape(str(anim_browser_perf_comparison_ready))}</div>
+      <div class=\"k\">Доступна</div><div>{_html_escape(str(anim_available))}</div>
+      <div class=\"k\">Токен визуального кэша</div><div>{_html_escape(anim_token or '—')}</div>
+      <div class=\"k\">Входные данные перезагрузки</div><div>{_html_escape(', '.join(str(x) for x in anim_reload_inputs) if anim_reload_inputs else '—')}</div>
+      <div class=\"k\">Указатель синхронизирован</div><div>{anim_pointer_sync_html}</div>
+      <div class=\"k\">Восстанавливается из архива</div><div>{_html_escape(str(anim_bundle_usable))}</div>
+      <div class=\"k\">Состояние производительности</div><div>{_html_escape(anim_browser_perf_status or '—')}</div>
+      <div class=\"k\">Данные производительности</div><div>{_html_escape(anim_browser_perf_evidence_status or '—')}</div>
+      <div class=\"k\">Данные производительности в архиве</div><div>{_html_escape(str(anim_browser_perf_bundle_ready))}</div>
+      <div class=\"k\">Состояние сравнения</div><div>{_html_escape(anim_browser_perf_comparison_status or '—')}</div>
+      <div class=\"k\">Сравнение готово</div><div>{_html_escape(str(anim_browser_perf_comparison_ready))}</div>
     </div>
-    <pre>{_html_escape(anim_md if anim_md else '(anim_latest diagnostics not found)')}</pre>
+    <pre>{_html_escape(anim_md if anim_md else '(данные последней анимации не найдены)')}</pre>
   </details>
 
   <details>
-    <summary>✅ Send bundle validation report (markdown)</summary>
+    <summary>Проверка архива проекта</summary>
     <pre>{_html_escape(val_md)}</pre>
   </details>
 
   <details>
-    <summary>🗄️ SQLite metrics report (markdown)</summary>
-    <pre>{_html_escape(sql_md if sql_md else '(sqlite report not found)')}</pre>
+    <summary>Отчёт SQLite-метрик</summary>
+    <pre>{_html_escape(sql_md if sql_md else '(отчёт SQLite не найден)')}</pre>
   </details>
 
   <details>
-    <summary>🧾 Run registry index.json</summary>
-    <pre>{_html_escape(_pretty_json(rr_index_obj) if rr_index_obj is not None else '(runs/index.json not found)')}</pre>
+    <summary>Реестр запусков: index.json</summary>
+    <pre>{_html_escape(_pretty_json(rr_index_obj) if rr_index_obj is not None else '(runs/index.json не найден)')}</pre>
   </details>
 
   <details>
-    <summary>🧾 Run registry tail (run_registry.jsonl last ~200KB)</summary>
-    <pre>{_html_escape(rr_tail_txt if rr_tail_txt else '(runs/run_registry.jsonl not found)')}</pre>
+    <summary>Реестр запусков: последние записи</summary>
+    <pre>{_html_escape(rr_tail_txt if rr_tail_txt else '(runs/run_registry.jsonl не найден)')}</pre>
   </details>
 
   <details>
-    <summary>📦 send_bundles/index.json</summary>
-    <pre>{_html_escape(_pretty_json(bundles_index_obj) if bundles_index_obj is not None else '(send_bundles/index.json not found)')}</pre>
+    <summary>Архивы проекта: index.json</summary>
+    <pre>{_html_escape(_pretty_json(bundles_index_obj) if bundles_index_obj is not None else '(send_bundles/index.json не найден)')}</pre>
   </details>
 
   <details>
-    <summary>🔧 dashboard_report.json (raw)</summary>
+    <summary>dashboard_report.json</summary>
     <pre>{_html_escape(_pretty_json(rep))}</pre>
   </details>
 
@@ -630,10 +623,10 @@ def write_dashboard_sidecars(out_dir: Path, html: str, rep_json: Dict[str, Any],
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Generate unified HTML dashboard report")
-    ap.add_argument("--out_dir", default="send_bundles", help="Directory where send bundle sidecars live")
+    ap = argparse.ArgumentParser(description="Сформировать единый HTML-отчёт проверки проекта")
+    ap.add_argument("--out_dir", default="send_bundles", help="Папка с файлами архива проекта")
     ap.add_argument("--keep_last_n", type=int, default=3)
-    ap.add_argument("--zip", default=None, help="Optional send bundle zip path (for validation on the fly)")
+    ap.add_argument("--zip", default=None, help="Необязательный путь к ZIP архива проекта для проверки")
     ap.add_argument("--print_paths", action="store_true")
     args = ap.parse_args()
 

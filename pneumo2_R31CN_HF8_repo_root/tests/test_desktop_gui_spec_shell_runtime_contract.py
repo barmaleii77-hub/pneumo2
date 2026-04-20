@@ -31,7 +31,8 @@ def test_main_window_applies_v3_shortcuts_and_docking_contracts(tmp_path, monkey
         assert window._keyboard_shortcut_by_name["Поиск команд"] == "Ctrl+K"
         assert window._keyboard_shortcut_by_name["Быстрый поиск"] == "Ctrl+K"
         assert window._keyboard_shortcut_by_name["Главное действие шага"] == "Ctrl+Enter"
-        assert window._keyboard_shortcut_by_name["Собрать архив для отправки"] == "Ctrl+Shift+D"
+        assert window._keyboard_shortcut_by_name["Сохранить архив проекта"] == "Ctrl+Shift+D"
+        assert "Собрать архив для отправки" not in window._keyboard_shortcut_by_name
         assert "Собрать диагностику" not in window._keyboard_shortcut_by_name
         assert len(window._shortcut_objects) >= 6
 

@@ -244,9 +244,9 @@ class DesktopRingScenarioEditor:
         ttk.Label(
             header,
             text=(
-                "Отдельное окно для настройки циклического сценария: сегменты, профиль дороги, события, "
-                "диагностика, предварительный просмотр и подготовка файлов сценария. "
-                "Быстрые действия: Ctrl+S сохранить, Ctrl+O загрузить, F5 пересчитать диагностику."
+                "Настройка циклического сценария: сегменты, профиль дороги, события, "
+                "проверка сценария, предварительный просмотр и подготовка файлов сценария. "
+                "Быстрые действия: Ctrl+S сохранить, Ctrl+O загрузить, F5 пересчитать проверку."
             ),
             wraplength=1200,
             justify="left",
@@ -277,7 +277,7 @@ class DesktopRingScenarioEditor:
         ttk.Button(actions, text="Применить", command=self._apply_segment_preset).grid(row=1, column=2, padx=(0, 6), pady=(6, 0))
         ttk.Button(actions, text="Вставить сегмент", command=self._insert_segment_preset).grid(row=1, column=3, padx=(0, 6), pady=(6, 0))
         ttk.Button(actions, text="Сбросить по умолчанию", command=self._reset_defaults).grid(row=0, column=3, padx=(0, 6))
-        ttk.Button(actions, text="Пересчитать диагностику", command=self._force_refresh).grid(row=0, column=4)
+        ttk.Button(actions, text="Пересчитать проверку", command=self._force_refresh).grid(row=0, column=4)
 
         for child in header.grid_slaves(row=1, column=0):
             child.grid_remove()
@@ -356,7 +356,7 @@ class DesktopRingScenarioEditor:
         self.notebook.add(self.motion_tab_scroll, text="Движение")
         self.notebook.add(self.road_tab_scroll, text="Дорога")
         self.notebook.add(self.events_tab_scroll, text="События")
-        self.notebook.add(self.diagnostics_tab_scroll, text="Диагностика")
+        self.notebook.add(self.diagnostics_tab_scroll, text="Проверка")
         self.notebook.add(self.export_tab_scroll, text="Экспорт")
 
         footer = ttk.Frame(outer)
@@ -1105,7 +1105,7 @@ class DesktopRingScenarioEditor:
         diagnostics = build_ring_editor_diagnostics(self.state.spec)
         if diagnostics.errors:
             if show_dialog:
-                messagebox.showerror(EDITOR_DIALOG_TITLE, "Исправьте ошибки в диагностике перед подготовкой файлов сценария.")
+                messagebox.showerror(EDITOR_DIALOG_TITLE, "Исправьте ошибки проверки перед подготовкой файлов сценария.")
             self._apply_diagnostics(diagnostics)
             return None
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Streamlit page: Diagnostics.
+"""Streamlit page: environment check.
 
 Цель:
 - Быстро понять, почему у пользователя не работают 2D/3D компоненты или Plotly.
@@ -50,7 +50,7 @@ def _try_import(name: str):
 
 
 
-st.title("Диагностика среды")
+st.title("Проверка окружения")
 
 st.markdown(
     "Эта страница помогает быстро локализовать типовые проблемы: **Plotly не установлен**, "
@@ -113,10 +113,10 @@ else:
     st.dataframe(rows, width="stretch", height=220)
 
 st.info(
-    "Если компоненты не загружаются или появляются ошибки/предупреждения — это нормально для диагностики.\n\n"
+    "Если компоненты не загружаются или появляются ошибки/предупреждения — это нормально для проверки окружения.\n\n"
     "Главное: **всё должно попадать в логи** и в `events.jsonl`.\n\n"
     "Что делать без консоли:\n"
-    "• Откройте эту страницу → нажмите **«Собрать диагностический пакет»** → скачайте zip.\n"
+    "• Откройте эту страницу → сохраните архив проекта → скачайте файл архива.\n"
     "• Если зависимости не установлены/сломаны — запустите **START_PNEUMO_APP.pyw** и нажмите **«Установить/обновить зависимости»**.\n"
     "• После обновления — обновите страницу (Ctrl+F5) и снова проверьте.\n"
 )
@@ -230,7 +230,7 @@ else:
     st.info(f"events.jsonl пока не создан: {events_path}. Открой любую страницу, где были ошибки/предупреждения, и вернись сюда.")
 
 
-st.subheader("Диагностический пакет")
+st.subheader("Архив проекта")
 try:
     raw_out_dir = str(st.session_state.get("diag_output_dir", "send_bundles") or "").strip()
     if not raw_out_dir:
@@ -243,26 +243,26 @@ try:
             diag_out_dir = (REPO_ROOT / raw_out_dir).resolve()
 
     last_meta = summarize_last_bundle_meta(read_last_meta_from_out_dir(diag_out_dir))
-    st.caption(f"Каталог SEND bundle: {diag_out_dir}")
+    st.caption(f"Каталог архива проекта: {diag_out_dir}")
     if last_meta.get("zip_name"):
-        st.write(
-            f"Последний ZIP: **{last_meta.get('zip_name')}**"
-            + (f" ({last_meta.get('zip_size_mb'):.1f} MB)" if last_meta.get("zip_size_mb") is not None else "")
-            + f" — ok={last_meta.get('ok')}, trigger={last_meta.get('trigger')}, ts={last_meta.get('ts')}"
-        )
+        archive_line = f"Последний архив: **{last_meta.get('zip_name')}**"
+        if last_meta.get("zip_size_mb") is not None:
+            archive_line += f" ({last_meta.get('zip_size_mb'):.1f} МБ)"
+        archive_line += f" — {'готов' if last_meta.get('ok') else 'требует проверки'}"
+        st.write(archive_line)
         if last_meta.get("summary_lines"):
             st.markdown("\n".join(f"- {line}" for line in last_meta["summary_lines"]))
         if last_meta.get("anim_pointer_diagnostics_path"):
-            st.caption(f"Anim pointer diagnostics: {last_meta['anim_pointer_diagnostics_path']}")
+            st.caption(f"Данные последней анимации: {last_meta['anim_pointer_diagnostics_path']}")
     else:
-        st.write("Последний ZIP: —")
+        st.write("Последний архив: —")
 except Exception as e:
-    st.warning(f"Не удалось прочитать статус последнего SEND bundle: {e!r}")
+    st.warning(f"Не удалось прочитать статус последнего архива проекта: {e!r}")
 
 st.info(
-    "Полный архив для отправки (включая результаты расчётов, логи, экспорт и отчёты) "
-    "собирается в разделе: **98 — Сборка архива (ZIP)**. "
-    "Там же выполняется автоматическое сохранение на диск и (если возможно) копирование ZIP в буфер обмена."
+    "Полный архив проекта (включая результаты расчётов, логи, экспорт и отчёты) "
+    "собирается в разделе: **98 — Сохранение архива проекта**. "
+    "Там же выполняется автоматическое сохранение на диск и (если возможно) копирование архива в буфер обмена."
 )
 
 st.write("Здесь оставлены только инструменты просмотра окружения (версии Python, пакеты, переменные среды и т.п.).")

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Streamlit page: Send Bundle (one button).
+"""Streamlit page: project archive (one button).
 
 Требование пользователя
 ----------------------
-Нужна максимально простая отправка результатов:
+Нужно максимально простое сохранение архива проекта:
 - ZIP пишется на диск автоматически (send_bundles/latest_send_bundle.zip)
 - в интерфейсе должна быть ОДНА кнопка: "скачать/скопировать ZIP"
 
@@ -12,7 +12,7 @@
 
 Но иногда проще именно *скачать* ZIP из Streamlit. Эта страница — ровно
 одна кнопка download, которая:
-  1) собирает send bundle (best-effort)
+  1) собирает архив проекта (best-effort)
   2) пишет его на диск в send_bundles/
   3) отдаёт браузеру ZIP как файл.
 
@@ -116,10 +116,10 @@ def _build_and_read_zip() -> bytes:
 
 
 
-st.title("Отправка результатов (ZIP)")
+st.title("Сохранение архива проекта (ZIP)")
 
 st.markdown(
-    "Эта страница содержит **ровно одну кнопку**. Нажмите её, чтобы получить ZIP для отправки в чат.\n\n"
+    "Эта страница содержит **ровно одну кнопку**. Нажмите её, чтобы сохранить ZIP архива проекта.\n\n"
     "ZIP также автоматически сохраняется на диск: `send_bundles/latest_send_bundle.zip`."
 )
 
@@ -139,10 +139,10 @@ if st.session_state.get("last_send_bundle_zip"):
     if _anim_lines:
         st.markdown("\n".join(f"- {line}" for line in _anim_lines))
     if _diag_path:
-        st.caption(f"Anim pointer diagnostics: {_diag_path}")
+        st.caption(f"Сведения указателя анимации: {_diag_path}")
 
 st.download_button(
-    "⬇️ Скачать ZIP и скопировать в буфер",
+    "Скачать ZIP и скопировать в буфер",
     data=_build_and_read_zip,
     file_name="latest_send_bundle.zip",
     mime="application/zip",

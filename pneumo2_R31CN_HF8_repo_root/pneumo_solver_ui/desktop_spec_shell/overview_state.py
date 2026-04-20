@@ -174,31 +174,31 @@ def build_overview_snapshot(repo_root: Path | None = None) -> OverviewSnapshot:
         OverviewCardState(
             title="Последние результаты",
             value=_safe_relative(result_path, root) if result_path else "Пока нет файлов результатов",
-            detail="Результаты и сравнение открываются из окна анализа результатов.",
+            detail="Результаты и сравнение доступны в анализе результатов.",
             command_id="results.center.open",
             action_text="Открыть анализ результатов",
         ),
         OverviewCardState(
-            title="Последний архив для отправки",
+            title="Последний архив проекта",
             value=str(bundle_path.name) if bundle_path else "Архив пока не найден",
-            detail=str(bundle_path.parent) if bundle_path else "Проверка и отправка должны оставаться доступными из любого рабочего шага приложения.",
+            detail=str(bundle_path.parent) if bundle_path else "Проверка проекта и архив должны оставаться доступными из любого рабочего шага приложения.",
             command_id="diagnostics.collect_bundle",
-            action_text="Собрать архив для отправки",
+            action_text="Сохранить архив проекта",
         ),
         OverviewCardState(
             title="Проверка готовности",
             value=(
                 f"Основные окна: {'готовы' if pyside6_ready else 'не найдены'} | "
                 f"Аниматор: {'найден' if animator_ready else 'не найден'} | "
-                f"Проверка и отправка: {'готовы' if diagnostics_ready else 'не найдены'}"
+                f"Проверка проекта и архив: {'готовы' if diagnostics_ready else 'не найдены'}"
             ),
             detail=(
                 "Схема последовательности "
                 + ("готова" if workflow_graphs_ready else "не найдена")
-                + "; главное окно должно открывать существующие инженерные окна без скрытой подмены."
+            + "; рабочее место должно открывать существующие инженерные окна без скрытой подмены."
             ),
             command_id="workspace.diagnostics.open",
-            action_text="Открыть проверку и отправку",
+            action_text="Открыть проверку проекта",
         ),
     )
     return OverviewSnapshot(cards=cards)

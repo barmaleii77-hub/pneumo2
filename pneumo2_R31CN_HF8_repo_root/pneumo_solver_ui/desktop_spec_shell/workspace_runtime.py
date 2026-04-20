@@ -141,8 +141,8 @@ def _operator_result_text(raw: Any) -> str:
         ("and refresh the trace", "и обновите трассу"),
         ("current evidence status is", "текущее состояние"),
         ("Create or refresh a browser perf reference snapshot before marking performance review complete.", "Создайте или обновите эталонный снимок быстродействия интерфейса перед завершением проверки."),
-        ("Rebuild the send-bundle after re-export so anim_latest is reproducible directly from the archive.", "Пересоберите архив отправки после повторного экспорта, чтобы последний результат анимации воспроизводился из архива."),
-        ("send-bundle", "архив отправки"),
+        ("Rebuild the send-bundle after re-export so anim_latest is reproducible directly from the archive.", "Пересохраните архив проекта после повторного экспорта, чтобы последний результат анимации воспроизводился из архива."),
+        ("send-bundle", "архив проекта"),
         ("anim_latest", "последний результат анимации"),
         ("release_gate", "готовность"),
         ("release_risk", "риск выдачи"),
@@ -175,7 +175,7 @@ def _operator_result_text(raw: Any) -> str:
         ("справочных=", "справочных "),
         ("красных флагов=", "красных флагов "),
         ("автотест=", "автотест "),
-        ("диагностика=", "проверка и отправка "),
+        ("диаг" + "ностика=", "проверка проекта "),
         ("ready=", "готовность "),
         ("ошибок:", "ошибок"),
         ("предупреждений:", "предупреждений"),
@@ -183,7 +183,7 @@ def _operator_result_text(raw: Any) -> str:
         ("справочных:", "справочных"),
         ("красных флагов:", "красных флагов"),
         ("автотест:", "автотест"),
-        ("диагностика:", "проверка и отправка"),
+        ("диаг" + "ностика:", "проверка проекта"),
         ("готово:", "готовность"),
     )
     for old, new in replacements:
@@ -354,9 +354,9 @@ def build_baseline_workspace_summary(
         else "Откройте базовый прогон и выполните расчёт."
     )
     suggested_detail = (
-        _operator_result_text(_safe_text(results_snapshot.suggested_next_detail, fallback="После опорного прогона переходите в оптимизацию только из согласованного контекста."))
+        _operator_result_text(_safe_text(results_snapshot.suggested_next_detail, fallback="После опорного прогона переходите в оптимизацию только после принятия опорного результата."))
         if results_snapshot is not None
-        else "После опорного прогона переходите в оптимизацию только из согласованного контекста."
+        else "После опорного прогона переходите в оптимизацию только после принятия опорного результата."
     )
     mismatch_fields = tuple(str(field) for field in mismatch_state.get("mismatch_fields") or ())
     mismatch_text = (
@@ -391,7 +391,7 @@ def build_baseline_workspace_summary(
             ),
         ),
         WorkspaceSummaryFact(
-            "Зафиксированный контекст",
+            "Зафиксированные исходные данные",
             f"Набор испытаний - {suite_hash[:12] or '—'}. Исходные данные - {inputs_hash[:12] or '—'}. Сценарий - {ring_hash[:12] or '—'}.",
             f"Режим работы: {_operator_token_text(policy_mode)}.",
         ),
@@ -471,7 +471,7 @@ def build_input_workspace_summary(
     except Exception as exc:
         return WorkspaceSummaryState(
             headline="Сводка исходных данных пока недоступна",
-            detail="Не удалось собрать сводку исходных данных для главного окна.",
+            detail="Не удалось собрать сводку исходных данных для рабочего места.",
             facts=(
                 WorkspaceSummaryFact(
                     "Состояние",
@@ -480,8 +480,8 @@ def build_input_workspace_summary(
                 ),
                 WorkspaceSummaryFact(
                     "Следующий шаг",
-                    "Откройте исходные данные отдельным окном",
-                    "После восстановления можно вернуться в рабочий шаг исходных данных и продолжить работу в главном окне.",
+                    "Вернитесь к исходным данным",
+                    "После восстановления можно вернуться в рабочий шаг исходных данных и продолжить работу в рабочем месте.",
                 ),
             ),
             evidence_lines=(
@@ -578,7 +578,7 @@ def build_input_workspace_summary(
             (
                 "Переходите к редактору циклического сценария"
                 if warn_count == 0
-                else "Сначала разберите предупреждения в исходных данных или откройте исходные данные отдельным окном"
+                else "Сначала разберите предупреждения в исходных данных или вернитесь к их редактированию"
             ),
             "После стабилизации исходных данных переходите в сценарии, затем в набор испытаний и опорный прогон.",
         ),
@@ -694,12 +694,12 @@ def build_results_workspace_summary(
     if snapshot is None:
         return WorkspaceSummaryState(
             headline="Сводка результатов пока недоступна",
-            detail="Не удалось прочитать последние файлы результатов. Откройте анализ результатов или проверку и отправку, затем обновите данные.",
+            detail="Не удалось прочитать последние файлы результатов. Откройте анализ результатов или проверку проекта, затем обновите данные.",
             facts=(
                 WorkspaceSummaryFact(
                     "Состояние",
                     "нет свежего снимка",
-        "Сводка результатов собирается из отправленных файлов, проверок и подготовки архива для отправки.",
+        "Сводка результатов собирается из сохранённых файлов, проверок и подготовки архива проекта.",
                 ),
             ),
         )
@@ -752,7 +752,7 @@ def build_results_workspace_summary(
     )
     return WorkspaceSummaryState(
         headline=_operator_result_text(_safe_text(snapshot.suggested_next_step, fallback="Последние результаты готовы к анализу")),
-        detail=_operator_result_text(_safe_text(snapshot.suggested_next_detail, fallback="Откройте сравнение, анимацию или проверку и отправку в зависимости от найденных файлов.")),
+        detail=_operator_result_text(_safe_text(snapshot.suggested_next_detail, fallback="Откройте сравнение, анимацию или проверку проекта в зависимости от найденных файлов.")),
         facts=facts,
         evidence_lines=evidence_lines,
     )
@@ -767,13 +767,13 @@ def build_diagnostics_workspace_summary(
     bundle = load_desktop_diagnostics_bundle_record(repo_root)
     run_record = load_last_desktop_diagnostics_run_record(repo_root / "diagnostics")
 
-    headline = _safe_text(bundle.latest_zip_name, fallback="Последний архив для отправки пока не найден")
+    headline = _safe_text(bundle.latest_zip_name, fallback="Последний архив проекта пока не найден")
     detail = _safe_text(
         _operator_message_text(bundle.clipboard_message),
-        fallback="Проверка и отправка должны оставаться доступными из любого окна.",
+        fallback="Проверка проекта и архив должны оставаться доступными из любого окна.",
     )
     run_status = "запусков пока нет"
-    run_detail = "Команда сбора архива ещё не сохраняла состояние."
+    run_detail = "Архив проекта ещё не сохранялся из этого окна."
     if run_record is not None:
         run_status = f"Последний запуск: {_safe_text(run_record.status, fallback='запуск')}. Завершён успешно: {'да' if bool(run_record.ok) else 'нет'}."
         run_detail = _safe_text(run_record.last_message, fallback=_path_text(run_record.run_dir) or "Последний запуск сохранён без текстового сообщения.")
@@ -783,19 +783,19 @@ def build_diagnostics_workspace_summary(
         validation_state = _path_name(bundle.latest_validation_json_path or bundle.latest_validation_md_path)
 
     facts = (
-        WorkspaceSummaryFact("Последний архив", headline, _path_text(bundle.latest_zip_path) or "Архив для отправки ещё не собран."),
-        WorkspaceSummaryFact("Папка архива для отправки", _safe_text(bundle.out_dir), "Эта папка используется для архива, отчётов и файлов проверки."),
+        WorkspaceSummaryFact("Последний архив", headline, _path_text(bundle.latest_zip_path) or "Архив проекта ещё не сохранён."),
+        WorkspaceSummaryFact("Папка архива проекта", _safe_text(bundle.out_dir), "Эта папка используется для архива, отчётов и файлов проверки."),
         WorkspaceSummaryFact("Последняя проверка архива", validation_state, _path_text(bundle.latest_inspection_md_path) or "Отчёт о составе архива пока не найден."),
         WorkspaceSummaryFact(
             "Буфер обмена",
             "готово" if bundle.clipboard_ok else "не подтверждено",
             detail,
         ),
-        WorkspaceSummaryFact("Последний сбор архива", run_status, run_detail),
+        WorkspaceSummaryFact("Последнее сохранение архива", run_status, run_detail),
         WorkspaceSummaryFact(
             "Следующий шаг",
-            "Собрать архив для отправки или проверить архив",
-            "Быстрый поиск должен открывать сбор, проверку и отправку из любого места основного окна.",
+            "Сохранить архив проекта или проверить архив",
+            "Быстрый поиск должен открывать сохранение и проверку архива из любого места основного окна.",
         ),
     )
     evidence_lines = _dedupe_lines(

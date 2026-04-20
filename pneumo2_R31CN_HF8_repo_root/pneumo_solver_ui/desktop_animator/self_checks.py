@@ -88,7 +88,7 @@ def run_self_checks(
         bundle_contract_issues = list((b.meta or {}).get("_geometry_contract_issues") or [])
     if bundle_contract_issues:
         stats["geometry_contract_issue_count"] = int(len(bundle_contract_issues))
-        msgs.append("FAIL: нарушен контракт meta_json.geometry для bundle аниматора.")
+        msgs.append("FAIL: данные meta_json.geometry не подходят для пакета анимации.")
         for _msg in bundle_contract_issues[:8]:
             msgs.append(f"FAIL: {_msg}")
         if len(bundle_contract_issues) > 8:
@@ -181,7 +181,7 @@ def run_self_checks(
                 miss_corner.append(base)
     if miss_corner:
         msgs.append(
-            "FAIL: отсутствуют ABS-каналы геометрии по углам (контракт аниматора): "
+            "FAIL: отсутствуют ABS-каналы геометрии по углам для анимации: "
             + ", ".join(miss_corner[:10])
             + (" ..." if len(miss_corner) > 10 else "")
         )

@@ -298,10 +298,13 @@ def test_ui_preflight_export_step_reports_visual_token_and_global_sync(tmp_path:
     export_step = steps["export"]
 
     assert export_step.ok is True
-    assert "visual_cache_token:" in export_step.detail
-    assert "global pointer:" in export_step.detail
-    assert "global token sync: OK" in export_step.detail
+    assert "Токен визуальных данных:" in export_step.detail
+    assert "Общий указатель анимации:" in export_step.detail
+    assert "Синхронизация визуальных данных: совпадает" in export_step.detail
     assert pointer["visual_cache_token"][:8] in export_step.detail
+    assert "Pointer OK" not in export_step.detail
+    assert "visual_cache_token:" not in export_step.detail
+    assert "global token sync:" not in export_step.detail
 
 
 def test_ui_preflight_recommends_desktop_mnemo_after_export_is_ready(tmp_path: Path, monkeypatch) -> None:
@@ -319,7 +322,7 @@ def test_ui_preflight_recommends_desktop_mnemo_after_export_is_ready(tmp_path: P
     assert "mnemo" in steps
     assert steps["export"].page == "pneumo_solver_ui/pages/08_DesktopMnemo.py"
     assert steps["mnemo"].page == "pneumo_solver_ui/pages/08_DesktopMnemo.py"
-    assert steps["mnemo"].action_label == "Открыть Desktop Mnemo"
+    assert steps["mnemo"].action_label == "Открыть мнемосхему"
 
     next_page, next_label = _pick_next_page_canonical(steps)
     assert next_page in {
@@ -327,7 +330,7 @@ def test_ui_preflight_recommends_desktop_mnemo_after_export_is_ready(tmp_path: P
         "pneumo_solver_ui/pages/09_Validation_Web.py",
     }
     if next_page == "pneumo_solver_ui/pages/08_DesktopMnemo.py":
-        assert "Desktop Mnemo" in next_label
+        assert "мнемосхем" in next_label
 
 
 def test_ui_preflight_send_bundle_step_reports_last_bundle_summary(tmp_path: Path, monkeypatch) -> None:
@@ -346,8 +349,8 @@ def test_ui_preflight_send_bundle_step_reports_last_bundle_summary(tmp_path: Pat
                     "size_bytes": 3 * 1024 * 1024,
                 },
                 "summary_lines": [
-                    "Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True",
-                    "Browser perf comparison: regression_checked / PASS / ready=True",
+                    "Данные производительности анимации: trace_bundle_ready / PASS / готовы_в_архиве=True",
+                    "Сравнение производительности анимации: regression_checked / PASS / готово=True",
                 ],
                 "anim_pointer_diagnostics_path": str(send_bundles / "latest_anim_pointer_diagnostics.json"),
             },
@@ -363,9 +366,14 @@ def test_ui_preflight_send_bundle_step_reports_last_bundle_summary(tmp_path: Pat
     send_bundle_step = steps["send_bundle"]
 
     assert send_bundle_step.ok is True
-    assert "Последний ZIP: latest_send_bundle.zip" in send_bundle_step.detail
-    assert "Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True" in send_bundle_step.detail
-    assert "Диагностика указателя анимации:" in send_bundle_step.detail
+    assert "Последний архив: latest_send_bundle.zip" in send_bundle_step.detail
+    assert "Состояние: готов" in send_bundle_step.detail
+    assert "Размер:" in send_bundle_step.detail
+    assert "Данные производительности анимации: trace_bundle_ready / PASS / готовы_в_архиве=True" in send_bundle_step.detail
+    assert "Данные последней анимации:" in send_bundle_step.detail
+    assert "ok=" not in send_bundle_step.detail
+    assert "trigger=" not in send_bundle_step.detail
+    assert "size_mb=" not in send_bundle_step.detail
     assert "Anim pointer diagnostics:" not in send_bundle_step.detail
 
 
@@ -410,8 +418,8 @@ def test_ui_preflight_send_bundle_step_rebuilds_ring_summary_from_anim_latest_su
     send_bundle_step = steps["send_bundle"]
 
     assert send_bundle_step.ok is True
-    assert "Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True" in send_bundle_step.detail
-    assert "Ring seam: closure=strict_exact / open=True / seam_max_m=0.012 / raw_seam_max_m=0.015" in send_bundle_step.detail
+    assert "Данные производительности анимации: trace_bundle_ready / PASS / готовы_в_архиве=True" in send_bundle_step.detail
+    assert "Шов кольца: замыкание=strict_exact / открыт=True / скачок_м=0.012 / исходный_скачок_м=0.015" in send_bundle_step.detail
 
 
 def test_sources_use_run_artifacts_global_anim_pointer_flow() -> None:

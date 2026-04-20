@@ -24,21 +24,21 @@ def build_desktop_launch_catalog(*, include_mnemo: bool = True) -> tuple[Desktop
     items: list[DesktopLaunchCatalogItem] = [
         DesktopLaunchCatalogItem(
             key="desktop_main_shell_qt",
-            title="Главное окно приложения",
+            title="Рабочее место инженера",
             module="pneumo_solver_ui.tools.desktop_main_shell_qt",
             description=(
-                "Главное Windows-окно оператора: верхнее меню, быстрый поиск, список порядка работы, "
-                "инспектор, строка состояния, индикатор выполнения и единый запуск инженерных окон."
+                "Классическое Windows-рабочее место: верхнее меню, быстрый поиск, список порядка работы, "
+            "инспектор, строка состояния, индикатор выполнения и единый доступ к рабочим местам."
             ),
-            group="Главное окно",
+            group="Рабочее место",
             runtime_kind="qt",
             workspace_role="workspace",
             source_of_truth_role="launcher",
             migration_status="native",
             search_aliases=(
-                "главное окно",
                 "рабочее место инженера",
                 "основное рабочее место",
+                "панель проекта",
             ),
             context_handoff_keys=(
                 "selected_tool_key",
@@ -52,20 +52,20 @@ def build_desktop_launch_catalog(*, include_mnemo: bool = True) -> tuple[Desktop
         ),
         DesktopLaunchCatalogItem(
             key="desktop_gui_spec_shell",
-            title="Проверочное рабочее место",
+            title="Панель восстановления окон",
             module="pneumo_solver_ui.tools.desktop_gui_spec_shell",
             description=(
-                "Проверочное рабочее место для сверки порядка работы и восстановления доступа к окнам."
+                "Панель помогает вернуть доступ к рабочим окнам и проверить порядок работы."
             ),
-            group="Инструменты восстановления",
+            group="Восстановление окон",
             runtime_kind="qt",
             workspace_role="workspace",
             source_of_truth_role="launcher",
             migration_status="in_development",
             search_aliases=(
-                "проверочное рабочее место",
+                "восстановление окон",
                 "восстановление доступа",
-                "сверка окон",
+                "рабочие окна",
             ),
             context_handoff_keys=(
                 "selected_tool_key",

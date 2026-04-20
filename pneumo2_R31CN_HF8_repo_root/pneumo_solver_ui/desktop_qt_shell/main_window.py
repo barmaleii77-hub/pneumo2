@@ -86,8 +86,8 @@ PRIMARY_START_ACTIONS = (
     ),
     (
         "desktop_diagnostics_center",
-        "8. Проверка и отправка",
-        "Проверьте проект и подготовьте архив для отправки после проверки результата.",
+        "8. Проверка проекта",
+        "Проверьте проект и сохраните архив проекта после проверки результата.",
     ),
 )
 
@@ -188,7 +188,7 @@ def _build_shell_settings() -> QtCore.QSettings:
 def _operator_state_label(spec: DesktopShellToolSpec) -> str:
     status = spec.effective_migration_status
     if status == "managed_external":
-        return "Готово: отдельное окно"
+        return "Готово: рабочее окно"
     if status == "in_development":
         return "Есть открытые ограничения"
     return "Готово к работе"
@@ -331,7 +331,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             entries.append(
                 ShellCommandSearchEntry(
                     label=surface.title,
-                    location=f"Главное окно / Основной порядок работы / {surface.title}",
+                    location=f"Рабочее место / Основной порядок работы / {surface.title}",
                     summary=surface.purpose,
                     action_kind="pipeline_surface",
                     action_value=surface.key,
@@ -536,10 +536,10 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             object_name = button.objectName()
             if object_name == "qt_dockwidget_floatbutton":
                 button.setAccessibleName("Открепить панель")
-                button.setAccessibleDescription("Открепляет панель или возвращает её в главное окно")
+                button.setAccessibleDescription("Открепляет панель или возвращает её в рабочее место")
             elif object_name == "qt_dockwidget_closebutton":
                 button.setAccessibleName("Закрыть панель")
-                button.setAccessibleDescription("Скрывает панель главного окна")
+                button.setAccessibleDescription("Скрывает панель рабочего места")
             elif object_name == "ScrollLeftButton":
                 button.setAccessibleName("Прокрутить вкладки влево")
                 button.setAccessibleDescription("")
@@ -575,7 +575,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         panels_menu = view_menu.addMenu("Панели")
         for dock in (self.browser_dock, self.inspector_dock, self.runtime_dock):
             action = dock.toggleViewAction()
-            action.setStatusTip("Включить или скрыть панель главного окна.")
+            action.setStatusTip("Включить или скрыть панель рабочего места.")
             action.setToolTip("Панель можно открепить, вернуть в окно и изменить размер границей.")
             panels_menu.addAction(action)
         panels_menu.addSeparator()
@@ -674,7 +674,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.launch_tool_combo.setObjectName("DesktopQtShellLaunchToolCombo")
         self.launch_tool_combo.setAccessibleName("Выбор рабочего окна без запуска")
         self.launch_tool_combo.setToolTip(
-            "Выбор показывает связанный рабочий шаг. Запуск отдельного окна — через меню «Запуск», "
+                "Выбор показывает связанный рабочий шаг. Рабочее окно запускается через меню «Запуск», "
             "двойной щелчок в списке «Окна» или быстрый поиск."
         )
         self.launch_tool_combo.currentIndexChanged.connect(self._on_launch_tool_changed)
@@ -687,7 +687,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.command_search_edit = QtWidgets.QLineEdit(toolbar)
         self.command_search_edit.setAccessibleName("Быстрый поиск")
         self.command_search_edit.setPlaceholderText(
-            "Окна, действия, испытания, сценарии, архивы отправки, расчёты, файлы"
+            "Окна, действия, испытания, сценарии, архив проекта, расчёты, файлы"
         )
         self.command_search_edit.setToolTip("Ctrl+K. Поиск по окнам, действиям, файлам и запуску.")
         self.command_search_edit.textChanged.connect(self._refresh_search_results)
@@ -699,11 +699,11 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.diagnostics_button = QtWidgets.QPushButton("Проверить проект", toolbar)
         self.diagnostics_button.setObjectName("AlwaysVisibleDiagnosticsAction")
         self.diagnostics_button.setShortcut(QtGui.QKeySequence("F7"))
-        self.diagnostics_button.setToolTip("F7. Проверить проект и подготовить архив для отправки.")
+        self.diagnostics_button.setToolTip("F7. Проверить проект и сохранить архив проекта.")
         self.diagnostics_button.clicked.connect(lambda: self.open_tool("desktop_diagnostics_center"))
         toolbar.addWidget(self.diagnostics_button)
 
-        self.animator_button = QtWidgets.QPushButton("Открыть аниматор", toolbar)
+        self.animator_button = QtWidgets.QPushButton("Анимировать результат", toolbar)
         self.animator_button.clicked.connect(lambda: self.open_tool("desktop_animator"))
         toolbar.addWidget(self.animator_button)
 
@@ -837,7 +837,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         central_layout.addWidget(self.banner_label)
 
         self.route_label = QtWidgets.QLabel(
-            "Основной порядок: исходные данные -> сценарии -> испытания -> базовый прогон -> оптимизация -> анализ -> анимация -> проверка и отправка.",
+            "Основной порядок: исходные данные -> сценарии -> испытания -> базовый прогон -> оптимизация -> анализ -> анимация -> проверка проекта.",
             central,
         )
         self.route_label.setWordWrap(True)
@@ -887,7 +887,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         for row_index, (tool_key, button_text, hint_text) in enumerate(PRIMARY_START_ACTIONS):
             button = QtWidgets.QPushButton(button_text, start_box)
             button.setObjectName(f"PrimaryStartAction_{row_index + 1}_{tool_key}")
-            button.setToolTip("Переход к рабочему шагу внутри главного окна. Отдельное окно запускается только явной командой.")
+            button.setToolTip("Переход к рабочему шагу внутри рабочего места. Рабочее окно запускается только явной командой.")
             button.clicked.connect(
                 lambda _checked=False, key=tool_key: self._select_surface(default_surface_key_for_tool(key))
             )
@@ -976,7 +976,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.status_progress_bar.setMaximumWidth(170)
         self.mode_status_label = QtWidgets.QLabel(status)
         self.bundle_status_label = QtWidgets.QLabel(
-            "Архив для отправки: пока не подготовлен",
+            "Архив проекта: пока не сохранён",
             status,
         )
         status.addWidget(self.status_label, 1)
@@ -1106,7 +1106,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             self.central_stack.setCurrentWidget(self.search_page)
         else:
             self.search_summary_label.setText(
-                "Начните вводить действие, окно, расчёт, архив отправки или файл."
+                "Начните вводить действие, окно, расчёт, архив проекта или файл."
             )
             self.central_stack.setCurrentWidget(self.overview_page)
 
@@ -1166,7 +1166,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.project_summary_label.setText(self._project_summary_text())
         self.session_summary_label.setText(
             "Выбор в списке, быстром поиске или верхнем переключателе уже является навигацией. "
-                "Отдельное окно запускается только явной командой из списка окон."
+                "Рабочее окно запускается только явной командой из списка окон."
         )
         self._refresh_workflow_list()
         self._refresh_inspector(surface, spec)
@@ -1206,7 +1206,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
     ) -> None:
         self.property_title_value.setText(surface.title)
         self.property_runtime_value.setText(
-            "Панель проекта внутри главного окна" if spec is None else _runtime_label(spec)
+            "Панель проекта внутри рабочего места" if spec is None else _runtime_label(spec)
         )
         self.property_role_value.setText(
             "Сводка проекта" if spec is None else _workspace_role_label(spec)
@@ -1220,7 +1220,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             else _operator_state_label(spec)
         )
         self.property_module_value.setText(
-            "Навигация внутри главного окна" if spec is None else spec.title
+            "Навигация внутри рабочего места" if spec is None else spec.title
         )
 
         self.help_text.setPlainText(
@@ -1239,7 +1239,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         warnings: list[str] = []
         if spec is not None and spec.effective_migration_status == "managed_external":
             warnings.append(
-                "Окно открывается отдельно, а главное окно передаёт ему данные проекта и отслеживает состояние."
+                "Окно открывается отдельно, а рабочее место передаёт ему данные проекта и отслеживает состояние."
             )
         if spec is not None and spec.key == "desktop_animator":
             warnings.append(
@@ -1278,7 +1278,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             self.runtime_progress_bar.setValue(min(100, 10 + len(sessions) * 10))
             self._set_shell_progress(min(100, 10 + len(sessions) * 10), text="Окна: %p%")
             self.runtime_progress_label.setText(
-                "Главное окно отслеживает запущенные окна и передаёт им данные текущего проекта."
+                "Рабочее место отслеживает запущенные окна и передаёт им данные текущего проекта."
             )
         else:
             self.runtime_progress_bar.setValue(0)
@@ -1756,11 +1756,11 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             self._set_status_message(f"Не удалось открыть {spec.title}: {exc}")
             QtWidgets.QMessageBox.warning(
                 self,
-                "Не удалось открыть окно",
+                "Не удалось запустить рабочее окно",
                 f"{spec.title}\n\n{exc}",
             )
             return False
-        self._set_status_message(f"Открыто окно: {spec.title}")
+        self._set_status_message(f"Рабочее окно запущено: {spec.title}")
         self._refresh_runtime_table()
         return True
 
@@ -1774,7 +1774,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         if isinstance(key, str) and key:
             self._select_workspace(key)
             self._set_status_message(
-                "Выбран связанный рабочий шаг. Для запуска отдельного окна используйте меню «Запуск» или двойной щелчок в списке «Окна»."
+                    "Выбран связанный рабочий шаг. Для запуска рабочего окна используйте меню «Запуск» или двойной щелчок в списке «Окна»."
             )
 
     def stop_selected_tool(self) -> None:
@@ -1797,7 +1797,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             self,
             "Помощь по рабочим окнам",
             "Рабочие окна проекта доступны из меню, списка окон и быстрого поиска. "
-            "Основная работа идёт через это главное окно.",
+            "Основная работа идёт через рабочее место инженера.",
         )
 
     def _show_about_dialog(self) -> None:
@@ -1805,7 +1805,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             self,
             "О рабочем месте",
             "PneumoApp\n\n"
-                "Главное окно держит меню, быстрый поиск, список проекта, инспектор, проверку, отправку и запуск окон.\n"
+                "Рабочее место держит меню, быстрый поиск, список проекта, инспектор, проверку проекта, архив и запуск окон.\n"
                 "Аниматор, сравнение прогонов и мнемосхема остаются отдельными специализированными окнами.",
         )
 
@@ -1824,7 +1824,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         if isinstance(key, str) and key:
             self._select_workspace(key)
             self._set_status_message(
-                "Выбран связанный рабочий шаг. Отдельное окно запускается только явной командой."
+                "Выбран связанный рабочий шаг. Рабочее окно запускается только явной командой."
             )
 
     def _select_workspace(self, key: str) -> None:

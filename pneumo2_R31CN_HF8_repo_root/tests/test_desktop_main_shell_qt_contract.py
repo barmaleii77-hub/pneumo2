@@ -253,7 +253,7 @@ def test_desktop_qt_shell_launcher_exposes_qt_first_cli_and_legacy_fallback() ->
     assert "Рабочие окна приложения:" in src
     assert "from pneumo_solver_ui.tools import desktop_main_shell as legacy_shell" in src
     assert "from pneumo_solver_ui.desktop_qt_shell.main_window import main as run_qt_shell_main" in src
-    assert "запускаю проверочное Tk-окно" in src
+    assert "запускаю запасной оконный режим" in src
     assert "запускаю резервное Tk-окно" not in src
 
 
@@ -263,8 +263,8 @@ def test_desktop_qt_shell_launcher_catalog_keeps_runtime_and_migration_metadata(
 
     assert catalog[0].key == "desktop_main_shell_qt"
     assert by_key["desktop_main_shell_qt"].module == "pneumo_solver_ui.tools.desktop_main_shell_qt"
-    assert by_key["desktop_main_shell_qt"].group == "Главное окно"
-    assert by_key["desktop_gui_spec_shell"].group == "Инструменты восстановления"
+    assert by_key["desktop_main_shell_qt"].group == "Рабочее место"
+    assert by_key["desktop_gui_spec_shell"].group == "Восстановление окон"
     assert by_key["desktop_gui_spec_shell"].module == "pneumo_solver_ui.tools.desktop_gui_spec_shell"
 
     assert by_key["desktop_input_editor"].runtime_kind == "tk"
@@ -376,7 +376,7 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert 'self.runtime_table.setHeaderLabels(("Окно", "Состояние", "Тип"))' in src
     assert 'self.diagnostics_button.setObjectName("AlwaysVisibleDiagnosticsAction")' in src
     assert 'self.diagnostics_button.setShortcut(QtGui.QKeySequence("F7"))' in src
-    assert 'self.diagnostics_button.setToolTip("F7. Проверить проект и подготовить архив для отправки.")' in src
+    assert 'self.diagnostics_button.setToolTip("F7. Проверить проект и сохранить архив проекта.")' in src
     assert "Открыть диагностику и собрать" not in src
     assert "self.central_stack = QtWidgets.QStackedWidget(central)" in src
     assert 'self.banner_label = QtWidgets.QLabel(' in src
@@ -396,7 +396,7 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert '"5. Оптимизация"' in src
     assert '"6. Анализ"' in src
     assert '"7. Анимация"' in src
-    assert '"8. Проверка и отправка"' in src
+    assert '"8. Проверка проекта"' in src
     assert '"Проверить проект"' in src
     assert "self.start_action_buttons" in src
     assert 'self.start_action_buttons.setdefault(tool_key, button)' in src
@@ -453,8 +453,8 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert 'return "Инструмент проекта"' in src
     assert 'setObjectName("CalculationStatusBadge")' in src
     assert "def _refresh_calculation_status_badge(self) -> None:" in src
-    assert '"Окна, действия, испытания, сценарии, архивы отправки, расчёты, файлы"' in src
-    assert '"Начните вводить действие, окно, расчёт, архив отправки или файл."' in src
+    assert '"Окна, действия, испытания, сценарии, архив проекта, расчёты, файлы"' in src
+    assert '"Начните вводить действие, окно, расчёт, архив проекта или файл."' in src
     forbidden_qt_visible_fragments = [
         "Команды, экраны, тесты, сценарии, bundle, runs, artifacts",
         "run, bundle или artifact",
@@ -501,7 +501,7 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
         "Проект: default",
             "C:\\",
             "master-copy",
-        "Проверочное рабочее место",
+        "Панель восстановления окон",
         "dt и t_end",
     ]
     for fragment in forbidden_qt_visible_fragments:
@@ -575,8 +575,8 @@ def test_desktop_shell_command_search_manual_keywords_are_operator_language() ->
     entries = build_shell_command_search_entries(build_desktop_shell_specs())
     checked_labels = {
         "Перейти к списку рабочих окон",
-        "Проверить проект и подготовить архив",
-        "Открыть аниматор",
+        "Проверить проект и сохранить архив",
+        "Анимировать результат",
         "Проверить подготовку анимации",
         "Проверить связь с аниматором",
         "Открыть результаты расчёта",
@@ -884,18 +884,18 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
         assert "Дополнительная визуализация" in visible_audit["menu_actions"]
         assert "Все окна" not in visible_audit["menu_actions"]
         assert "Окно восстановления" not in visible_audit["menu_actions"]
-        assert "Проверочное рабочее место" not in visible_audit["menu_actions"]
+        assert "Панель восстановления окон" not in visible_audit["menu_actions"]
         assert "Открыть окно" not in visible_audit["toolbar_buttons"]
         assert "1. Исходные данные" in visible_audit["toolbar_buttons"]
         assert "2. Сценарии" in visible_audit["toolbar_buttons"]
         assert "7. Анимация" in visible_audit["toolbar_buttons"]
-        assert "8. Проверка и отправка" in visible_audit["toolbar_buttons"]
+        assert "8. Проверка проекта" in visible_audit["toolbar_buttons"]
         assert "Открыть сравнение" not in visible_audit["toolbar_buttons"]
         assert "Открыть в аниматоре" not in visible_audit["toolbar_buttons"]
         assert "Показать в аниматоре" not in visible_audit["toolbar_buttons"]
-        assert "Открыть аниматор" in visible_audit["toolbar_buttons"]
+        assert "Анимировать результат" in visible_audit["toolbar_buttons"]
         assert (
-            "Выбор показывает связанный рабочий шаг. Запуск отдельного окна — через меню «Запуск», двойной щелчок в списке «Окна» или быстрый поиск."
+            "Выбор показывает связанный рабочий шаг. Рабочее окно запускается через меню «Запуск», двойной щелчок в списке «Окна» или быстрый поиск."
             in visible_audit["auxiliary_visible_texts"]
         )
         assert "Выбор из списка сразу открывает выбранное окно." not in visible_audit["auxiliary_visible_texts"]
@@ -909,10 +909,10 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
             in visible_audit["direct_visible_texts"]
         )
         assert (
-            "Основной порядок: исходные данные -> сценарии -> испытания -> базовый прогон -> оптимизация -> анализ -> анимация -> проверка и отправка."
+            "Основной порядок: исходные данные -> сценарии -> испытания -> базовый прогон -> оптимизация -> анализ -> анимация -> проверка проекта."
             in visible_audit["direct_visible_texts"]
         )
-        assert "Окна, действия, испытания, сценарии, архивы отправки, расчёты, файлы" in visible_audit["direct_visible_texts"]
+        assert "Окна, действия, испытания, сценарии, архив проекта, расчёты, файлы" in visible_audit["direct_visible_texts"]
         assert "Панель проекта" in visible_audit["direct_visible_texts"]
         assert "Основной порядок работы" in visible_audit["direct_visible_texts"]
         assert "Рабочие шаги" in visible_audit["direct_visible_texts"]

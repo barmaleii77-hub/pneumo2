@@ -130,10 +130,10 @@ def test_run_script_page_autobundle_surfaces_anim_and_browser_perf_summary(tmp_p
 
     _page_runner.run_script_page(str(page), auto_bundle=True, title="Broken")
 
-    assert any("Диагностика сохранена:" in text for text in fake_st.calls["caption"])
-    assert any("Anim pointer diagnostics:" in text for text in fake_st.calls["caption"])
-    assert any("Optimizer scope gate: FAIL / release_risk=True / reason=problem_hash mismatch between sources" in text for text in fake_st.calls["markdown"])
-    assert any("Optimizer scope: scope=ph_runner_1 / mode=stable / source=triage / sync=False / mismatches=problem_hash" in text for text in fake_st.calls["markdown"])
-    assert any("Browser perf evidence: trace_bundle_ready / PASS / bundle_ready=True" in text for text in fake_st.calls["markdown"])
-    assert any("Browser perf comparison: regression_checked / PASS / ready=True" in text for text in fake_st.calls["markdown"])
-    assert any("ZIP диагностики уже скопирован в буфер обмена." in text for text in fake_st.calls["success"])
+    assert any("Архив проекта сохранён:" in text for text in fake_st.calls["caption"])
+    assert any("Данные последней анимации:" in text for text in fake_st.calls["caption"])
+    assert any("Допуск области оптимизации: FAIL / риск выпуска=True / причина=problem_hash mismatch between sources" in text for text in fake_st.calls["markdown"])
+    assert any("Область оптимизации: ключ=ph_runner_1 / режим=stable / источник=triage / синхронизация=False / расхождения=problem_hash" in text for text in fake_st.calls["markdown"])
+    assert any("Данные производительности анимации: trace_bundle_ready / PASS / готовы_в_архиве=True" in text for text in fake_st.calls["markdown"])
+    assert any("Сравнение производительности анимации: regression_checked / PASS / готово=True" in text for text in fake_st.calls["markdown"])
+    assert any("Архив проекта скопирован в буфер обмена." in text for text in fake_st.calls["success"])

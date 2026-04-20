@@ -260,7 +260,7 @@ def test_generate_triage_report_surfaces_road_contract_artifacts(tmp_path: Path,
     assert mnemo["severity"] == "critical"
     assert mnemo["current_mode"] == "Регуляторный коридор"
     assert summary["severity_counts"]["critical"] == 1
-    assert summary["operator_recommendations"][0].startswith("Open Desktop Mnemo first")
+    assert summary["operator_recommendations"][0].startswith("Сначала откройте мнемосхему")
     assert "anim_latest_road_contract_web" in md
     assert "anim_latest_road_contract_desktop" in md
     assert "anim_latest_contract_validation_json" in md
@@ -269,8 +269,8 @@ def test_generate_triage_report_surfaces_road_contract_artifacts(tmp_path: Path,
     assert "anim_latest_geometry_acceptance_md" in md
     assert "anim_latest_capture_export_manifest" in md
     assert "anim_latest_frame_budget_evidence" in md
-    assert "## Desktop Mnemo events" in md
-    assert "## Recommended actions" in md
+    assert "## События мнемосхемы" in md
+    assert "## Рекомендуемые действия" in md
     assert "Большой перепад давлений" in md
 def test_generate_triage_report_surfaces_distributed_problem_scope_and_hash_mode(tmp_path: Path) -> None:
     dist_dir = tmp_path / "runs" / "dist_runs" / "DIST_scope_demo"
@@ -299,5 +299,5 @@ def test_generate_triage_report_surfaces_distributed_problem_scope_and_hash_mode
     assert dist_progress["problem_hash"] == "ph_triage_scope_1234567890"
     assert dist_progress["problem_hash_short"] == "ph_triage_sc"
     assert dist_progress["problem_hash_mode"] == "legacy"
-    assert "Problem scope: `ph_triage_sc`" in md
-    assert "Hash mode: `legacy`" in md
+    assert "Область задачи: `ph_triage_sc`" in md
+    assert "Режим хэша: `legacy`" in md

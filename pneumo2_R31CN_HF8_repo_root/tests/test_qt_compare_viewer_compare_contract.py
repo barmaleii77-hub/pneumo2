@@ -243,7 +243,7 @@ def test_qt_compare_viewer_surfaces_compare_contract_and_mismatch_banner(monkeyp
         assert "Хэш источника: ring-left, ring-right" in summary_text
         assert "Хэш цели: obj-a, obj-b" in summary_text
         assert "Хэш базового прогона: base-a" in summary_text
-        assert "Предупреждение: контекст отличается: хэш цели" in summary_text
+        assert "Предупреждение: расчётные данные отличаются: хэш цели" in summary_text
         assert "Сохранение: сессия сравнения; файл правил сравнения" in summary_text
         for service_text in ("Compare contract", "Контракт расчёта", "compare_contract.json", "workspace"):
             assert service_text not in summary_text

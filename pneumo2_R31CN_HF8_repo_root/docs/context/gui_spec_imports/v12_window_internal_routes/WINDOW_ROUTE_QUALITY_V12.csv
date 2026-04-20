@@ -1,0 +1,5 @@
+window_name,current_discoverability,current_role_clarity,current_feedback_clarity,canonical_target,priority
+Диагностика,medium,weak,medium,один primary diagnostics route,P0
+Подробное сравнение результатов,medium,weak,weak,one quick compare + one advanced compare,P1
+Исходные данные проекта,medium,medium,weak,master-copy + visual twin + cognitive state cards,P0
+Набор испытаний,medium,weak,medium,consumer of ring scenarios with explicit stale-link feedback,P0
