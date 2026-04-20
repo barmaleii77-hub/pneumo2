@@ -36,6 +36,17 @@ def _make_panel() -> tuple[tk.Tk, DesktopInputGraphicPanel]:
     return _ROOT, _PANEL
 
 
+def teardown_module() -> None:
+    global _ROOT, _PANEL
+    if _ROOT is not None:
+        try:
+            _ROOT.destroy()
+        except tk.TclError:
+            pass
+    _ROOT = None
+    _PANEL = None
+
+
 def _canvas_texts(panel: DesktopInputGraphicPanel) -> list[str]:
     texts: list[str] = []
     for item in panel.canvas.find_all():
