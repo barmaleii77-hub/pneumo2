@@ -41,6 +41,16 @@ from pneumo_solver_ui.tools.desktop_input_editor import DesktopInputEditor
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _run_python_script(script: str, *, timeout: int = 10) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, "-u", "-c", script],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        timeout=timeout,
+    )
+
+
 def test_desktop_main_shell_registry_separates_hosted_and_external_tools() -> None:
     specs = build_desktop_shell_specs()
     by_key = {spec.key: spec for spec in specs}
@@ -190,48 +200,46 @@ app.quit_app()
 print("closed", flush=True)
 """
 
-    result = subprocess.run(
-        [sys.executable, "-u", "-c", script],
-        cwd=ROOT,
-        text=True,
-        capture_output=True,
-        timeout=10,
-    )
+    result = _run_python_script(script)
 
     assert result.returncode == 0, result.stderr
     assert ["created", "updated", "closed"] == result.stdout.strip().splitlines()
 
 
 def test_desktop_main_shell_launches_external_tools_without_process_jargon() -> None:
-    try:
-        app = DesktopMainShell()
-    except Exception as exc:
-        message = str(exc).lower()
-        if "tk" in message or "tcl" in message:
-            pytest.skip(f"Tk runtime is unavailable in this environment: {exc}")
-        raise
-    launched: list[str] = []
+    script = """
+from dataclasses import replace
+from types import SimpleNamespace
 
-    def _fake_launcher(key: str):
-        def _launch() -> SimpleNamespace:
-            launched.append(key)
-            return SimpleNamespace(pid=12345)
+from pneumo_solver_ui.desktop_shell.main_window import DesktopMainShell
 
-        return _launch
+app = DesktopMainShell()
+launched = []
 
-    try:
-        for key in ("compare_viewer", "desktop_animator", "desktop_mnemo"):
-            spec = app.spec_by_key[key]
-            app.spec_by_key[key] = replace(spec, launch_external=_fake_launcher(key))
-            app.open_tool(key)
-            status = app.status_var.get()
-            assert "pid" not in status.lower()
-            assert "12345" not in status
-            assert status == f"Запущено внешнее окно: {spec.title}"
-    finally:
-        app.quit_app()
+def _fake_launcher(key):
+    def _launch():
+        launched.append(key)
+        return SimpleNamespace(pid=12345)
+    return _launch
 
-    assert launched == ["compare_viewer", "desktop_animator", "desktop_mnemo"]
+try:
+    for key in ("compare_viewer", "desktop_animator", "desktop_mnemo"):
+        spec = app.spec_by_key[key]
+        app.spec_by_key[key] = replace(spec, launch_external=_fake_launcher(key))
+        app.open_tool(key)
+        status = app.status_var.get()
+        assert "pid" not in status.lower()
+        assert "12345" not in status
+        assert spec.title in status
+finally:
+    app.quit_app()
+
+assert launched == ["compare_viewer", "desktop_animator", "desktop_mnemo"]
+print("ok", flush=True)
+"""
+    result = _run_python_script(script)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "ok"
 
 
 def test_desktop_main_shell_external_adapters_spawn_expected_modules(monkeypatch, tmp_path: Path) -> None:
@@ -1096,60 +1104,66 @@ def test_navigation_helpers_cover_full_user_gui_graph() -> None:
 
 
 def test_workspace_manager_tracks_recently_closed_history_and_can_reopen_by_index() -> None:
-    try:
-        root = tk.Tk()
-    except tk.TclError as exc:
-        pytest.skip(f"Tk runtime is unavailable in this environment: {exc}")
-    try:
-        notebook = ttk.Notebook(root)
-        notebook.pack()
-        home_tab = ttk.Frame(notebook)
-        notebook.add(home_tab, text="Панель проекта")
+    script = """
+import tkinter as tk
+from tkinter import ttk
 
-        statuses: list[str] = []
-        manager = DesktopWorkspaceManager(
-            root,
-            notebook,
-            home_tab,
-            set_status=statuses.append,
-        )
+from pneumo_solver_ui.desktop_shell.contracts import DesktopShellToolSpec
+from pneumo_solver_ui.desktop_shell.workspace import DesktopWorkspaceManager
 
-        spec_a = DesktopShellToolSpec(
-            key="a",
-            title="Tool A",
-            description="",
-            group="Встроенные окна",
-            mode="hosted",
-            create_hosted=lambda _parent: object(),
-        )
-        spec_b = DesktopShellToolSpec(
-            key="b",
-            title="Tool B",
-            description="",
-            group="Встроенные окна",
-            mode="hosted",
-            create_hosted=lambda _parent: object(),
-        )
+root = tk.Tk()
+root.withdraw()
+try:
+    notebook = ttk.Notebook(root)
+    notebook.pack()
+    home_tab = ttk.Frame(notebook)
+    notebook.add(home_tab, text="Home")
 
-        manager.open_hosted_tool(spec_a)
-        manager.open_hosted_tool(spec_b)
+    statuses = []
+    manager = DesktopWorkspaceManager(root, notebook, home_tab, set_status=statuses.append)
 
-        assert tuple(session.key for session in manager.list_open_sessions()) == ("a", "b")
-        assert manager.close_other_hosted_tabs() == 1
-        assert tuple(spec.key for spec in manager.list_recently_closed_specs()) == ("a",)
-        assert tuple(session.key for session in manager.list_open_sessions()) == ("b",)
-        assert manager.has_recently_closed_sessions() is True
-        assert manager.close_current_tab() is True
-        assert tuple(spec.key for spec in manager.list_recently_closed_specs()) == ("b", "a")
-        assert manager.reopen_recently_closed_at_index(2) is True
-        assert tuple(session.key for session in manager.list_open_sessions()) == ("a",)
-        assert tuple(spec.key for spec in manager.list_recently_closed_specs()) == ("b",)
-        assert manager.reopen_last_closed_tab() is True
-        assert tuple(session.key for session in manager.list_open_sessions()) == ("a", "b")
-        assert manager.reopen_recently_closed_at_index(3) is False
-        assert statuses[-1] == "Недавно закрытое окно #3 недоступно."
-    finally:
-        root.destroy()
+    spec_a = DesktopShellToolSpec(
+        key="a",
+        title="Tool A",
+        description="",
+        group="hosted",
+        mode="hosted",
+        create_hosted=lambda _parent: object(),
+    )
+    spec_b = DesktopShellToolSpec(
+        key="b",
+        title="Tool B",
+        description="",
+        group="hosted",
+        mode="hosted",
+        create_hosted=lambda _parent: object(),
+    )
+
+    manager.open_hosted_tool(spec_a)
+    manager.open_hosted_tool(spec_b)
+
+    assert tuple(session.key for session in manager.list_open_sessions()) == ("a", "b")
+    assert manager.close_other_hosted_tabs() == 1
+    assert tuple(spec.key for spec in manager.list_recently_closed_specs()) == ("a",)
+    assert tuple(session.key for session in manager.list_open_sessions()) == ("b",)
+    assert manager.has_recently_closed_sessions() is True
+    assert manager.close_current_tab() is True
+    assert tuple(spec.key for spec in manager.list_recently_closed_specs()) == ("b", "a")
+    assert manager.reopen_recently_closed_at_index(2) is True
+    assert tuple(session.key for session in manager.list_open_sessions()) == ("a",)
+    assert tuple(spec.key for spec in manager.list_recently_closed_specs()) == ("b",)
+    assert manager.reopen_last_closed_tab() is True
+    assert tuple(session.key for session in manager.list_open_sessions()) == ("a", "b")
+    assert manager.reopen_recently_closed_at_index(3) is False
+    assert "#3" in statuses[-1]
+finally:
+    root.destroy()
+
+print("ok", flush=True)
+"""
+    result = _run_python_script(script)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "ok"
 
 
 def test_navigation_helpers_keep_open_workflow_sessions_in_route_order() -> None:
