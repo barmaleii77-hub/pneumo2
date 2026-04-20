@@ -1040,6 +1040,11 @@ def build_desktop_section_field_search_items(section_title: str) -> list[dict[st
     for section in DESKTOP_INPUT_SECTIONS:
         if str(section.title or "").strip() != clean_section_title:
             continue
+        specs = list(section.fields)
+        if clean_section_title == "Статическая настройка":
+            corner_loads = field_spec_map().get("corner_loads_mode")
+            if corner_loads is not None and all(spec.key != corner_loads.key for spec in specs):
+                specs.append(corner_loads)
         return [
             {
                 "key": spec.key,
@@ -1048,7 +1053,7 @@ def build_desktop_section_field_search_items(section_title: str) -> list[dict[st
                 "description": spec.description,
                 "display": desktop_field_search_display_name(spec, section.title),
             }
-            for spec in section.fields
+            for spec in specs
             if str(spec.key or "").strip()
         ]
     return []
@@ -1448,6 +1453,8 @@ def evaluate_desktop_section_readiness(
         reference_issues.append("сомкнутая длина пружины")
     if _safe_float(current, "пружина_запас_до_coil_bind_минимум_м") < 0.0:
         reference_issues.append("запас до смыкания витков")
+    if _safe_float(current, "макс_число_внутренних_шагов_на_dt") < 1000.0:
+        reference_issues.append("лимит внутренних шагов")
     rows.append(
         {
             "title": "Справочные данные",
@@ -1735,6 +1742,11 @@ _SECTION_ISSUE_FOCUS_MAP = {
             "Запас до смыкания витков",
             "Запас до смыкания витков не может быть отрицательным.",
         ),
+        "лимит внутренних шагов": _issue_focus_entry(
+            "макс_число_внутренних_шагов_на_dt",
+            "Лимит внутренних шагов",
+            "Лимит внутренних шагов слишком мал для устойчивого расчёта.",
+        ),
     },
     "Численные настройки": {
         "максимальный шаг интегрирования": _issue_focus_entry(
@@ -1843,10 +1855,13 @@ def build_desktop_section_summary_cards(
     pneumatic_focus = _focus("Пневматика")
     mass_focus = _focus("Массы")
     mechanics_focus = _focus("Механика")
+    combined_mechanics_focus = mass_focus if mass_focus.get("focus_key") else mechanics_focus
     static_focus = _focus("Статическая настройка")
     components_focus = _focus("Компоненты")
     reference_focus = _focus("Справочные данные")
     numerical_focus = _focus("Численные настройки")
+    combined_mechanics_status = "warn" if "warn" in {mass_status, mechanics_status} else (mechanics_status or mass_status)
+    combined_mechanics_detail = f"{mass_detail} {mechanics_detail}".strip()
 
     return [
         {
@@ -1895,24 +1910,28 @@ def build_desktop_section_summary_cards(
         },
         {
             "title": "Механика",
-            "status": mechanics_status,
+            "status": combined_mechanics_status,
             "headline": (
+                f"Рама {_safe_float(current, 'масса_рамы'):.0f} кг; "
                 f"шина {_safe_float(current, 'жёсткость_шины'):.0f} Н/м; "
                 f"демпфер {_safe_float(current, 'демпфирование_шины'):.0f} Н·с/м; "
                 f"пружина {_fmt_mm_from_m(current.get('пружина_длина_свободная_м'))}."
             ),
             "details": (
+                f"Угол {_safe_float(current, 'масса_неподрессоренная_на_угол'):.0f} кг; "
+                f"ЦМ H {_fmt_m(current.get('высота_центра_масс'))}; "
                 f"Стабилизатор {_fmt_bool_flag(current.get('стабилизатор_вкл'), 'включён', 'выключен')}; "
                 f"масштаб пружины {_safe_float(current, 'пружина_масштаб', 0.0):.2f}. "
-                f"{mechanics_detail}"
+                f"{combined_mechanics_detail}"
             ),
-            **mechanics_focus,
+            **combined_mechanics_focus,
         },
         {
             "title": "Статическая настройка",
             "status": static_status,
             "headline": (
                 f"vx0 {_safe_float(current, 'vx0_м_с', 0.0):.2f} м/с; "
+                f"corner loads {str(current.get('corner_loads_mode') or '—')}; "
                 f"static trim {_fmt_bool_flag(current.get('static_trim_enable'), 'включён', 'выключен')}; "
                 f"pneumo mode {str(current.get('static_trim_pneumo_mode') or '—')}."
             ),
