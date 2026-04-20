@@ -8,6 +8,7 @@ from .catalogs import (
     get_ui_element,
     legacy_key_aliases,
     migration_hints_by_workspace_code,
+    v19_search_hints_by_workspace_code,
 )
 from .contracts import DesktopShellCommandSpec, DesktopWorkspaceSpec
 
@@ -196,6 +197,38 @@ def _migration_aliases_for_workspace(workspace_id: str) -> tuple[str, ...]:
     return _sanitize_visible_aliases(values)
 
 
+def _sanitize_v19_search_aliases(values: object) -> tuple[str, ...]:
+    if isinstance(values, str):
+        raw_values = (values,)
+    else:
+        raw_values = tuple(values) if isinstance(values, (list, tuple)) else ()
+
+    aliases: list[str] = []
+    for raw in raw_values:
+        alias = " ".join(str(raw or "").split()).strip(" .")
+        folded = alias.casefold()
+        if not alias:
+            continue
+        if any(block in folded for block in _VISIBLE_ALIAS_BLOCKLIST):
+            continue
+        aliases.append(alias)
+    return _dedupe(aliases)
+
+
+def _v19_aliases_for_workspace(workspace_id: str) -> tuple[str, ...]:
+    hints_by_code = v19_search_hints_by_workspace_code()
+    values: list[str] = []
+    codes = _dedupe(
+        [
+            *WORKSPACE_CODE_BY_ID.get(workspace_id, ()),
+            *WORKSPACE_CATALOG_ALIAS_CODES_BY_ID.get(workspace_id, ()),
+        ]
+    )
+    for code in codes:
+        values.extend(hints_by_code.get(code, ()))
+    return _sanitize_v19_search_aliases(values)
+
+
 def _bind_workspace_catalog(spec: DesktopWorkspaceSpec) -> DesktopWorkspaceSpec:
     element = get_ui_element(WORKSPACE_ELEMENT_BY_ID.get(spec.workspace_id))
     return replace(
@@ -210,7 +243,13 @@ def _bind_workspace_catalog(spec: DesktopWorkspaceSpec) -> DesktopWorkspaceSpec:
         access_key=(element.access_key if element is not None else spec.access_key),
         hotkey=(element.hotkey if element is not None else spec.hotkey),
         tab_index=(element.tab_index if element is not None else spec.tab_index),
-        search_aliases=_dedupe([*spec.search_aliases, *_migration_aliases_for_workspace(spec.workspace_id)]),
+        search_aliases=_dedupe(
+            [
+                *spec.search_aliases,
+                *_migration_aliases_for_workspace(spec.workspace_id),
+                *_v19_aliases_for_workspace(spec.workspace_id),
+            ]
+        ),
         quick_action_ids=ROUTE_QUICK_ACTIONS_BY_WORKSPACE.get(spec.workspace_id, spec.quick_action_ids),
     )
 

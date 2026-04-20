@@ -225,6 +225,10 @@ def test_gui_spec_shell_search_indexes_migration_aliases_and_visual_routes() -> 
     mnemo_hits = search_command_palette(entries, "пневмосхема")
     baseline_hits = search_command_palette(entries, "активный опорный прогон")
     baseline_review_hits = search_command_palette(entries, "просмотр опорного прогона")
+    v19_springs_hits = search_command_palette(entries, "две пружины")
+    v19_seam_hits = search_command_palette(entries, "статус шва")
+    v19_underfill_hits = search_command_palette(entries, "недобор")
+    v19_diagnostics_hits = search_command_palette(entries, "свежесть путь состав архива")
 
     assert diagnostics_hits
     assert diagnostics_hits[0].command_id == "diagnostics.collect_bundle"
@@ -236,6 +240,20 @@ def test_gui_spec_shell_search_indexes_migration_aliases_and_visual_routes() -> 
     assert baseline_hits[0].command_id in {"baseline.center.open", "workspace.baseline_run.open"}
     assert baseline_review_hits
     assert any(hit.command_id == "baseline.review" for hit in baseline_review_hits)
+    assert v19_springs_hits
+    assert v19_springs_hits[0].command_id == "workspace.input_data.open"
+    assert v19_seam_hits
+    assert v19_seam_hits[0].command_id == "workspace.ring_editor.open"
+    assert v19_underfill_hits
+    assert v19_underfill_hits[0].command_id in {
+        "workspace.optimization.open",
+        "optimization.center.open",
+    }
+    assert v19_diagnostics_hits
+    assert any(
+        hit.command_id in {"workspace.diagnostics.open", "diagnostics.collect_bundle"}
+        for hit in v19_diagnostics_hits
+    )
 
 
 def test_gui_spec_shell_help_registry_covers_every_workspace_with_catalog_text() -> None:

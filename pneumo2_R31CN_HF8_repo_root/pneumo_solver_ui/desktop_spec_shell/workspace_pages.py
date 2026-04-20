@@ -21,6 +21,7 @@ from .workspace_runtime import (
     build_optimization_workspace_summary,
     build_results_workspace_summary,
 )
+from .v19_guidance_widgets import build_v19_action_feedback_box
 
 
 def _clear_layout(layout: QtWidgets.QLayout) -> None:
@@ -253,6 +254,10 @@ class RuntimeWorkspacePage(QtWidgets.QWidget):
         self.evidence_layout = QtWidgets.QVBoxLayout(self.evidence_box)
         layout.addWidget(self.evidence_box)
 
+        v19_box = build_v19_action_feedback_box(workspace)
+        if v19_box is not None:
+            layout.addWidget(v19_box)
+
         actions_box = QtWidgets.QGroupBox("Быстрые действия")
         actions_layout = QtWidgets.QVBoxLayout(actions_box)
         refresh_button = QtWidgets.QPushButton("Обновить сводку")
@@ -365,6 +370,10 @@ class ControlHubWorkspacePage(QtWidgets.QWidget):
         contract_layout.addRow("Следующий шаг", QtWidgets.QLabel(workspace.next_step))
         contract_layout.addRow("Обязательное условие", QtWidgets.QLabel(workspace.hard_gate))
         layout.addWidget(contract_box)
+
+        v19_box = build_v19_action_feedback_box(workspace)
+        if v19_box is not None:
+            layout.addWidget(v19_box)
 
         self.surface_box = QtWidgets.QGroupBox("Ключевые элементы рабочего шага")
         self.surface_layout = QtWidgets.QVBoxLayout(self.surface_box)

@@ -19,6 +19,7 @@ from pneumo_solver_ui.desktop_spec_shell.workspace_pages import (
     ResultsWorkspacePage,
     _operator_catalog_text,
 )
+from pneumo_solver_ui.desktop_spec_shell.v19_guidance_widgets import V19_ACTION_FEEDBACK_TITLE
 from pneumo_solver_ui.desktop_spec_shell.workspace_runtime import (
     build_baseline_workspace_summary,
     build_diagnostics_workspace_summary,
@@ -181,6 +182,36 @@ def test_gui_spec_main_window_uses_hosted_pages_for_runtime_and_control_hubs_for
         assert isinstance(window._page_widget_by_workspace_id["results_analysis"], ResultsWorkspacePage)
         assert isinstance(window._page_widget_by_workspace_id["diagnostics"], DiagnosticsWorkspacePage)
         assert callable(getattr(window._page_widget_by_workspace_id["overview"], "refresh_view", None))
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_v19_action_feedback_guidance_is_visible_on_route_critical_pages() -> None:
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        expected_by_workspace = {
+            "input_data": "две пружины",
+            "ring_editor": "статус шва",
+            "optimization": "недобор",
+            "diagnostics": "архив",
+        }
+        for workspace_id, expected in expected_by_workspace.items():
+            window.open_workspace(workspace_id)
+            app.processEvents()
+            page = window._page_widget_by_workspace_id[workspace_id]
+            visible_text = "\n".join(
+                [
+                    *(label.text() for label in page.findChildren(QtWidgets.QLabel)),
+                    *(box.title() for box in page.findChildren(QtWidgets.QGroupBox)),
+                ]
+            )
+            assert V19_ACTION_FEEDBACK_TITLE in visible_text
+            assert expected in visible_text.casefold()
+            assert "contract" not in visible_text
+            assert "контракт" not in visible_text.casefold()
     finally:
         window.close()
         window.deleteLater()

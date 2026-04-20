@@ -23,6 +23,12 @@ MIGRATION_MATRIX_PATH = ACTIVE_IMPORT_ROOT / "migration_matrix.csv"
 KEYBOARD_MATRIX_PATH = ACTIVE_IMPORT_ROOT / "keyboard_matrix.csv"
 DOCKING_MATRIX_PATH = ACTIVE_IMPORT_ROOT / "docking_matrix.csv"
 UI_STATE_MATRIX_PATH = ACTIVE_IMPORT_ROOT / "ui_state_matrix.csv"
+V19_GRAPH_IMPORT_ROOT = _repo_root() / "docs" / "context" / "gui_spec_imports" / "v19_graph_iteration"
+V19_COGNITIVE_VISIBILITY_PATH = V19_GRAPH_IMPORT_ROOT / "COGNITIVE_VISIBILITY_MATRIX_V19.csv"
+V19_TASK_CHECK_BLOCK_LOOP_PATH = V19_GRAPH_IMPORT_ROOT / "TASK_CHECK_BLOCK_LOOP_MATRIX_V19.csv"
+V19_TREE_DIRECT_OPEN_PATH = V19_GRAPH_IMPORT_ROOT / "TREE_DIRECT_OPEN_MATRIX_V19.csv"
+V19_NOT_PROVEN_CURRENT_WINDOWS_PATH = V19_GRAPH_IMPORT_ROOT / "NOT_PROVEN_CURRENT_WINDOWS_V19.csv"
+V19_PATH_COST_SCENARIOS_PATH = V19_GRAPH_IMPORT_ROOT / "PATH_COST_SCENARIOS_V19.csv"
 
 
 @dataclass(frozen=True)
@@ -114,6 +120,47 @@ class UiStateMatrixEntry:
     text: str
 
 
+@dataclass(frozen=True)
+class V19CognitiveVisibilityEntry:
+    vis_id: str
+    workspace: str
+    user_action_or_state: str
+    optimized_visibility: str
+    required_feedback: str
+    why_critical: str
+
+
+@dataclass(frozen=True)
+class V19TaskCheckBlockLoopEntry:
+    node_id: str
+    workspace: str
+    node_kind: str
+    label: str
+
+
+@dataclass(frozen=True)
+class V19DirectOpenEntry:
+    workspace: str
+    tree_item: str
+    optimized_route: str
+    direct_open_required: bool
+    intermediate_step_forbidden: bool
+
+
+@dataclass(frozen=True)
+class V19WorkspaceGuidance:
+    workspace: str
+    direct_open_route: str
+    direct_open_required: bool
+    intermediate_step_forbidden: bool
+    visibility_lines: tuple[str, ...]
+    check_lines: tuple[str, ...]
+    block_lines: tuple[str, ...]
+    loop_lines: tuple[str, ...]
+    user_goals: tuple[str, ...]
+    evidence_boundary: str
+
+
 def _load_csv_rows(path: Path) -> tuple[dict[str, str], ...]:
     if not path.exists():
         return ()
@@ -126,7 +173,7 @@ def _safe_text(value: Any) -> str:
 
 
 def _safe_bool(value: Any) -> bool:
-    return str(value).strip().lower() in {"1", "true", "yes"}
+    return str(value).strip().casefold() in {"1", "true", "yes", "y", "on", "да", "д"}
 
 
 def _safe_literal(raw: str) -> Any:
@@ -168,6 +215,104 @@ def _safe_float(raw: Any) -> float | None:
 def _split_workspace_codes(raw: str) -> tuple[str, ...]:
     values = [part.strip() for part in str(raw or "").replace(",", ";").split(";")]
     return tuple(part for part in values if part)
+
+
+def _operator_v19_text(raw: Any) -> str:
+    text = _safe_text(raw)
+    replacements = (
+        ("Badge", "метка"),
+        ("badge", "метка"),
+        ("badges", "метки"),
+        ("Mode badge", "метка режима"),
+        ("Lock badge", "метка блокировки"),
+        ("Mode метка", "метка режима"),
+        ("Lock метка", "метка блокировки"),
+        ("inspector", "правая панель"),
+        ("Inspector", "Правая панель"),
+        ("preview", "предпросмотр"),
+        ("Preview", "Предпросмотр"),
+        ("stale", "устаревший"),
+        ("snapshot", "снимок"),
+        ("Snapshot", "Снимок"),
+        ("Underfill", "недобор"),
+        ("underfill", "недобор"),
+        ("gate reasons", "причины недопуска"),
+        ("selected counts", "выбранные количества"),
+        ("Primary collect action", "основное действие сбора"),
+        ("Freshness + path + contents", "свежесть, путь и состав"),
+        ("Contract summary", "сводка целей расчёта"),
+        ("provenance", "происхождение"),
+        ("Promotion reason list", "список причин продвижения"),
+        ("Promotion reason", "причина продвижения"),
+        ("blocked reason", "причина остановки"),
+        ("validated", "проверенный"),
+        ("active", "активный"),
+        ("budget", "лимит"),
+        ("context", "контекст"),
+        ("evidence manifest", "описание подтверждений"),
+        ("helper", "помощник"),
+        ("summary", "сводка"),
+        ("message", "сообщение"),
+        ("unified", "единый"),
+        ("auto-close", "автозамыкание"),
+        ("меткаs", "метки"),
+        ("baseline", "опорный прогон"),
+        ("Baseline", "Опорный прогон"),
+        ("контракт", "условия расчёта"),
+        ("Контракт", "Условия расчёта"),
+        ("suite snapshot", "снимок набора испытаний"),
+        ("suite", "набор испытаний"),
+        ("Suite", "Набор испытаний"),
+        ("objective contract", "цели расчёта"),
+        ("Objective contract", "Цели расчёта"),
+        ("hard gate", "обязательное условие"),
+        ("Hard gate", "Обязательное условие"),
+        ("seed budget", "первичный лимит"),
+        ("stop/resume", "остановка и продолжение"),
+        ("Health summary", "Сводка состояния"),
+        ("health summary", "сводка состояния"),
+        ("helper python", "вспомогательный Python"),
+        ("Helper python", "Вспомогательный Python"),
+        ("interpreter provenance", "происхождение интерпретатора"),
+        ("workspace contract", "правила рабочего окна"),
+        ("contract", "условия расчёта"),
+        ("Contract", "Условия расчёта"),
+        ("effective workspace", "текущее рабочее окно"),
+        ("workspace", "рабочее окно"),
+        ("Workspace", "Рабочее окно"),
+        ("bundle", "архив диагностики"),
+        ("Bundle", "Архив диагностики"),
+        ("standard selfcheck", "стандартная самопроверка"),
+        ("Standard selfcheck", "Стандартная самопроверка"),
+        ("selfcheck", "самопроверка"),
+        ("Selfcheck", "Самопроверка"),
+        ("live rows", "живые строки"),
+        ("Live rows", "Живые строки"),
+        ("elapsed budget", "затраченное время"),
+        ("method text", "описание метода"),
+        ("residual mm", "остаток в миллиметрах"),
+        ("mirrored update", "зеркальное обновление"),
+        ("Selection sync", "синхронизация выбора"),
+        ("unified preview", "единый предпросмотр"),
+        ("Seam status", "статус шва"),
+        ("live current", "текущие живые"),
+        ("Live current", "Текущие живые"),
+        ("runtime", "живой запуск"),
+        ("Runtime", "Живой запуск"),
+        ("still split", "ещё разделены"),
+        ("Current layer", "Текущий слой"),
+        ("current layer", "текущий слой"),
+        ("evidence-bound", "ограничен подтверждением"),
+        ("full coverage", "полное покрытие"),
+        ("optimized canonical subgraph", "целевой граф"),
+        ("locked last segment", "зафиксированный последний сегмент"),
+        ("enum", "выбор"),
+        ("route", "маршрут"),
+        ("advanced", "расширенный"),
+    )
+    for old, new in replacements:
+        text = text.replace(old, new)
+    return " ".join(text.split()).strip()
 
 
 def _row_value(row: dict[str, Any], *keys: str) -> Any:
@@ -367,6 +512,180 @@ def load_ui_state_matrix() -> dict[str, UiStateMatrixEntry]:
         if entry.state_id:
             entries[entry.state_id] = entry
     return entries
+
+
+@lru_cache(maxsize=1)
+def load_v19_cognitive_visibility_matrix() -> tuple[V19CognitiveVisibilityEntry, ...]:
+    entries: list[V19CognitiveVisibilityEntry] = []
+    for row in _load_csv_rows(V19_COGNITIVE_VISIBILITY_PATH):
+        entries.append(
+            V19CognitiveVisibilityEntry(
+                vis_id=_safe_text(_row_value(row, "vis_id")),
+                workspace=_safe_text(_row_value(row, "workspace")),
+                user_action_or_state=_operator_v19_text(
+                    _row_value(row, "user_action_or_state")
+                ),
+                optimized_visibility=_operator_v19_text(
+                    _row_value(row, "optimized_visibility")
+                ),
+                required_feedback=_operator_v19_text(
+                    _row_value(row, "required_feedback")
+                ),
+                why_critical=_operator_v19_text(_row_value(row, "why_critical")),
+            )
+        )
+    return tuple(entries)
+
+
+@lru_cache(maxsize=1)
+def load_v19_task_check_block_loop_matrix() -> tuple[V19TaskCheckBlockLoopEntry, ...]:
+    entries: list[V19TaskCheckBlockLoopEntry] = []
+    for row in _load_csv_rows(V19_TASK_CHECK_BLOCK_LOOP_PATH):
+        entries.append(
+            V19TaskCheckBlockLoopEntry(
+                node_id=_safe_text(_row_value(row, "node_id")),
+                workspace=_safe_text(_row_value(row, "workspace")),
+                node_kind=_safe_text(_row_value(row, "node_kind")),
+                label=_operator_v19_text(_row_value(row, "label")),
+            )
+        )
+    return tuple(entries)
+
+
+@lru_cache(maxsize=1)
+def load_v19_tree_direct_open_matrix() -> tuple[V19DirectOpenEntry, ...]:
+    entries: list[V19DirectOpenEntry] = []
+    for row in _load_csv_rows(V19_TREE_DIRECT_OPEN_PATH):
+        entries.append(
+            V19DirectOpenEntry(
+                workspace=_safe_text(_row_value(row, "workspace")),
+                tree_item=_operator_v19_text(_row_value(row, "tree_item")),
+                optimized_route=_operator_v19_text(_row_value(row, "optimized_route")),
+                direct_open_required=_safe_bool(_row_value(row, "direct_open_required")),
+                intermediate_step_forbidden=_safe_bool(
+                    _row_value(row, "intermediate_step_forbidden")
+                ),
+            )
+        )
+    return tuple(entries)
+
+
+def _top_v19_lines(
+    rows: tuple[V19TaskCheckBlockLoopEntry, ...],
+    workspace: str,
+    node_kind: str,
+    *,
+    limit: int = 3,
+) -> tuple[str, ...]:
+    lines: list[str] = []
+    for row in rows:
+        if row.workspace != workspace or row.node_kind != node_kind or not row.label:
+            continue
+        if row.label not in lines:
+            lines.append(row.label)
+        if len(lines) >= limit:
+            break
+    return tuple(lines)
+
+
+@lru_cache(maxsize=1)
+def v19_guidance_by_workspace_code() -> dict[str, V19WorkspaceGuidance]:
+    visibility_rows = load_v19_cognitive_visibility_matrix()
+    task_rows = load_v19_task_check_block_loop_matrix()
+    direct_rows = {row.workspace: row for row in load_v19_tree_direct_open_matrix()}
+    not_proven_rows = {
+        _safe_text(_row_value(row, "workspace")): _operator_v19_text(
+            _row_value(row, "what_is_not_proven")
+        )
+        for row in _load_csv_rows(V19_NOT_PROVEN_CURRENT_WINDOWS_PATH)
+    }
+    path_goals: dict[str, list[str]] = {}
+    for row in _load_csv_rows(V19_PATH_COST_SCENARIOS_PATH):
+        workspace = _safe_text(_row_value(row, "workspace"))
+        goal = _operator_v19_text(_row_value(row, "user_goal"))
+        if workspace and goal:
+            path_goals.setdefault(workspace, []).append(goal)
+
+    guidance: dict[str, V19WorkspaceGuidance] = {}
+    workspaces = sorted(
+        {
+            *(row.workspace for row in visibility_rows if row.workspace),
+            *(row.workspace for row in task_rows if row.workspace),
+            *direct_rows.keys(),
+        }
+    )
+    for workspace in workspaces:
+        direct = direct_rows.get(workspace)
+        visibility_lines: list[str] = []
+        for row in visibility_rows:
+            if row.workspace != workspace:
+                continue
+            line = ". ".join(
+                part
+                for part in (
+                    row.optimized_visibility,
+                    f"Обратная связь: {row.required_feedback}"
+                    if row.required_feedback
+                    else "",
+                )
+                if part
+            )
+            if line and line not in visibility_lines:
+                visibility_lines.append(line)
+            if len(visibility_lines) >= 3:
+                break
+
+        guidance[workspace] = V19WorkspaceGuidance(
+            workspace=workspace,
+            direct_open_route=direct.optimized_route if direct is not None else "",
+            direct_open_required=direct.direct_open_required if direct is not None else False,
+            intermediate_step_forbidden=(
+                direct.intermediate_step_forbidden if direct is not None else False
+            ),
+            visibility_lines=tuple(visibility_lines),
+            check_lines=_top_v19_lines(task_rows, workspace, "check"),
+            block_lines=_top_v19_lines(task_rows, workspace, "block", limit=2),
+            loop_lines=_top_v19_lines(task_rows, workspace, "loop", limit=2),
+            user_goals=tuple(path_goals.get(workspace, ())[:3]),
+            evidence_boundary=(
+                not_proven_rows.get(workspace)
+                or "Текущие внутренние экраны не считаются доказанными без отдельного живого артефакта."
+            ),
+        )
+    return guidance
+
+
+def get_v19_workspace_guidance(workspace_code: str | None) -> V19WorkspaceGuidance | None:
+    if not workspace_code:
+        return None
+    return v19_guidance_by_workspace_code().get(str(workspace_code).strip())
+
+
+@lru_cache(maxsize=1)
+def v19_search_hints_by_workspace_code() -> dict[str, tuple[str, ...]]:
+    hints: dict[str, tuple[str, ...]] = {}
+    for workspace, guidance in v19_guidance_by_workspace_code().items():
+        values = (
+            *guidance.visibility_lines,
+            *guidance.check_lines,
+            *guidance.block_lines,
+            *guidance.loop_lines,
+            *guidance.user_goals,
+            guidance.direct_open_route,
+        )
+        seen: set[str] = set()
+        ordered: list[str] = []
+        for raw in values:
+            text = _operator_v19_text(raw)
+            if not text:
+                continue
+            key = text.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            ordered.append(text)
+        hints[workspace] = tuple(ordered)
+    return hints
 
 
 @lru_cache(maxsize=1)

@@ -3,8 +3,10 @@ from __future__ import annotations
 from pneumo_solver_ui.desktop_spec_shell.catalogs import (
     ACTIVE_GUI_SPEC_IMPORT_VERSION,
     ACTIVE_IMPORT_ROOT,
+    V19_GRAPH_IMPORT_ROOT,
     docking_rules_by_panel,
     f6_region_order,
+    get_v19_workspace_guidance,
     get_help_topic,
     get_tooltip,
     get_ui_element,
@@ -14,7 +16,11 @@ from pneumo_solver_ui.desktop_spec_shell.catalogs import (
     load_migration_matrix,
     load_tooltip_catalog,
     load_ui_element_catalog,
+    load_v19_cognitive_visibility_matrix,
+    load_v19_task_check_block_loop_matrix,
+    load_v19_tree_direct_open_matrix,
     ui_state_palette,
+    v19_search_hints_by_workspace_code,
 )
 from pneumo_solver_ui.desktop_spec_shell.registry import build_command_map, build_shell_workspaces
 
@@ -91,3 +97,57 @@ def test_v3_runtime_matrices_expose_shell_shortcuts_docking_and_state_contracts(
     assert docks["правая_панель_свойств_и_справки"].can_second_monitor is True
     assert states["STATE-WARNING"].title == "Предупреждение"
     assert states["STATE-ERROR"].border == "граница_ошибки"
+
+
+def test_v19_graph_iteration_exposes_runtime_action_feedback_contract() -> None:
+    visibility_rows = load_v19_cognitive_visibility_matrix()
+    task_rows = load_v19_task_check_block_loop_matrix()
+    direct_rows = {row.workspace: row for row in load_v19_tree_direct_open_matrix()}
+
+    assert V19_GRAPH_IMPORT_ROOT.name == "v19_graph_iteration"
+    assert len(visibility_rows) == 12
+    assert len(task_rows) == 116
+    assert direct_rows["WS-INPUTS"].direct_open_required is True
+    assert direct_rows["WS-INPUTS"].intermediate_step_forbidden is True
+
+    input_guidance = get_v19_workspace_guidance("WS-INPUTS")
+    ring_guidance = get_v19_workspace_guidance("WS-RING")
+    optimization_guidance = get_v19_workspace_guidance("WS-OPTIMIZATION")
+    diagnostics_guidance = get_v19_workspace_guidance("WS-DIAGNOSTICS")
+    assert input_guidance is not None
+    assert ring_guidance is not None
+    assert optimization_guidance is not None
+    assert diagnostics_guidance is not None
+
+    input_text = "\n".join((*input_guidance.visibility_lines, *input_guidance.user_goals))
+    ring_text = "\n".join((*ring_guidance.visibility_lines, *ring_guidance.user_goals))
+    optimization_text = "\n".join(
+        (*optimization_guidance.visibility_lines, *optimization_guidance.block_lines, *optimization_guidance.user_goals)
+    )
+    diagnostics_text = "\n".join(
+        (*diagnostics_guidance.visibility_lines, *diagnostics_guidance.check_lines, *diagnostics_guidance.user_goals)
+    )
+    combined_text = "\n".join((input_text, ring_text, optimization_text, diagnostics_text))
+
+    assert "две пружины" in input_text
+    assert "статус шва" in ring_text.casefold()
+    assert "недобор" in optimization_text
+    assert "архив" in diagnostics_text
+    for forbidden in (
+        "bundle",
+        "workspace",
+        "selfcheck",
+        "Underfill",
+        "hard gate",
+        "objective contract",
+        "baseline",
+        "suite snapshot",
+        "contract",
+        "контракт",
+    ):
+        assert forbidden not in combined_text
+
+    hints = v19_search_hints_by_workspace_code()
+    assert any("две пружины" in hint for hint in hints["WS-INPUTS"])
+    assert any("статус шва" in hint.casefold() for hint in hints["WS-RING"])
+    assert any("недобор" in hint for hint in hints["WS-OPTIMIZATION"])
