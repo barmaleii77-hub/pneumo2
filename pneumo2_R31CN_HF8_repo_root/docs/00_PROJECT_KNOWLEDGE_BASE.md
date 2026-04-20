@@ -222,6 +222,16 @@ Operational note:
 - обязательные графические input surfaces, source markers и время построения для расчётных previews и графиков;
 - refined Windows title-bar/system-menu/Snap Layout behavior, `UI Automation`, `WM_DPICHANGED`, idle CPU, hidden-pane budget и ETW-style instrumentation policy для desktop GUI.
 
+Актуальный imported KB/TZ/spec successor layer для GUI-first задач:
+
+- [docs/context/gui_spec_imports/v38_github_kb_commit_ready/README.md](./context/gui_spec_imports/v38_github_kb_commit_ready/README.md)
+- [docs/context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md](./context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md)
+- [docs/context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml](./context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml)
+- [docs/context/gui_spec_imports/v38_github_kb_commit_ready/REPO_OPEN_GAPS_TO_KEEP_OPEN.csv](./context/gui_spec_imports/v38_github_kb_commit_ready/REPO_OPEN_GAPS_TO_KEEP_OPEN.csv)
+- [docs/context/gui_spec_imports/v38_github_kb_commit_ready/NON_RUNTIME_CLOSURE_NOTICE.md](./context/gui_spec_imports/v38_github_kb_commit_ready/NON_RUNTIME_CLOSURE_NOTICE.md)
+
+`v38_github_kb_commit_ready` не заменяет `17/18` и не является runtime-closure proof. Он фиксирует current successor knowledge-base/ТЗ/spec connector layer после `v37`; producer-side truth, measured perf trace, Windows visual/runtime acceptance и cylinder packaging gaps остаются открытыми до отдельного evidence layer.
+
 Связанные, но вспомогательные UX-источники:
 
 - [docs/UX_BEST_PRACTICES_SOURCES.md](./UX_BEST_PRACTICES_SOURCES.md)
@@ -341,6 +351,12 @@ Operational note:
 ### Если задача затрагивает runtime/exports/contracts
 
 14. relevant `*contract*.py`, registries и contract tests
+
+### Если задача затрагивает GUI knowledge-base / ТЗ / imported spec layers
+
+15. [docs/context/gui_spec_imports/README.md](./context/gui_spec_imports/README.md)
+16. [docs/context/gui_spec_imports/v38_github_kb_commit_ready/README.md](./context/gui_spec_imports/v38_github_kb_commit_ready/README.md)
+17. [docs/context/GUI_SPEC_ARCHIVE_LINEAGE.md](./context/GUI_SPEC_ARCHIVE_LINEAGE.md)
 
 ## Короткий operational summary
 

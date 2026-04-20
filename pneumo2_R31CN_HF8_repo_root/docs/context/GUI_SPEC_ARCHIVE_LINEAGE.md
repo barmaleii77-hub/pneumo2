@@ -1,9 +1,9 @@
-# GUI-Spec Archive Lineage PROMPT_V2 + v1–v13 + v37
+# GUI-Spec Archive Lineage PROMPT_V2 + v1–v13 + v37 + v38
 
 Этот документ фиксирует, как upstream prompt source `PROMPT_V2` и серия
-архивов `v1…v13`, а также successor supplement `v37`, влияют на текущий
-GUI-spec проекта и какие из них считаются active, historical, recovery или
-knowledge-base слоями.
+архивов `v1…v13`, а также successor supplements `v37` и `v38`, влияют на
+текущий GUI-spec проекта и какие из них считаются active, historical,
+recovery или knowledge-base слоями.
 
 ## Как читать lineage
 
@@ -21,6 +21,10 @@ knowledge-base слоями.
   consolidated technical specification, workspace/parameter/acceptance
   matrices и open gaps в repo-local knowledge-base layer, но не является
   runtime-closure proof.
+- `v38` — commit-ready successor package после `v37`. Он добавляет
+  import-ready subtree `v38_github_kb_commit_ready`, maintainer-ready patch
+  proposals/checklists и сохраняет запрет объявлять runtime closure без
+  evidence.
 
 ## Версии
 
@@ -155,26 +159,46 @@ knowledge-base слоями.
   measured perf trace или Windows runtime acceptance закрытыми без отдельного
   evidence layer.
 
+### v38
+
+- Роль: current successor GitHub knowledge-base commit-ready layer и
+  TZ/spec connector.
+- Архив:
+  `pneumo_codex_tz_spec_connector_reconciled_v38_github_kb_commit_ready.zip`.
+- Что добавил: import-ready subtree для
+  `docs/context/gui_spec_imports/v38_github_kb_commit_ready/`, refreshed
+  package identity, `TECHNICAL_SPECIFICATION.md`, `GUI_SPEC.yaml`, workspace
+  contract matrix, parameter catalogs, requirements/acceptance matrices,
+  repo canon alignment, maintainer checklist и список gaps, которые должны
+  оставаться открытыми.
+- Статус: current successor KB supplement в
+  `docs/context/gui_spec_imports/v38_github_kb_commit_ready/`.
+- Ограничение: слой не является runtime-closure proof; producer-side truth,
+  measured perf trace, Windows visual/runtime acceptance и full cylinder
+  packaging остаются открытыми до отдельного evidence layer.
+
 ## Итоговый приоритет
 
 1. `docs/17_WINDOWS_DESKTOP_CAD_GUI_CANON.md`
 2. `docs/18_PNEUMOAPP_WINDOWS_GUI_SPEC.md`
 3. `docs/context/gui_spec_imports/foundations/*`
-4. `docs/context/gui_spec_imports/v37_github_kb_supplement/*`
-5. `docs/context/gui_spec_imports/v3/*`
-6. `docs/context/gui_spec_imports/v13_ring_editor_migration/*` для `WS-RING`
+4. `docs/context/gui_spec_imports/v38_github_kb_commit_ready/*`
+5. `docs/context/gui_spec_imports/v37_github_kb_supplement/*`
+6. `docs/context/gui_spec_imports/v3/*`
+7. `docs/context/gui_spec_imports/v13_ring_editor_migration/*` для `WS-RING`
    и ring-to-suite handoff
-7. `docs/context/gui_spec_imports/v12_design_recovery/*`
-8. lineage `PROMPT_V2 + v1…v13 + v37`
-9. прочие historical imports и implementation archives
+8. `docs/context/gui_spec_imports/v12_design_recovery/*`
+9. lineage `PROMPT_V2 + v1…v13 + v37 + v38`
+10. прочие historical imports и implementation archives
 
 ## Практическое правило
 
 - Для текущих GUI-задач сначала опираемся на `17`, `18`, `foundations`,
-  `v37` как KB/TZ/spec supplement и затем `v3`.
+  `v38` как current KB/TZ/spec supplement, затем `v37` как predecessor
+  reference и затем `v3`.
 - Для ring editor и suite handoff обязательно добавляем `v13`.
 - Для requirements, параметров, workspace coverage, acceptance и open gaps
-  обязательно сверяемся с `v37`, но не выдаём его за runtime acceptance.
+  обязательно сверяемся с `v38`, но не выдаём его за runtime acceptance.
 - Для спорных вопросов о происхождении канона, design/recovery decisions и
   границе между design и implementation-pass читаем `v12` и lineage
-  `PROMPT_V2 + v1…v13 + v37`.
+  `PROMPT_V2 + v1…v13 + v37 + v38`.

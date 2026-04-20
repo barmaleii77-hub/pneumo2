@@ -21,6 +21,17 @@
 - `docs/context/gui_spec_imports/README.md` — верхний source note для imported GUI-spec layers.
 - `docs/context/gui_spec_imports/foundations/README.md` — upstream prompt layer, предшествующий серии архивов `v1…v13`.
 - `docs/context/gui_spec_imports/foundations/prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md` — foundational prompt source (`PROMPT_V2`).
+- `docs/context/gui_spec_imports/v38_github_kb_commit_ready/README.md` — current successor consolidated GUI-spec / knowledge-base commit-ready layer.
+- `docs/context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md` — current successor human-readable technical specification.
+- `docs/context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml` — current successor top-level machine-readable GUI spec.
+- `docs/context/gui_spec_imports/v38_github_kb_commit_ready/WORKSPACE_CONTRACT_MATRIX.csv` — current successor workspace contract matrix.
+- `docs/context/gui_spec_imports/v38_github_kb_commit_ready/PARAMETER_CATALOG.csv` — current successor parameter catalog.
+- `docs/context/gui_spec_imports/v38_github_kb_commit_ready/PARAMETER_PIPELINE_MATRIX.csv` — current successor parameter-pipeline matrix.
+- `docs/context/gui_spec_imports/v38_github_kb_commit_ready/PARAMETER_VISIBILITY_MATRIX.csv` — current successor parameter visibility/editability matrix.
+- `docs/context/gui_spec_imports/v38_github_kb_commit_ready/REQUIREMENTS_MATRIX.csv` — current successor requirements matrix.
+- `docs/context/gui_spec_imports/v38_github_kb_commit_ready/ACCEPTANCE_MATRIX.csv` — current successor acceptance matrix.
+- `docs/context/gui_spec_imports/v38_github_kb_commit_ready/REPO_OPEN_GAPS_TO_KEEP_OPEN.csv` — current successor open gaps list; эти gaps нельзя скрывать как закрытые.
+- `docs/context/gui_spec_imports/v38_github_kb_commit_ready/NON_RUNTIME_CLOSURE_NOTICE.md` — явное ограничение: v38 не является runtime-closure proof.
 - `docs/context/gui_spec_imports/v37_github_kb_supplement/README.md` — successor consolidated GitHub knowledge-base supplement layer.
 - `docs/context/gui_spec_imports/v37_github_kb_supplement/TECHNICAL_SPECIFICATION.md` — human-readable ТЗ/spec connector для Windows desktop GUI.
 - `docs/context/gui_spec_imports/v37_github_kb_supplement/GUI_SPEC.yaml` — machine-readable successor GUI-spec/TZ connector.
@@ -70,8 +81,8 @@
 - `docs/context/gui_spec_imports/v12_design_recovery/optimization_control_plane_contract_v12.json` — precursor optimization control-plane contract.
 - `docs/context/gui_spec_imports/v12_design_recovery/truthful_graphics_contract_v12.json` — precursor truthful-graphics contract.
 - `docs/context/gui_spec_imports/v12_design_recovery/workspace_delta_v12.json` — workspace-level recovery delta.
-- `docs/context/GUI_SPEC_ARCHIVE_LINEAGE.md` — human-readable lineage `v1…v13`.
-- `docs/context/gui_spec_archive_lineage.json` — machine-readable lineage inventory `v1…v13`.
+- `docs/context/GUI_SPEC_ARCHIVE_LINEAGE.md` — human-readable lineage `v1…v13 + v37 + v38`.
+- `docs/context/gui_spec_archive_lineage.json` — machine-readable lineage inventory `v1…v13 + v37 + v38`.
 
 ### Historical import
 
@@ -96,13 +107,14 @@
 1. `17_WINDOWS_DESKTOP_CAD_GUI_CANON.md`
 2. `18_PNEUMOAPP_WINDOWS_GUI_SPEC.md`
 3. `docs/context/gui_spec_imports/foundations/*` как upstream intent/provenance layer
-4. `docs/context/gui_spec_imports/v37_github_kb_supplement/*` как successor consolidated KB/TZ/spec supplement, но не runtime-closure proof
-5. `docs/context/gui_spec_imports/v3/*`
-6. `docs/context/gui_spec_imports/v13_ring_editor_migration/*` для `WS-RING` и handoff `WS-RING -> WS-SUITE`
-7. `docs/context/gui_spec_imports/v12_design_recovery/*` как historical design-recovery layer
-8. `docs/context/gui_spec_archive_lineage.json` и `docs/context/GUI_SPEC_ARCHIVE_LINEAGE.md`
-9. older versions в `docs/context/gui_spec_imports/*`
-10. `docs/gui_chat_prompts/*`
+4. `docs/context/gui_spec_imports/v38_github_kb_commit_ready/*` как current successor consolidated KB/TZ/spec commit-ready supplement, но не runtime-closure proof
+5. `docs/context/gui_spec_imports/v37_github_kb_supplement/*` как predecessor successor supplement/reference layer
+6. `docs/context/gui_spec_imports/v3/*`
+7. `docs/context/gui_spec_imports/v13_ring_editor_migration/*` для `WS-RING` и handoff `WS-RING -> WS-SUITE`
+8. `docs/context/gui_spec_imports/v12_design_recovery/*` как historical design-recovery layer
+9. `docs/context/gui_spec_archive_lineage.json` и `docs/context/GUI_SPEC_ARCHIVE_LINEAGE.md`
+10. older versions в `docs/context/gui_spec_imports/*`
+11. `docs/gui_chat_prompts/*`
 
 ## Зафиксированные внешние AI snapshots
 
@@ -121,6 +133,6 @@
 ## Правило использования
 
 - Внешние ссылки не заменяют локальный канон.
-- Для GUI-first задач сначала читать `17`, затем `18`, затем `gui_spec_imports/foundations/*`, затем `gui_spec_imports/v37_github_kb_supplement/*` для KB/TZ/spec reconciliation, затем `gui_spec_imports/v3/*`, parity docs и только потом lane-level prompts.
+- Для GUI-first задач сначала читать `17`, затем `18`, затем `gui_spec_imports/foundations/*`, затем `gui_spec_imports/v38_github_kb_commit_ready/*` для KB/TZ/spec reconciliation, затем `gui_spec_imports/v37_github_kb_supplement/*` как predecessor reference, затем `gui_spec_imports/v3/*`, parity docs и только потом lane-level prompts.
 - Imported JSON/DOT/CSV используются как reference artifacts, а не как единственный источник правды.
 - При конфликте между imported sources и текущим каноном приоритет у `17/18`.

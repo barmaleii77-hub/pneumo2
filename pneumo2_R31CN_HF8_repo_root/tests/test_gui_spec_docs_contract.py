@@ -14,6 +14,7 @@ IMPORTS_V3 = IMPORTS / "v3"
 IMPORTS_V12 = IMPORTS / "v12_design_recovery"
 IMPORTS_V13 = IMPORTS / "v13_ring_editor_migration"
 IMPORTS_V37 = IMPORTS / "v37_github_kb_supplement"
+IMPORTS_V38 = IMPORTS / "v38_github_kb_commit_ready"
 
 CANON_17 = DOCS / "17_WINDOWS_DESKTOP_CAD_GUI_CANON.md"
 CANON_18 = DOCS / "18_PNEUMOAPP_WINDOWS_GUI_SPEC.md"
@@ -44,7 +45,7 @@ def _load_csv_rows(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
-def test_v37_kb_supplement_import_layer_exists_and_loads_contracts() -> None:
+def test_v38_kb_commit_ready_import_layer_exists_and_loads_contracts() -> None:
     required_files = {
         "README.md",
         "TECHNICAL_SPECIFICATION.md",
@@ -65,35 +66,34 @@ def test_v37_kb_supplement_import_layer_exists_and_loads_contracts() -> None:
         "PIPELINE_OPTIMIZED.dot",
     }
 
-    assert IMPORTS_V37.exists()
-    actual_files = {path.name for path in IMPORTS_V37.iterdir() if path.is_file()}
+    assert IMPORTS_V38.exists()
+    actual_files = {path.name for path in IMPORTS_V38.iterdir() if path.is_file()}
     assert required_files <= actual_files
     for file_name in required_files:
-        assert (IMPORTS_V37 / file_name).stat().st_size > 0, file_name
+        assert (IMPORTS_V38 / file_name).stat().st_size > 0, file_name
 
-    readme_text = (IMPORTS_V37 / "README.md").read_text(encoding="utf-8-sig")
-    tech_spec_text = (IMPORTS_V37 / "TECHNICAL_SPECIFICATION.md").read_text(
+    readme_text = (IMPORTS_V38 / "README.md").read_text(encoding="utf-8-sig")
+    tech_spec_text = (IMPORTS_V38 / "TECHNICAL_SPECIFICATION.md").read_text(
         encoding="utf-8-sig"
     )
-    gui_spec_text = (IMPORTS_V37 / "GUI_SPEC.yaml").read_text(encoding="utf-8-sig")
-    non_runtime_text = (IMPORTS_V37 / "NON_RUNTIME_CLOSURE_NOTICE.md").read_text(
+    gui_spec_text = (IMPORTS_V38 / "GUI_SPEC.yaml").read_text(encoding="utf-8-sig")
+    non_runtime_text = (IMPORTS_V38 / "NON_RUNTIME_CLOSURE_NOTICE.md").read_text(
         encoding="utf-8-sig"
     )
 
-    assert "import-ready successor knowledge-base layer" in readme_text
-    assert "17_WINDOWS_DESKTOP_CAD_GUI_CANON.md" in readme_text
-    assert "18_PNEUMOAPP_WINDOWS_GUI_SPEC.md" in readme_text
-    assert "runtime-closure proof" in readme_text
-    assert "Package status V37" in tech_spec_text
+    assert "imported successor layer" in readme_text
+    assert "17/18" in readme_text
+    assert "runtime closure proof" in readme_text
+    assert "Package status V38" in tech_spec_text
     assert "runtime_closure_proof: false" in gui_spec_text
     assert "github_knowledge_base_supplement: true" in gui_spec_text
     assert "не является доказательством runtime closure" in non_runtime_text
 
-    workspace_rows = _load_csv_rows(IMPORTS_V37 / "WORKSPACE_CONTRACT_MATRIX.csv")
-    parameter_rows = _load_csv_rows(IMPORTS_V37 / "PARAMETER_CATALOG.csv")
-    acceptance_rows = _load_csv_rows(IMPORTS_V37 / "ACCEPTANCE_MATRIX.csv")
-    gaps_rows = _load_csv_rows(IMPORTS_V37 / "REPO_OPEN_GAPS_TO_KEEP_OPEN.csv")
-    requirements_rows = _load_csv_rows(IMPORTS_V37 / "REQUIREMENTS_MATRIX.csv")
+    workspace_rows = _load_csv_rows(IMPORTS_V38 / "WORKSPACE_CONTRACT_MATRIX.csv")
+    parameter_rows = _load_csv_rows(IMPORTS_V38 / "PARAMETER_CATALOG.csv")
+    acceptance_rows = _load_csv_rows(IMPORTS_V38 / "ACCEPTANCE_MATRIX.csv")
+    gaps_rows = _load_csv_rows(IMPORTS_V38 / "REPO_OPEN_GAPS_TO_KEEP_OPEN.csv")
+    requirements_rows = _load_csv_rows(IMPORTS_V38 / "REQUIREMENTS_MATRIX.csv")
 
     assert {"workspace_id", "source_of_truth", "editing_rule", "layout_rule"} <= set(
         workspace_rows[0].keys()
@@ -248,7 +248,9 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
     assert "upstream prompt sources" in imports_readme
     assert "v12_design_recovery/" in imports_readme
     assert "v13_ring_editor_migration/" in imports_readme
+    assert "v38_github_kb_commit_ready/" in imports_readme
     assert "v37_github_kb_supplement/" in imports_readme
+    assert "current successor" in imports_readme
     assert "successor consolidated" in imports_readme
     assert "runtime-closure proof" in imports_readme
     assert "специализированный ring-editor migration" in imports_readme
@@ -257,6 +259,14 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
 
     assert "gui_spec_imports/foundations/README.md" in project_sources_text
     assert "prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md" in project_sources_text
+    assert "v38_github_kb_commit_ready/README.md" in project_sources_text
+    assert "v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md" in project_sources_text
+    assert "v38_github_kb_commit_ready/GUI_SPEC.yaml" in project_sources_text
+    assert "v38_github_kb_commit_ready/WORKSPACE_CONTRACT_MATRIX.csv" in project_sources_text
+    assert "v38_github_kb_commit_ready/PARAMETER_CATALOG.csv" in project_sources_text
+    assert "v38_github_kb_commit_ready/ACCEPTANCE_MATRIX.csv" in project_sources_text
+    assert "v38_github_kb_commit_ready/REPO_OPEN_GAPS_TO_KEEP_OPEN.csv" in project_sources_text
+    assert "v38_github_kb_commit_ready/NON_RUNTIME_CLOSURE_NOTICE.md" in project_sources_text
     assert "v37_github_kb_supplement/README.md" in project_sources_text
     assert "v37_github_kb_supplement/TECHNICAL_SPECIFICATION.md" in project_sources_text
     assert "v37_github_kb_supplement/GUI_SPEC.yaml" in project_sources_text
@@ -278,6 +288,7 @@ def test_project_sources_index_and_import_notes_register_v13_addendum() -> None:
 
     assert "gui_spec_imports/foundations/README.md" in index_text
     assert "prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md" in index_text
+    assert "gui_spec_imports/v38_github_kb_commit_ready/README.md" in index_text
     assert "gui_spec_imports/v37_github_kb_supplement/README.md" in index_text
     assert "TECHNICAL_SPECIFICATION.md" in index_text
     assert "GUI_SPEC.yaml" in index_text
@@ -299,13 +310,22 @@ def test_canon_and_parity_summary_reference_v13_ring_editor_layer() -> None:
     assert "## П. Специализированный addendum `v13` для `WS-RING`" in canon_18
     assert "## Р. Контракт handoff `WS-RING -> WS-SUITE`" in canon_18
     assert "## С. Ring-level migration gates" in canon_18
-    assert "## Т. Историческая линия `PROMPT_V2 + v1…v13 + v37` и политика продолжения" in canon_18
-    assert "## У. V37 GitHub KB supplement и TZ/spec connector" in canon_18
+    assert "## Т. Историческая линия `PROMPT_V2 + v1…v13 + v37 + v38` и политика продолжения" in canon_18
+    assert "## У. V38 GitHub KB commit-ready successor layer" in canon_18
+    assert "## Ф. V37 GitHub KB supplement и TZ/spec connector" in canon_18
     assert "./context/gui_spec_imports/foundations/README.md" in canon_18
     assert "./context/gui_spec_imports/foundations/prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md" in canon_18
     assert "./context/GUI_SPEC_ARCHIVE_LINEAGE.md" in canon_18
     assert "./context/gui_spec_archive_lineage.json" in canon_18
     assert "./context/gui_spec_imports/v12_design_recovery/README.md" in canon_18
+    assert "./context/gui_spec_imports/v38_github_kb_commit_ready/README.md" in canon_18
+    assert "./context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md" in canon_18
+    assert "./context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml" in canon_18
+    assert "./context/gui_spec_imports/v38_github_kb_commit_ready/WORKSPACE_CONTRACT_MATRIX.csv" in canon_18
+    assert "./context/gui_spec_imports/v38_github_kb_commit_ready/PARAMETER_CATALOG.csv" in canon_18
+    assert "./context/gui_spec_imports/v38_github_kb_commit_ready/ACCEPTANCE_MATRIX.csv" in canon_18
+    assert "./context/gui_spec_imports/v38_github_kb_commit_ready/REPO_OPEN_GAPS_TO_KEEP_OPEN.csv" in canon_18
+    assert "./context/gui_spec_imports/v38_github_kb_commit_ready/NON_RUNTIME_CLOSURE_NOTICE.md" in canon_18
     assert "./context/gui_spec_imports/v37_github_kb_supplement/README.md" in canon_18
     assert "./context/gui_spec_imports/v37_github_kb_supplement/TECHNICAL_SPECIFICATION.md" in canon_18
     assert "./context/gui_spec_imports/v37_github_kb_supplement/GUI_SPEC.yaml" in canon_18
@@ -353,12 +373,14 @@ def test_v12_design_recovery_layer_and_lineage_inventory_are_registered() -> Non
     assert (IMPORTS_V12 / "optimization_control_plane_contract_v12.json").exists()
     assert (IMPORTS_V12 / "truthful_graphics_contract_v12.json").exists()
 
-    assert "PROMPT_V2 + v1–v13 + v37" in lineage_md
+    assert "PROMPT_V2 + v1–v13 + v37 + v38" in lineage_md
     assert "PROMPT_V2" in lineage_md
     assert "v12" in lineage_md
     assert "v13" in lineage_md
     assert "v37" in lineage_md
+    assert "v38" in lineage_md
     assert "successor GitHub knowledge-base supplement" in lineage_md
+    assert "commit-ready successor package" in lineage_md
     assert "implementation-oriented passes" in lineage_md
     assert "design-recovery" in lineage_md
 
@@ -379,6 +401,7 @@ def test_v12_design_recovery_layer_and_lineage_inventory_are_registered() -> Non
         "v12",
         "v13",
         "v37",
+        "v38",
     ]
     assert any(item["version"] == "PROMPT_V2" and item["repo_layer"] == "docs/context/gui_spec_imports/foundations/" for item in lineage_json)
     assert any(item["version"] == "v12" and item["repo_layer"] == "docs/context/gui_spec_imports/v12_design_recovery/" for item in lineage_json)
@@ -386,7 +409,13 @@ def test_v12_design_recovery_layer_and_lineage_inventory_are_registered() -> Non
     assert any(
         item["version"] == "v37"
         and item["repo_layer"] == "docs/context/gui_spec_imports/v37_github_kb_supplement/"
-        and item["status"] == "successor_kb_supplement"
+        and item["status"] == "predecessor_successor_kb_supplement"
+        for item in lineage_json
+    )
+    assert any(
+        item["version"] == "v38"
+        and item["repo_layer"] == "docs/context/gui_spec_imports/v38_github_kb_commit_ready/"
+        and item["status"] == "current_successor_kb_commit_ready"
         for item in lineage_json
     )
 
@@ -441,6 +470,10 @@ def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
         FOUNDATIONS / "prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md",
         IMPORTS_V12 / "README.md",
         IMPORTS_V13 / "README.md",
+        IMPORTS_V38 / "README.md",
+        IMPORTS_V38 / "TECHNICAL_SPECIFICATION.md",
+        IMPORTS_V38 / "REPO_GITHUB_KB_SUPPLEMENT.md",
+        IMPORTS_V38 / "NON_RUNTIME_CLOSURE_NOTICE.md",
         IMPORTS_V37 / "README.md",
         IMPORTS_V37 / "TECHNICAL_SPECIFICATION.md",
         IMPORTS_V37 / "REPO_GITHUB_KB_SUPPLEMENT.md",

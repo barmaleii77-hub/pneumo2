@@ -148,6 +148,20 @@ ID: `PLAN-0018`.
 Источник: chat.
 ID: `PLAN-0019`.
 
+20. PROJECT_KB_AUDIT_2026-04-20.md
+Назначение: Изучена база знаний проекта, закрыты шесть contract regressions по desktop input и StageRunner, зафиксированы оставшиеся GUI-spec gaps: command metadata, v37 non-runtime closure и открытые runtime evidence gaps.
+Артефакт: [REPORTS/PROJECT_KB_AUDIT_2026-04-20.md](./REPORTS/PROJECT_KB_AUDIT_2026-04-20.md)
+Статус: актуален.
+Источник: chat.
+ID: `PLAN-0020`.
+
+21. v38_github_kb_commit_ready import
+Назначение: Актуализировать базу знаний по pneumo_codex_tz_spec_connector_reconciled_v38_github_kb_commit_ready.zip: импортировать current successor layer v38, обновить PROJECT_SOURCES, GUI imports README, GUI prompt index, 18 GUI-spec lineage и сохранить правило non-runtime-closure proof.
+Артефакт: [docs/context/gui_spec_imports/v38_github_kb_commit_ready/README.md](./docs/context/gui_spec_imports/v38_github_kb_commit_ready/README.md)
+Статус: актуален.
+Источник: chat.
+ID: `PLAN-0021`.
+
 ## Текущее правило интерпретации
 
 Если в будущем возникает вопрос:

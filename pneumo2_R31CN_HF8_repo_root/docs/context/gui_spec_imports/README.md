@@ -17,10 +17,12 @@
 
 - `foundations/` — upstream prompt sources, предшествующие серии архивов
   `v1…v13`;
+- `v38_github_kb_commit_ready/` — import-ready successor knowledge-base
+  commit-ready layer для CODEX/TZ/spec пакета. Слой читается после
+  `foundations/*`, но не выше `17/18`, и не является `runtime-closure proof`;
 - `v37_github_kb_supplement/` — import-ready successor knowledge-base
-  supplement layer для GitHub/CODEX/TZ/spec reconciliation. Слой читается
-  после `foundations/*`, но не выше `17/18`, и не является
-  `runtime-closure proof`;
+  supplement layer для GitHub/CODEX/TZ/spec reconciliation. После `v38`
+  сохраняется как predecessor reference-layer;
 - `v3/` — active detailed machine-readable reference layer из
   `pneumo_gui_codex_package_v3.zip`;
 - `v12_design_recovery/` — historical design-recovery layer из
@@ -42,23 +44,26 @@
 2. Если нужен upstream provenance исходного design-intent, читать
    `foundations/*` как pre-`v1` prompt layer.
 3. Для repo knowledge-base reconciliation, связки ТЗ с GUI-spec, workspace
-   contract matrix, parameter catalogs, open gaps and acceptance matrix читать
-   `v37_github_kb_supplement/*`. Этот слой является successor KB supplement,
-   но не закрывает runtime acceptance без отдельного evidence layer.
-4. Затем использовать `v3/*` как active detailed machine-readable reference для:
+    contract matrix, parameter catalogs, open gaps and acceptance matrix читать
+   `v38_github_kb_commit_ready/*`. Этот слой является current successor
+   commit-ready KB supplement, но не закрывает runtime acceptance без отдельного
+   evidence layer.
+4. Если нужно сравнить predecessor supplement, читать
+   `v37_github_kb_supplement/*`.
+5. Затем использовать `v3/*` как active detailed machine-readable reference для:
    layout, UI elements, field/help/tooltip catalogs, migration matrix,
    acceptance criteria, pipeline verification, source-of-truth, docking,
    keyboard, UI state и observability contracts.
-5. Если нужно понять, как текущий канон вырос из старых архивов, читать
+6. Если нужно понять, как текущий канон вырос из старых архивов, читать
    `GUI_SPEC_ARCHIVE_LINEAGE.md` и `gui_spec_archive_lineage.json`.
-6. Для `WS-RING` и handoff `WS-RING -> WS-SUITE` дополнительно использовать
+7. Для `WS-RING` и handoff `WS-RING -> WS-SUITE` дополнительно использовать
    `v13_ring_editor_migration/*` как специализированный addendum поверх `v3`:
    schema contract, screen blueprints, state machine, ring-level migration
    matrix, acceptance gates и suite-link contract.
-7. `v12_design_recovery/*` использовать как historical design-recovery layer:
+8. `v12_design_recovery/*` использовать как historical design-recovery layer:
    он фиксирует возврат в design-first ветку, канон ring editor, optimization
    control plane и truthful graphics перед `v13`.
-8. `v2` и `v1` использовать только как historical imports и источник для
+9. `v2` и `v1` использовать только как historical imports и источник для
    сравнения эволюции GUI-spec.
 
 ## Политика обновления
@@ -70,8 +75,9 @@
   source artifacts;
 - при конфликте между imported sources и текущим каноном приоритет у `17/18`,
   затем у `foundations/*` как upstream intent layer только для provenance,
-  затем у `v37_github_kb_supplement/*` как successor consolidated
-  knowledge-base supplement, затем у active detailed layer `v3`, затем у
+  затем у `v38_github_kb_commit_ready/*` как current successor consolidated
+  knowledge-base supplement, затем у `v37_github_kb_supplement/*` как
+  predecessor supplement, затем у active detailed layer `v3`, затем у
   специализированного addendum
   `v13_ring_editor_migration` в пределах `WS-RING` и ring-to-suite handoff,
   затем у `v12_design_recovery` как historical design-recovery layer, затем у

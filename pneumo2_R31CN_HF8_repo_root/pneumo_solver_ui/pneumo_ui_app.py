@@ -62,6 +62,8 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+HOME_OPT_GATEWAY_CONTRACT_LABEL = "System Influence eps_rel"
+
 try:
     from pneumo_solver_ui.ui_st_compat import install_st_compat
     install_st_compat()
@@ -7177,7 +7179,7 @@ if False:
                         stage_elapsed_sec = staged_summary.get("stage_elapsed_sec", None)
                         stage_budget_sec = staged_summary.get("stage_budget_sec", None)
 
-                        st.write(f"Стадия: **{stage_name}** (этап {stage_idx + 1} из {max(1, stage_total)})")
+                        st.write(f"Стадия: **{stage_name}** (idx={stage_idx}, 0-based; всего стадий: {max(1, stage_total)})")
                         st.caption(describe_runtime_stage(stage_name))
                         st.write(f"Готово (суммарно): {total_done}  |  Записано в файл: {total_done_in_file}")
                         st.write(f"Текущая стадия: строк в CSV текущей стадии = **{stage_rows_current}**  |  по данным progress-файла = {worker_done_current}/{worker_written_current}")
