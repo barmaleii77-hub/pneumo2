@@ -110,6 +110,7 @@ def _operator_token_text(value: Any, *, fallback: str = "нет данных") -
 def _operator_message_text(raw: Any) -> str:
     text = " ".join(str(raw or "").split()).strip()
     replacements = (
+        ("Missing required files:", "Не найдены обязательные файлы:"),
         ("Clipboard status is stale for the current latest bundle:", "Буфер обмена устарел для текущего последнего архива:"),
         ("Clipboard updated for latest bundle:", "Буфер обмена обновлён для последнего архива:"),
         ("no clipboard activity", "буфер обмена не использовался"),

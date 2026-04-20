@@ -192,9 +192,14 @@ def _restore_request_from_center_state(
         except Exception:
             return default
 
-    level = str(ui.get("level") or "standard").strip().lower()
+    level = str(ui.get("level") or "full").strip().lower()
     if level not in {"minimal", "standard", "full"}:
-        level = "standard"
+        level = "full"
+    elif level == "standard":
+        # The hosted GUI-spec lane runs the full diagnostics contract by default.
+        # Older Tk center state may persist "standard"; do not let that downgrade
+        # the always-visible diagnostics workspace.
+        level = "full"
 
     osc_dir = str(ui.get("osc_dir") or "").strip()
     if osc_dir:
