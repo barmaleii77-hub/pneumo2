@@ -268,7 +268,7 @@ class DiagnosticsShellController(QtCore.QObject):
         self._current_run_record: DesktopDiagnosticsRunRecord | None = None
         self._current_bundle: DesktopDiagnosticsBundleRecord | None = None
         self._current_snapshot: DiagnosticsWorkspaceSnapshot | None = None
-        self._status_text = "Готово. Диагностика доступна из текущего окна."
+        self._status_text = "Готово. Проверка и отправка доступны из текущего окна."
 
     @property
     def current_snapshot(self) -> DiagnosticsWorkspaceSnapshot | None:
@@ -318,9 +318,9 @@ class DiagnosticsShellController(QtCore.QObject):
             recommended_next_step=(
                 "Проверьте базовый прогон перед отправкой результатов."
                 if baseline_attention
-                else "Если архив диагностики уже собран, проверьте состав и состояние, затем переходите к отправке."
+                else "Если архив для отправки уже собран, проверьте состав и состояние, затем переходите к отправке."
                 if bundle.latest_zip_path
-                else "Сначала соберите диагностику, чтобы получить архив и свежую проверку состава и состояния."
+                else "Сначала соберите архив для отправки, чтобы получить свежую проверку состава и состояния."
             ),
             baseline_evidence=baseline_evidence,
             baseline_attention_required=baseline_attention,
@@ -349,7 +349,7 @@ class DiagnosticsShellController(QtCore.QObject):
 
     def start_collect(self) -> None:
         if self.is_busy():
-            self._set_status("Диагностика уже выполняется.", busy=True)
+            self._set_status("Сбор архива уже выполняется.", busy=True)
             return
 
         bundle = self._current_bundle or load_desktop_diagnostics_bundle_record(self.repo_root)
@@ -382,23 +382,23 @@ class DiagnosticsShellController(QtCore.QObject):
         self._process.setProgram(cmd[0])
         self._process.setArguments(cmd[1:])
         self._process.start()
-        self._set_status("Идёт сбор диагностики...", busy=True)
+        self._set_status("Идёт сбор архива для отправки...", busy=True)
         self.refresh(regenerate_reports=False)
 
     def verify_bundle(self) -> None:
         bundle = self._current_bundle or load_desktop_diagnostics_bundle_record(self.repo_root)
         if not bundle.latest_zip_path:
-            self._set_status("Проверка архива диагностики недоступна: сначала соберите диагностику.", busy=False)
+            self._set_status("Проверка архива недоступна: сначала соберите архив для отправки.", busy=False)
             self.refresh(regenerate_reports=False)
             return
-        self._set_status("Обновляю проверку состава и состояния архива диагностики...", busy=True)
+        self._set_status("Обновляю проверку состава и состояния архива для отправки...", busy=True)
         self.refresh(regenerate_reports=True)
-        self._set_status("Проверка архива диагностики обновлена.", busy=False)
+        self._set_status("Проверка архива для отправки обновлена.", busy=False)
 
     def send_results(self) -> None:
         bundle = self._current_bundle or load_desktop_diagnostics_bundle_record(self.repo_root)
         if not bundle.latest_zip_path:
-            self._set_status("Отправка результатов недоступна: архив диагностики ещё не готов.", busy=False)
+            self._set_status("Отправка результатов недоступна: архив для отправки ещё не готов.", busy=False)
             self.refresh(regenerate_reports=False)
             return
         self.spawn_module_fn("pneumo_solver_ui.tools.send_results_gui")
@@ -408,11 +408,11 @@ class DiagnosticsShellController(QtCore.QObject):
     def open_bundle_folder(self) -> None:
         bundle = self._current_bundle or load_desktop_diagnostics_bundle_record(self.repo_root)
         self.open_path_fn(Path(bundle.out_dir).expanduser().resolve())
-        self._set_status("Открыта папка файлов диагностики.", busy=False)
+        self._set_status("Открыта папка архива для отправки.", busy=False)
 
     def open_legacy_center(self) -> None:
         self.spawn_module_fn("pneumo_solver_ui.tools.desktop_diagnostics_center")
-        self._set_status("Диагностика открыта отдельным окном.", busy=False)
+        self._set_status("Проверка и отправка открыты отдельным окном.", busy=False)
 
     def _set_status(self, text: str, *, busy: bool) -> None:
         self._status_text = text
@@ -455,7 +455,7 @@ class DiagnosticsShellController(QtCore.QObject):
     def _on_finished(self, exit_code: int, _exit_status: QtCore.QProcess.ExitStatus) -> None:
         request = self._current_request
         if request is None:
-            self._set_status("Диагностика завершилась, но сведения о запуске не найдены.", busy=False)
+            self._set_status("Сбор архива завершился, но сведения о запуске не найдены.", busy=False)
             self.refresh(regenerate_reports=False)
             return
 
@@ -481,7 +481,7 @@ class DiagnosticsShellController(QtCore.QObject):
             log_text="",
         )
         self._set_status(
-            "Диагностика завершена успешно." if exit_code == 0 else f"Диагностика завершилась с кодом {exit_code}.",
+            "Сбор архива завершён успешно." if exit_code == 0 else f"Сбор архива завершился с кодом {exit_code}.",
             busy=False,
         )
         self.refresh(regenerate_reports=exit_code == 0)
@@ -489,16 +489,16 @@ class DiagnosticsShellController(QtCore.QObject):
     def _on_process_error(self, error: QtCore.QProcess.ProcessError) -> None:
         if self.is_busy():
             return
-        self._set_status(f"Ошибка запуска диагностики: {error!s}", busy=False)
+        self._set_status(f"Ошибка запуска сбора архива: {error!s}", busy=False)
         self.refresh(regenerate_reports=False)
 
     def _persist_center_state(self, snapshot: DiagnosticsWorkspaceSnapshot) -> None:
         summary_text = "\n".join(
             [
-                "# Сводка диагностики",
+                "# Сводка проверки и отправки",
                 "",
                 f"- Состояние: {snapshot.status_text}",
-                f"- Архив диагностики: {_safe_path_text(snapshot.bundle.latest_zip_path)}",
+                f"- Архив для отправки: {_safe_path_text(snapshot.bundle.latest_zip_path)}",
                 f"- Состав архива: {_safe_path_text(snapshot.bundle.latest_inspection_md_path)}",
                 f"- Состояние проекта: {_safe_path_text(snapshot.bundle.latest_health_md_path)}",
                 f"- Проверка результата: {_safe_path_text(snapshot.bundle.latest_validation_md_path)}",
@@ -584,13 +584,13 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         layout.addWidget(self.status_label)
 
         self.source_label = QtWidgets.QLabel(
-            "Данные берутся из состояния диагностики приложения и модели проверки."
+            "Данные берутся из состояния проверки проекта и подготовки архива для отправки."
         )
         self.source_label.setWordWrap(True)
         self.source_label.setStyleSheet("color: #405060;")
         layout.addWidget(self.source_label)
 
-        self.bundle_box = QtWidgets.QGroupBox("Текущее состояние архива диагностики")
+        self.bundle_box = QtWidgets.QGroupBox("Текущее состояние архива для отправки")
         bundle_layout = QtWidgets.QFormLayout(self.bundle_box)
         self.bundle_zip_value = QtWidgets.QLabel("")
         self.bundle_out_dir_value = QtWidgets.QLabel("")
@@ -604,12 +604,12 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         ):
             label.setWordWrap(True)
         bundle_layout.addRow("Последний архив", self.bundle_zip_value)
-        bundle_layout.addRow("Папка файлов диагностики", self.bundle_out_dir_value)
+        bundle_layout.addRow("Папка архива для отправки", self.bundle_out_dir_value)
         bundle_layout.addRow("Буфер обмена", self.bundle_clipboard_value)
         bundle_layout.addRow("Связанные пути", self.bundle_paths_value)
         layout.addWidget(self.bundle_box)
 
-        self.run_box = QtWidgets.QGroupBox("Последний запуск диагностики")
+        self.run_box = QtWidgets.QGroupBox("Последний сбор архива")
         run_layout = QtWidgets.QFormLayout(self.run_box)
         self.run_state_value = QtWidgets.QLabel("")
         self.run_started_value = QtWidgets.QLabel("")
@@ -631,7 +631,7 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         run_layout.addRow("Параметры запуска", self.request_value)
         layout.addWidget(self.run_box)
 
-        self.check_box = QtWidgets.QGroupBox("Проверка архива диагностики")
+        self.check_box = QtWidgets.QGroupBox("Проверка архива для отправки")
         check_layout = QtWidgets.QFormLayout(self.check_box)
         self.inspection_value = QtWidgets.QLabel("")
         self.health_value = QtWidgets.QLabel("")
@@ -667,12 +667,12 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
 
         self.actions_box = QtWidgets.QGroupBox("Действия")
         actions_layout = QtWidgets.QGridLayout(self.actions_box)
-        self.collect_button = QtWidgets.QPushButton("Собрать диагностику")
-        self.verify_button = QtWidgets.QPushButton("Проверить архив диагностики")
+        self.collect_button = QtWidgets.QPushButton("Собрать архив для отправки")
+        self.verify_button = QtWidgets.QPushButton("Проверить архив для отправки")
         self.send_button = QtWidgets.QPushButton("Отправить результаты")
         self.open_dir_button = QtWidgets.QPushButton("Открыть каталог")
         self.refresh_button = QtWidgets.QPushButton("Обновить состояние")
-        self.legacy_button = QtWidgets.QPushButton("Открыть диагностику отдельным окном")
+        self.legacy_button = QtWidgets.QPushButton("Открыть проверку и отправку отдельным окном")
         _apply_action_contract(self.collect_button, "DG-BTN-COLLECT")
         self.collect_button.clicked.connect(lambda: self.handle_command("diagnostics.collect_bundle"))
         self.verify_button.clicked.connect(lambda: self.handle_command("diagnostics.verify_bundle"))
@@ -716,7 +716,7 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
     def open_baseline_center(self) -> None:
         if self.on_command is not None:
             self.on_command("baseline.center.open")
-            self.status_label.setText("Открыт базовый прогон из окна диагностики.")
+            self.status_label.setText("Открыт базовый прогон из окна проверки и отправки.")
             return
         self.status_label.setText("Базовый прогон доступен из основного окна приложения.")
 
@@ -740,15 +740,15 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
             "\n".join(
                 [
                     f"Описание архива сохранено в файле {_safe_path_text(snapshot.bundle.latest_bundle_meta_path)}",
-                    f"Настройки диагностики сохранены в файле {_safe_path_text(snapshot.center_state_path)}",
-                    f"Сводка диагностики сохранена в файле {_safe_path_text(snapshot.summary_md_path)}",
+                    f"Настройки проверки сохранены в файле {_safe_path_text(snapshot.center_state_path)}",
+                    f"Сводка проверки сохранена в файле {_safe_path_text(snapshot.summary_md_path)}",
                 ]
             )
         )
 
         run_record = snapshot.run_record
         if run_record is None:
-            self.run_state_value.setText("Диагностика ещё не запускалась в текущей папке.")
+            self.run_state_value.setText("Архив для отправки ещё не собирался в текущей папке.")
             self.run_started_value.setText("нет данных")
             self.run_finished_value.setText("нет данных")
             self.run_dir_value.setText("нет данных")
@@ -762,7 +762,7 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         self.request_value.setText(
             f"Объём проверки - {_request_level_text(snapshot.request.level)}. "
             f"Проверка окна будет {'пропущена' if snapshot.request.skip_ui_smoke else 'выполнена'}. "
-            f"Архив диагностики будет {'не собран' if snapshot.request.no_zip else 'собран'}. "
+            f"Архив для отправки будет {'не собран' if snapshot.request.no_zip else 'собран'}. "
             f"Проверка оптимизации будет {'выполнена' if snapshot.request.run_opt_smoke else 'пропущена'}. "
             f"Лимит проверки оптимизации {snapshot.request.opt_minutes} мин. Задач {snapshot.request.opt_jobs}."
         )

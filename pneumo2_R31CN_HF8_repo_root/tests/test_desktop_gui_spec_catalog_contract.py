@@ -77,7 +77,8 @@ def test_v3_runtime_matrices_expose_shell_shortcuts_docking_and_state_contracts(
     assert shortcuts["Поиск команд"] == "Ctrl+K"
     assert shortcuts["Быстрый поиск"] == "Ctrl+K"
     assert shortcuts["Главное действие шага"] == "Ctrl+Enter"
-    assert shortcuts["Собрать диагностику"] == "Ctrl+Shift+D"
+    assert shortcuts["Собрать архив для отправки"] == "Ctrl+Shift+D"
+    assert "Собрать диагностику" not in shortcuts
     assert shortcuts["Помощь по выбранному элементу"] == "F1"
     assert f6_region_order() == (
         "верхняя_командная_панель",

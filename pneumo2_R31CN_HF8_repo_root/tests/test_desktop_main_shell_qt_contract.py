@@ -356,6 +356,9 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert '("Детальная проверка результата", result_detail_specs)' in src
     assert 'analysis_menu.addMenu("Детальная проверка результата")' in src
     assert 'animation_menu.addMenu("Дополнительная визуализация")' in src
+    assert 'panels_menu = view_menu.addMenu("Панели")' in src
+    assert 'show_all_panels_action = panels_menu.addAction("Вернуть все панели")' in src
+    assert "def _show_all_docks(self) -> None:" in src
     assert 'self.workspace_combo = QtWidgets.QComboBox(toolbar)' in src
     assert 'self.launch_tool_combo = QtWidgets.QComboBox(toolbar)' in src
     assert "self.launch_tool_combo.activated.connect(self._on_launch_tool_activated)" in src
@@ -367,6 +370,9 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert 'self.browser_dock = QtWidgets.QDockWidget("Панель проекта", self)' in src
     assert 'self.inspector_dock = QtWidgets.QDockWidget("Свойства и помощь", self)' in src
     assert 'self.runtime_dock = QtWidgets.QDockWidget("Ход выполнения и внешние окна", self)' in src
+    assert "def _dock_features(self) -> QtWidgets.QDockWidget.DockWidgetFeature:" in src
+    assert "setAllowedAreas(" in src
+    assert "resizeDocks((self.browser_dock, self.inspector_dock)" in src
     assert 'self.runtime_table.setHeaderLabels(("Окно", "Состояние", "Тип"))' in src
     assert 'self.diagnostics_button.setObjectName("AlwaysVisibleDiagnosticsAction")' in src
     assert 'self.diagnostics_button.setShortcut(QtGui.QKeySequence("F7"))' in src
@@ -376,7 +382,12 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert 'self.banner_label = QtWidgets.QLabel(' in src
     assert 'self.route_label = QtWidgets.QLabel(' in src
     assert 'self.project_summary_label = QtWidgets.QLabel(self._project_summary_text(), central)' in src
-    assert 'QtWidgets.QGroupBox("Начните здесь", self.overview_page)' in src
+    assert "self.overview_splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal, self.overview_page)" in src
+    assert 'self.overview_splitter.setObjectName("DesktopQtShellOverviewSplitter")' in src
+    assert "self.overview_splitter.setChildrenCollapsible(False)" in src
+    assert "self.overview_splitter.setSizes((920, 560))" in src
+    assert 'QtWidgets.QGroupBox("Основной порядок работы", left_overview_panel)' in src
+    assert 'QtWidgets.QGroupBox("Рабочие шаги", left_overview_panel)' in src
     assert "V10_ROUTE_SURFACE_KEYS = (" in src
     assert '"1. Исходные данные"' in src
     assert '"2. Сценарии"' in src
@@ -389,7 +400,7 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert '"Проверить проект"' in src
     assert "self.start_action_buttons" in src
     assert 'self.start_action_buttons.setdefault(tool_key, button)' in src
-    assert 'QtWidgets.QGroupBox("Достоверность отображения", self.overview_page)' in src
+    assert 'QtWidgets.QGroupBox("Достоверность отображения", right_overview_panel)' in src
     assert '"Результаты"' in src
     assert '"Графики"' in src
     assert '"Анимация"' in src
@@ -525,8 +536,8 @@ def test_desktop_shell_command_search_home_and_project_tree_actions_are_routable
 
     assert by_label["Панель проекта"].action_kind == "home"
     assert by_label["Панель проекта"].action_value == "home"
-    assert by_label["Показать список рабочих окон"].action_kind == "focus"
-    assert by_label["Показать список рабочих окон"].action_value == "project_tree"
+    assert by_label["Перейти к списку рабочих окон"].action_kind == "focus"
+    assert by_label["Перейти к списку рабочих окон"].action_value == "project_tree"
     assert by_label["Инженерный анализ"].action_kind == "tool"
     assert by_label["Инженерный анализ"].action_value == "desktop_engineering_analysis_center"
     assert "HO-007" in by_label["Инженерный анализ"].keywords
@@ -539,17 +550,20 @@ def test_desktop_shell_command_search_home_and_project_tree_actions_are_routable
     assert by_label["Проверить связь с аниматором"].action_value == (
         "animator.animator_link_contract"
     )
-    assert by_label["Показать результаты расчёта"].action_value == (
+    assert by_label["Открыть результаты расчёта"].action_value == (
         "animator.selected_result_artifact_pointer"
     )
     assert by_label["Загрузить файл анимации"].action_kind == "tool"
     assert by_label["Загрузить файл анимации"].action_value == "desktop_animator"
-    assert by_label["Показать сохранение анимации"].action_kind == "open_artifact"
-    assert by_label["Показать сохранение анимации"].action_value == (
+    assert by_label["Открыть описание сохранённой анимации"].action_kind == "open_artifact"
+    assert by_label["Открыть описание сохранённой анимации"].action_value == (
         "animator.capture_export_manifest"
     )
+    assert "Показать результаты расчёта" not in by_label
+    assert "Показать сохранение анимации" not in by_label
     assert "Показать файл анимации" not in by_label
     assert "Показать выбранный результат" not in by_label
+    assert "Показать список рабочих окон" not in by_label
     assert "Открыть выбранный результат" not in by_label
     assert "Открыть файл анимации" not in by_label
     assert "Открыть сведения об экспорте анимации" not in by_label
@@ -560,14 +574,14 @@ def test_desktop_shell_command_search_home_and_project_tree_actions_are_routable
 def test_desktop_shell_command_search_manual_keywords_are_operator_language() -> None:
     entries = build_shell_command_search_entries(build_desktop_shell_specs())
     checked_labels = {
-        "Показать список рабочих окон",
+        "Перейти к списку рабочих окон",
         "Проверить проект и подготовить архив",
-        "Показать в аниматоре",
+        "Открыть аниматор",
         "Проверить подготовку анимации",
         "Проверить связь с аниматором",
-        "Показать результаты расчёта",
+        "Открыть результаты расчёта",
         "Загрузить файл анимации",
-        "Показать сохранение анимации",
+        "Открыть описание сохранённой анимации",
         "Сравнить прогоны",
     }
     forbidden = (
@@ -862,6 +876,8 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
             "Справка",
         ]
         assert "Помощь по рабочим окнам" in visible_audit["menu_actions"]
+        assert "Панели" in visible_audit["menu_actions"]
+        assert "Вернуть все панели" in visible_audit["menu_actions"]
         assert "Окна по задаче" in visible_audit["menu_actions"]
         assert "Справочники и проверки" in visible_audit["menu_actions"]
         assert "Детальная проверка результата" in visible_audit["menu_actions"]
@@ -876,17 +892,30 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
         assert "8. Проверка и отправка" in visible_audit["toolbar_buttons"]
         assert "Открыть сравнение" not in visible_audit["toolbar_buttons"]
         assert "Открыть в аниматоре" not in visible_audit["toolbar_buttons"]
-        assert "Показать в аниматоре" in visible_audit["toolbar_buttons"]
-        assert "Выбор из списка сразу открывает выбранное окно." in visible_audit["auxiliary_visible_texts"]
+        assert "Показать в аниматоре" not in visible_audit["toolbar_buttons"]
+        assert "Открыть аниматор" in visible_audit["toolbar_buttons"]
+        assert (
+            "Выбор показывает связанный рабочий шаг. Запуск отдельного окна — через меню «Запуск», двойной щелчок в списке «Окна» или быстрый поиск."
+            in visible_audit["auxiliary_visible_texts"]
+        )
+        assert "Выбор из списка сразу открывает выбранное окно." not in visible_audit["auxiliary_visible_texts"]
+        assert "Док-панель: перетаскивается, открепляется и меняет ширину границей." in visible_audit["auxiliary_visible_texts"]
         assert "Открепить панель" in visible_audit["auxiliary_visible_texts"]
         assert "Закрыть панель" in visible_audit["auxiliary_visible_texts"]
         assert "Прокрутить вкладки влево" in visible_audit["auxiliary_visible_texts"]
         assert "Прокрутить вкладки вправо" in visible_audit["auxiliary_visible_texts"]
-        assert "Главное окно показывает первый путь пользователя и оставляет дополнительные окна во втором слое." in visible_audit["direct_visible_texts"]
-        assert "Что делать сначала: исходные данные; сценарии; набор испытаний; базовый прогон; оптимизация; анализ; анимация; проверка и отправка." in visible_audit["direct_visible_texts"]
+        assert (
+            "Рабочее место инженера: выберите шаг работы, проверьте состояние и запускайте отдельные окна только явной командой."
+            in visible_audit["direct_visible_texts"]
+        )
+        assert (
+            "Основной порядок: исходные данные -> сценарии -> испытания -> базовый прогон -> оптимизация -> анализ -> анимация -> проверка и отправка."
+            in visible_audit["direct_visible_texts"]
+        )
         assert "Окна, действия, испытания, сценарии, архивы отправки, расчёты, файлы" in visible_audit["direct_visible_texts"]
         assert "Панель проекта" in visible_audit["direct_visible_texts"]
-        assert "Начните здесь" in visible_audit["direct_visible_texts"]
+        assert "Основной порядок работы" in visible_audit["direct_visible_texts"]
+        assert "Рабочие шаги" in visible_audit["direct_visible_texts"]
         assert "Достоверность отображения" in visible_audit["direct_visible_texts"]
         assert "Крупные состояния: расчётно подтверждено, по исходным данным, условно, недоступно." in visible_audit["direct_visible_texts"]
         assert "Окно / шаг" in visible_audit["item_visible_texts"]
@@ -948,12 +977,13 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
             "Артефакт",
             "артефакт",
             "статус миграции",
+            "Показать список рабочих окон",
         ):
             assert fragment not in visible_text
         catalog_labels = {
             entry["label"] for entry in visible_audit["command_search_catalog"]
         }
-        assert "Показать список рабочих окон" in catalog_labels
+        assert "Перейти к списку рабочих окон" in catalog_labels
         assert any(
             result["action_value"] == "project_tree"
             for result in visible_audit["command_search_results"]["список проекта"]
@@ -1008,11 +1038,11 @@ def test_desktop_qt_shell_handoff_payload_and_layout_state_are_runtime_checked(
         window.launch_tool_combo.setCurrentIndex(input_index)
         window.launch_tool_combo.activated.emit(input_index)
         app.processEvents()
+        assert window._selected_surface_key == "ws_inputs"
         assert window.open_tool("desktop_animator") is True
 
         manager = _FakeCoexistenceManager.instances[-1]
         assert [session.spec.key for session in manager.opened] == [
-            "desktop_input_editor",
             "desktop_animator",
         ]
         payload = manager.opened[-1].context_payload
@@ -1021,7 +1051,7 @@ def test_desktop_qt_shell_handoff_payload_and_layout_state_are_runtime_checked(
         assert payload["project_name"] == "Runtime Shell"
         assert payload["workspace_dir"] == str((tmp_path / "workspace").resolve())
         assert payload["repo_root"] == str((tmp_path / "repo").resolve())
-        assert window.runtime_table.topLevelItemCount() == 2
+        assert window.runtime_table.topLevelItemCount() == 1
         assert window.runtime_table.columnCount() == 3
         runtime_rows = [
             " | ".join(

@@ -179,18 +179,18 @@ def build_overview_snapshot(repo_root: Path | None = None) -> OverviewSnapshot:
             action_text="Открыть анализ результатов",
         ),
         OverviewCardState(
-            title="Последний архив диагностики",
+            title="Последний архив для отправки",
             value=str(bundle_path.name) if bundle_path else "Архив пока не найден",
-            detail=str(bundle_path.parent) if bundle_path else "Диагностика должна оставаться доступной из любого рабочего шага приложения.",
+            detail=str(bundle_path.parent) if bundle_path else "Проверка и отправка должны оставаться доступными из любого рабочего шага приложения.",
             command_id="diagnostics.collect_bundle",
-            action_text="Собрать диагностику",
+            action_text="Собрать архив для отправки",
         ),
         OverviewCardState(
             title="Проверка готовности",
             value=(
                 f"Основные окна: {'готовы' if pyside6_ready else 'не найдены'} | "
                 f"Аниматор: {'найден' if animator_ready else 'не найден'} | "
-                f"Диагностика: {'найдена' if diagnostics_ready else 'не найдена'}"
+                f"Проверка и отправка: {'готовы' if diagnostics_ready else 'не найдены'}"
             ),
             detail=(
                 "Схема последовательности "
@@ -198,7 +198,7 @@ def build_overview_snapshot(repo_root: Path | None = None) -> OverviewSnapshot:
                 + "; главное окно должно открывать существующие инженерные окна без скрытой подмены."
             ),
             command_id="workspace.diagnostics.open",
-            action_text="Открыть диагностику",
+            action_text="Открыть проверку и отправку",
         ),
     )
     return OverviewSnapshot(cards=cards)

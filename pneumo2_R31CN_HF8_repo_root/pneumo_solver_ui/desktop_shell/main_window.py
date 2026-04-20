@@ -301,7 +301,7 @@ class DesktopMainShell:
         ).pack(anchor="w", pady=(8, 0))
         self.details_open_button = ttk.Button(
             body,
-            text="Показать в рабочей области",
+            text="Открыть в рабочей области",
             command=self._open_current_detail_target,
         )
         self.details_open_button.pack(
@@ -322,7 +322,7 @@ class DesktopMainShell:
         actions.grid(row=0, column=0, sticky="w")
         ttk.Button(
             actions,
-            text="Собрать диагностику",
+            text="Собрать архив для отправки",
             command=self._open_global_diagnostics,
         ).pack(side="left")
         ttk.Button(
@@ -332,7 +332,7 @@ class DesktopMainShell:
         ).pack(side="left", padx=(8, 0))
         ttk.Button(
             actions,
-            text="Показать в аниматоре",
+            text="Открыть аниматор",
             command=self._open_animator,
         ).pack(side="left", padx=(8, 0))
         ttk.Button(
@@ -462,7 +462,7 @@ class DesktopMainShell:
             self.details_title_var.set("Панель проекта")
             self.details_meta_var.set(self.workflow_var.get())
             self.details_body_var.set(
-                "Панель проекта собирает порядок работы, открытые окна и переходы к исходным данным, сценариям, расчёту, оптимизации, результатам, анализу, визуализации и диагностике."
+                "Панель проекта собирает порядок работы, открытые окна и переходы к исходным данным, сценариям, расчёту, оптимизации, результатам, анализу, визуализации, проверке и отправке."
             )
             self.details_hint_var.set(
                 "Выбор в списке сразу открывает окно; меню и поиск нужны только для быстрых переходов."
@@ -570,7 +570,7 @@ class DesktopMainShell:
             "PneumoApp",
             "PneumoApp\n\n"
             "Нативное Windows desktop-рабочее место инженера.\n"
-            "Основной порядок работы: исходные данные, сценарии, опорный прогон и оптимизация, анализ, аниматор и диагностика.\n"
+            "Основной порядок работы: исходные данные, сценарии, опорный прогон и оптимизация, анализ, аниматор, проверка и отправка.\n"
             "Главное окно держит панель команд, быстрый поиск, инспектор и переходы к специализированным окнам.",
         )
 
@@ -645,7 +645,7 @@ class DesktopMainShell:
         if not ranked:
             if query:
                 self.command_search_hint_var.set(
-                    f"Совпадений по запросу «{query}» нет. Попробуйте название окна, диагностику, аниматор или сравнение."
+                    f"Совпадений по запросу «{query}» нет. Попробуйте название окна, проверку, отправку, аниматор или сравнение."
                 )
             else:
                 self.command_search_hint_var.set(

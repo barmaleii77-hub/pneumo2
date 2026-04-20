@@ -154,6 +154,7 @@ class DesktopOptimizerContractSnapshot:
     removed_runtime_knob_count: int
     widened_range_count: int
     sample_search_params: tuple[str, ...]
+    search_param_rows: tuple[dict[str, str], ...]
 
 
 def _read_json(path: Path) -> Any:
@@ -173,6 +174,45 @@ def _json_list(path: Path) -> list[dict[str, Any]]:
     if not isinstance(obj, list):
         return []
     return [dict(item) for item in obj if isinstance(item, dict)]
+
+
+def _format_operator_value(value: Any) -> str:
+    if value is None:
+        return "—"
+    if isinstance(value, bool):
+        return "да" if value else "нет"
+    try:
+        if isinstance(value, (int, float)):
+            return f"{float(value):.6g}"
+    except Exception:
+        pass
+    text = str(value).strip()
+    return text if text else "—"
+
+
+def _build_search_param_rows(
+    base_payload: Mapping[str, Any],
+    ranges_payload: Mapping[str, Any],
+) -> tuple[dict[str, str], ...]:
+    rows: list[dict[str, str]] = []
+    for param_name in sorted(str(key) for key in ranges_payload.keys()):
+        raw_range = ranges_payload.get(param_name)
+        if isinstance(raw_range, (list, tuple)) and len(raw_range) == 2:
+            lower_text = _format_operator_value(raw_range[0])
+            upper_text = _format_operator_value(raw_range[1])
+        else:
+            lower_text = _format_operator_value(raw_range)
+            upper_text = "—"
+        rows.append(
+            {
+                "parameter": param_name,
+                "base": _format_operator_value(base_payload.get(param_name)),
+                "lower": lower_text,
+                "upper": upper_text,
+                "state": "оптимизируется",
+            }
+        )
+    return tuple(rows)
 
 
 def build_optimizer_session_defaults(
@@ -461,6 +501,7 @@ def build_contract_snapshot(
         current_ring_source_hash=str(suite_handoff.get("ring_source_hash") or ""),
     )
     sample_search_params = tuple(sorted(str(key) for key in ranges_clean.keys())[:8])
+    search_param_rows = _build_search_param_rows(base_clean, ranges_clean)
     return DesktopOptimizerContractSnapshot(
         workspace_dir=workspace_dir,
         model_path=default_model_path(ui_root),
@@ -498,6 +539,7 @@ def build_contract_snapshot(
             dict((audit.get("ranges") or {}).get("widened_to_include_base") or {})
         ),
         sample_search_params=sample_search_params,
+        search_param_rows=search_param_rows,
     )
 
 

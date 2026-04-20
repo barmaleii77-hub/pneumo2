@@ -14,13 +14,13 @@ def create_hosted_full_diagnostics(parent: tk.Misc) -> App:
 def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="full_diagnostics_gui",
-        title="Полная диагностика",
-        description="Проверка архивов диагностики, прогонов и сборки расширенной технической информации.",
+        title="Расширенная проверка проекта",
+        description="Проверка архива для отправки, прогонов и сборки расширенной технической информации.",
         group="Встроенные окна",
         mode="hosted",
         menu_section="Инструменты",
         nav_section="Инструменты",
-        details="Подробная диагностика для углублённого разбора состояния проекта и файлов.",
+        details="Расширенная проверка для углублённого разбора состояния проекта и файлов.",
         menu_order=140,
         nav_order=140,
         standalone_module="pneumo_solver_ui.tools.run_full_diagnostics_gui",

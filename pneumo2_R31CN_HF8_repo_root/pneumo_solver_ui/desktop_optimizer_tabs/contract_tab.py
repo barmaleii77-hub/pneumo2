@@ -5,6 +5,7 @@ from tkinter import ttk
 
 from pneumo_solver_ui.desktop_optimizer_panels import (
     KeyValueGridPanel,
+    OptimizationParametersTreePanel,
     ScrollableFrame,
     TextReportPanel,
     replace_text,
@@ -98,14 +99,17 @@ class DesktopOptimizerContractTab(ttk.Frame):
             justify="left",
         ).grid(row=1, column=0, sticky="ew", pady=(6, 10))
 
+        self.parameters_panel = OptimizationParametersTreePanel(body)
+        self.parameters_panel.grid(row=2, column=0, sticky="ew")
+
         self.summary_panel = KeyValueGridPanel(body, text="Снимок параметров оптимизации")
-        self.summary_panel.grid(row=2, column=0, sticky="ew")
+        self.summary_panel.grid(row=3, column=0, sticky="ew", pady=(10, 0))
 
         self.paths_panel = KeyValueGridPanel(body, text="Подготовленные файлы")
-        self.paths_panel.grid(row=3, column=0, sticky="ew", pady=(10, 0))
+        self.paths_panel.grid(row=4, column=0, sticky="ew", pady=(10, 0))
 
         objective_frame = ttk.LabelFrame(body, text="Цели и ограничение", padding=10)
-        objective_frame.grid(row=4, column=0, sticky="ew", pady=(10, 0))
+        objective_frame.grid(row=5, column=0, sticky="ew", pady=(10, 0))
         objective_frame.columnconfigure(1, weight=1)
         objective_frame.columnconfigure(3, weight=1)
 
@@ -150,17 +154,17 @@ class DesktopOptimizerContractTab(ttk.Frame):
             text="План стадий",
             height=8,
         )
-        self.stage_policy_panel.grid(row=5, column=0, sticky="ew", pady=(10, 0))
+        self.stage_policy_panel.grid(row=6, column=0, sticky="ew", pady=(10, 0))
 
         self.drift_panel = TextReportPanel(
             body,
             text="Расхождение выбранного прогона с текущим запуском",
             height=10,
         )
-        self.drift_panel.grid(row=6, column=0, sticky="ew", pady=(10, 0))
+        self.drift_panel.grid(row=7, column=0, sticky="ew", pady=(10, 0))
 
         selection_frame = ttk.LabelFrame(body, text="Действия по выбранному прогону", padding=10)
-        selection_frame.grid(row=7, column=0, sticky="ew", pady=(10, 0))
+        selection_frame.grid(row=8, column=0, sticky="ew", pady=(10, 0))
         ttk.Button(
             selection_frame,
             text="Применить параметры оптимизации",
@@ -183,7 +187,7 @@ class DesktopOptimizerContractTab(ttk.Frame):
         ).pack(side="left", padx=(8, 0))
 
         open_frame = ttk.LabelFrame(body, text="Быстрые действия", padding=10)
-        open_frame.grid(row=8, column=0, sticky="ew", pady=(10, 0))
+        open_frame.grid(row=9, column=0, sticky="ew", pady=(10, 0))
         ttk.Button(
             open_frame,
             text="Открыть исходные данные",
@@ -236,6 +240,7 @@ class DesktopOptimizerContractTab(ttk.Frame):
             or getattr(snapshot, "baseline_source_kind", "")
             or "default_base.json only"
         )
+        self.parameters_panel.set_rows(tuple(getattr(snapshot, "search_param_rows", ()) or ()))
         self.summary_panel.set_rows(
             [
                 ("Рабочая папка", str(getattr(snapshot, "workspace_dir", ""))),

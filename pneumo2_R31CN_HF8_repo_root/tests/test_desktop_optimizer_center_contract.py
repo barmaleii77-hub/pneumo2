@@ -148,6 +148,10 @@ def test_desktop_optimizer_contract_tab_links_blocked_ho006_to_baseline_center()
     assert "optimizer_baseline_can_consume" in src
     assert 'text="Открыть базовый прогон"' in src
     assert "command=controller.open_baseline_center" in src
+    assert "OptimizationParametersTreePanel" in src
+    assert "self.parameters_panel = OptimizationParametersTreePanel(body)" in src
+    assert 'text="Параметры оптимизации и диапазоны поиска"' in src
+    assert "self.parameters_panel.set_rows" in src
 
 
 def test_root_desktop_optimizer_center_wrappers_delegate_to_launcher() -> None:
@@ -204,6 +208,12 @@ def test_desktop_optimizer_contract_snapshot_reads_default_contract() -> None:
     assert snapshot.ranges_json_path.exists()
     assert snapshot.suite_json_path.exists()
     assert snapshot.search_param_count > 0
+    assert snapshot.search_param_rows
+    assert len(snapshot.search_param_rows) == snapshot.search_param_count
+    first_search_row = snapshot.search_param_rows[0]
+    assert set(first_search_row) == {"parameter", "base", "lower", "upper", "state"}
+    assert first_search_row["parameter"]
+    assert first_search_row["state"] == "оптимизируется"
     assert snapshot.enabled_suite_total > 0
     assert snapshot.objective_keys
     assert snapshot.penalty_key
@@ -293,6 +303,32 @@ def test_desktop_optimizer_runtime_builds_stage_and_coordinator_previews() -> No
     assert "--backend ray" in coord_preview
     assert "--budget" in coord_preview
     assert runtime.handoff_overview_rows() == []
+
+
+def test_desktop_optimizer_formats_stage_plan_without_operator_visible_internal_tokens() -> None:
+    center = object.__new__(DesktopOptimizerCenter)
+    text = center._format_stage_policy_blueprint_text(
+        [
+            {
+                "stage_name": "stage0_relevance",
+                "role": "Быстрый relevance-screen: only cheap checks.",
+                "policy_name": "broad_relevance",
+                "requested_mode": "influence_weighted",
+                "effective_mode": "static",
+                "top_k": 16,
+                "explore_frac": 0.6,
+                "explore_budget": 12,
+                "focus_budget": 8,
+            }
+        ]
+    )
+
+    assert "предварительный отбор" in text
+    assert "широкий предварительный отбор" in text
+    assert "по влиянию параметров" in text
+    assert "stage0_relevance" not in text
+    assert "broad_relevance" not in text
+    assert "relevance-screen" not in text
 
 
 def test_desktop_optimizer_runtime_binds_selected_history_run_as_resume_target(tmp_path: Path) -> None:
@@ -1291,6 +1327,8 @@ def test_desktop_optimizer_center_keeps_tabbed_modular_architecture() -> None:
 
     assert "class HandoffTreePanel" in panels_src
     assert "class PackagingTreePanel" in panels_src
+    assert "class OptimizationParametersTreePanel" in panels_src
+    assert 'text="Что оптимизируем"' in panels_src
     assert 'columns=("status", "pipeline", "run_id", "objective", "scope", "baseline")' in panels_src
     assert "class DesktopOptimizerDashboardTab" in dashboard_tab_src
     assert "class DesktopOptimizerContractTab" in contract_tab_src

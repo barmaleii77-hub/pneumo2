@@ -34,7 +34,7 @@ def test_gui_spec_shell_workspace_order_matches_canonical_route() -> None:
         "Оптимизация",
         "Анализ результатов",
         "Анимация",
-        "Диагностика",
+        "Проверка и отправка",
         "Параметры приложения",
         "Инструменты",
     ]
@@ -64,7 +64,12 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
 
     assert commands["diagnostics.collect_bundle"].kind == "hosted_action"
     assert commands["diagnostics.collect_bundle"].automation_id == "DG-BTN-COLLECT"
-    assert workspaces["diagnostics"].summary.startswith("Проверка, архив диагностики")
+    assert workspaces["diagnostics"].summary.startswith("Проверка проекта, архив для отправки")
+    assert workspaces["diagnostics"].title == "Проверка и отправка"
+    assert commands["workspace.diagnostics.open"].title == "Перейти к проверке и отправке"
+    assert commands["diagnostics.collect_bundle"].title == "Собрать архив для отправки"
+    assert commands["diagnostics.verify_bundle"].title == "Проверить архив для отправки"
+    assert commands["diagnostics.legacy_center.open"].title == "Открыть проверку и отправку отдельным окном"
     assert commands["tools.autotest.open"].title == "Открыть проверки"
     assert commands["tools.autotest.open"].route_label == "Окна -> Инструменты -> Проверки"
     assert commands["input.editor.open"].title == "Открыть исходные данные отдельным окном"
@@ -215,7 +220,7 @@ def test_gui_spec_shell_search_indexes_migration_aliases_and_visual_routes() -> 
     commands = tuple(build_command_map().values())
     entries = build_search_entries(workspaces, commands)
 
-    diagnostics_hits = search_command_palette(entries, "собрать диагностику")
+    diagnostics_hits = search_command_palette(entries, "собрать архив для отправки")
     stiffness_hits = search_command_palette(entries, "жёсткость")
     mnemo_hits = search_command_palette(entries, "пневмосхема")
     baseline_hits = search_command_palette(entries, "активный опорный прогон")
@@ -321,14 +326,15 @@ def test_gui_spec_shell_overview_snapshot_exposes_project_baseline_results_and_d
     assert "Активный опорный прогон" in titles
     assert "Настройки оптимизации" in titles
     assert "Последние результаты" in titles
-    assert "Последний архив диагностики" in titles
+    assert "Последний архив для отправки" in titles
+    assert "Последний архив диагностики" not in titles
     assert "Последний diagnostics bundle" not in titles
     assert "Проверка готовности" in titles
     assert "Health / self-check" not in titles
     actions = {card.title: card.action_text for card in snapshot.cards}
     assert actions["Текущий проект"] == "Открыть исходные данные"
     assert actions["Активный опорный прогон"] == "Открыть базовый прогон"
-    assert actions["Последний архив диагностики"] == "Собрать диагностику"
+    assert actions["Последний архив для отправки"] == "Собрать архив для отправки"
 
     visible_text = "\n".join(
         part
@@ -371,7 +377,7 @@ def test_gui_spec_shell_main_window_uses_hosted_hubs_and_single_dispatcher() -> 
 
     assert "class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):" in src
     assert "self.command_search = QtWidgets.QComboBox()" in src
-    assert 'diagnostics_button = QtWidgets.QPushButton("Собрать диагностику")' in src
+    assert 'diagnostics_button = QtWidgets.QPushButton("Собрать архив для отправки")' in src
     assert "self.primary_action_button = QtWidgets.QPushButton(" in src
     assert "def _compact_command_title(" in src
     assert "def _primary_command_title(" in src
@@ -395,8 +401,9 @@ def test_gui_spec_shell_main_window_uses_hosted_hubs_and_single_dispatcher() -> 
         "Краткая сводка.",
         "Открыть рабочие окна во вкладках",
         "Сравнить прогоны",
-        "Показать анимацию",
-        "Открыть диагностику отдельным окном",
+        "Открыть аниматор",
+        "Проверка и отправка",
+        "Собрать архив для отправки",
         "О главном окне приложения",
         "Фокус перенесён в панель свойств и справки",
         "Действие пока недоступно в окне",
@@ -430,6 +437,7 @@ def test_gui_spec_shell_main_window_uses_hosted_hubs_and_single_dispatcher() -> 
         "Открыть центр диагностики",
         "Открыть резервное окно приложения",
         "Открыть резервный центр диагностики",
+        "Открыть диагностику отдельным окном",
         "Открыть сравнение",
         "Открыть анимацию",
         "Действие пока недоступно для раздела",
@@ -446,6 +454,44 @@ def test_gui_spec_shell_main_window_uses_hosted_hubs_and_single_dispatcher() -> 
         "inspector/help pane",
     ):
         assert forbidden not in src
+
+
+def test_gui_spec_shell_diagnostics_page_uses_send_bundle_operator_language() -> None:
+    src = (ROOT / "pneumo_solver_ui" / "desktop_spec_shell" / "diagnostics_panel.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+    runtime_src = (ROOT / "pneumo_solver_ui" / "desktop_spec_shell" / "workspace_runtime.py").read_text(
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    for expected in (
+        "Проверка и отправка доступны из текущего окна.",
+        "Собрать архив для отправки",
+        "Проверить архив для отправки",
+        "Папка архива для отправки",
+        "Последний сбор архива",
+        "Архив для отправки будет",
+        "Сбор архива завершён успешно.",
+    ):
+        assert expected in src
+    assert "Последний архив для отправки пока не найден" in runtime_src
+    assert "Собрать архив для отправки или проверить архив" in runtime_src
+
+    for forbidden in (
+        "Собрать диагностику",
+        "Проверить архив диагностики",
+        "Папка файлов диагностики",
+        "Последний запуск диагностики",
+        "Диагностика доступна",
+        "Диагностика уже выполняется",
+        "Диагностика завершена",
+        "архив диагностики",
+        "Архив диагностики",
+    ):
+        assert forbidden not in src
+        assert forbidden not in runtime_src
 
 
 def test_gui_spec_shell_is_available_in_shared_launch_catalog() -> None:

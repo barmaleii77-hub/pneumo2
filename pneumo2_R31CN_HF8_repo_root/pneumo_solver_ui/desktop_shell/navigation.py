@@ -28,7 +28,7 @@ NAVIGATION_SECTION_ORDER = (
     "Результаты",
     "Анализ",
     "Визуализация",
-    "Диагностика и инструменты",
+    "Проверка и отправка",
 )
 WORKFLOW_STAGE_NAVIGATION_SECTIONS = {
     "overview": "Проект",
@@ -40,7 +40,7 @@ WORKFLOW_STAGE_NAVIGATION_SECTIONS = {
     "results": "Результаты",
     "analysis": "Анализ",
     "visualization": "Визуализация",
-    "tools": "Диагностика и инструменты",
+    "tools": "Проверка и отправка",
 }
 
 
@@ -48,7 +48,7 @@ def navigation_section_label(spec: DesktopShellToolSpec) -> str:
     return (
         WORKFLOW_STAGE_NAVIGATION_SECTIONS.get(str(spec.workflow_stage or ""))
         or str(spec.nav_section or spec.menu_section or "").strip()
-        or "Диагностика и инструменты"
+        or "Проверка и отправка"
     )
 
 

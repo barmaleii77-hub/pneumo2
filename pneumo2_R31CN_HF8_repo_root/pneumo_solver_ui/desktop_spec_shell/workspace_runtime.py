@@ -174,7 +174,7 @@ def _operator_result_text(raw: Any) -> str:
         ("справочных=", "справочных "),
         ("красных флагов=", "красных флагов "),
         ("автотест=", "автотест "),
-        ("диагностика=", "диагностика "),
+        ("диагностика=", "проверка и отправка "),
         ("ready=", "готовность "),
         ("ошибок:", "ошибок"),
         ("предупреждений:", "предупреждений"),
@@ -182,7 +182,7 @@ def _operator_result_text(raw: Any) -> str:
         ("справочных:", "справочных"),
         ("красных флагов:", "красных флагов"),
         ("автотест:", "автотест"),
-        ("диагностика:", "диагностика"),
+        ("диагностика:", "проверка и отправка"),
         ("готово:", "готовность"),
     )
     for old, new in replacements:
@@ -693,12 +693,12 @@ def build_results_workspace_summary(
     if snapshot is None:
         return WorkspaceSummaryState(
             headline="Сводка результатов пока недоступна",
-            detail="Не удалось прочитать последние файлы результатов. Откройте анализ результатов или диагностику и обновите данные.",
+            detail="Не удалось прочитать последние файлы результатов. Откройте анализ результатов или проверку и отправку, затем обновите данные.",
             facts=(
                 WorkspaceSummaryFact(
                     "Состояние",
                     "нет свежего снимка",
-        "Сводка результатов собирается из отправленных файлов, проверок и диагностики.",
+        "Сводка результатов собирается из отправленных файлов, проверок и подготовки архива для отправки.",
                 ),
             ),
         )
@@ -751,7 +751,7 @@ def build_results_workspace_summary(
     )
     return WorkspaceSummaryState(
         headline=_operator_result_text(_safe_text(snapshot.suggested_next_step, fallback="Последние результаты готовы к анализу")),
-        detail=_operator_result_text(_safe_text(snapshot.suggested_next_detail, fallback="Откройте сравнение, анимацию или диагностику в зависимости от найденных файлов.")),
+        detail=_operator_result_text(_safe_text(snapshot.suggested_next_detail, fallback="Откройте сравнение, анимацию или проверку и отправку в зависимости от найденных файлов.")),
         facts=facts,
         evidence_lines=evidence_lines,
     )
@@ -766,13 +766,13 @@ def build_diagnostics_workspace_summary(
     bundle = load_desktop_diagnostics_bundle_record(repo_root)
     run_record = load_last_desktop_diagnostics_run_record(repo_root / "diagnostics")
 
-    headline = _safe_text(bundle.latest_zip_name, fallback="Последний архив диагностики пока не найден")
+    headline = _safe_text(bundle.latest_zip_name, fallback="Последний архив для отправки пока не найден")
     detail = _safe_text(
         _operator_message_text(bundle.clipboard_message),
-        fallback="Диагностика должна оставаться доступной из любого окна.",
+        fallback="Проверка и отправка должны оставаться доступными из любого окна.",
     )
     run_status = "запусков пока нет"
-    run_detail = "Команда запуска диагностики ещё не сохраняла состояние."
+    run_detail = "Команда сбора архива ещё не сохраняла состояние."
     if run_record is not None:
         run_status = f"Последний запуск: {_safe_text(run_record.status, fallback='запуск')}. Завершён успешно: {'да' if bool(run_record.ok) else 'нет'}."
         run_detail = _safe_text(run_record.last_message, fallback=_path_text(run_record.run_dir) or "Последний запуск сохранён без текстового сообщения.")
@@ -782,18 +782,18 @@ def build_diagnostics_workspace_summary(
         validation_state = _path_name(bundle.latest_validation_json_path or bundle.latest_validation_md_path)
 
     facts = (
-        WorkspaceSummaryFact("Последний архив", headline, _path_text(bundle.latest_zip_path) or "Архив диагностики ещё не собран."),
-        WorkspaceSummaryFact("Папка файлов диагностики", _safe_text(bundle.out_dir), "Эта папка используется для архива диагностики, отчётов и файлов проверки."),
+        WorkspaceSummaryFact("Последний архив", headline, _path_text(bundle.latest_zip_path) or "Архив для отправки ещё не собран."),
+        WorkspaceSummaryFact("Папка архива для отправки", _safe_text(bundle.out_dir), "Эта папка используется для архива, отчётов и файлов проверки."),
         WorkspaceSummaryFact("Последняя проверка архива", validation_state, _path_text(bundle.latest_inspection_md_path) or "Отчёт о составе архива пока не найден."),
         WorkspaceSummaryFact(
             "Буфер обмена",
             "готово" if bundle.clipboard_ok else "не подтверждено",
             detail,
         ),
-        WorkspaceSummaryFact("Последний запуск диагностики", run_status, run_detail),
+        WorkspaceSummaryFact("Последний сбор архива", run_status, run_detail),
         WorkspaceSummaryFact(
             "Следующий шаг",
-            "Собрать диагностику или проверить архив",
+            "Собрать архив для отправки или проверить архив",
             "Быстрый поиск должен открывать сбор, проверку и отправку из любого места основного окна.",
         ),
     )

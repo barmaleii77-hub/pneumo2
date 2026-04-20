@@ -320,7 +320,7 @@ def test_desktop_main_shell_keeps_classic_menu_and_workspace_shell() -> None:
     assert "self._refresh_details_panel()" in src
     assert "self._open_selected_navigation_item()" in src
     assert 'ttk.Button(panel, text="Открыть окно", command=self._open_selected_navigation_item)' not in src
-    assert 'text="Показать в рабочей области"' in src
+    assert 'text="Открыть в рабочей области"' in src
     assert "отдельная кнопка" not in src
     assert "self.toolbar.frame.pack(fill=\"x\", before=body)" in src
     assert 'external_specs=self._specs_for_group("Внешние окна")' in src
@@ -546,7 +546,8 @@ def test_desktop_main_shell_extracts_home_view_builder() -> None:
     assert '"desktop_optimizer_center": "Настроить оптимизацию"' in src
     assert '"desktop_results_center": "Разобрать результаты"' in src
     assert '"compare_viewer": "Подробное сравнение"' in src
-    assert '"desktop_mnemo": "Показать пневмосхему"' in src
+    assert '"desktop_mnemo": "Открыть пневмосхему"' in src
+    assert '"desktop_mnemo": "Показать пневмосхему"' not in src
     assert '"desktop_animator": "Загрузить анимацию"' in src
     assert 'return ACTION_BUTTON_TEXTS.get(spec.key, f"Перейти: {spec.title}")' in src
     assert "Расширенный режим из анализа результатов" in src
@@ -561,6 +562,10 @@ def test_desktop_main_shell_extracts_home_view_builder() -> None:
         "внутрь shell",
         "Справочники, анализ и диагностика",
         "Анализ и визуализация",
+        "Диагностика и отправка",
+        "Один понятный порядок работы: собрать диагностику",
+        'primary_button_text="Собрать диагностику"',
+        'secondary_title="Дополнительные действия после диагностики"',
     ]
     for fragment in forbidden_visible_home_fragments:
         assert fragment not in src
@@ -568,14 +573,14 @@ def test_desktop_main_shell_extracts_home_view_builder() -> None:
     assert '"Открыто в рабочей области" if key in open_keys else "Готов к переходу"' in src
     assert "button.configure(text=_action_button_text(spec))" in src
     assert 'status_var = tk.StringVar(value="Готов к переходу")' in src
-    assert '"Диагностика и отправка"' in src
+    assert '"Проверка и отправка"' in src
     assert '"Справочники, проверка и анализ"' in src
     assert '"Анимация результата"' in src
     assert '"Расширенное сравнение и пневмосхема"' in src
-    assert '"Один понятный порядок работы: собрать диагностику' in src
+    assert '"Один понятный порядок работы: проверить проект и подготовить архив для отправки' in src
     assert 'primary_key="desktop_diagnostics_center"' in src
-    assert 'primary_button_text="Собрать диагностику"' in src
-    assert 'secondary_title="Дополнительные действия после диагностики"' in src
+    assert 'primary_button_text="Собрать архив для отправки"' in src
+    assert 'secondary_title="Дополнительные действия после проверки"' in src
     assert "def _build_tool_card(" in src
     assert "primary_specs = tuple(spec for spec in specs if primary_key and spec.key == primary_key)" in src
     assert "secondary_specs = tuple(spec for spec in specs if not primary_key or spec.key != primary_key)" in src
@@ -848,7 +853,8 @@ def test_hosted_adapters_no_longer_need_manual_close_handlers_for_known_tk_tools
     assert "on_close=" not in test_center_adapter_src
     assert "on_close=" not in diag_adapter_src
     assert "диагностический центр" not in diag_adapter_src
-    assert "Подробная диагностика" in diag_adapter_src
+    assert "Подробная диагностика" not in diag_adapter_src
+    assert "Расширенная проверка" in diag_adapter_src
 
 
 def test_desktop_shell_adapter_text_avoids_center_wording_for_diagnostics_and_send() -> None:
@@ -871,6 +877,9 @@ def test_desktop_shell_adapter_text_avoids_center_wording_for_diagnostics_and_se
         "Единый центр проверки",
         "один центр",
         "диагностический центр",
+        "Подробная диагностика",
+        "Полная диагностика",
+        "архива диагностики",
         "Центр подготовки",
         "центр подготовки отправки",
     ):
@@ -1070,7 +1079,7 @@ def test_navigation_helpers_cover_full_user_gui_graph() -> None:
         "Результаты",
         "Анализ",
         "Визуализация",
-        "Диагностика и инструменты",
+        "Проверка и отправка",
     ]
     assert navigation_section_label(
         next(spec for spec in specs if spec.key == "desktop_geometry_reference_center")
@@ -1082,7 +1091,7 @@ def test_navigation_helpers_cover_full_user_gui_graph() -> None:
     assert "compare_viewer" in specs_by_section["Анализ"]
     assert {"desktop_animator", "desktop_mnemo"} <= specs_by_section["Визуализация"]
     assert {"desktop_diagnostics_center", "autotest_gui"} <= specs_by_section[
-        "Диагностика и инструменты"
+        "Проверка и отправка"
     ]
 
 

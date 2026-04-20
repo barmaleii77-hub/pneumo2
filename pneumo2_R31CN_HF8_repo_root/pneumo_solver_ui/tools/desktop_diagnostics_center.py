@@ -541,9 +541,9 @@ class DesktopDiagnosticsCenter:
 
         header_actions = ttk.Frame(header)
         header_actions.pack(side="right", anchor="ne")
-        ttk.Button(header_actions, text="1. Проверить проект", command=lambda: self.notebook.select(self.diag_tab)).pack(side="left")
-        ttk.Button(header_actions, text="2. Собрать архив", command=lambda: self.notebook.select(self.bundle_tab)).pack(side="left", padx=(8, 0))
-        ttk.Button(header_actions, text="3. Подготовить отправку", command=lambda: self.notebook.select(self.send_tab)).pack(side="left", padx=(8, 0))
+        ttk.Button(header_actions, text="Настройки проверки", command=lambda: self.notebook.select(self.diag_tab)).pack(side="left")
+        ttk.Button(header_actions, text="Состав архива", command=lambda: self.notebook.select(self.bundle_tab)).pack(side="left", padx=(8, 0))
+        ttk.Button(header_actions, text="Отправка", command=lambda: self.notebook.select(self.send_tab)).pack(side="left", padx=(8, 0))
         ttk.Button(
             header_actions,
             text="Обновить сводку",
@@ -584,7 +584,7 @@ class DesktopDiagnosticsCenter:
             wraplength=260,
             justify="left",
         ).pack(anchor="w")
-        quick_box = ttk.LabelFrame(sidebar, text="Быстрые действия", padding=8)
+        quick_box = ttk.LabelFrame(sidebar, text="Основные действия", padding=8)
         quick_box.pack(fill="x", pady=(8, 0))
         ttk.Button(
             quick_box,
@@ -731,7 +731,7 @@ class DesktopDiagnosticsCenter:
 
         summary_box = ttk.LabelFrame(self.bundle_body, text="Сводка и полезные файлы")
         summary_box.pack(fill="both", expand=False, pady=(0, 8))
-        summary_body, self.summary_text = build_scrolled_text(summary_box, wrap="word", height=13)
+        summary_body, self.summary_text = build_scrolled_text(summary_box, wrap="word", height=8)
         summary_body.pack(fill="both", expand=True)
 
         evidence_box = ttk.LabelFrame(self.bundle_body, text="Готовность данных для отправки")
@@ -771,10 +771,10 @@ class DesktopDiagnosticsCenter:
         health_box = ttk.LabelFrame(preview_area, text="Состояние проекта", padding=6)
         health_box.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
 
-        inspect_body, self.inspect_text = build_scrolled_text(inspect_box, wrap="word", height=16)
+        inspect_body, self.inspect_text = build_scrolled_text(inspect_box, wrap="word", height=10)
         inspect_body.pack(fill="both", expand=True)
 
-        health_body, self.health_text = build_scrolled_text(health_box, wrap="word", height=16)
+        health_body, self.health_text = build_scrolled_text(health_box, wrap="word", height=10)
         health_body.pack(fill="both", expand=True)
 
     def _build_send_tab(self) -> None:
@@ -791,9 +791,8 @@ class DesktopDiagnosticsCenter:
         ttk.Label(
             frm,
             text=(
-                "Здесь можно собрать архив для отправки, просмотреть сводку, проверку и состояние, "
-                "а затем подготовить архив к передаче без браузера. Прогресс любой длительной операции "
-                "всегда отображается в блоке «Текущий процесс» сверху, без переключения разделов."
+                "Архив для отправки собирается здесь. Прогресс любой длительной операции всегда показан "
+                "в блоке «Текущий процесс» сверху, без переключения разделов."
             ),
             wraplength=860,
             justify="left",

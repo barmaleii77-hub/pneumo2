@@ -65,9 +65,22 @@ def test_desktop_results_center_uses_split_workspace_and_scrollable_summary_pane
     assert 'text="Обновить результаты"' in src
     assert 'text="Обновить"' not in src
     assert '"open_send_center": "открыта отправка результатов"' in src
+    assert '"open_diagnostics_gui": "открыта проверка и отправка"' in src
     assert 'success_message="Открыта отправка результатов."' in src
+    assert 'text="Собрать архив для отправки"' in src
+    assert "Материалы проверки и отправки" in src
+    assert "Перейти к рекомендованной проверке" in src
     assert "открыт центр отправки" not in src
     assert "Открыт центр отправки" not in src
+    for forbidden in (
+        "Собрать диагностику",
+        "Материалы диагностики",
+        "Открыть последнюю диагностику",
+        "Сохранить материалы диагностики",
+        "Открыта диагностика проекта",
+        "Показать рекомендованный раздел",
+    ):
+        assert forbidden not in src
 
 
 def test_desktop_results_center_refreshes_analysis_evidence_before_opening_send_center() -> None:
@@ -1212,7 +1225,7 @@ def test_test_center_gui_embeds_validation_results_center_modules() -> None:
     assert "Пояснение:" not in center_src
     assert "Материалы последнего прогона" in center_src
     assert "def set_session_handoff(" in center_src
-    assert "Показать рекомендованный раздел" in center_src
+    assert "Перейти к рекомендованной проверке" in center_src
     assert "Открыть последний архив" in center_src
     assert "Открыть текущую проверку" in center_src
     assert "Открыть текущий разбор замечаний" in center_src
@@ -1223,6 +1236,7 @@ def test_test_center_gui_embeds_validation_results_center_modules() -> None:
     assert "Аниматор по результату" in center_src
     assert "Открыть текущую анимацию" in center_src
     assert "Открыть текущую визуализацию" not in center_src
+    assert "Показать рекомендованный раздел" not in center_src
     assert 'text="Сопровождение"' not in center_src
     assert "Открыть последний ZIP" not in center_src
     assert "идентификатор:" not in center_src

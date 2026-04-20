@@ -810,8 +810,10 @@ def test_desktop_diagnostics_center_uses_split_workspace_and_sidebar_actions() -
 
     assert 'workspace = ttk.Panedwindow(outer, orient="horizontal")' in center_src
     assert 'context_box = ttk.LabelFrame(sidebar, text="Состояние", padding=8)' in center_src
-    assert 'quick_box = ttk.LabelFrame(sidebar, text="Быстрые действия", padding=8)' in center_src
-    assert 'ttk.Button(header_actions, text="1. Проверить проект", command=lambda: self.notebook.select(self.diag_tab)).pack(side="left")' in center_src
+    assert 'quick_box = ttk.LabelFrame(sidebar, text="Основные действия", padding=8)' in center_src
+    assert 'ttk.Button(header_actions, text="Настройки проверки", command=lambda: self.notebook.select(self.diag_tab)).pack(side="left")' in center_src
+    assert 'ttk.Button(header_actions, text="Состав архива", command=lambda: self.notebook.select(self.bundle_tab)).pack(side="left", padx=(8, 0))' in center_src
+    assert 'ttk.Button(header_actions, text="Отправка", command=lambda: self.notebook.select(self.send_tab)).pack(side="left", padx=(8, 0))' in center_src
     assert 'process_box = ttk.LabelFrame(outer, text="Текущий процесс", padding=8)' in center_src
     assert "self.process_progress = ttk.Progressbar(" in center_src
     assert "preview_area = ttk.Frame(self.bundle_body)" in center_src
@@ -843,7 +845,7 @@ def test_desktop_diagnostics_center_operator_text_is_russian_and_progress_global
         "Открыт шаг",
         "Прогресс любой длительной операции",
         "без переключения разделов",
-        "Здесь можно собрать архив для отправки",
+        "Архив для отправки собирается здесь.",
         "Сохранённое состояние проверки",
         "Скопировать архив в буфер обмена",
         "Папка файлов анимации",

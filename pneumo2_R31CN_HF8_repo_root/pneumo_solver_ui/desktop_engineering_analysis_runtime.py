@@ -1897,7 +1897,7 @@ class DesktopEngineeringAnalysisRuntime:
                     if compare_surfaces
                     else ("PARTIAL" if compare_artifacts else "MISSING")
                 ),
-                detail=compare_surface_error or "Поверхности влияния разобраны по осям, единицам измерения и диагностическим признакам.",
+                detail=compare_surface_error or "Поверхности влияния разобраны по осям, единицам измерения и признакам качества данных.",
                 path=compare_artifacts[0].path if compare_artifacts else None,
                 metrics={
                     "artifact_count": len(compare_artifacts),
@@ -2009,9 +2009,9 @@ class DesktopEngineeringAnalysisRuntime:
             EngineeringAnalysisPipelineRow(
                 key="handoff_ho009_diagnostics",
                 section="handoffs_evidence",
-                title="Материалы диагностики",
+                title="Материалы проверки и отправки",
                 status=snapshot.diagnostics_evidence_manifest_status,
-                detail="Актуальность материалов инженерного анализа для диагностики и отправки.",
+                detail="Актуальность материалов инженерного анализа для проверки проекта и отправки.",
                 path=snapshot.diagnostics_evidence_manifest_path or (
                     self.send_bundles_dir / LATEST_ENGINEERING_ANALYSIS_EVIDENCE_MANIFEST
                 ),

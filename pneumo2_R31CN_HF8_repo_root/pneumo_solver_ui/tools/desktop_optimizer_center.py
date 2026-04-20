@@ -78,6 +78,11 @@ OPERATOR_TOKEN_LABELS = {
     "stage0_relevance": "предварительный отбор",
     "stage1_long": "длинная проверка",
     "stage2_final": "финальная проверка",
+    "broad_relevance": "широкий предварительный отбор",
+    "focused_progress": "сфокусированное продвижение",
+    "strict_alignment": "финальное согласование",
+    "influence_weighted": "по влиянию параметров",
+    "static": "без перераспределения по влиянию",
     "0": "предварительный отбор",
     "1": "длинная проверка",
     "2": "финальная проверка",
@@ -172,6 +177,21 @@ def _operator_issue_text(value: Any) -> str:
     if text.startswith("run "):
         return "состояние запуска: " + _operator_state(text.removeprefix("run "), fallback="нет данных")
     return text
+
+
+def _operator_stage_role_text(stage_name: Any, role: Any) -> str:
+    stage_key = str(stage_name or "").strip()
+    role_text = str(role or "").strip()
+    by_stage = {
+        "stage0_relevance": "короткие недорогие проверки для первичного отбора параметров",
+        "stage1_long": "длинные дорожные и манёвренные проверки для уточнения кандидатов",
+        "stage2_final": "финальная проверка устойчивости и отбор лучших решений",
+    }
+    if stage_key in by_stage:
+        return by_stage[stage_key]
+    if "relevance-screen" in role_text or "fidelity" in role_text:
+        return "проверка стадии оптимизации"
+    return role_text or "проверка стадии оптимизации"
 
 
 def _operator_list_text(values: Any) -> str:
@@ -436,10 +456,15 @@ class DesktopOptimizerCenter:
         lines: list[str] = []
         for row in rows:
             explore_pct = int(round(float(row.get("explore_frac", 0.0) or 0.0) * 100.0))
+            stage_label = _operator_token_text(row.get("stage_name"))
+            role_label = _operator_stage_role_text(row.get("stage_name"), row.get("role"))
+            policy_label = _operator_token_text(row.get("policy_name"))
+            requested_label = _operator_token_text(row.get("requested_mode"))
+            effective_label = _operator_token_text(row.get("effective_mode"))
             line = (
-                f"{row.get('stage_name')} - {row.get('role')}\n"
-                f"  политика {row.get('policy_name')}; запрошено {row.get('requested_mode')}; "
-                f"применено {row.get('effective_mode')}; лучших {int(row.get('top_k', 0) or 0)}; "
+                f"{stage_label} - {role_label}\n"
+                f"  политика {policy_label}; запрошено {requested_label}; "
+                f"применено {effective_label}; лучших {int(row.get('top_k', 0) or 0)}; "
                 f"разведка {explore_pct}%; бюджет разведки {int(row.get('explore_budget', 0) or 0)}; "
                 f"бюджет уточнения {int(row.get('focus_budget', 0) or 0)}"
             )

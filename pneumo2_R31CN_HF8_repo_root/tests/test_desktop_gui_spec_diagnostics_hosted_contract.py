@@ -30,13 +30,13 @@ def test_hosted_diagnostics_workspace_page_builds_offscreen_and_refreshes() -> N
         page.refresh_view()
         app.processEvents()
 
-        assert page.bundle_box.title() == "Текущее состояние архива диагностики"
-        assert page.run_box.title() == "Последний запуск диагностики"
-        assert page.check_box.title() == "Проверка архива диагностики"
+        assert page.bundle_box.title() == "Текущее состояние архива для отправки"
+        assert page.run_box.title() == "Последний сбор архива"
+        assert page.check_box.title() == "Проверка архива для отправки"
         assert page.baseline_box.title() == "Опорный прогон"
         assert page.actions_box.title() == "Действия"
         assert page.log_box.title() == "Журнал / последние сообщения"
-        assert "Данные берутся из состояния диагностики приложения" in page.source_label.text()
+        assert "Данные берутся из состояния проверки проекта" in page.source_label.text()
     finally:
         page.close()
         page.deleteLater()
@@ -158,8 +158,9 @@ def test_diagnostics_fallback_command_remains_available() -> None:
     commands = build_command_map()
     assert commands["diagnostics.legacy_center.open"].kind == "launch_module"
     assert commands["diagnostics.legacy_center.open"].module == "pneumo_solver_ui.tools.desktop_diagnostics_center"
-    assert commands["diagnostics.legacy_center.open"].title == "Открыть диагностику отдельным окном"
+    assert commands["diagnostics.legacy_center.open"].title == "Открыть проверку и отправку отдельным окном"
     assert "центр диагностики" not in commands["diagnostics.legacy_center.open"].title.lower()
+    assert "диагностику" not in commands["diagnostics.legacy_center.open"].title.lower()
 
 
 def test_hosted_diagnostics_visible_text_avoids_stale_center_labels() -> None:
@@ -172,5 +173,9 @@ def test_hosted_diagnostics_visible_text_avoids_stale_center_labels() -> None:
         "центр опорного прогона",
         "Открыть центр диагностики",
         "Открыт центр диагностики",
+        "Текущее состояние архива диагностики",
+        "Последний запуск диагностики",
+        "Проверка архива диагностики",
+        "Данные берутся из состояния диагностики приложения",
     ):
         assert forbidden not in src

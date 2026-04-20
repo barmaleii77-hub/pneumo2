@@ -56,7 +56,7 @@ def _operator_text(value: object) -> str:
         "duration=": "длительность ",
         "ZIP": "архив",
         "Autotest:": "Автотест:",
-        "Diagnostics:": "Диагностика:",
+        "Diagnostics:": "Проверка и отправка:",
         "Action completed:": "Действие выполнено:",
         "Opened:": "Открыто:",
         "Pinned current run.": "Текущий прогон закреплён.",
@@ -110,10 +110,10 @@ def _action_label(action_key: str) -> str:
         "open_compare_viewer": "открыто окно сравнения",
         "open_animator": "открыт аниматор",
         "open_animator_follow": "открыта анимация результатов расчёта",
-        "open_diagnostics_gui": "открыта диагностика проекта",
+        "open_diagnostics_gui": "открыта проверка и отправка",
         "open_send_center": "открыта отправка результатов",
         "open_send_bundles": "открыта папка архивов",
-        "export_diagnostics_evidence": "сохранены материалы диагностики",
+        "export_diagnostics_evidence": "сохранены материалы проверки и отправки",
     }
     return labels.get(str(action_key or "").strip(), "действие выполнено")
 
@@ -150,7 +150,7 @@ _BROWSE_CATEGORY_OPTIONS: tuple[tuple[str, str], ...] = (
     ("triage", "Разбор замечаний"),
     ("results", "Результаты"),
     ("anim_latest", "Визуализация"),
-    ("evidence", "Материалы диагностики"),
+    ("evidence", "Материалы проверки и отправки"),
     ("runs", "Прогоны"),
     ("bundle", "Архив отправки"),
 )
@@ -215,10 +215,10 @@ class DesktopResultsCenter(ttk.Frame):
         self.optimizer_var = tk.StringVar(master=self, value="Оптимизация: шлюз оценки пока не собран")
         self.triage_var = tk.StringVar(master=self, value="Разбор замечаний: критичных: 0; предупреждений: 0; справочных: 0; красных флагов: 0")
         self.npz_var = tk.StringVar(master=self, value="Последний файл анимации: пока недоступен.")
-        self.runs_var = tk.StringVar(master=self, value="Последние прогоны: автотест: —; диагностика: —")
+        self.runs_var = tk.StringVar(master=self, value="Последние прогоны: автотест: —; проверка и отправка: —")
         self.context_var = tk.StringVar(master=self, value="Результаты расчёта: не определены")
         self.context_banner_var = tk.StringVar(master=self, value="Результаты расчёта пока не определены.")
-        self.evidence_manifest_var = tk.StringVar(master=self, value="Материалы диагностики: пока не сохранены.")
+        self.evidence_manifest_var = tk.StringVar(master=self, value="Материалы проверки и отправки: пока не сохранены.")
         self.next_step_var = tk.StringVar(master=self, value="Рекомендация: дождитесь первого снимка проверки и результатов.")
         self.next_detail_var = tk.StringVar(master=self, value="Свежие материалы проверки и результатов пока не появились.")
         self.handoff_summary_var = tk.StringVar(master=self, value="Последний прогон: материалы пока не подготовлены.")
@@ -254,7 +254,7 @@ class DesktopResultsCenter(ttk.Frame):
         ttk.Button(actions, text="Обновить результаты", command=self.refresh).pack(side="left")
         self.btn_open_selected = ttk.Button(actions, text="Открыть материал", command=self._open_selected)
         self.btn_open_selected.pack(side="left", padx=(8, 0))
-        self.btn_diagnostics = ttk.Button(actions, text="Собрать диагностику", command=self._launch_full_diagnostics_gui)
+        self.btn_diagnostics = ttk.Button(actions, text="Собрать архив для отправки", command=self._launch_full_diagnostics_gui)
         self.btn_diagnostics.pack(side="left", padx=(8, 0))
         self.btn_export_evidence = ttk.Button(actions, text="Сохранить материалы", command=self._export_diagnostics_evidence)
         self.btn_export_evidence.pack(side="left", padx=(8, 0))
@@ -357,13 +357,13 @@ class DesktopResultsCenter(ttk.Frame):
         self.btn_open_handoff_autotest.pack(side="left", padx=(8, 0))
         self.btn_open_handoff_diagnostics = ttk.Button(
             run_handoff_actions,
-            text="Открыть последнюю диагностику",
+            text="Открыть последнюю проверку",
             command=self._open_handoff_diagnostics_run,
         )
         self.btn_open_handoff_diagnostics.pack(side="left", padx=(8, 0))
         self.btn_focus_suggested = ttk.Button(
             run_handoff_actions,
-            text="Показать рекомендованный раздел",
+            text="Перейти к рекомендованной проверке",
             command=self._focus_suggested_branch,
         )
         self.btn_focus_suggested.pack(side="left", padx=(8, 0))
@@ -397,8 +397,8 @@ class DesktopResultsCenter(ttk.Frame):
         tools = ttk.LabelFrame(summary_body, text="Инструменты", padding=10)
         tools.pack(fill="x", pady=(10, 0))
         ttk.Button(tools, text="Открыть папку архивов", command=self._open_send_bundles).pack(fill="x")
-        ttk.Button(tools, text="Собрать диагностику", command=self._launch_full_diagnostics_gui).pack(fill="x", pady=(6, 0))
-        ttk.Button(tools, text="Сохранить материалы диагностики", command=self._export_diagnostics_evidence).pack(fill="x", pady=(6, 0))
+        ttk.Button(tools, text="Собрать архив для отправки", command=self._launch_full_diagnostics_gui).pack(fill="x", pady=(6, 0))
+        ttk.Button(tools, text="Сохранить материалы проверки и отправки", command=self._export_diagnostics_evidence).pack(fill="x", pady=(6, 0))
         ttk.Button(tools, text="Открыть отправку результатов", command=self._launch_send_results_gui).pack(fill="x", pady=(6, 0))
 
         overview = ttk.LabelFrame(left_pane, text="Обзор проверок", padding=8)
@@ -520,7 +520,7 @@ class DesktopResultsCenter(ttk.Frame):
             else "пока не сохранены"
         )
         self.evidence_manifest_var.set(
-            "Материалы диагностики: "
+            "Материалы проверки и отправки: "
             + f"{_status_label(snapshot.diagnostics_evidence_manifest_status)}; "
             + manifest_label
         )
@@ -942,7 +942,7 @@ class DesktopResultsCenter(ttk.Frame):
             _operator_text(snapshot.result_context_banner),
             selected_run_line,
             _operator_text(snapshot.selected_run_contract_banner),
-            f"Материалы диагностики: {snapshot.diagnostics_evidence_manifest_path or '—'}",
+            f"Материалы проверки и отправки: {snapshot.diagnostics_evidence_manifest_path or '—'}",
             "Область просмотра: " + self._browse_scope_summary(),
             "",
             "Рекомендуемый следующий шаг:",
@@ -1135,7 +1135,7 @@ class DesktopResultsCenter(ttk.Frame):
                     "diagnostics_evidence_manifest",
                 )
                 self._select_artifact(artifact)
-                self.status_var.set(f"Материалы диагностики сохранены: {manifest_path}")
+                self.status_var.set(f"Материалы проверки и отправки сохранены: {manifest_path}")
                 return
             else:
                 return
@@ -1256,7 +1256,7 @@ class DesktopResultsCenter(ttk.Frame):
         self._run_action(
             "open_artifact",
             path=handoff.diagnostics_run_dir,
-            success_message=f"Открыт каталог диагностики: {handoff.diagnostics_run_dir}",
+            success_message=f"Открыт каталог проверки и отправки: {handoff.diagnostics_run_dir}",
         )
 
     def _open_send_bundles(self) -> None:
@@ -1268,7 +1268,7 @@ class DesktopResultsCenter(ttk.Frame):
     def _export_diagnostics_evidence(self) -> None:
         self._run_action(
             "export_diagnostics_evidence",
-            success_message="Материалы диагностики сохранены.",
+            success_message="Материалы проверки и отправки сохранены.",
         )
 
     def _launch_compare_viewer(self) -> None:
@@ -1304,7 +1304,7 @@ class DesktopResultsCenter(ttk.Frame):
     def _launch_full_diagnostics_gui(self) -> None:
         self._run_action(
             "open_diagnostics_gui",
-            success_message="Открыта диагностика проекта.",
+            success_message="Открыта проверка и отправка.",
         )
 
     def _launch_send_results_gui(self) -> None:

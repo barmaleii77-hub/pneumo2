@@ -19,16 +19,16 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert 'workspace = ttk.Panedwindow(self, orient="horizontal")' in src
     for label in (
         "Обновить данные",
-        "Показать выбранный файл",
+        "Открыть выбранный файл",
         "Зафиксировать прогон",
-        "Подготовить диагностику",
-        "Показать диагностику",
+        "Подготовить материалы отправки",
+        "Открыть материалы отправки",
         "Влияние системы",
         "Полный отчёт",
         "Диапазоны влияния",
-        "Собрать диагностику",
-        "Что показать",
-        "Показать выбранное",
+        "Открыть проверку и отправку",
+        "Что открыть",
+        "Открыть выбранное",
     ):
         assert label in src
     assert "threading.Thread" in src
@@ -47,16 +47,16 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert "ttk.Checkbutton" in src
     assert "Только готовые" in src
     assert "def _refresh_candidate_filter" in src
-    assert "показано" in src
+    assert "в списке" in src
     assert "def _selected_candidate_run_dir" in src
     assert "bridge_status" in src
     assert 'label == "Зафиксировать выбранный прогон" and result.ok' in src
     assert "def _auto_export_evidence_after_ho007" in src
     assert "write_diagnostics_evidence_manifest" in src
-    assert "Материалы диагностики подготовлены автоматически" in src
+    assert "Материалы проверки и отправки подготовлены автоматически" in src
     assert "def _open_evidence_manifest" in src
-    assert "Материалы диагностики показаны" in src
-    assert "Подготовить диагностику" in src
+    assert "Материалы проверки и отправки открыты" in src
+    assert "Подготовить материалы отправки" in src
     assert "compare_influence_surface_count" in src
     assert "def _compare_surface_details" in src
     assert "def _compare_surface_preview_for_artifact" in src
@@ -73,7 +73,7 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert "Калибровка" in src
     assert "Влияние и сравнение" in src
     assert "Чувствительность и неопределённость" in src
-    assert "Аниматор и диагностика" in src
+    assert "Аниматор и отправка" in src
     assert "Предпросмотр графиков и таблиц" in src
     assert "Графики влияния" in src
     assert "Табличные файлы" in src
@@ -89,7 +89,7 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
     assert "Калибровочный запуск" in runtime_src
     assert "Статическая настройка" in runtime_src
     assert "Неопределённость и приоритет измерений" in runtime_src
-    assert "Материалы диагностики" in runtime_src
+    assert "Материалы проверки и отправки" in runtime_src
     assert "analysis_compare_handoff_summary" in src
     assert "analysis_results_boundary_summary" in src
     assert '"compare_viewer_handoff_summary"' in src
@@ -105,12 +105,18 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
         "Центр инженерного анализа готов",
         "Открыть артефакт",
         "Открыть выбранный артефакт",
-        "Открыть выбранный файл",
-        "Открыть выбранное",
         "Открыть выбранный прогон",
         "Открыть связь анализа с аниматором",
         "Открыть данные для анимации",
         "Открыть контекст анимации",
+        "Показать выбранный файл",
+        "Показать выбранное",
+        "Показать диагностику",
+        "Собрать диагностику",
+        "Подготовить диагностику",
+        "Материалы диагностики",
+        "Аниматор и диагностика",
+        "Диагностические данные",
         "Проверенные артефакты",
         "Табличные артефакты",
         "Маршрут рабочего места",
@@ -144,6 +150,9 @@ def test_engineering_analysis_center_uses_ttk_panedwindow_actions_status_and_log
         "HO-008 Animator handoff",
         "HO-009 Diagnostics evidence manifest",
         "Diagnostics/SEND handoff",
+        "Материалы диагностики",
+        "диагностическим признакам",
+        "для диагностики и отправки",
         "workspace/handoffs/WS-ANALYSIS",
         "send_bundles/latest_engineering_analysis_evidence_manifest.json",
     ):

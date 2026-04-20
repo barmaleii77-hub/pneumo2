@@ -275,7 +275,7 @@ class OverviewPage(QtWidgets.QWidget):
         layout.addWidget(title)
 
         subtitle = QtWidgets.QLabel(
-            "Главное окно ведёт по последовательности: исходные данные -> сценарии -> набор испытаний -> опорный прогон -> оптимизация -> анализ -> анимация -> диагностика."
+            "Главное окно ведёт по последовательности: исходные данные -> сценарии -> набор испытаний -> опорный прогон -> оптимизация -> анализ -> анимация -> проверка и отправка."
         )
         subtitle.setWordWrap(True)
         layout.addWidget(subtitle)
@@ -415,10 +415,10 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         _apply_element_contract(self.command_search, "SH-CMD-SEARCH")
         self.command_search.setAccessibleName("Быстрый поиск")
         self.command_search.setAccessibleDescription(
-            "Поиск по рабочим шагам, действиям, диагностике и файлам."
+            "Поиск по рабочим шагам, действиям, проверке, отправке и файлам."
         )
         self.command_search.setToolTip(
-            "Ctrl+K. Найдите окно, действие, диагностику или файл."
+            "Ctrl+K. Найдите окно, действие, проверку, отправку или файл."
         )
         self.command_search.setWhatsThis("")
         row2.addWidget(self.command_search, 1)
@@ -428,7 +428,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         _apply_element_contract(self.primary_action_button, "SH-PRIMARY-ACTION")
         row2.addWidget(self.primary_action_button)
 
-        self.diagnostics_button = QtWidgets.QPushButton("Собрать диагностику")
+        self.diagnostics_button = QtWidgets.QPushButton("Собрать архив для отправки")
         self.diagnostics_button.clicked.connect(
             lambda: self.run_command("diagnostics.collect_bundle")
         )
@@ -439,7 +439,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         compare_button.clicked.connect(lambda: self.run_command("results.compare.open"))
         row2.addWidget(compare_button)
 
-        animator_button = QtWidgets.QPushButton("Показать анимацию")
+        animator_button = QtWidgets.QPushButton("Открыть аниматор")
         animator_button.clicked.connect(
             lambda: self.run_command("animation.animator.open")
         )
@@ -451,7 +451,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         info_layout.setContentsMargins(0, 0, 0, 0)
         info_layout.setSpacing(4)
         self.contract_label = QtWidgets.QLabel(
-            "Цели и ограничения: основные показатели расчёта | диагностика всегда видима"
+            "Цели и ограничения: основные показатели расчёта | проверка и отправка всегда видимы"
         )
         self.contract_label.setWordWrap(True)
         self.contract_label.setMinimumHeight(30)
@@ -492,7 +492,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
                 lambda _checked=False, wid=workspace.workspace_id: self.open_workspace(wid)
             )
 
-        diagnostics_menu = self.menuBar().addMenu("Диагностика")
+        diagnostics_menu = self.menuBar().addMenu("Проверка и отправка")
         for command_id in (
             "diagnostics.collect_bundle",
             "diagnostics.verify_bundle",
@@ -504,7 +504,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
                 lambda _checked=False, cid=command.command_id: self.run_command(cid)
             )
         diagnostics_menu.addSeparator()
-        legacy_action = diagnostics_menu.addAction("Открыть диагностику отдельным окном")
+        legacy_action = diagnostics_menu.addAction("Открыть проверку и отправку отдельным окном")
         legacy_action.triggered.connect(
             lambda: self.run_command("diagnostics.legacy_center.open")
         )
@@ -640,7 +640,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
             self._run_primary_action,
         )
         self._register_shortcut(
-            self._keyboard_shortcut_by_name.get("Собрать диагностику", "Ctrl+Shift+D"),
+            self._keyboard_shortcut_by_name.get("Собрать архив для отправки", "Ctrl+Shift+D"),
             lambda: self.run_command("diagnostics.collect_bundle"),
         )
         self._register_shortcut(

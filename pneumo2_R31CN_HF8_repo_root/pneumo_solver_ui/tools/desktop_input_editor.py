@@ -1629,7 +1629,7 @@ class DesktopInputEditor:
             side="left",
             padx=(8, 0),
         )
-        ttk.Button(quick_actions, text="Собрать диагностику", command=self._open_diagnostics_center).pack(
+        ttk.Button(quick_actions, text="Собрать архив для отправки", command=self._open_diagnostics_center).pack(
             side="left",
             padx=(8, 0),
         )
@@ -3540,7 +3540,7 @@ class DesktopInputEditor:
         existing = self._diagnostics_center
         try:
             if existing is not None and self._focus_toplevel_controller(existing):
-                self._set_status("Диагностика и отправка открыты.")
+                self._set_status("Проверка и отправка открыты.")
                 return
         except Exception:
             pass
@@ -3549,7 +3549,7 @@ class DesktopInputEditor:
 
         window = tk.Toplevel(self.root)
         self._diagnostics_center = DesktopDiagnosticsCenter(window, hosted=True, initial_tab="restore")
-        self._set_status("Диагностика и отправка открыты.")
+        self._set_status("Проверка и отправка открыты.")
 
     def _notify_run_setup_center_closed(self) -> None:
         self._run_setup_center = None

@@ -82,6 +82,58 @@ class TextReportPanel(ttk.LabelFrame):
         self.text_widget.configure(state="disabled")
 
 
+class OptimizationParametersTreePanel(ttk.LabelFrame):
+    def __init__(self, master: tk.Misc) -> None:
+        super().__init__(master, text="Что оптимизируем", padding=8)
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
+        self.tree = ttk.Treeview(
+            self,
+            columns=("base", "lower", "upper", "state"),
+            show="tree headings",
+            height=12,
+        )
+        self.tree.heading("#0", text="Параметр")
+        self.tree.heading("base", text="Текущее значение")
+        self.tree.heading("lower", text="Нижняя граница")
+        self.tree.heading("upper", text="Верхняя граница")
+        self.tree.heading("state", text="Состояние")
+        self.tree.column("#0", width=360, stretch=True)
+        self.tree.column("base", width=130, stretch=False, anchor="center")
+        self.tree.column("lower", width=130, stretch=False, anchor="center")
+        self.tree.column("upper", width=130, stretch=False, anchor="center")
+        self.tree.column("state", width=130, stretch=False, anchor="center")
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.tree.yview)
+        scrollbar.grid(row=0, column=1, sticky="ns")
+        self.tree.configure(yscrollcommand=scrollbar.set)
+        ttk.Label(
+            self,
+            text=(
+                "Состав оптимизации задаётся этой таблицей: каждая строка будет изменяться в поиске. "
+                "Допустимые значения исходных данных служат только для проверки ввода."
+            ),
+            wraplength=900,
+            justify="left",
+        ).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+
+    def set_rows(self, rows: tuple[dict[str, str], ...]) -> None:
+        self.tree.delete(*self.tree.get_children())
+        for row_index, row in enumerate(rows):
+            self.tree.insert(
+                "",
+                "end",
+                iid=f"opt-param-{row_index}",
+                text=str(row.get("parameter") or ""),
+                values=(
+                    str(row.get("base") or "—"),
+                    str(row.get("lower") or "—"),
+                    str(row.get("upper") or "—"),
+                    str(row.get("state") or "оптимизируется"),
+                ),
+            )
+
+
 class HistoryTreePanel(ttk.LabelFrame):
     def __init__(self, master: tk.Misc, *, on_select: callable) -> None:
         super().__init__(master, text="История рабочей области", padding=8)

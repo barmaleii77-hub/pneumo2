@@ -925,6 +925,10 @@ def test_desktop_input_editor_is_wired_into_desktop_control_center() -> None:
     assert "Загрузить файл данных..." in editor_src
     assert "Вернуть исходный шаблон" in editor_src
     assert "Сохранить рабочую копию" in editor_src
+    assert "Собрать архив для отправки" in editor_src
+    assert "Проверка и отправка открыты." in editor_src
+    assert "Собрать диагностику" not in editor_src
+    assert "Диагностика и отправка открыты." not in editor_src
     assert "Рабочие профили" in editor_src
     assert 'profile_details_notebook.add(snapshots, text="Снимки")' in editor_src
     assert "Сохранить профиль" in editor_src

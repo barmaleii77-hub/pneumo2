@@ -518,6 +518,19 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.message_strip_label.setFocus()
         self._set_status_message("Фокус переведён в нижнюю строку сообщений.")
 
+    def _dock_features(self) -> QtWidgets.QDockWidget.DockWidgetFeature:
+        return (
+            QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetClosable
+            | QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetMovable
+            | QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetFloatable
+        )
+
+    def _show_all_docks(self) -> None:
+        for dock in (self.browser_dock, self.inspector_dock, self.runtime_dock):
+            dock.show()
+            dock.raise_()
+        self._set_status_message("Все панели возвращены. Ширину и высоту меняйте границами между панелями.")
+
     def _localize_builtin_accessibility(self) -> None:
         for button in self.findChildren(QtWidgets.QAbstractButton):
             object_name = button.objectName()
@@ -559,9 +572,16 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         tree_action.triggered.connect(self._focus_project_tree)
 
         view_menu = menubar.addMenu("Вид")
-        view_menu.addAction(self.browser_dock.toggleViewAction())
-        view_menu.addAction(self.inspector_dock.toggleViewAction())
-        view_menu.addAction(self.runtime_dock.toggleViewAction())
+        panels_menu = view_menu.addMenu("Панели")
+        for dock in (self.browser_dock, self.inspector_dock, self.runtime_dock):
+            action = dock.toggleViewAction()
+            action.setStatusTip("Включить или скрыть панель главного окна.")
+            action.setToolTip("Панель можно открепить, вернуть в окно и изменить размер границей.")
+            panels_menu.addAction(action)
+        panels_menu.addSeparator()
+        show_all_panels_action = panels_menu.addAction("Вернуть все панели")
+        show_all_panels_action.setStatusTip("Вернуть видимость списка проекта, свойств и хода выполнения.")
+        show_all_panels_action.triggered.connect(self._show_all_docks)
         view_menu.addSeparator()
         restore_layout_action = view_menu.addAction("Восстановить раскладку")
         restore_layout_action.triggered.connect(self._restore_layout)
@@ -619,7 +639,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         collect_diag_action = diagnostics_menu.addAction("Проверить проект и подготовить архив")
         collect_diag_action.setShortcut(QtGui.QKeySequence("F7"))
         collect_diag_action.triggered.connect(lambda: self.open_tool("desktop_diagnostics_center"))
-        focus_messages_action = diagnostics_menu.addAction("Показать сообщения рабочего места")
+        focus_messages_action = diagnostics_menu.addAction("Перейти к сообщениям рабочего места")
         focus_messages_action.triggered.connect(self._focus_messages_strip)
 
         tools_menu = menubar.addMenu("Инструменты")
@@ -649,11 +669,14 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
 
         toolbar.addSeparator()
 
-        toolbar.addWidget(QtWidgets.QLabel("Окно:"))
+        toolbar.addWidget(QtWidgets.QLabel("Рабочее окно:"))
         self.launch_tool_combo = QtWidgets.QComboBox(toolbar)
         self.launch_tool_combo.setObjectName("DesktopQtShellLaunchToolCombo")
-        self.launch_tool_combo.setAccessibleName("Единый выбор окна")
-        self.launch_tool_combo.setToolTip("Выбор из списка сразу открывает выбранное окно.")
+        self.launch_tool_combo.setAccessibleName("Выбор рабочего окна без запуска")
+        self.launch_tool_combo.setToolTip(
+            "Выбор показывает связанный рабочий шаг. Запуск отдельного окна — через меню «Запуск», "
+            "двойной щелчок в списке «Окна» или быстрый поиск."
+        )
         self.launch_tool_combo.currentIndexChanged.connect(self._on_launch_tool_changed)
         self.launch_tool_combo.activated.connect(self._on_launch_tool_activated)
         toolbar.addWidget(self.launch_tool_combo)
@@ -680,7 +703,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.diagnostics_button.clicked.connect(lambda: self.open_tool("desktop_diagnostics_center"))
         toolbar.addWidget(self.diagnostics_button)
 
-        self.animator_button = QtWidgets.QPushButton("Показать в аниматоре", toolbar)
+        self.animator_button = QtWidgets.QPushButton("Открыть аниматор", toolbar)
         self.animator_button.clicked.connect(lambda: self.open_tool("desktop_animator"))
         toolbar.addWidget(self.animator_button)
 
@@ -706,6 +729,13 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
     def _build_browser_dock(self) -> None:
         self.browser_dock = QtWidgets.QDockWidget("Панель проекта", self)
         self.browser_dock.setObjectName("DesktopQtShellBrowserDock")
+        self.browser_dock.setFeatures(self._dock_features())
+        self.browser_dock.setAllowedAreas(
+            QtCore.Qt.DockWidgetArea.LeftDockWidgetArea
+            | QtCore.Qt.DockWidgetArea.RightDockWidgetArea
+        )
+        self.browser_dock.setMinimumWidth(280)
+        self.browser_dock.setToolTip("Док-панель: перетаскивается, открепляется и меняет ширину границей.")
         self.browser_tree = QtWidgets.QTreeWidget(self.browser_dock)
         self.browser_tree.setHeaderLabels(("Окно / шаг", "Состояние"))
         self.browser_tree.itemSelectionChanged.connect(self._on_browser_selection_changed)
@@ -716,6 +746,13 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
     def _build_inspector_dock(self) -> None:
         self.inspector_dock = QtWidgets.QDockWidget("Свойства и помощь", self)
         self.inspector_dock.setObjectName("DesktopQtShellInspectorDock")
+        self.inspector_dock.setFeatures(self._dock_features())
+        self.inspector_dock.setAllowedAreas(
+            QtCore.Qt.DockWidgetArea.LeftDockWidgetArea
+            | QtCore.Qt.DockWidgetArea.RightDockWidgetArea
+        )
+        self.inspector_dock.setMinimumWidth(300)
+        self.inspector_dock.setToolTip("Док-панель: перетаскивается, открепляется и меняет ширину границей.")
         self.inspector_tabs = QtWidgets.QTabWidget(self.inspector_dock)
 
         properties_page = QtWidgets.QWidget(self.inspector_tabs)
@@ -757,6 +794,13 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
     def _build_runtime_dock(self) -> None:
         self.runtime_dock = QtWidgets.QDockWidget("Ход выполнения и внешние окна", self)
         self.runtime_dock.setObjectName("DesktopQtShellRuntimeDock")
+        self.runtime_dock.setFeatures(self._dock_features())
+        self.runtime_dock.setAllowedAreas(
+            QtCore.Qt.DockWidgetArea.TopDockWidgetArea
+            | QtCore.Qt.DockWidgetArea.BottomDockWidgetArea
+        )
+        self.runtime_dock.setMinimumHeight(150)
+        self.runtime_dock.setToolTip("Док-панель: перетаскивается, открепляется и меняет высоту границей.")
         runtime_widget = QtWidgets.QWidget(self.runtime_dock)
         runtime_layout = QtWidgets.QVBoxLayout(runtime_widget)
 
@@ -785,7 +829,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         central_layout = QtWidgets.QVBoxLayout(central)
 
         self.banner_label = QtWidgets.QLabel(
-            "Главное окно показывает первый путь пользователя и оставляет дополнительные окна во втором слое.",
+            "Рабочее место инженера: выберите шаг работы, проверьте состояние и запускайте отдельные окна только явной командой.",
             central,
         )
         self.banner_label.setWordWrap(True)
@@ -793,7 +837,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         central_layout.addWidget(self.banner_label)
 
         self.route_label = QtWidgets.QLabel(
-            "Что делать сначала: исходные данные; сценарии; набор испытаний; базовый прогон; оптимизация; анализ; анимация; проверка и отправка.",
+            "Основной порядок: исходные данные -> сценарии -> испытания -> базовый прогон -> оптимизация -> анализ -> анимация -> проверка и отправка.",
             central,
         )
         self.route_label.setWordWrap(True)
@@ -824,7 +868,20 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.surface_description.setWordWrap(True)
         overview_layout.addWidget(self.surface_description)
 
-        start_box = QtWidgets.QGroupBox("Начните здесь", self.overview_page)
+        self.overview_splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal, self.overview_page)
+        self.overview_splitter.setObjectName("DesktopQtShellOverviewSplitter")
+        self.overview_splitter.setChildrenCollapsible(False)
+        overview_layout.addWidget(self.overview_splitter, 1)
+
+        left_overview_panel = QtWidgets.QWidget()
+        left_overview_layout = QtWidgets.QVBoxLayout(left_overview_panel)
+        left_overview_layout.setContentsMargins(0, 0, 8, 0)
+
+        right_overview_panel = QtWidgets.QWidget()
+        right_overview_layout = QtWidgets.QVBoxLayout(right_overview_panel)
+        right_overview_layout.setContentsMargins(8, 0, 0, 0)
+
+        start_box = QtWidgets.QGroupBox("Основной порядок работы", left_overview_panel)
         start_layout = QtWidgets.QGridLayout(start_box)
         self.start_action_buttons: dict[str, QtWidgets.QPushButton] = {}
         for row_index, (tool_key, button_text, hint_text) in enumerate(PRIMARY_START_ACTIONS):
@@ -840,9 +897,16 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             start_layout.addWidget(button, row_index, 0)
             start_layout.addWidget(hint_label, row_index, 1)
         start_layout.setColumnStretch(1, 1)
-        overview_layout.addWidget(start_box)
+        left_overview_layout.addWidget(start_box)
 
-        truth_box = QtWidgets.QGroupBox("Достоверность отображения", self.overview_page)
+        workflow_box = QtWidgets.QGroupBox("Рабочие шаги", left_overview_panel)
+        workflow_layout = QtWidgets.QVBoxLayout(workflow_box)
+        self.workflow_list = QtWidgets.QListWidget(workflow_box)
+        self.workflow_list.itemDoubleClicked.connect(self._on_workflow_item_activated)
+        workflow_layout.addWidget(self.workflow_list)
+        left_overview_layout.addWidget(workflow_box, 1)
+
+        truth_box = QtWidgets.QGroupBox("Достоверность отображения", right_overview_panel)
         truth_layout = QtWidgets.QGridLayout(truth_box)
         truth_intro = QtWidgets.QLabel(
             "Крупные состояния: расчётно подтверждено, по исходным данным, условно, недоступно.",
@@ -867,21 +931,21 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             truth_layout.addWidget(explanation_label, row_index, 2)
             self.visual_truth_labels[name] = state_label
         truth_layout.setColumnStretch(2, 1)
-        overview_layout.addWidget(truth_box)
+        right_overview_layout.addWidget(truth_box)
 
-        workflow_box = QtWidgets.QGroupBox("Видимый основной путь", self.overview_page)
-        workflow_layout = QtWidgets.QVBoxLayout(workflow_box)
-        self.workflow_list = QtWidgets.QListWidget(workflow_box)
-        self.workflow_list.itemDoubleClicked.connect(self._on_workflow_item_activated)
-        workflow_layout.addWidget(self.workflow_list)
-        overview_layout.addWidget(workflow_box, 1)
-
-        session_box = QtWidgets.QGroupBox("Открытые окна", self.overview_page)
+        session_box = QtWidgets.QGroupBox("Открытые окна", right_overview_panel)
         session_layout = QtWidgets.QVBoxLayout(session_box)
         self.session_summary_label = QtWidgets.QLabel(session_box)
         self.session_summary_label.setWordWrap(True)
         session_layout.addWidget(self.session_summary_label)
-        overview_layout.addWidget(session_box)
+        right_overview_layout.addWidget(session_box)
+        right_overview_layout.addStretch(1)
+
+        self.overview_splitter.addWidget(left_overview_panel)
+        self.overview_splitter.addWidget(right_overview_panel)
+        self.overview_splitter.setStretchFactor(0, 3)
+        self.overview_splitter.setStretchFactor(1, 2)
+        self.overview_splitter.setSizes((920, 560))
 
         self.central_stack.addWidget(self.overview_page)
 
@@ -936,6 +1000,12 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.launch_tool_combo.clear()
         for spec in self._launchable_specs():
             self.launch_tool_combo.addItem(spec.title, userData=spec.key)
+            index = self.launch_tool_combo.count() - 1
+            self.launch_tool_combo.setItemData(
+                index,
+                "Выбор показывает связанный рабочий шаг; запуск окна выполняется отдельной явной командой.",
+                QtCore.Qt.ItemDataRole.ToolTipRole,
+            )
         index = max(0, self.launch_tool_combo.findData(self._selected_tool_key))
         self.launch_tool_combo.setCurrentIndex(index)
         self.launch_tool_combo.blockSignals(False)
@@ -1702,7 +1772,10 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
     def open_selected_launch_tool(self) -> None:
         key = self.launch_tool_combo.currentData()
         if isinstance(key, str) and key:
-            self.open_tool(key)
+            self._select_workspace(key)
+            self._set_status_message(
+                "Выбран связанный рабочий шаг. Для запуска отдельного окна используйте меню «Запуск» или двойной щелчок в списке «Окна»."
+            )
 
     def stop_selected_tool(self) -> None:
         key = self._selected_tool_key
@@ -1732,7 +1805,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             self,
             "О рабочем месте",
             "PneumoApp\n\n"
-                "Главное окно держит меню, быстрый поиск, список проекта, инспектор, диагностику и запуск окон.\n"
+                "Главное окно держит меню, быстрый поиск, список проекта, инспектор, проверку, отправку и запуск окон.\n"
                 "Аниматор, сравнение прогонов и мнемосхема остаются отдельными специализированными окнами.",
         )
 
@@ -1749,7 +1822,10 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
     def _on_launch_tool_activated(self, index: int) -> None:
         key = self.launch_tool_combo.itemData(index)
         if isinstance(key, str) and key:
-            self.open_tool(key)
+            self._select_workspace(key)
+            self._set_status_message(
+                "Выбран связанный рабочий шаг. Отдельное окно запускается только явной командой."
+            )
 
     def _select_workspace(self, key: str) -> None:
         self._apply_selected_tool(key)
@@ -1918,6 +1994,8 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, self.browser_dock)
         self.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, self.inspector_dock)
         self.addDockWidget(QtCore.Qt.DockWidgetArea.BottomDockWidgetArea, self.runtime_dock)
+        self.resizeDocks((self.browser_dock, self.inspector_dock), (320, 360), QtCore.Qt.Orientation.Horizontal)
+        self.resizeDocks((self.runtime_dock,), (190,), QtCore.Qt.Orientation.Vertical)
         self._localize_builtin_accessibility()
         self.resize(1640, 980)
         self._set_status_message("Раскладка сброшена к базовой: список проекта слева, инспектор справа, ход выполнения снизу.")
