@@ -38,6 +38,7 @@ from .workspace_pages import (
     InputWorkspacePage,
     OptimizationWorkspacePage,
     ResultsWorkspacePage,
+    RingWorkspacePage,
     SuiteWorkspacePage,
 )
 
@@ -817,6 +818,13 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         actions = self._command_specs_for_workspace(workspace)
         if workspace.workspace_id == "input_data":
             return InputWorkspacePage(
+                workspace,
+                actions,
+                self.run_command,
+                repo_root=self.repo_root,
+            )
+        if workspace.workspace_id == "ring_editor":
+            return RingWorkspacePage(
                 workspace,
                 actions,
                 self.run_command,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from pathlib import Path
 import sys
 from typing import Any
@@ -23,6 +24,12 @@ from pneumo_solver_ui.desktop_input_model import (
     load_base_defaults,
     load_base_with_defaults,
 )
+from pneumo_solver_ui.desktop_ring_editor_model import (
+    build_default_ring_spec,
+    build_segment_flow_rows,
+    normalize_spec,
+)
+from pneumo_solver_ui.desktop_ring_editor_runtime import build_ring_editor_diagnostics
 from pneumo_solver_ui.desktop_optimizer_runtime import DesktopOptimizerRuntime
 from pneumo_solver_ui.desktop_results_model import (
     DesktopResultsSnapshot,
@@ -227,6 +234,231 @@ def _dedupe_lines(*groups: tuple[str, ...] | list[str] | tuple[Any, ...]) -> tup
             seen.add(key)
             lines.append(text)
     return tuple(lines)
+
+
+def _latest_existing_path(paths: tuple[Path, ...] | list[Path]) -> Path | None:
+    existing = [path for path in paths if path.exists() and path.is_file()]
+    if not existing:
+        return None
+    return max(existing, key=lambda path: path.stat().st_mtime)
+
+
+def _ring_candidate_paths(repo_root: Path) -> tuple[Path, ...]:
+    workspace_dir = Path(repo_root) / "pneumo_solver_ui" / "workspace"
+    candidates: list[Path] = []
+    explicit_names = (
+        "ring_source_of_truth.json",
+        "scenario_ring_source_of_truth.json",
+        "desktop_ring_source_of_truth.json",
+        "ring_spec.json",
+        "scenario_ring_spec.json",
+    )
+    for name in explicit_names:
+        candidates.append(workspace_dir / name)
+        candidates.append(workspace_dir / "ui_state" / name)
+    if workspace_dir.exists():
+        patterns = (
+            "*ring_source_of_truth.json",
+            "*scenario*ring*source_of_truth.json",
+            "*ring*_spec.json",
+            "*scenario*ring*.json",
+        )
+        for pattern in patterns:
+            candidates.extend(path for path in workspace_dir.rglob(pattern) if path.is_file())
+    seen: set[str] = set()
+    ordered: list[Path] = []
+    for path in candidates:
+        key = str(path.resolve()) if path.exists() else str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        ordered.append(path)
+    return tuple(ordered)
+
+
+def _looks_like_ring_spec(payload: Any) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    if isinstance(payload.get("segments"), list):
+        return True
+    return str(payload.get("schema_version") or "").strip().startswith("ring")
+
+
+def _load_ring_spec_json(path: Path) -> tuple[dict[str, Any], str]:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if _looks_like_ring_spec(raw):
+        return normalize_spec(raw), "source"
+    if isinstance(raw, dict):
+        for key in ("ring_source_of_truth", "ring_spec", "scenario", "spec"):
+            nested = raw.get(key)
+            if _looks_like_ring_spec(nested):
+                return normalize_spec(nested), "nested"
+    raise ValueError(f"JSON is not a ring scenario spec: {path}")
+
+
+def _load_ring_spec_for_workspace(repo_root: Path) -> tuple[dict[str, Any], Path | None, str]:
+    candidates = tuple(path for path in _ring_candidate_paths(repo_root) if path.exists() and path.is_file())
+    if not candidates:
+        return build_default_ring_spec(), None, "default"
+    source_paths = tuple(path for path in candidates if "source_of_truth" in path.name)
+    spec_paths = tuple(path for path in candidates if path.name.endswith("_spec.json") or path.name in {"ring_spec.json", "scenario_ring_spec.json"})
+    other_paths = tuple(
+        path
+        for path in candidates
+        if path not in source_paths and path not in spec_paths and not path.name.endswith("_meta.json")
+    )
+    for group in (source_paths, spec_paths, other_paths):
+        ordered = sorted(group, key=lambda path: path.stat().st_mtime, reverse=True)
+        for path in ordered:
+            try:
+                spec, source_kind = _load_ring_spec_json(path)
+                return spec, path, source_kind
+            except Exception:
+                continue
+    latest_path = _latest_existing_path(candidates)
+    if latest_path is not None:
+        try:
+            spec, source_kind = _load_ring_spec_json(latest_path)
+            return spec, latest_path, source_kind
+        except Exception:
+            pass
+    return build_default_ring_spec(), latest_path, "fallback"
+
+
+def _ring_modes_text(rows: list[dict[str, Any]]) -> str:
+    modes: dict[str, int] = {}
+    for row in rows:
+        mode = str(row.get("road_mode") or "unknown").strip() or "unknown"
+        modes[mode] = modes.get(mode, 0) + 1
+    if not modes:
+        return "профиль дороги пока не рассчитан"
+    return ", ".join(f"{mode}: {count}" for mode, count in sorted(modes.items()))
+
+
+def _ring_turns_text(rows: list[dict[str, Any]]) -> str:
+    labels = {"STRAIGHT": "прямо", "LEFT": "лево", "RIGHT": "право"}
+    turns: dict[str, int] = {}
+    for row in rows:
+        turn = str(row.get("turn_direction") or "STRAIGHT").strip().upper()
+        label = labels.get(turn, turn.lower())
+        turns[label] = turns.get(label, 0) + 1
+    if not turns:
+        return "манёвры пока не рассчитаны"
+    return ", ".join(f"{label}: {count}" for label, count in sorted(turns.items()))
+
+
+def build_ring_workspace_summary(
+    repo_root: Path,
+    *,
+    python_executable: str | None = None,
+) -> WorkspaceSummaryState:
+    del python_executable
+    try:
+        spec, source_path, source_kind = _load_ring_spec_for_workspace(repo_root)
+        rows = build_segment_flow_rows(spec)
+        diagnostics = build_ring_editor_diagnostics(spec)
+    except Exception as exc:
+        return WorkspaceSummaryState(
+            headline="Сводка циклического сценария пока недоступна",
+            detail="Не удалось прочитать WS-RING runtime. Старый редактор остаётся fallback-инструментом, но основной маршрут должен вернуться в этот рабочий шаг.",
+            facts=(
+                WorkspaceSummaryFact(
+                    "Состояние",
+                    "сводка недоступна",
+                    _safe_text(exc, fallback="Проверьте desktop_ring_editor_model и desktop_ring_editor_runtime."),
+                ),
+                WorkspaceSummaryFact(
+                    "Следующий шаг",
+                    "открыть fallback-редактор или проверить исходный JSON",
+                    "После восстановления сценария вернитесь в WS-RING и затем переходите к набору испытаний.",
+                ),
+            ),
+            evidence_lines=(
+                "Runtime source: desktop_ring_editor_model + desktop_ring_editor_runtime.",
+                "Fallback command: ring.editor.open.",
+            ),
+        )
+
+    metrics = dict(diagnostics.metrics)
+    segment_count = len(rows)
+    event_count = sum(int(row.get("event_count", 0) or 0) for row in rows)
+    warning_count = len(diagnostics.warnings)
+    error_count = len(diagnostics.errors)
+    source_text = _path_text(source_path) if source_path is not None else "демо-сценарий по умолчанию"
+    source_detail = (
+        "Найден repo-local source-of-truth JSON для WS-RING."
+        if source_path is not None and source_kind in {"source", "nested"}
+        else "Сохраните сценарий из редактора, чтобы downstream-окна читали один и тот же источник."
+    )
+    state_text = (
+        "требует исправления"
+        if error_count
+        else "есть предупреждения"
+        if warning_count
+        else "готов к набору испытаний"
+    )
+    ring_length = float(metrics.get("ring_length_m", 0.0) or 0.0)
+    lap_time = float(metrics.get("lap_time_s", 0.0) or 0.0)
+    total_time = float(metrics.get("total_time_s", 0.0) or 0.0)
+    seam_max = float(metrics.get("seam_max_mm", 0.0) or 0.0)
+    raw_seam_max = float(metrics.get("raw_seam_max_mm", 0.0) or 0.0)
+    closure_policy = _safe_text(metrics.get("closure_policy"), fallback="режим замыкания не выбран")
+
+    facts = (
+        WorkspaceSummaryFact(
+            "Source of truth WS-RING",
+            source_text,
+            source_detail,
+        ),
+        WorkspaceSummaryFact(
+            "Сегменты и события",
+            f"Сегментов: {segment_count}. Событий дороги: {event_count}.",
+            f"Типы покрытия: {_ring_modes_text(rows)}. Манёвры: {_ring_turns_text(rows)}.",
+        ),
+        WorkspaceSummaryFact(
+            "Длина и время",
+            f"Длина круга: {ring_length:.2f} м. Круг: {lap_time:.2f} с. Всего: {total_time:.2f} с.",
+            "Эти значения вычислены runtime-моделью, а не введены вручную в shell.",
+        ),
+        WorkspaceSummaryFact(
+            "Шов и замыкание",
+            f"Максимальный шов: {seam_max:.2f} мм. До обработки: {raw_seam_max:.2f} мм.",
+            f"Политика замыкания: {closure_policy}. Downstream-окна не должны редактировать геометрию кольца.",
+        ),
+        WorkspaceSummaryFact(
+            "Проверка сценария",
+            f"{state_text}: ошибок {error_count}, предупреждений {warning_count}.",
+            "Ошибки блокируют передачу сценария в набор испытаний; предупреждения должны быть видимы оператору.",
+        ),
+        WorkspaceSummaryFact(
+            "Следующий шаг",
+            "перейти к набору испытаний",
+            "WS-SUITE потребляет сценарий как HO-004 handoff и не становится вторым редактором кольца.",
+        ),
+    )
+    evidence_lines = _dedupe_lines(
+        (
+            "Runtime source: desktop_ring_editor_model.normalize_spec + desktop_ring_editor_runtime.build_ring_editor_diagnostics.",
+            f"Source file: {source_text}.",
+            "Fallback editor command: ring.editor.open.",
+            "Primary next route: workspace.test_matrix.open.",
+        ),
+        tuple(str(item) for item in diagnostics.errors[:3]),
+        tuple(str(item) for item in diagnostics.warnings[:3]),
+    )
+    headline = (
+        f"Циклический сценарий: {segment_count} сегментов, {event_count} событий, состояние - {state_text}"
+    )
+    detail = (
+        "WS-RING теперь открыт как hosted рабочая страница: shell показывает состояние сценария, provenance и безопасный переход дальше, "
+        "а старый редактор остаётся отдельным fallback-действием для детального редактирования."
+    )
+    return WorkspaceSummaryState(
+        headline=headline,
+        detail=detail,
+        facts=facts,
+        evidence_lines=evidence_lines,
+    )
 
 
 def _stage_counts_text(counts: dict[str, int] | None) -> str:

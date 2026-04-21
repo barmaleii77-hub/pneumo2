@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
 from PySide6 import QtCore, QtWidgets
 
+from pneumo_solver_ui.desktop_ring_editor_model import build_default_ring_spec
 from pneumo_solver_ui.desktop_spec_shell.main_window import DesktopGuiSpecMainWindow
+from pneumo_solver_ui.desktop_spec_shell.workspace_runtime import build_ring_workspace_summary
+from pneumo_solver_ui.desktop_spec_shell.workspace_pages import RingWorkspacePage
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -76,6 +80,58 @@ def test_main_window_defers_settings_sync_during_initial_open(tmp_path, monkeypa
 
     settings = QtCore.QSettings(str(settings_path), QtCore.QSettings.IniFormat)
     assert str(settings.value("window/last_workspace") or "") == "diagnostics"
+
+
+def test_main_window_hosts_ring_workspace_without_legacy_bridge_surface(tmp_path, monkeypatch) -> None:
+    settings_path = tmp_path / "desktop_spec_shell_ring_state.ini"
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
+
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        window.open_workspace("ring_editor")
+        app.processEvents()
+
+        page = window._page_widget_by_workspace_id["ring_editor"]
+        assert isinstance(page, RingWorkspacePage)
+        assert page.objectName() == "WS-RING-HOSTED-PAGE"
+        assert "Циклический сценарий" in page.headline_label.text()
+        action_ids = tuple(command.command_id for command in page.action_commands)
+        assert action_ids == ("ring.editor.open", "workspace.test_matrix.open")
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_ring_workspace_summary_prefers_source_of_truth_over_newer_meta(tmp_path) -> None:
+    ring_dir = tmp_path / "pneumo_solver_ui" / "workspace" / "generated_scenarios" / "ring"
+    ring_dir.mkdir(parents=True)
+    source_path = ring_dir / "scenario_demo_ring_source_of_truth.json"
+    meta_path = ring_dir / "scenario_demo_ring_meta.json"
+    source_path.write_text(
+        json.dumps(build_default_ring_spec(), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    meta_path.write_text(
+        json.dumps({"kind": "meta", "segments": "not-a-ring-spec"}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    os.utime(source_path, (1000, 1000))
+    os.utime(meta_path, (2000, 2000))
+
+    summary = build_ring_workspace_summary(tmp_path)
+    visible_text = "\n".join(
+        (
+            summary.headline,
+            summary.detail,
+            *(fact.value for fact in summary.facts),
+            *summary.evidence_lines,
+        )
+    )
+
+    assert str(source_path.resolve()) in visible_text
+    assert str(meta_path.resolve()) not in visible_text
 
 
 def test_main_window_cycles_focus_by_f6_region_order(tmp_path, monkeypatch) -> None:

@@ -45,6 +45,7 @@ evidence draft behavior.
 | `START_DESKTOP_MAIN_SHELL.py` | needs-review | V32-01 | RGH-009 RGH-020 OG-005 | desktop main shell launcher proof | `tests/test_desktop_gui_spec_shell_contract.py` | Review shell launcher entrypoint. |
 | `docs/00_PROJECT_KNOWLEDGE_BASE.md` | keep | V32-16 | v33-v32 source order | KB link evidence | `tests/test_gui_spec_docs_contract.py` | Keep as source map update. |
 | `docs/PROJECT_SOURCES.md` | keep | V32-16 | v33-v32 source order | Active release-readiness source link | `tests/test_gui_spec_docs_contract.py` | Keep triage reference in source map. |
+| `docs/context/release_readiness/CHAT_CONSOLIDATED_MASTER_V1_GUI_ROUTE_AUDIT_2026-04-21.md` | keep | V32-16 | chat master route audit | WS-RING hosted follow-up recorded without runtime closure claim | `tests/test_gui_spec_docs_contract.py; tests/test_desktop_gui_spec_shell_contract.py` | Keep as GUI route audit evidence. |
 | `docs/13_CHAT_REQUIREMENTS_LOG.md` | keep | V32-16 | KB capture | KB generated log | `tests/test_knowledge_base_sync_contract.py` | Keep generated KB entry. |
 | `docs/14_CHAT_PLANS_LOG.md` | keep | V32-16 | KB capture | KB generated log | `tests/test_knowledge_base_sync_contract.py` | Keep generated plan entry. |
 | `docs/15_CHAT_KNOWLEDGE_BASE.json` | keep | V32-16 | KB capture | Machine-readable KB store | `tests/test_knowledge_base_sync_contract.py` | Keep JSON store update. |
@@ -253,6 +254,7 @@ evidence draft behavior.
 | `tests/test_desktop_gui_spec_catalog_contract.py` | needs-review | V32-01/V32-16 | V19 graph iteration RGH-020 | catalog contract coverage for V19 graph guidance | `tests/test_desktop_gui_spec_catalog_contract.py` | Review V19 graph guidance assertions; this is not a runtime closure claim. |
 | `tests/test_desktop_gui_spec_diagnostics_hosted_contract.py` | needs-review | V32-11/V32-01 | RGH-006 RGH-020 OG-005 | hosted diagnostics workspace contract test | `tests/test_desktop_gui_spec_diagnostics_hosted_contract.py` | Review hosted diagnostics spec-shell test. |
 | `tests/test_desktop_gui_spec_shell_contract.py` | needs-review | V32-01 | RGH-009 RGH-020 | spec-shell contract tests | `tests/test_desktop_gui_spec_shell_contract.py` | Review spec-shell test changes. |
+| `tests/test_desktop_gui_spec_shell_runtime_contract.py` | needs-review | V32-01 | RGH-009 RGH-020 | offscreen spec-shell runtime smoke tests | `tests/test_desktop_gui_spec_shell_runtime_contract.py` | Review hosted WS-RING smoke coverage. |
 | `tests/test_desktop_gui_spec_workspace_pages_contract.py` | needs-review | V32-01 | RGH-009 RGH-020 | workspace page contract tests | `tests/test_desktop_gui_spec_workspace_pages_contract.py` | Review workspace page test changes. |
 | `tests/test_desktop_geometry_reference_center_contract.py` | needs-review | V32-12 | RGH-018 OG-006 | geometry reference tests | `tests/test_desktop_geometry_reference_center_contract.py` | Review geometry tests. |
 | `tests/test_desktop_input_editor_contract.py` | needs-review | V32-02 | WS-INPUTS HO-002 HO-003 | input editor tests | `tests/test_desktop_input_editor_contract.py` | Review input tests. |

@@ -37,11 +37,21 @@ V21 says the main conflict is at shell/route level: the home surface must stop a
 
 This keeps direct actions available through their owning workspaces and command search, but removes legacy/external actions from the first overview decision row.
 
+## Follow-Up Applied: Hosted WS-RING
+
+The second implementation change starts the route-critical migration after the overview cleanup:
+
+- `ring_editor.launch_surface` is now `workspace`, so the canonical shell treats WS-RING as a hosted route surface.
+- `DesktopGuiSpecMainWindow` creates `RingWorkspacePage` for `ring_editor` instead of falling through to the generic bridge/control hub.
+- The new WS-RING page reads state through `desktop_ring_editor_model` and `desktop_ring_editor_runtime`, then shows source-of-truth, segment/event counts, ring length/time, seam/closure status, validation status and the next route.
+- `ring.editor.open` remains a legacy fallback command for detailed editing; it is no longer the only visible implementation of the workspace.
+- The ring workspace quick actions are now the fallback editor plus the route-forward handoff to `workspace.test_matrix.open`.
+
 ## Remaining Gaps Against Master V1
 
 | Gap | Master V1 source | Current state | Next action |
 | --- | --- | --- | --- |
-| Ring editor must dominate as step 2 | V21 `CUR-RING-NOT-DOMINANT`, V20/V19 ring graphs, V13 ring migration | route-visible, still legacy bridge | build hosted `WS-RING` control surface and keep legacy editor as fallback |
+| Ring editor must dominate as step 2 | V21 `CUR-RING-NOT-DOMINANT`, V20/V19 ring graphs, V13 ring migration | hosted summary/control surface; legacy editor fallback remains | expand WS-RING from control surface to native editor once source mutation rules are ready |
 | Suite must read as consumer after ring | V21 `CUR-WIN-SUITE`, V20 `WS-SUITE` graph | route-visible, still legacy bridge | host suite summary/list/detail and validation snapshot |
 | Baseline setup must not be a side launcher | V20 `WS-BASELINE`, route cost scenarios | baseline state hosted, setup still legacy bridge | host run setup and single-run handoff |
 | Optimization needs one primary route | V21 `CUR-SHELL-OPT-PAGE`, V17 path-cost data | workspace exists, optimizer center still legacy bridge | host StageRunner/contract summary and keep distributed mode advanced |
@@ -63,3 +73,5 @@ This keeps direct actions available through their owning workspaces and command 
 - `tests/test_desktop_gui_spec_shell_contract.py` now asserts that overview quick actions are workspace-only.
 - The same test asserts that overview result and diagnostics cards open workspaces, not legacy/action commands.
 - Existing diagnostics hosted tests remain responsible for proving that `diagnostics.collect_bundle` still works from the diagnostics lane and global command routing.
+- `tests/test_desktop_gui_spec_shell_contract.py` now asserts that WS-RING is a hosted workspace while `ring.editor.open` remains a legacy fallback.
+- `tests/test_desktop_gui_spec_shell_runtime_contract.py` now opens `ring_editor` offscreen and verifies that the shell hosts `RingWorkspacePage`.

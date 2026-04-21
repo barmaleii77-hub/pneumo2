@@ -25,6 +25,7 @@ from .workspace_runtime import (
     build_input_workspace_summary,
     build_optimization_workspace_summary,
     build_results_workspace_summary,
+    build_ring_workspace_summary,
 )
 from .v19_guidance_widgets import build_v19_action_feedback_box
 from .v16_guidance_widgets import build_v16_visibility_priority_box
@@ -1198,6 +1199,30 @@ class InputWorkspacePage(RuntimeWorkspacePage):
             ),
             parent,
         )
+
+
+class RingWorkspacePage(RuntimeWorkspacePage):
+    def __init__(
+        self,
+        workspace: DesktopWorkspaceSpec,
+        action_commands: Iterable[DesktopShellCommandSpec],
+        on_command: Callable[[str], None],
+        *,
+        repo_root: Path,
+        python_executable: str | None = None,
+        parent: QtWidgets.QWidget | None = None,
+    ) -> None:
+        super().__init__(
+            workspace,
+            action_commands,
+            on_command,
+            lambda: build_ring_workspace_summary(
+                repo_root,
+                python_executable=python_executable,
+            ),
+            parent,
+        )
+        self.setObjectName("WS-RING-HOSTED-PAGE")
 
 
 class OptimizationWorkspacePage(RuntimeWorkspacePage):
