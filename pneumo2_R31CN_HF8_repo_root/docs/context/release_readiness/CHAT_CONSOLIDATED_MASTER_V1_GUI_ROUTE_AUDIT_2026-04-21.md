@@ -23,7 +23,8 @@ Status: actionable implementation audit after importing `pneumo_chat_consolidate
 - `diagnostics` is already a hosted workspace. `diagnostics.collect_bundle`, `diagnostics.verify_bundle` and `diagnostics.send_results` are hosted actions, while `diagnostics.legacy_center.open` remains a fallback.
 - `baseline_run` has hosted run setup, readiness check and review/adopt/restore surfaces. The old `desktop_run_setup_center` remains available as an explicit advanced fallback command.
 - `ring_editor` and `test_matrix` are hosted workspace surfaces with legacy fallback commands for detailed tools.
-- `optimization` and `results_analysis` are still mostly `legacy_bridge` surfaces.
+- `optimization` now has a hosted primary setup/readiness surface. The old `desktop_optimizer_center` remains available as an explicit advanced fallback command.
+- `results_analysis` is still mostly a `legacy_bridge` surface.
 - `animation` is route-visible, but its main actions still launch external Animator and Mnemo windows.
 - `tools` is a support workspace and keeps legacy/tooling entrypoints available for fallback.
 
@@ -68,6 +69,17 @@ The fourth implementation change starts closing the baseline side-launcher gap:
 - `baseline.legacy_run_setup.open` keeps the old Tk run setup center available as an explicit advanced fallback.
 - The active route now reads as `WS-SUITE -> WS-BASELINE` without forcing the user into an external setup window before seeing baseline state.
 
+## Follow-Up Applied: Hosted WS-OPTIMIZATION Setup
+
+The fifth implementation change moves optimization setup onto the active route:
+
+- `optimization.center.open` is now a hosted action routed through `OptimizationWorkspacePage`, not a direct module launch.
+- `OptimizationWorkspacePage` now exposes `WS-OPTIMIZATION-HOSTED-PAGE` plus `OP-STAGERUNNER-BLOCK` for the primary optimization setup surface.
+- The hosted surface shows objective stack, hard gate, baseline provenance, suite/search-space readiness, active job and latest run state through `desktop_optimizer_runtime`.
+- `optimization.readiness.check` and `optimization.primary_launch.prepare` are command-search-visible hosted actions for readiness and preparation.
+- `optimization.legacy_center.open` keeps the old optimizer center available as an explicit advanced fallback.
+- The active route now reads as `WS-BASELINE -> WS-OPTIMIZATION -> WS-ANALYSIS` without forcing the user into the optimizer center before seeing launch readiness.
+
 ## Remaining Gaps Against Master V1
 
 | Gap | Master V1 source | Current state | Next action |
@@ -75,7 +87,7 @@ The fourth implementation change starts closing the baseline side-launcher gap:
 | Ring editor must dominate as step 2 | V21 `CUR-RING-NOT-DOMINANT`, V20/V19 ring graphs, V13 ring migration | hosted summary/control surface; legacy editor fallback remains | expand WS-RING from control surface to native editor once source mutation rules are ready |
 | Suite must read as consumer after ring | V21 `CUR-WIN-SUITE`, V20 `WS-SUITE` graph | hosted table/check/snapshot surface; legacy test center fallback remains | expand native suite editing beyond enable/check/save once mutation rules are ready |
 | Baseline setup must not be a side launcher | V20 `WS-BASELINE`, route cost scenarios | setup/readiness hosted; actual heavy run execution still delegated to advanced center | wire native execution once subprocess contract is isolated from Tk editor state |
-| Optimization needs one primary route | V21 `CUR-SHELL-OPT-PAGE`, V17 path-cost data | workspace exists, optimizer center still legacy bridge | host StageRunner/contract summary and keep distributed mode advanced |
+| Optimization needs one primary route | V21 `CUR-SHELL-OPT-PAGE`, V17 path-cost data | setup/readiness hosted; heavy execution remains in advanced optimizer center | wire native execution once launch subprocess state is separated from the detailed optimizer center |
 | Analysis compare must be primary inside analysis | V21 `CUR-WIN-COMPARE` | results workspace exists, results center and compare viewer are launchers | host latest result/compare summary first, keep viewer advanced |
 | Animation is route-visible but still external | V20 `WS-ANIMATOR` | workspace exists, Animator/Mnemo external | host route-aware animation hub before native re-host |
 
@@ -85,7 +97,7 @@ The fourth implementation change starts closing the baseline side-launcher gap:
 2. Implement hosted `WS-RING` as the next route-critical workspace. Done as hosted summary/control surface.
 3. Implement hosted `WS-SUITE` as consumer of the ring/source snapshot. Done as hosted table/check/snapshot surface.
 4. Move baseline run setup into hosted `WS-BASELINE`. Done as hosted setup/readiness surface; native execution wiring remains next.
-5. Move StageRunner-first optimization controls into hosted `WS-OPTIMIZATION`.
+5. Move StageRunner-first optimization controls into hosted `WS-OPTIMIZATION`. Done as hosted setup/readiness surface; native execution wiring remains next.
 6. Move latest results and primary compare summary into hosted `WS-ANALYSIS`.
 7. Convert `WS-ANIMATOR` from external-window hub to hosted control hub, then re-host Animator/Mnemo surfaces when runtime evidence is ready.
 
@@ -100,3 +112,5 @@ The fourth implementation change starts closing the baseline side-launcher gap:
 - `tests/test_desktop_gui_spec_shell_runtime_contract.py` and `tests/test_desktop_gui_spec_workspace_pages_contract.py` now verify the hosted suite page, route-forward baseline action and advanced fallback action.
 - `tests/test_desktop_gui_spec_shell_contract.py` now asserts that baseline setup is hosted while `baseline.legacy_run_setup.open` remains the advanced fallback.
 - `tests/test_desktop_gui_spec_shell_runtime_contract.py` and `tests/test_desktop_gui_spec_workspace_pages_contract.py` now verify the hosted baseline setup panel and command routing.
+- `tests/test_desktop_gui_spec_shell_contract.py` now asserts that optimization setup is hosted while `optimization.legacy_center.open` remains the advanced fallback.
+- `tests/test_desktop_gui_spec_shell_runtime_contract.py` and `tests/test_desktop_gui_spec_workspace_pages_contract.py` now verify the hosted optimization setup panel and command routing.

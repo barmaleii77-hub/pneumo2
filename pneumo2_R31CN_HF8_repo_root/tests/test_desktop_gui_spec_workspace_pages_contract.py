@@ -181,6 +181,7 @@ def test_gui_spec_main_window_uses_hosted_pages_for_runtime_and_control_hubs_for
         assert isinstance(window._page_widget_by_workspace_id["animation"], ControlHubWorkspacePage)
         assert isinstance(window._page_widget_by_workspace_id["baseline_run"], BaselineWorkspacePage)
         assert isinstance(window._page_widget_by_workspace_id["optimization"], OptimizationWorkspacePage)
+        assert window._page_widget_by_workspace_id["optimization"].objectName() == "WS-OPTIMIZATION-HOSTED-PAGE"
         assert isinstance(window._page_widget_by_workspace_id["results_analysis"], ResultsWorkspacePage)
         assert isinstance(window._page_widget_by_workspace_id["diagnostics"], DiagnosticsWorkspacePage)
         assert callable(getattr(window._page_widget_by_workspace_id["overview"], "refresh_view", None))
@@ -230,6 +231,32 @@ def test_suite_workspace_page_shows_test_rows_without_launcher_shell() -> None:
         assert "stage" not in visible_text
         assert "suite" not in visible_text
         assert "sidecar" not in visible_text
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_optimization_workspace_page_hosts_primary_launch_controls() -> None:
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        page = window._page_widget_by_workspace_id["optimization"]
+        assert isinstance(page, OptimizationWorkspacePage)
+        window.run_command("optimization.center.open")
+        app.processEvents()
+
+        assert page.optimization_launch_box.objectName() == "OP-STAGERUNNER-BLOCK"
+        visible_buttons = {button.text() for button in page.findChildren(QtWidgets.QPushButton)}
+        assert "Проверить готовность" in visible_buttons
+        assert "Подготовить основной запуск" in visible_buttons
+        assert "Расширенная настройка" in visible_buttons
+        assert "Настройка основного запуска открыта" in page.optimization_result_label.text()
+
+        window.run_command("optimization.primary_launch.prepare")
+        app.processEvents()
+        assert page.optimization_result_label.text()
+        assert "optimization.primary_launch.prepare" in window.recent_command_ids
     finally:
         window.close()
         window.deleteLater()

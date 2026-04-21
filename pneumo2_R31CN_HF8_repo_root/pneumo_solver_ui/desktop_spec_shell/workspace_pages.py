@@ -10,6 +10,7 @@ from pneumo_solver_ui.desktop_suite_runtime import (
     write_desktop_suite_handoff_snapshot,
 )
 from pneumo_solver_ui.desktop_suite_snapshot import load_suite_rows
+from pneumo_solver_ui.desktop_optimizer_runtime import DesktopOptimizerRuntime
 from pneumo_solver_ui.desktop_run_setup_model import (
     DESKTOP_RUN_CACHE_POLICY_OPTIONS,
     DESKTOP_RUN_PROFILE_OPTIONS,
@@ -1522,6 +1523,8 @@ class OptimizationWorkspacePage(RuntimeWorkspacePage):
         python_executable: str | None = None,
         parent: QtWidgets.QWidget | None = None,
     ) -> None:
+        self.repo_root = Path(repo_root)
+        self.python_executable = python_executable
         super().__init__(
             workspace,
             action_commands,
@@ -1532,6 +1535,278 @@ class OptimizationWorkspacePage(RuntimeWorkspacePage):
             ),
             parent,
         )
+        self.setObjectName("WS-OPTIMIZATION-HOSTED-PAGE")
+
+    def _build_extra_controls(self, layout: QtWidgets.QVBoxLayout) -> None:
+        self.optimization_launch_box = QtWidgets.QGroupBox("Оптимизация и основной запуск")
+        self.optimization_launch_box.setObjectName("OP-STAGERUNNER-BLOCK")
+        self.optimization_launch_box.setFocusPolicy(QtCore.Qt.StrongFocus)
+        launch_layout = QtWidgets.QVBoxLayout(self.optimization_launch_box)
+        launch_layout.setSpacing(8)
+
+        intro = QtWidgets.QLabel(
+            "Основной расчёт является рекомендуемым путём. Расширенная координация доступна отдельно "
+            "и не должна запускаться параллельно с основным расчётом."
+        )
+        intro.setWordWrap(True)
+        launch_layout.addWidget(intro)
+
+        self.optimization_source_label = QtWidgets.QLabel("")
+        self.optimization_source_label.setWordWrap(True)
+        self.optimization_source_label.setStyleSheet("color: #405060;")
+        launch_layout.addWidget(self.optimization_source_label)
+
+        form = QtWidgets.QFormLayout()
+        self.optimization_objectives_label = QtWidgets.QLabel("")
+        self.optimization_gate_label = QtWidgets.QLabel("")
+        self.optimization_baseline_label = QtWidgets.QLabel("")
+        self.optimization_suite_label = QtWidgets.QLabel("")
+        self.optimization_active_job_label = QtWidgets.QLabel("")
+        self.optimization_latest_run_label = QtWidgets.QLabel("")
+        for label in (
+            self.optimization_objectives_label,
+            self.optimization_gate_label,
+            self.optimization_baseline_label,
+            self.optimization_suite_label,
+            self.optimization_active_job_label,
+            self.optimization_latest_run_label,
+        ):
+            label.setWordWrap(True)
+        form.addRow("Цели расчёта", self.optimization_objectives_label)
+        form.addRow("Обязательное условие", self.optimization_gate_label)
+        form.addRow("Опорный прогон", self.optimization_baseline_label)
+        form.addRow("Набор испытаний", self.optimization_suite_label)
+        form.addRow("Активное задание", self.optimization_active_job_label)
+        form.addRow("Последний запуск", self.optimization_latest_run_label)
+        launch_layout.addLayout(form)
+
+        button_row = QtWidgets.QHBoxLayout()
+        self.optimization_check_button = QtWidgets.QPushButton("Проверить готовность")
+        self.optimization_check_button.setObjectName("OP-BTN-CHECK")
+        self.optimization_check_button.setToolTip(
+            "Проверить цели, ограничение, опорный прогон и набор испытаний перед запуском."
+        )
+        self.optimization_check_button.clicked.connect(
+            lambda: self.on_command("optimization.readiness.check")
+        )
+        self.optimization_prepare_button = QtWidgets.QPushButton("Подготовить основной запуск")
+        self.optimization_prepare_button.setObjectName("OP-BTN-LAUNCH")
+        self.optimization_prepare_button.setToolTip(
+            "Собрать видимые условия запуска и следующий рекомендуемый шаг."
+        )
+        self.optimization_prepare_button.clicked.connect(
+            lambda: self.on_command("optimization.primary_launch.prepare")
+        )
+        self.optimization_advanced_button = QtWidgets.QPushButton("Расширенная настройка")
+        self.optimization_advanced_button.setObjectName("OP-BTN-ADVANCED")
+        self.optimization_advanced_button.setToolTip(
+            "Открыть подробную настройку для специальных сценариев."
+        )
+        self.optimization_advanced_button.clicked.connect(
+            lambda: self.on_command("optimization.legacy_center.open")
+        )
+        for button in (
+            self.optimization_check_button,
+            self.optimization_prepare_button,
+            self.optimization_advanced_button,
+        ):
+            button_row.addWidget(button)
+        button_row.addStretch(1)
+        launch_layout.addLayout(button_row)
+
+        self.optimization_result_label = QtWidgets.QLabel("")
+        self.optimization_result_label.setObjectName("OP-ACTION-RESULT")
+        self.optimization_result_label.setWordWrap(True)
+        self.optimization_result_label.setStyleSheet("color: #576574;")
+        launch_layout.addWidget(self.optimization_result_label)
+
+        layout.addWidget(self.optimization_launch_box)
+
+    def _optimizer_runtime(self) -> DesktopOptimizerRuntime:
+        return DesktopOptimizerRuntime(
+            ui_root=self.repo_root,
+            python_executable=self.python_executable,
+        )
+
+    @staticmethod
+    def _token_text(raw: object, fallback: str = "не задано") -> str:
+        text = " ".join(str(raw or "").replace("_", " ").split()).strip()
+        if not text:
+            return fallback
+        labels = {
+            "stage runner": "основной расчёт",
+            "staged": "основной расчёт",
+            "coordinator": "распределённый режим",
+            "coord": "распределённый режим",
+            "missing": "не найдено",
+            "unknown": "нет данных",
+            "ready": "готов",
+            "blocked": "требует подготовки",
+            "done": "завершён",
+            "failed": "есть ошибка",
+            "active": "активен",
+            "stale": "устарел",
+            "invalid": "требует проверки",
+        }
+        return labels.get(text.casefold(), text)
+
+    @staticmethod
+    def _short_value(raw: object, *, fallback: str = "нет данных") -> str:
+        text = " ".join(str(raw or "").split()).strip()
+        if not text:
+            return fallback
+        if len(text) <= 24:
+            return text
+        return f"{text[:12]}...{text[-8:]}"
+
+    @staticmethod
+    def _yes_no(value: object) -> str:
+        return "да" if bool(value) else "нет"
+
+    def _readiness_state(self, snapshot: Any) -> tuple[bool, tuple[str, ...]]:
+        blockers: list[str] = []
+        if not tuple(getattr(snapshot, "objective_keys", ()) or ()):
+            blockers.append("цели расчёта не выбраны")
+        if not str(getattr(snapshot, "penalty_key", "") or "").strip():
+            blockers.append("обязательное ограничение не выбрано")
+        if not bool(getattr(snapshot, "optimizer_baseline_can_consume", False)):
+            blockers.append("опорный прогон требует проверки")
+        if int(getattr(snapshot, "enabled_suite_total", 0) or 0) <= 0:
+            blockers.append("нет включённых испытаний")
+        return (not blockers, tuple(blockers))
+
+    def _refresh_optimization_controls(self) -> None:
+        if not hasattr(self, "optimization_launch_box"):
+            return
+        try:
+            runtime = self._optimizer_runtime()
+            snapshot = runtime.contract_snapshot()
+            pointer = runtime.latest_pointer_summary()
+            current_job = runtime.current_job()
+        except Exception as exc:
+            message = f"Сводка оптимизации временно недоступна: {exc}"
+            for label in (
+                self.optimization_objectives_label,
+                self.optimization_gate_label,
+                self.optimization_baseline_label,
+                self.optimization_suite_label,
+                self.optimization_active_job_label,
+                self.optimization_latest_run_label,
+            ):
+                label.setText(message)
+            self.optimization_prepare_button.setEnabled(False)
+            return
+
+        objectives = tuple(str(item) for item in getattr(snapshot, "objective_keys", ()) or ())
+        objective_text = ", ".join(self._token_text(item) for item in objectives[:5]) if objectives else "цели не выбраны"
+        if len(objectives) > 5:
+            objective_text += f"; ещё {len(objectives) - 5}"
+        penalty_key = self._token_text(getattr(snapshot, "penalty_key", ""), fallback="не выбрано")
+        penalty_tol = float(getattr(snapshot, "penalty_tol", 0.0) or 0.0)
+        ready, blockers = self._readiness_state(snapshot)
+
+        self.optimization_source_label.setText(
+            "Данные берутся из опорного прогона, набора испытаний, диапазонов оптимизации "
+            "и настроек стадий в рабочей папке проекта."
+        )
+        self.optimization_objectives_label.setText(objective_text)
+        self.optimization_gate_label.setText(
+            f"{penalty_key} не выше {penalty_tol:g}. "
+            + ("Проверка готовности пройдена." if ready else "Нужно исправить: " + ", ".join(blockers) + ".")
+        )
+        baseline_hash = self._short_value(getattr(snapshot, "active_baseline_hash", ""))
+        baseline_state = self._token_text(getattr(snapshot, "active_baseline_state", ""), fallback="не найден")
+        self.optimization_baseline_label.setText(
+            f"Состояние опорного прогона - {baseline_state}. "
+            f"Контроль прогона - {baseline_hash}. "
+            f"Доступен оптимизатору - {self._yes_no(getattr(snapshot, 'optimizer_baseline_can_consume', False))}."
+        )
+        enabled_total = int(getattr(snapshot, "enabled_suite_total", 0) or 0)
+        suite_total = int(getattr(snapshot, "suite_row_count", 0) or 0)
+        search_count = int(getattr(snapshot, "search_param_count", 0) or 0)
+        base_count = int(getattr(snapshot, "base_param_count", 0) or 0)
+        self.optimization_suite_label.setText(
+            f"Включено {enabled_total} из {suite_total} испытаний. "
+            f"Параметров в переборе {search_count}; всего базовых параметров {base_count}."
+        )
+
+        if current_job is None:
+            self.optimization_active_job_label.setText(
+                "Активного задания нет. Запускайте только один способ выполнения."
+            )
+        else:
+            self.optimization_active_job_label.setText(
+                f"Исполнитель - {self._token_text(getattr(current_job, 'backend', ''))}; "
+                f"режим выполнения - {self._token_text(getattr(current_job, 'pipeline_mode', ''))}; "
+                f"папка - {self._short_value(getattr(current_job, 'run_dir', ''))}."
+            )
+
+        if bool(pointer.get("exists")):
+            self.optimization_latest_run_label.setText(
+                f"{self._token_text(pointer.get('status_label'), fallback='запуск')}; "
+                f"{self._token_text(pointer.get('run_name'), fallback='без имени')}. "
+                f"Таблица {int(pointer.get('rows') or 0)} строк, выполнено {int(pointer.get('done_count') or 0)}, "
+                f"ошибок {int(pointer.get('error_count') or 0)}."
+            )
+        else:
+            self.optimization_latest_run_label.setText(
+                "Последний запуск пока не найден. После запуска здесь появится ссылка на результат."
+            )
+
+        self.optimization_prepare_button.setEnabled(ready)
+        self.optimization_prepare_button.setToolTip(
+            "Готово к подготовке основного запуска."
+            if ready
+            else "Сначала устраните блокирующие причины в целях, опорном прогоне или наборе испытаний."
+        )
+
+    def _activate_optimization_panel(self, message: str = "") -> None:
+        self._refresh_optimization_controls()
+        self.optimization_launch_box.setFocus(QtCore.Qt.OtherFocusReason)
+        if message:
+            self.optimization_result_label.setText(message)
+
+    def _verify_optimization_readiness(self) -> tuple[bool, tuple[str, ...]]:
+        runtime = self._optimizer_runtime()
+        snapshot = runtime.contract_snapshot()
+        ready, blockers = self._readiness_state(snapshot)
+        self._refresh_optimization_controls()
+        if ready:
+            self.optimization_result_label.setText(
+                "Проверка готовности - оптимизация готова к основному запуску."
+            )
+        else:
+            self.optimization_result_label.setText(
+                "Проверка готовности - нужно исправить: " + ", ".join(blockers) + "."
+            )
+        return ready, blockers
+
+    def _prepare_primary_launch(self) -> None:
+        ready, blockers = self._verify_optimization_readiness()
+        if ready:
+            self.optimization_result_label.setText(
+                "Основной запуск подготовлен: цели, обязательное условие, опорный прогон и набор испытаний видимы в этом рабочем шаге."
+            )
+        else:
+            self.optimization_result_label.setText(
+                "Подготовка остановлена: " + ", ".join(blockers) + "."
+            )
+
+    def refresh_view(self) -> None:
+        super().refresh_view()
+        self._refresh_optimization_controls()
+
+    def handle_command(self, command_id: str) -> None:
+        if command_id == "optimization.center.open":
+            self._activate_optimization_panel(
+                "Настройка основного запуска открыта в рабочем шаге оптимизации."
+            )
+            return
+        if command_id == "optimization.readiness.check":
+            self._verify_optimization_readiness()
+            return
+        if command_id == "optimization.primary_launch.prepare":
+            self._prepare_primary_launch()
 
 
 class ResultsWorkspacePage(RuntimeWorkspacePage):

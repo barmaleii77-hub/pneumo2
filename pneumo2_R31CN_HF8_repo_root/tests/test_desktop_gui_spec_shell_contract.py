@@ -119,7 +119,14 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert "baseline.legacy_launch.open" not in commands
     assert commands["test.center.open"].title == "Проверить набор испытаний"
     assert commands["test.center.open"].route_label == "Окна -> Набор испытаний -> Проверка набора"
+    assert commands["optimization.center.open"].kind == "hosted_action"
     assert commands["optimization.center.open"].automation_id == "OP-BTN-LAUNCH"
+    assert commands["optimization.center.open"].module is None
+    assert commands["optimization.readiness.check"].kind == "hosted_action"
+    assert commands["optimization.primary_launch.prepare"].kind == "hosted_action"
+    assert commands["optimization.legacy_center.open"].kind == "launch_module"
+    assert commands["optimization.legacy_center.open"].module == "pneumo_solver_ui.tools.desktop_optimizer_center"
+    assert commands["optimization.legacy_center.open"].launch_surface == "legacy_bridge"
     assert commands["input.editor.open"].launch_surface == "legacy_bridge"
     assert commands["workspace.ring_editor.open"].kind == "open_workspace"
     assert commands["workspace.ring_editor.open"].target_workspace_id == "ring_editor"
@@ -128,7 +135,7 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert commands["ring.editor.open"].launch_surface == "legacy_bridge"
     assert commands["test.center.open"].launch_surface == "legacy_bridge"
     assert commands["baseline.center.open"].launch_surface == "workspace"
-    assert commands["optimization.center.open"].launch_surface == "legacy_bridge"
+    assert commands["optimization.center.open"].launch_surface == "workspace"
     assert commands["results.center.open"].launch_surface == "legacy_bridge"
     assert commands["diagnostics.legacy_center.open"].launch_surface == "legacy_bridge"
     assert commands["diagnostics.legacy_center.open"].module == "pneumo_solver_ui.tools.desktop_diagnostics_center"
@@ -140,6 +147,8 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert "baseline.legacy_launch.open" not in workspaces["baseline_run"].quick_action_ids
     assert "baseline.legacy_run_setup.open" not in workspaces["baseline_run"].quick_action_ids
     assert "workspace.baseline_run.open" in workspaces["optimization"].quick_action_ids
+    assert "optimization.center.open" in workspaces["optimization"].quick_action_ids
+    assert "optimization.legacy_center.open" not in workspaces["optimization"].quick_action_ids
     assert workspaces["overview"].quick_action_ids == (
         "workspace.input_data.open",
         "workspace.ring_editor.open",

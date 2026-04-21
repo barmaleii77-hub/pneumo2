@@ -11,6 +11,7 @@ from pneumo_solver_ui.desktop_spec_shell.main_window import DesktopGuiSpecMainWi
 from pneumo_solver_ui.desktop_spec_shell.workspace_runtime import build_ring_workspace_summary
 from pneumo_solver_ui.desktop_spec_shell.workspace_pages import (
     BaselineWorkspacePage,
+    OptimizationWorkspacePage,
     RingWorkspacePage,
     SuiteWorkspacePage,
 )
@@ -188,6 +189,33 @@ def test_main_window_routes_baseline_setup_to_hosted_page(tmp_path, monkeypatch)
         window.run_command("baseline.run_setup.verify")
         app.processEvents()
         assert "Проверка готовности" in page.run_setup_result_label.text()
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_main_window_routes_optimization_setup_to_hosted_page(tmp_path, monkeypatch) -> None:
+    settings_path = tmp_path / "desktop_spec_shell_optimization_setup_state.ini"
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
+
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        window.run_command("optimization.center.open")
+        app.processEvents()
+
+        assert window._current_workspace_id == "optimization"
+        page = window._page_widget_by_workspace_id["optimization"]
+        assert isinstance(page, OptimizationWorkspacePage)
+        assert page.objectName() == "WS-OPTIMIZATION-HOSTED-PAGE"
+        assert page.optimization_launch_box.objectName() == "OP-STAGERUNNER-BLOCK"
+        assert "Настройка основного запуска открыта" in page.optimization_result_label.text()
+        assert "optimization.center.open" in window.recent_command_ids
+
+        window.run_command("optimization.readiness.check")
+        app.processEvents()
+        assert "Проверка готовности" in page.optimization_result_label.text()
     finally:
         window.close()
         window.deleteLater()
