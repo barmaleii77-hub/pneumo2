@@ -1,0 +1,54 @@
+{
+  "EXEC_SUMMARY.md": {
+    "sha256": "2c85756a311e27a9e22a9582e43486fafdfb47ff32e629dd460f2cde1d7c5718",
+    "size_bytes": 2088
+  },
+  "CURRENT_VS_CANONICAL_DIAGNOSTICS_V11.md": {
+    "sha256": "af16de43d28471a17f6f7b5c3b4b1d9f9866049cae8d8b967ade8768b1786f52",
+    "size_bytes": 3147
+  },
+  "CURRENT_VS_CANONICAL_COMPARE_VIEWER_V11.md": {
+    "sha256": "a01e28a984bf774df8fdffe35fc42dc76eb9b72792f3e4ca199d42e947248f1f",
+    "size_bytes": 2554
+  },
+  "CURRENT_VS_CANONICAL_INPUT_EDITOR_V11.md": {
+    "sha256": "226565828659ea017c240d424e0ab7386a2a00136a3ca9b29e83f2e26548a68e",
+    "size_bytes": 2525
+  },
+  "CURRENT_VS_CANONICAL_TEST_CENTER_V11.md": {
+    "sha256": "806ef5256edebda0c6a96471f0fd2dba56fe6d6366c0feaabf3401adda027fec",
+    "size_bytes": 2329
+  },
+  "LAUNCHER_HIERARCHY_AND_WINDOW_ROLE_V11.md": {
+    "sha256": "ccedd86fefac551ccb570c00a4d7a1efdb36ff7b57f7c1b4e61f47e0883b94bb",
+    "size_bytes": 1478
+  },
+  "LIMITS_AND_NOT_OPENED_V11.md": {
+    "sha256": "414500220eb2a8a4db781d258e40fff0dd1c67b0956c3f9f7546ae5e0874c565",
+    "size_bytes": 748
+  },
+  "NEXT_STEP_V11.md": {
+    "sha256": "9377efa37afc11f32fc5ec06e13d14bf888a44baad420f832671fb5689f51a79",
+    "size_bytes": 536
+  },
+  "WINDOW_CURRENT_VS_CANONICAL_MATRIX_V11.csv": {
+    "sha256": "0a8ea7c1a0f57d18f6e3b9be074f4f442973d2992f7397dacf3be706f209c295",
+    "size_bytes": 1262
+  },
+  "SEMANTIC_REWRITE_MATRIX_V11.csv": {
+    "sha256": "5b1a30a4781e948723bf8d910e4bacd106d4927983bd1c59051c9500f8dbe278",
+    "size_bytes": 2177
+  },
+  "ROUTE_CONFLICTS_V11.csv": {
+    "sha256": "5c8a9f303274abde2b85a6886bef597e0770d17121043c9d620917782c21f421",
+    "size_bytes": 657
+  },
+  "CURRENT_LAUNCHPOINT_CLUSTER_V11.dot": {
+    "sha256": "41a0795280e542e7022b233b970b5dc464348aeecfb3b0bc160427c10e269530",
+    "size_bytes": 1107
+  },
+  "CANONICAL_WINDOW_ROLES_V11.dot": {
+    "sha256": "866e2872866335a61f89db9c2ceda09a5518a0bb36b46db9f1d6029d4e1a1e67",
+    "size_bytes": 998
+  }
+}

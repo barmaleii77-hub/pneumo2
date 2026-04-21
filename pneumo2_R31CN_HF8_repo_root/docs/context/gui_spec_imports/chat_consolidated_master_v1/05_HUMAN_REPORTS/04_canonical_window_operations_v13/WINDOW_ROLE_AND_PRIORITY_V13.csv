@@ -1,0 +1,5 @@
+window,canonical_role,launcher_level,primary_or_secondary,must_open_from_tree,must_have_dock_or_inspector_support
+Диагностика,first-class operational surface,top-level,primary,yes,yes
+Подробное сравнение результатов,advanced compare route from Analysis,secondary,advanced,yes,yes
+Исходные данные проекта,master-copy input workspace,top-level,primary,yes,yes
+Набор испытаний,consumer of scenario source-of-truth,top-level,primary,yes,yes

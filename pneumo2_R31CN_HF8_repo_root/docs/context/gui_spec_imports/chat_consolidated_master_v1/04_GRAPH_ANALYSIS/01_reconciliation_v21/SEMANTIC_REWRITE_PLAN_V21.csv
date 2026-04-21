@@ -1,0 +1,25 @@
+﻿label_current,label_recommended,issue_type,severity,note
+GUI диагностики,Открыть Диагностику,implementation_leak,high,слово GUI не помогает понять задачу
+GUI отправки результатов,Отправить архив диагностики,route_misleading,high,отправка не должна выглядеть отдельным первым маршрутом
+Compare Viewer,Подробное сравнение результатов,internal_name_leak,high,"Viewer — внутренний термин, а не пользовательская цель"
+Desktop Mnemo,Открыть мнемосхему,mixed_language,medium,Desktop не должен быть основным смыслом
+Центр desktop-инструментов,Инструменты,mixed_language,medium,слово desktop лишнее в пользовательском слое
+GUI автотестов,Автотесты,implementation_leak,high,GUI — внутренний термин
+Оптимизация (фон),Фоновый прогресс оптимизации,ambiguous,medium,текущая надпись неясна обычному пользователю
+Перейти на страницу оптимизации,Открыть центр оптимизации,weak_goal,medium,"лучше описывать цель, а не факт страницы"
+Запустить StageRunner,Запустить оптимизацию по стадиям,internal_engine_name,medium,можно сохранить StageRunner во вторичной подсказке
+Distributed coordinator (Dask / Ray / BoTorch),Распределённый режим оптимизации,implementation_stack_leak,high,названия стеков не должны быть главным ярлыком
+Метод предложения кандидатов,Алгоритм выбора новых кандидатов,jargon,medium,"понятнее как смысл, а не как внутренний proposer"
+penalty key,Жёсткое ограничение,english+jargon,high,hard gate должен читаться по смыслу
+penalty tolerance,Допуск жёсткого ограничения,english+jargon,high,требуется human-readable contract
+objective keys,Целевые показатели,english+jargon,high,keys — внутренняя техническая семантика
+worldroad_flat,Ровная дорога,internal_preset_name,medium,preset id не должен быть основным названием
+ring_test_01,Кольцевой сценарий 1,raw_internal_name,medium,служебное имя не должно быть единственной подписью
+baseline_best.json,Активный baseline,file_name_leak,high,"пользователь работает не с JSON, а с baseline"
+latest_send_bundle.zip,Последний архив диагностики,file_name_leak,medium,имя файла вторично относительно смысла
+anim_latest.npz,Последний пакет анимации,file_name_leak,medium,нужна смысловая подпись и provenance
+stage0_relevance,Стадия 0: быстрый отбор,internal_stage_name,medium,runtime stage name должен иметь человеческую расшифровку
+stage1_long,Стадия 1: длительные испытания,internal_stage_name,medium,runtime stage name должен иметь человеческую расшифровку
+stage2_final,Стадия 2: финальная проверка,internal_stage_name,medium,runtime stage name должен иметь человеческую расшифровку
+underfill,Недобор бюджета стадии,jargon,medium,нужно сразу объяснять причину недобора
+gate reason,Причина блокировки,jargon,medium,лучше писать по-русски и по смыслу

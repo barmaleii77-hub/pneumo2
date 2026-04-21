@@ -1,0 +1,8 @@
+﻿window_name,current_status,internal_runtime_opened,canonical_target,should_remain_top_level,should_move_inside_other_surface,note
+GUI диагностики,launchpoint_only,нет,WS-DIAGNOSTICS,да,нет,"нельзя честно описывать внутренний UX, только роль и target-route"
+GUI отправки результатов,launchpoint_only,нет,inside WS-DIAGNOSTICS,нет,да,не должен оставаться самостоятельным первым маршрутом
+Compare Viewer,launchpoint_only,частично,WIN-COMPARE,"да, как advanced",нет,"внутренности окна не подтверждены, но роль понятна"
+Desktop Mnemo,launchpoint_only,нет,WIN-MNEMO,"да, как specialized",нет,нужна лучшая роль и объяснение
+Редактор исходных данных,launchpoint_only,нет,WS-INPUTS,да,нет,текущая внутренняя surface не доказана
+Центр тестов,launchpoint_only,нет,WS-SUITE,да,нет,текущая внутренняя surface не доказана
+Центр desktop-инструментов,launchpoint_only,нет,WS-TOOLS,нет,да,"служебный узел, не основной маршрут"

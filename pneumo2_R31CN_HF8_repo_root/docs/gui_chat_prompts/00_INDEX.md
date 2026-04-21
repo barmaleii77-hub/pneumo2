@@ -291,3 +291,18 @@
   у `v32_connector_reconciled`, затем у `v3`, затем у специализированного
   `v13_ring_editor_migration`, затем у `v12_design_recovery`, затем у
   historical imports.
+
+## Chat consolidated master V1 reference
+
+For new GUI lanes that need the latest consolidated chat-derived context from
+`pneumo_chat_consolidated_master_v1.zip`, read
+`docs/context/gui_spec_imports/chat_consolidated_master_v1/REPO_IMPORT_NOTE.md`,
+`docs/context/gui_spec_imports/chat_consolidated_master_v1/README.md`,
+`docs/context/gui_spec_imports/chat_consolidated_master_v1/06_INDEX/MASTER_EXEC_SUMMARY.json`,
+`docs/context/gui_spec_imports/chat_consolidated_master_v1/06_INDEX/LINEAGE_AND_READING_ORDER.md`,
+`docs/context/gui_spec_imports/chat_consolidated_master_v1/06_INDEX/SUPERSEDED_AND_EXCLUDED.csv`
+and `docs/context/release_readiness/CHAT_CONSOLIDATED_MASTER_V1_KB_IMPORT_AUDIT_2026-04-21.md`.
+
+This layer is a reference/provenance layer, not a lane prompt and not runtime-closure proof.
+It consolidates source context, `v38_actualized_with_v10`, `v34_repo_audit`,
+graph layers `v17 + v19 + v20 + v21`, and human reports `v10..v16`.

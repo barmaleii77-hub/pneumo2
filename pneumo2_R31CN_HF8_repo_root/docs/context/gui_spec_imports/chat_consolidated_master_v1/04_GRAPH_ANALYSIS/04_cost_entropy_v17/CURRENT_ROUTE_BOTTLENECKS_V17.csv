@@ -1,0 +1,13 @@
+scenario_id,source_id,source_label,target_id,target_label,weight_total,entropy_source,label_penalty_target,advanced_penalty,unknown_penalty
+launch_compare,SC_HOME,Главная heavy home page,HC_LAUNCH_COMPARE,Открыть Compare Viewer,6.312,2.362,1.05,1.1,0.0
+launch_diag,SC_HOME,Главная heavy home page,HC_LAUNCH_DIAG,Открыть GUI диагностики,5.912,2.362,1.75,0.0,0.0
+launch_ring,SC_HOME,Главная heavy home page,HC_LAUNCH_TEST,Открыть центр тестов,4.862,2.362,0.7,0.0,0.0
+launch_opt,SC_HOME,Главная heavy home page,HC_GO_OPT,Перейти на страницу оптимизации,4.862,2.362,0.7,0.0,0.0
+launch_anim,SC_HOME,Главная heavy home page,HC_OPEN_ANIM,Запустить Animator (--follow),4.862,2.362,0.7,0.0,0.0
+launch_inputs,SC_HOME,Главная heavy home page,HC_LAUNCH_INPUT,Открыть редактор исходных данных,4.162,2.362,0.0,0.0,0.0
+launch_inputs,HC_LAUNCH_INPUT,Открыть редактор исходных данных,CTASK_EDIT_INPUTS,Изменить исходные данные,1.05,0.0,0.0,0.0,0.0
+launch_ring,HC_LAUNCH_TEST,Открыть центр тестов,CTASK_EDIT_RING,Изменить сценарий кольца,1.05,0.0,0.0,0.0,0.0
+launch_opt,HC_GO_OPT,Перейти на страницу оптимизации,CTASK_OPEN_OPT,Открыть оптимизацию,1.05,0.0,0.0,0.0,0.0
+launch_diag,HC_LAUNCH_DIAG,Открыть GUI диагностики,CTASK_COLLECT_DIAG,Собрать диагностику,1.05,0.0,0.0,0.0,0.0
+launch_compare,HC_LAUNCH_COMPARE,Открыть Compare Viewer,CTASK_COMPARE,Сравнить результаты,1.05,0.0,0.0,0.0,0.0
+launch_anim,HC_OPEN_ANIM,Запустить Animator (--follow),CTASK_OPEN_ANIMATOR,Открыть аниматор,1.05,0.0,0.0,0.0,0.0

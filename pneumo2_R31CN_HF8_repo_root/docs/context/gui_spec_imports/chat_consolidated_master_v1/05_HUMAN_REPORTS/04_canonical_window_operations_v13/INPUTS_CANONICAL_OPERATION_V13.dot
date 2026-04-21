@@ -1,0 +1,31 @@
+digraph G {
+rankdir=LR;
+node [shape=box, style="rounded,filled", fillcolor=white, fontsize=10];
+"in_open" [label="Открыть Исходные данные проекта", fillcolor="#dbeafe"];
+"in_first" [label="Первый экран:\nгруппа полей + dirty-state + validation + visual twin", fillcolor="#dbeafe"];
+"in_group" [label="Выбрать группу параметров", fillcolor="#dcfce7"];
+"in_edit" [label="Изменить поле", fillcolor="#dcfce7"];
+"in_twin" [label="Feedback:\nvisual twin обновлён", fillcolor="#ede9fe"];
+"in_cog_springs" [label="Feedback:\nдве пружины на угол видны", fillcolor="#ede9fe"];
+"in_cog_level" [label="Feedback:\nрежим выравнивания и остаток видны", fillcolor="#ede9fe"];
+"in_cog_mirror" [label="Feedback:\nзеркальный режим виден", fillcolor="#ede9fe"];
+"in_validate" [label="Primary action:\nПроверить", fillcolor="#fef3c7"];
+"in_block_invalid" [label="Блокировка:\nvalidation issues", fillcolor="#fee2e2"];
+"in_save" [label="Primary action:\nСохранить", fillcolor="#dcfce7"];
+"in_to_ring" [label="Перейти в Редактор кольца", fillcolor="#f3f4f6"];
+"in_to_suite" [label="Перейти в Набор испытаний", fillcolor="#f3f4f6"];
+
+"in_open" -> "in_first";
+"in_first" -> "in_group";
+"in_group" -> "in_edit";
+"in_edit" -> "in_twin";
+"in_edit" -> "in_cog_springs";
+"in_edit" -> "in_cog_level";
+"in_edit" -> "in_cog_mirror";
+"in_edit" -> "in_validate";
+"in_validate" -> "in_block_invalid";
+"in_validate" -> "in_save";
+"in_block_invalid" -> "in_edit" [label="исправить поля"];
+"in_save" -> "in_to_ring";
+"in_save" -> "in_to_suite";
+}

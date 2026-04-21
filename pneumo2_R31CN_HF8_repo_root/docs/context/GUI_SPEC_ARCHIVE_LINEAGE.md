@@ -296,3 +296,23 @@ workspace contracts, acceptance playbooks, release gates, runtime artifact
 schema, evidence policy и open gaps. Поэтому для новых задач V32 читается после
 `17/18` как актуальный digest, а этот lineage-документ остается картой
 происхождения старых слоев.
+
+## Chat consolidated master V1
+
+`chat_consolidated_master_v1` is imported from `pneumo_chat_consolidated_master_v1.zip`
+as the current consolidated master reference layer. It does not replace the
+human-readable canon `17/18`, and it is not runtime-closure proof.
+
+The layer includes:
+
+- source context and prompt provenance in `01_SOURCE_CONTEXT/`;
+- final CODEX spec package `v38_actualized_with_v10`;
+- repo audit `v34_repo_audit`;
+- graph analysis V17, V19, V20 and V21;
+- human report-only layers V10 through V16;
+- `06_INDEX/MASTER_EXEC_SUMMARY.json`, `INCLUDED_ARTIFACTS.csv`,
+  `SUPERSEDED_AND_EXCLUDED.csv` and `LINEAGE_AND_READING_ORDER.md`.
+
+For lineage work, start with
+`docs/context/gui_spec_imports/chat_consolidated_master_v1/REPO_IMPORT_NOTE.md`
+and `docs/context/release_readiness/CHAT_CONSOLIDATED_MASTER_V1_KB_IMPORT_AUDIT_2026-04-21.md`.

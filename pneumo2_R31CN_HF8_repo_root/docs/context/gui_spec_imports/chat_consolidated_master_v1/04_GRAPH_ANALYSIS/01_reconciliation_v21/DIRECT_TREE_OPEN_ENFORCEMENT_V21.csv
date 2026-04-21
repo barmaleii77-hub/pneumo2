@@ -1,0 +1,13 @@
+﻿target_id,target_name,target_kind,direct_open_required,current_live_status,current_open_path,target_open_path,why_it_matters
+WS-PROJECT,Панель проекта,workspace,yes,partial,главная поверхность / shell,дерево -> Панель проекта,"обзор проекта, здоровье, next action"
+WS-INPUTS,Исходные данные,workspace,yes,partial,кнопка «Редактор исходных данных»,дерево -> Исходные данные,master-copy входных данных
+WS-RING,Редактор кольца,workspace,yes,weak,не доминирует в старте,дерево -> Сценарии и редактор кольца,единственный источник сценариев
+WS-SUITE,Набор испытаний,workspace,yes,partial,кнопка «Центр тестов»,дерево -> Набор испытаний,consumer сценарного контракта
+WS-BASELINE,Базовый прогон,workspace,yes,partial,карточки baseline / detailed run на home,дерево -> Базовый прогон,явный baseline contract
+WS-OPTIMIZATION,Оптимизация,workspace,yes,partial,главная поверхность + отдельная страница,дерево -> Оптимизация,один shell-route к центру оптимизации
+WS-ANALYSIS,Анализ результатов,workspace,yes,weak,embedded results / compare на home,дерево -> Анализ результатов,primary compare route
+WS-ANIMATOR,Анимация,workspace/window,yes,partial,кнопка Desktop Animator,дерево -> Анимация,viewport-first surface
+WS-DIAGNOSTICS,Диагностика,workspace,yes,partial,GUI диагностики,дерево -> Диагностика,один доминирующий diagnostics-route
+WIN-COMPARE,Подробное сравнение,window,yes,partial,Compare Viewer,дерево -> Подробное сравнение,advanced compare route
+WIN-MNEMO,Мнемосхема,window,yes,partial,Desktop Mnemo,дерево -> Мнемосхема,specialized visualization
+WS-TOOLS,Инструменты,workspace,yes,partial,Центр desktop-инструментов,дерево -> Инструменты,service surfaces and tools

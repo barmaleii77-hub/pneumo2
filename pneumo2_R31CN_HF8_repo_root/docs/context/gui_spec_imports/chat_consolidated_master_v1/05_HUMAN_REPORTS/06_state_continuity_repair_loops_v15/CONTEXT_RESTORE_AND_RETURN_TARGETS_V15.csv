@@ -1,0 +1,13 @@
+from_context,to_context,handoff_kind,selection_restore,target_selection_restore,compare_or_overlay_restore,focus_restore,why
+WS-INPUTS,WS-RING,upstream_handoff,selected_input_group,selected_segment,visual twin persists if safe,none,ring export invalidated
+WS-RING,WS-SUITE,validated_export_handoff,selected_segment,selected_row,none,none,suite link consumes ring export
+WS-SUITE,WS-RING,repair_return,selected_row,selected_segment_from_link,none,focus ring diagnostics,stale link or seam issue
+WS-SUITE,WS-BASELINE,validated_snapshot_handoff,selected_row,selected_run,none,focus baseline contract,snapshot exists
+WS-BASELINE,WS-OPTIMIZATION,active_baseline_handoff,selected_run,selected_mode,none,focus objective contract,baseline active
+WS-OPTIMIZATION,WS-BASELINE,repair_return,selected_stage,selected_run,none,focus baseline warnings,baseline/source mismatch
+WS-OPTIMIZATION,WS-ANALYSIS,selected_run_handoff,selected_run,selected_plot,compare picks preserved if same run,focus summary plot,run finished
+WS-ANALYSIS,Подробное сравнение результатов,advanced_compare_handoff,selected_plot,left/right compare contexts,compare filter preserved,focus compare diff,user requested detailed compare
+WS-ANALYSIS,WS-ANIMATOR,selected_run_handoff,selected_plot,selected_view,overlay picks preserved if same lineage,focus viewport,run has anim artifacts
+WS-ANIMATOR,WS-ANALYSIS,return_with_view_state,selected_view,selected_plot,overlay mismatch state preserved,focus provenance block,user needs analysis context
+WS-ANALYSIS,WS-DIAGNOSTICS,evidence_manifest_handoff,selected_run,selected_bundle_scope,none,focus bundle preview,artifacts missing or user collects diagnostics
+WS-DIAGNOSTICS,WS-ANALYSIS,return_after_bundle,selected_bundle_scope,selected_plot,none,focus bundle freshness banner,bundle assembled

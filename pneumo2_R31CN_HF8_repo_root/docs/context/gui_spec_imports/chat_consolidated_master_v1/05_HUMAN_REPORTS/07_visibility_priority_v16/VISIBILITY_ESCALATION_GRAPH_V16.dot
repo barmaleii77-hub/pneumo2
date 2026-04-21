@@ -1,0 +1,41 @@
+digraph visibility_escalation_v16 {
+  rankdir=LR;
+  node [shape=box, style="rounded"];
+
+  user_action [label="Пользователь делает действие"];
+  hidden_result [label="Результат скрыт\nтолько в данных/логике", shape=ellipse];
+  inspector_only [label="Только inspector/help", shape=ellipse];
+  inline_state [label="Inline state / badge", shape=ellipse];
+  summary_card [label="Сводная карточка в центре", shape=ellipse];
+  top_strip [label="Верхняя лента состояния", shape=ellipse];
+  message_bar [label="Message bar / banner", shape=ellipse];
+  blocker [label="Blocking state / repair route", shape=ellipse];
+  return_route [label="Возврат в upstream workspace", shape=ellipse];
+  trust [label="Пользователь понимает\nчто произошло и что делать дальше", shape=doublecircle];
+
+  user_action -> hidden_result [label="anti-pattern"];
+  hidden_result -> inspector_only [label="частичный прогресс"];
+  user_action -> inline_state [label="обычный локальный эффект"];
+  user_action -> summary_card [label="результат важен для задачи"];
+  user_action -> top_strip [label="контекст должен жить всегда"];
+  user_action -> message_bar [label="конфликт / stale / mismatch / degraded"];
+  message_bar -> blocker [label="если нужен repair"];
+  blocker -> return_route [label="переход к месту исправления"];
+  inline_state -> trust;
+  summary_card -> trust;
+  top_strip -> trust;
+  message_bar -> trust;
+  return_route -> trust;
+
+  subgraph cluster_shell {
+    label="Shell policy";
+    style=dashed;
+    tree [label="Левое дерево\nпрямой вход"];
+    center [label="Центральная рабочая область"];
+    right [label="Правый inspector/help"];
+    bottom [label="Нижний progress/status"];
+    tree -> center;
+    center -> right;
+    center -> bottom;
+  }
+}

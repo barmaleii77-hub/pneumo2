@@ -1,0 +1,5 @@
+route_a,route_b,problem,canonical_resolution
+GUI диагностики,GUI отправки результатов,ложная параллельность,"diagnostics must dominate, send-results nested after bundle"
+embedded compare,Compare Viewer,дублирование compare-route,"embedded compare primary, viewer advanced"
+Редактор исходных данных,heavy home/edit-like controls,размытый master-copy route,inputs editor must be explicit master-copy
+Центр тестов,Редактор кольца,рискует стать вторым сценарным центром,test center must consume scenarios only

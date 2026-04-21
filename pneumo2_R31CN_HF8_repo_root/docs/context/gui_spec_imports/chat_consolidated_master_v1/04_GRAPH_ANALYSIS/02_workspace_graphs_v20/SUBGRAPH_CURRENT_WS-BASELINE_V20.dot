@@ -1,0 +1,13 @@
+digraph G {
+rankdir=LR;
+node [shape=box, fontsize=10];
+"cur_baseline_home" [label="Экран базового прогона", style="filled", fillcolor="#dbeafe"];
+"cur_baseline_source" [label="Источник baseline", style="filled", fillcolor="#f3f4f6"];
+"cur_baseline_run" [label="Кнопка базового прогона", style="filled", fillcolor="#dcfce7"];
+"cur_baseline_history" [label="История baseline", style="filled", fillcolor="#f3f4f6"];
+"cur_baseline_summary" [label="Сводка baseline", style="filled", fillcolor="#ffffff"];
+"cur_baseline_home" -> "cur_baseline_source" [label="клик_или_переход"];
+"cur_baseline_source" -> "cur_baseline_run" [label="клик_или_переход"];
+"cur_baseline_run" -> "cur_baseline_history" [label="клик_или_переход"];
+"cur_baseline_history" -> "cur_baseline_summary" [label="клик_или_переход"];
+}

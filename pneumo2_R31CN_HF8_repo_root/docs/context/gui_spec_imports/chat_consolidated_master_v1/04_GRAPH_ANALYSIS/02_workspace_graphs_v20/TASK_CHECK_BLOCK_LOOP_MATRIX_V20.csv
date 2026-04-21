@@ -1,0 +1,90 @@
+workspace,kind,node_id,label,current_or_target
+WS-PROJECT,task,WS-PROJECT_task_1,открыть или создать проект,optimized
+WS-PROJECT,task,WS-PROJECT_task_2,проверить здоровье проекта,optimized
+WS-PROJECT,task,WS-PROJECT_task_3,восстановить последний проект,optimized
+WS-PROJECT,task,WS-PROJECT_task_4,выбрать следующий шаг,optimized
+WS-PROJECT,check,WS-PROJECT_check_1,путь проекта доступен,optimized
+WS-PROJECT,check,WS-PROJECT_check_2,workspace доступен для записи,optimized
+WS-PROJECT,check,WS-PROJECT_check_3,версия совместима,optimized
+WS-PROJECT,check,WS-PROJECT_check_4,история проекта не повреждена,optimized
+WS-PROJECT,block,WS-PROJECT_block_1,путь недоступен,optimized
+WS-PROJECT,block,WS-PROJECT_block_2,проект поврежден,optimized
+WS-PROJECT,block,WS-PROJECT_block_3,несовместимая версия,optimized
+WS-PROJECT,feedback,WS-PROJECT_feedback_1,проект открыт,optimized
+WS-PROJECT,feedback,WS-PROJECT_feedback_2,последний проект восстановлен,optimized
+WS-PROJECT,feedback,WS-PROJECT_feedback_3,здоровье проекта норма,optimized
+WS-PROJECT,feedback,WS-PROJECT_feedback_4,следующее действие рекомендовано,optimized
+WS-PROJECT,feedback,WS-PROJECT_feedback_5,несовместимость объяснена,optimized
+WS-SUITE,task,WS-SUITE_task_1,включить или исключить испытание,optimized
+WS-SUITE,task,WS-SUITE_task_2,назначить стадию входа,optimized
+WS-SUITE,task,WS-SUITE_task_3,привязать сценарий и sidecar,optimized
+WS-SUITE,task,WS-SUITE_task_4,проверить целевые показатели,optimized
+WS-SUITE,task,WS-SUITE_task_5,сохранить валидированный набор,optimized
+WS-SUITE,check,WS-SUITE_check_1,уникальные имена испытаний,optimized
+WS-SUITE,check,WS-SUITE_check_2,валидные dt и t end,optimized
+WS-SUITE,check,WS-SUITE_check_3,существуют sidecar файлы,optimized
+WS-SUITE,check,WS-SUITE_check_4,stage семантика не сломана,optimized
+WS-SUITE,check,WS-SUITE_check_5,scenario lineage полный,optimized
+WS-SUITE,block,WS-SUITE_block_1,дубли имен,optimized
+WS-SUITE,block,WS-SUITE_block_2,битый sidecar,optimized
+WS-SUITE,block,WS-SUITE_block_3,несовместимая stage семантика,optimized
+WS-SUITE,block,WS-SUITE_block_4,пустой валидный набор,optimized
+WS-SUITE,feedback,WS-SUITE_feedback_1,таблица валидна,optimized
+WS-SUITE,feedback,WS-SUITE_feedback_2,ошибки валидации показаны,optimized
+WS-SUITE,feedback,WS-SUITE_feedback_3,валидированный suite snapshot сохранен,optimized
+WS-SUITE,feedback,WS-SUITE_feedback_4,stale link показан,optimized
+WS-SUITE,feedback,WS-SUITE_feedback_5,context stale показан,optimized
+WS-SUITE,feedback,WS-SUITE_feedback_6,строки по стадиям видимы,optimized
+WS-BASELINE,task,WS-BASELINE_task_1,выбрать источник baseline,optimized
+WS-BASELINE,task,WS-BASELINE_task_2,запустить базовый прогон,optimized
+WS-BASELINE,task,WS-BASELINE_task_3,сравнить с предыдущим baseline,optimized
+WS-BASELINE,task,WS-BASELINE_task_4,принять или заморозить baseline,optimized
+WS-BASELINE,task,WS-BASELINE_task_5,передать active baseline в оптимизацию,optimized
+WS-BASELINE,check,WS-BASELINE_check_1,suite snapshot валиден,optimized
+WS-BASELINE,check,WS-BASELINE_check_2,inputs lineage совместим,optimized
+WS-BASELINE,check,WS-BASELINE_check_3,baseline policy задана,optimized
+WS-BASELINE,check,WS-BASELINE_check_4,active baseline hash актуален,optimized
+WS-BASELINE,block,WS-BASELINE_block_1,stale baseline source,optimized
+WS-BASELINE,block,WS-BASELINE_block_2,несовместимый suite snapshot,optimized
+WS-BASELINE,block,WS-BASELINE_block_3,run failed,optimized
+WS-BASELINE,feedback,WS-BASELINE_feedback_1,baseline выполнен,optimized
+WS-BASELINE,feedback,WS-BASELINE_feedback_2,лучший baseline обновлен,optimized
+WS-BASELINE,feedback,WS-BASELINE_feedback_3,auto update статус видим,optimized
+WS-BASELINE,feedback,WS-BASELINE_feedback_4,active baseline contract сохранен,optimized
+WS-BASELINE,feedback,WS-BASELINE_feedback_5,источник baseline и hash видимы,optimized
+WS-ANALYSIS,task,WS-ANALYSIS_task_1,выбрать прогон,optimized
+WS-ANALYSIS,task,WS-ANALYSIS_task_2,выбрать режим сравнения,optimized
+WS-ANALYSIS,task,WS-ANALYSIS_task_3,отфильтровать по испытанию или сегменту,optimized
+WS-ANALYSIS,task,WS-ANALYSIS_task_4,прочитать графики и таблицы,optimized
+WS-ANALYSIS,task,WS-ANALYSIS_task_5,экспортировать отчет,optimized
+WS-ANALYSIS,task,WS-ANALYSIS_task_6,открыть подробное сравнение,optimized
+WS-ANALYSIS,check,WS-ANALYSIS_check_1,selected run contract полный,optimized
+WS-ANALYSIS,check,WS-ANALYSIS_check_2,compare contract валиден,optimized
+WS-ANALYSIS,check,WS-ANALYSIS_check_3,lineage совместим,optimized
+WS-ANALYSIS,check,WS-ANALYSIS_check_4,objective contract совместим,optimized
+WS-ANALYSIS,block,WS-ANALYSIS_block_1,run not selected,optimized
+WS-ANALYSIS,block,WS-ANALYSIS_block_2,mismatch contracts,optimized
+WS-ANALYSIS,block,WS-ANALYSIS_block_3,compare context invalid,optimized
+WS-ANALYSIS,feedback,WS-ANALYSIS_feedback_1,текущий или исторический контекст виден,optimized
+WS-ANALYSIS,feedback,WS-ANALYSIS_feedback_2,mismatch banner виден,optimized
+WS-ANALYSIS,feedback,WS-ANALYSIS_feedback_3,compare mode подписан,optimized
+WS-ANALYSIS,feedback,WS-ANALYSIS_feedback_4,run contract hash виден,optimized
+WS-ANALYSIS,feedback,WS-ANALYSIS_feedback_5,report manifest готов,optimized
+WS-ANIMATOR,task,WS-ANIMATOR_task_1,открыть контекст анимации,optimized
+WS-ANIMATOR,task,WS-ANIMATOR_task_2,включить проигрывание,optimized
+WS-ANIMATOR,task,WS-ANIMATOR_task_3,изменить скорость,optimized
+WS-ANIMATOR,task,WS-ANIMATOR_task_4,выбрать вид,optimized
+WS-ANIMATOR,task,WS-ANIMATOR_task_5,прочитать truth state,optimized
+WS-ANIMATOR,task,WS-ANIMATOR_task_6,экспортировать кадр или видео,optimized
+WS-ANIMATOR,check,WS-ANIMATOR_check_1,artifact pointer существует,optimized
+WS-ANIMATOR,check,WS-ANIMATOR_check_2,analysis context совместим,optimized
+WS-ANIMATOR,check,WS-ANIMATOR_check_3,packaging truth complete,optimized
+WS-ANIMATOR,check,WS-ANIMATOR_check_4,overlay contract разрешен,optimized
+WS-ANIMATOR,block,WS-ANIMATOR_block_1,pointer missing,optimized
+WS-ANIMATOR,block,WS-ANIMATOR_block_2,packaging incomplete,optimized
+WS-ANIMATOR,block,WS-ANIMATOR_block_3,overlay invalid,optimized
+WS-ANIMATOR,feedback,WS-ANIMATOR_feedback_1,axis only honesty mode виден,optimized
+WS-ANIMATOR,feedback,WS-ANIMATOR_feedback_2,full truth mode виден,optimized
+WS-ANIMATOR,feedback,WS-ANIMATOR_feedback_3,current vs historical banner виден,optimized
+WS-ANIMATOR,feedback,WS-ANIMATOR_feedback_4,playback time видно,optimized
+WS-ANIMATOR,feedback,WS-ANIMATOR_feedback_5,скорость и источник данных видны,optimized

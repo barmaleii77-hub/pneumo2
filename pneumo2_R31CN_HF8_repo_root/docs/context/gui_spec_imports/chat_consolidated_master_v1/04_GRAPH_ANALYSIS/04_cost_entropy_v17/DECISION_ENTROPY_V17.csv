@@ -1,0 +1,36 @@
+scope,node_id,label,kind,out_degree,entropy_penalty
+current,FB_HOME_SUITE_INVALID,Ошибка в наборе испытаний,feedback,2,0.0
+current,HC_BASE_RUN,Запустить базовый прогон,button,2,0.0
+current,HC_COMPARE_EMBED,Встроенное сравнение,button_or_tab,2,0.0
+current,HC_GO_OPT,Перейти на страницу оптимизации,button,3,0.0
+current,HC_LAUNCH_COMPARE,Открыть Compare Viewer,button,4,0.0
+current,HC_LAUNCH_DIAG,Открыть GUI диагностики,button,4,0.0
+current,HC_LAUNCH_INPUT,Открыть редактор исходных данных,button,3,0.0
+current,HC_LAUNCH_SEND,Открыть GUI отправки результатов,button,3,0.0
+current,HC_LAUNCH_TEST,Открыть центр тестов,button,3,0.0
+current,HC_LAUNCH_TOOLS,Открыть центр desktop-инструментов,button,3,0.0
+current,HC_OPEN_ANIM,Запустить Animator (--follow),button,3,0.0
+current,HC_OPEN_MNEMO,Запустить Mnemo (follow),button,3,0.0
+current,HC_UPLOAD_SUITE,Загрузить suite.json,button,3,0.0
+current,HZ_ANIM,Графики и анимация опорного прогона,screen_zone,2,0.45
+current,HZ_BASE,Базовый и детальный прогон,screen_zone,2,0.45
+current,HZ_MSG,Статус и сообщения,screen_zone,6,1.163
+current,HZ_OPT,Оптимизация,screen_zone,2,0.45
+current,HZ_SUITE,Набор испытаний / suite editor,screen_zone,10,1.495
+current,HZ_WIN,Сетка отдельных окон,screen_zone,7,1.263
+current,OC_MODE_COORD,Distributed coordinator (Dask / Ray / BoTorch),radio,2,0.0
+current,OC_MODE_STAGE,Режим по стадиям (StageRunner) — рекомендуется,radio,2,0.0
+current,OC_START_COORD,Запустить distributed coordinator,button,2,0.0
+current,OC_START_STAGE,Запустить StageRunner,button,5,0.0
+current,OZ_COORD,Настройки distributed coordinator,screen_zone,38,2.362
+current,OZ_HISTORY,История и сравнение запусков,screen_zone,3,0.713
+current,OZ_MODE,Активный путь запуска,screen_zone,2,0.45
+current,OZ_STAGE,Настройки режима по стадиям,screen_zone,17,1.839
+current,OZ_STAGE_OBS,Прогресс стадии,screen_zone,7,1.263
+current,SC_HOME,Главная heavy home page,screen,38,2.362
+current,SC_OPT,Страница «Оптимизация»,screen,29,2.186
+current,CBLOCK_ROUTE_ENTROPY,Слишком много равноправных входов на старте,block,2,0.0
+optimized_focus,BAR_ROUTE,Маршрут работы,screen_zone,10,0.15
+optimized_focus,BTN_ADVANCED,Расширенные окна,button,2,0.0
+optimized_focus,WS_ANALYSIS,Анализ результатов,screen,2,0.0
+optimized_focus,ACT_QUICK_COMPARE,Быстрое сравнение результатов,button_or_tab,2,0.0

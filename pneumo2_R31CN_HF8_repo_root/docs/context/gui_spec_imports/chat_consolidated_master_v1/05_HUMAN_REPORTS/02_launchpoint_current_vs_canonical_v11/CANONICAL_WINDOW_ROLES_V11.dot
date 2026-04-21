@@ -1,0 +1,21 @@
+digraph CANONICAL_WINDOW_ROLES_V11 {
+    rankdir=LR;
+    node [shape=box, fontsize=10];
+    TREE [label="Левое дерево / browser"];
+    INPUTS [label="Исходные данные проекта\nfirst-class workspace"];
+    RING [label="Редактор кольца\nsource-of-truth"];
+    TESTS [label="Набор испытаний\nconsumer of scenarios"];
+    ANALYSIS [label="Анализ результатов\nprimary compare route"];
+    CMP_VIEW [label="Подробное сравнение результатов\nadvanced direct-open"];
+    DIAG [label="Диагностика\nfirst-class workspace"];
+    SEND [label="Отправить архив диагностики\nsecondary action"];
+    TREE -> INPUTS;
+    TREE -> RING;
+    TREE -> TESTS;
+    TREE -> ANALYSIS;
+    TREE -> CMP_VIEW;
+    TREE -> DIAG;
+    DIAG -> SEND [label="только после bundle"];
+    ANALYSIS -> CMP_VIEW [label="advanced compare"];
+    RING -> TESTS [label="scenario lineage"];
+}

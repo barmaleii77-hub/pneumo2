@@ -1,0 +1,6 @@
+source_control,synced_targets,immediate_feedback,degraded_or_failure_feedback
+Левое дерево,центральная поверхность; правый inspector; нижняя status strip,подсветка узла + заголовок рабочей области + breadcrumb,узел disabled / В разработке / нет контекста проекта
+Строка таблицы испытаний,preview; inspector; stale markers; baseline eligibility,подсветка строки + карточка параметров + snapshot status,stale scenario link / missing sidecar / invalid row
+Группа параметров входов,формы полей; visual twin; inspector help,подсветка группы + dirty-state + validation-state,range invalid / unsupported mode / missing source data
+Выбор compare context,левый/правый compare panes; mismatch banner; diff metrics,visible hashes + compare mode + selected artifacts,contract mismatch / stale run / missing artifact
+Запуск диагностики,health summary; bundle composition; latest bundle path,progress + path + freshness markers,helper runtime unavailable / bundle generation degraded

@@ -1,0 +1,5 @@
+window,task,primary_action,required_check,block,feedback,return_or_handoff
+Диагностика,Собрать самодостаточный архив,Собрать диагностику,workspace/runtime/artifacts,missing workspace/runtime/artifacts,bundle fresh + path + contents visible,Отправить архив диагностики / вернуться к проекту
+Подробное сравнение результатов,Понять отличие двух run context,Выбрать левый и правый контексты,objective/suite/lineage compatibility,mismatch contracts,summary delta + mismatch banner,Вернуться в Анализ
+Исходные данные проекта,Отредактировать master-copy входов,Проверить → Сохранить,validation,invalid fields,visual twin + dirty/clean state + cognitive flags,Перейти в Редактор кольца / Набор испытаний
+Набор испытаний,Собрать валидный snapshot испытаний,Проверить snapshot → Сохранить snapshot,dt/t_end/sidecars/stale link,context stale / invalid sidecars,validated snapshot status,Перейти к Baseline / вернуться в Ring

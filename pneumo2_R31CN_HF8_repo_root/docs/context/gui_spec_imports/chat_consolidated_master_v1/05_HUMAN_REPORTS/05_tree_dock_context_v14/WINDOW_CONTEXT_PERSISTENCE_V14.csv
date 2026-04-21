@@ -1,0 +1,5 @@
+window,preserved_context,must_survive_forward_navigation,must_survive_return,reset_only_when,must_show_stale_marker_when
+Диагностика,project_id; latest_send_bundle; health_summary; selected_manifest_node,yes,yes,project_switch or explicit reset,bundle stale / helper runtime mismatch / missing evidence
+Подробное сравнение результатов,left_run; right_run; compare_mode; mismatch_dims; selected_metric,yes,yes,new compare session or explicit swap/reset,historical mismatch / stale run contract / objective mismatch
+Исходные данные проекта,selected_group; selected_field; dirty_state; validation_state; visual_twin_view,yes,yes,project_switch or discard/reset,invalid input / unsaved edits / derived preview degraded
+Набор испытаний,selected_row; filter_state; validated_snapshot_state; stale_link_state,yes,yes,project_switch or explicit new suite,stale scenario link / context stale / snapshot invalid

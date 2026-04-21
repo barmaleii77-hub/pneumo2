@@ -1,0 +1,7 @@
+KB_ID,KNOWLEDGE_BASE_CLAIM,SOURCE_FILE,STATUS,NOTES
+KB-001,solver_export_animator_truth_contract_is_main_frontier,Прогрев контекста проекта.txt,aligned,v33 OPEN_GAPS_REGISTER preserves hardpoints/packaging/browser trace as open P0/P1 gaps.
+KB-002,axis_only_honesty_mode_until_packaging_complete,Прогрев контекста проекта.txt,aligned,v33 RELEASE_GATE_MATRIX RG-007 and conflict register keep full-truth blocked until packaging passport complete.
+KB-003,stage_policy_visibility_and_gate_reason_preview,Проектный релиз.txt,aligned,v33 workspace and pipeline layers model visible progress/policy/gates.
+KB-004,objective_contract_as_runtime_artifact,Разработка софта для подвески.txt,covered_partially,v33 contains objective contract playbook/matrix but cannot prove latest HF runtime persistence.
+KB-005,project_is_desktop_CAD_like_not_web_in_window,deep-research-report (5).md,aligned,v33 shell contract and repo docs 17/18 both enforce native desktop baseline.
+KB-006,all_long_running_operations_show_progress_on_current_screen,wishlist / primary context,covered_partially,"v33 models this in shell and workspace contracts, but runtime evidence remains separate."

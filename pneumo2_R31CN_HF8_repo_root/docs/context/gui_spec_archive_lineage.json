@@ -260,5 +260,26 @@
       "V38_KB_IMPORT_AUDIT_2026-04-18.md"
     ],
     "repo_layer": "docs/context/gui_spec_imports/v38_github_kb_commit_ready/"
+  },
+  {
+    "version": "chat_consolidated_master_v1",
+    "archive_name": "pneumo_chat_consolidated_master_v1.zip",
+    "phase": "consolidated_master_reference",
+    "status": "current_consolidated_master_reference",
+    "role": "deduplicated master archive for source context, final V38+V10 CODEX spec, V34 repo audit, graph V17/V19/V20/V21 and human reports V10-V16 without runtime-closure proof",
+    "main_artifacts": [
+      "README.md",
+      "06_INDEX/MASTER_EXEC_SUMMARY.json",
+      "06_INDEX/INCLUDED_ARTIFACTS.csv",
+      "06_INDEX/SUPERSEDED_AND_EXCLUDED.csv",
+      "06_INDEX/LINEAGE_AND_READING_ORDER.md",
+      "02_CODEX_SPEC_FINAL/v38_actualized_with_v10/TECHNICAL_SPECIFICATION.md",
+      "03_REPO_AUDIT/v34_repo_audit/AUDIT_REPORT.md",
+      "04_GRAPH_ANALYSIS/01_reconciliation_v21/GRAPH_ANALYSIS_REPORT_V21.md",
+      "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/GRAPH_ANALYSIS_REPORT_V20.md",
+      "04_GRAPH_ANALYSIS/04_cost_entropy_v17/GRAPH_ANALYSIS_REPORT_V17.md",
+      "05_HUMAN_REPORTS/00_MASTER_SUMMARY.md"
+    ],
+    "repo_layer": "docs/context/gui_spec_imports/chat_consolidated_master_v1/"
   }
 ]

@@ -238,3 +238,23 @@
   `v13_ring_editor_migration` в пределах `WS-RING` и ring-to-suite handoff,
   затем у `v12_design_recovery` как historical design-recovery layer, затем у
   остальных historical imports.
+
+## Chat consolidated master V1
+
+- `chat_consolidated_master_v1/` - consolidated master reference layer imported from
+  `pneumo_chat_consolidated_master_v1.zip`.
+- The import preserves `README.md`, `06_INDEX/MASTER_EXEC_SUMMARY.json`,
+  `06_INDEX/LINEAGE_AND_READING_ORDER.md`, `06_INDEX/INCLUDED_ARTIFACTS.csv`,
+  `06_INDEX/SUPERSEDED_AND_EXCLUDED.csv`,
+  `02_CODEX_SPEC_FINAL/v38_actualized_with_v10/TECHNICAL_SPECIFICATION.md`,
+  `03_REPO_AUDIT/v34_repo_audit/AUDIT_REPORT.md`,
+  `04_GRAPH_ANALYSIS/00_MASTER_SUMMARY.md`,
+  `04_GRAPH_ANALYSIS/01_reconciliation_v21/GRAPH_ANALYSIS_REPORT_V21.md`,
+  `04_GRAPH_ANALYSIS/02_workspace_graphs_v20/GRAPH_ANALYSIS_REPORT_V20.md`,
+  `04_GRAPH_ANALYSIS/04_cost_entropy_v17/GRAPH_ANALYSIS_REPORT_V17.md` and
+  `05_HUMAN_REPORTS/00_MASTER_SUMMARY.md`.
+- `chat_consolidated_master_v1/REPO_IMPORT_NOTE.md` and
+  `../release_readiness/CHAT_CONSOLIDATED_MASTER_V1_KB_IMPORT_AUDIT_2026-04-21.md`
+  define the local boundary: use this layer for deduplicated reading order,
+  source provenance, V21/V20/V17 graph evidence and V10-V16 human reports.
+- This layer is not runtime-closure proof and does not replace `17/18`.

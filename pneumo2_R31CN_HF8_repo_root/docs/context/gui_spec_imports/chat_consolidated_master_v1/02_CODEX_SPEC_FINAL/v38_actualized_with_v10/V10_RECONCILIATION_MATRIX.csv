@@ -1,0 +1,7 @@
+finding_id,v10_finding,integrated_into,status,notes
+V10-001,Shell first screen must show one dominant 8-step route,TECHNICAL_SPECIFICATION.md;GUI_SPEC.yaml;REQUIREMENTS_MATRIX.csv;SCREEN_CATALOG.csv,covered,Added dominant start route and launcher hierarchy annex
+V10-002,Ring editor must dominate as scenario center,TECHNICAL_SPECIFICATION.md;GUI_SPEC.yaml;REQUIREMENTS_MATRIX.csv;SCREEN_CATALOG.csv,covered,Strengthened WS-RING role and launcher prominence
+V10-003,Diagnostics route must have one primary entry; send-results nested,TECHNICAL_SPECIFICATION.md;GUI_SPEC.yaml;REQUIREMENTS_MATRIX.csv;ACCEPTANCE_MATRIX.csv;WINDOW_CATALOG.csv,covered,Send-results explicitly treated as nested action after bundle ready
+V10-004,Embedded compare is primary; Compare Viewer advanced,TECHNICAL_SPECIFICATION.md;GUI_SPEC.yaml;REQUIREMENTS_MATRIX.csv;ACCEPTANCE_MATRIX.csv;WINDOW_CATALOG.csv,covered,Compare Viewer re-positioned as advanced from Analysis
+V10-005,Desktop Mnemo and Tools Center should be advanced/secondary,TECHNICAL_SPECIFICATION.md;GUI_SPEC.yaml;REQUIREMENTS_MATRIX.csv;WINDOW_CATALOG.csv;WORKSPACE_CONTRACT_MATRIX.csv,covered,Launcher priority demoted without removing specialized surfaces
+V10-006,Inputs editor is master-copy; Test Center is scenario consumer,TECHNICAL_SPECIFICATION.md;GUI_SPEC.yaml;WORKSPACE_CONTRACT_MATRIX.csv,covered,Existing canon reinforced and linked to launcher route

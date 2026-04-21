@@ -1,0 +1,49 @@
+workspace,state_or_message,must_be_visible,visibility_surface,evidence_type,notes
+WS-PROJECT,проект открыт,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-PROJECT,последний проект восстановлен,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-PROJECT,здоровье проекта норма,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-PROJECT,следующее действие рекомендовано,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-PROJECT,несовместимость объяснена,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-PROJECT,проект сохранен,yes,message_bar_or_context_panel,message,Сообщение должно быть читаемо без просмотра логов
+WS-PROJECT,проект открыт с предупреждением,yes,message_bar_or_context_panel,message,Сообщение должно быть читаемо без просмотра логов
+WS-PROJECT,проект не может быть открыт,yes,message_bar_or_context_panel,message,Сообщение должно быть читаемо без просмотра логов
+WS-SUITE,таблица валидна,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-SUITE,ошибки валидации показаны,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-SUITE,валидированный suite snapshot сохранен,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-SUITE,stale link показан,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-SUITE,context stale показан,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-SUITE,строки по стадиям видимы,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-SUITE,набор испытаний валиден,yes,message_bar_or_context_panel,message,Сообщение должно быть читаемо без просмотра логов
+WS-SUITE,набор испытаний содержит ошибки,yes,message_bar_or_context_panel,message,Сообщение должно быть читаемо без просмотра логов
+WS-SUITE,валидированный snapshot сохранен,yes,message_bar_or_context_panel,message,Сообщение должно быть читаемо без просмотра логов
+WS-BASELINE,baseline выполнен,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-BASELINE,лучший baseline обновлен,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-BASELINE,auto update статус видим,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-BASELINE,active baseline contract сохранен,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-BASELINE,источник baseline и hash видимы,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-BASELINE,baseline готов,yes,message_bar_or_context_panel,message,Сообщение должно быть читаемо без просмотра логов
+WS-BASELINE,baseline устарел,yes,message_bar_or_context_panel,message,Сообщение должно быть читаемо без просмотра логов
+WS-BASELINE,источник baseline не совместим,yes,message_bar_or_context_panel,message,Сообщение должно быть читаемо без просмотра логов
+WS-ANALYSIS,текущий или исторический контекст виден,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-ANALYSIS,mismatch banner виден,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-ANALYSIS,compare mode подписан,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-ANALYSIS,run contract hash виден,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-ANALYSIS,report manifest готов,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-ANALYSIS,выбран исторический контекст,yes,message_bar_or_context_panel,message,Сообщение должно быть читаемо без просмотра логов
+WS-ANALYSIS,контракт сравнения несовместим,yes,message_bar_or_context_panel,message,Сообщение должно быть читаемо без просмотра логов
+WS-ANALYSIS,отчет экспортирован,yes,message_bar_or_context_panel,message,Сообщение должно быть читаемо без просмотра логов
+WS-ANIMATOR,axis only honesty mode виден,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-ANIMATOR,full truth mode виден,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-ANIMATOR,current vs historical banner виден,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-ANIMATOR,playback time видно,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-ANIMATOR,скорость и источник данных видны,yes,main_area_or_inspector,explicit label/badge/banner,Пользователь должен увидеть состояние явно
+WS-ANIMATOR,показывается axis only mode,yes,message_bar_or_context_panel,message,Сообщение должно быть читаемо без просмотра логов
+WS-ANIMATOR,packaging truth неполный,yes,message_bar_or_context_panel,message,Сообщение должно быть читаемо без просмотра логов
+WS-ANIMATOR,кадр экспортирован,yes,message_bar_or_context_panel,message,Сообщение должно быть читаемо без просмотра логов
+WS-INPUTS,На угол установлены две пружины: контур C1 и контур C2,yes,карточка_угла_и_схема_подвески,explicit label/badge/banner,Усилено по требованию пользователя
+WS-INPUTS,Выравнивание кузова пружинами активно,yes,карточка_режима_и_схема_подвески,explicit label/badge/banner,Усилено по требованию пользователя
+WS-INPUTS,Метод выравнивания пружинами,yes,панель_свойств,explicit label/badge/banner,Усилено по требованию пользователя
+WS-INPUTS,"Остаточная разница после выравнивания, миллиметры",yes,карточка_выравнивания,explicit label/badge/banner,Усилено по требованию пользователя
+WS-ANIMATOR,Режим truth-state цилиндров,yes,панель_truth,explicit label/badge/banner,Усилено по требованию пользователя
+WS-ANALYSIS,Текущий или исторический контекст,yes,верхний_banner,explicit label/badge/banner,Усилено по требованию пользователя
+WS-DIAGNOSTICS,Путь к последнему архиву диагностики,yes,карточка_bundle,explicit label/badge/banner,Усилено по требованию пользователя

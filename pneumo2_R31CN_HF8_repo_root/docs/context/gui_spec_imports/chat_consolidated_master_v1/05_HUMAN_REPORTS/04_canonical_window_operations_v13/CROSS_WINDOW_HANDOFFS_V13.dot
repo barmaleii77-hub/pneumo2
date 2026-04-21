@@ -1,0 +1,24 @@
+digraph G {
+rankdir=LR;
+node [shape=box, style="rounded,filled", fillcolor=white, fontsize=10];
+"PRJ" [label="Панель проекта", fillcolor="#dbeafe"];
+"INP" [label="Исходные данные проекта", fillcolor="#dcfce7"];
+"RING" [label="Редактор кольца", fillcolor="#dcfce7"];
+"SUITE" [label="Набор испытаний", fillcolor="#dcfce7"];
+"BASE" [label="Базовый прогон", fillcolor="#dcfce7"];
+"AN" [label="Анализ результатов", fillcolor="#dcfce7"];
+"CMP" [label="Подробное сравнение результатов", fillcolor="#f3f4f6"];
+"DIAG" [label="Диагностика", fillcolor="#f3f4f6"];
+
+"PRJ" -> "INP" [label="начать настройку"];
+"INP" -> "RING" [label="сценарная геометрия не редактируется здесь"];
+"INP" -> "SUITE" [label="если входы валидны"];
+"RING" -> "SUITE" [label="после сохранённого source-of-truth"];
+"SUITE" -> "RING" [label="если stale scenario link"];
+"SUITE" -> "BASE" [label="после validated snapshot"];
+"BASE" -> "AN" [label="после baseline run"];
+"AN" -> "CMP" [label="если quick-compare недостаточно"];
+"AN" -> "DIAG" [label="если нужен bundle/evidence"];
+"CMP" -> "AN" [label="возврат к анализу"];
+"DIAG" -> "PRJ" [label="возврат к обзору проекта"];
+}

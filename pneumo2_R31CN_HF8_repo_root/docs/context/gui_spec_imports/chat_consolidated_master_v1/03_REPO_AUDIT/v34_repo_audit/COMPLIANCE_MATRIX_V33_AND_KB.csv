@@ -1,0 +1,16 @@
+CHECK_ID,CHECK_DESCRIPTION,TARGET,STATUS,EVIDENCE_NOTE
+C-001,Mandatory deliverables present in local v33 package,v33_local,covered,PROMPT_MANDATORY_FILES_AUDIT.csv shows all mandatory files present.
+C-002,v33 internal package integrity / label consistency,v33_local,covered_partially,GUI_SPEC.yaml still says V32 and PACKAGE_SELFCHECK_REPORT flags stale label drift.
+C-003,Prompt lane rule: no code/bootstrap as primary output,v33_local,covered,README_PROVENANCE and TECHNICAL_SPECIFICATION stay in TZ/spec lane.
+C-004,Repo source priority reflected in package,v33_local,covered,SOURCE_AUTHORITY_MATRIX and CONNECTOR_REPO_CONFORMANCE_REPORT map repo priority.
+C-005,Remote repo active GUI canon updated to v33,remote_repo,gap,"PROJECT_SOURCES still points to imported v3/v13/v12 as active detailed layers, not v33."
+C-006,Native Windows desktop target is explicit in repo canon,remote_repo,covered,"17/18 docs define native desktop shell, docking, parity and ring editor canon."
+C-007,Current remote runtime matches desktop shell target,remote_repo,covered_partially,pneumo_ui_app.py remains Streamlit-heavy canonical launcher.
+C-008,Ring editor is single scenario source of truth,repo_vs_v33,covered,18 spec and v33 both require this.
+C-009,Diagnostics first-class surface and always-visible action,repo_vs_v33,covered,18 spec and v33 agree.
+C-010,Truth-state graphics policy and honest degraded mode,repo_vs_v33,covered_partially,"Policy exists in repo canon and v33, but producer-side closure remains open."
+C-011,Producer-side hardpoints / solver_points / cylinder packaging closed,repo_vs_v33,gap,Remote TODO and v33 open gaps both keep this unresolved.
+C-012,Measured browser perf trace / viewport gating accepted,repo_vs_v33,gap,Open P0 in repo TODO and v33 open gaps.
+C-013,Web->desktop parity proven as runtime release gate,repo_vs_v33,covered_partially,"Required by canon, not proven by runtime evidence."
+C-014,Local knowledge base prioritizes solver->export->animator truth and v33 preserves that priority,knowledge_base_vs_v33,covered,Strong alignment across local context texts and open gaps.
+C-015,Local knowledge base later release fixes are fully represented in v33,knowledge_base_vs_v33,covered_partially,v33 predates or abstracts later HF runtime patches; not full runtime mirror.

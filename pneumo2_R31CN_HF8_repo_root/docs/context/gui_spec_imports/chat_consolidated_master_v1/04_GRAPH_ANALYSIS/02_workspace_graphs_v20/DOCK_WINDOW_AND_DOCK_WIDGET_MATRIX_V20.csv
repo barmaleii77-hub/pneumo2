@@ -1,0 +1,16 @@
+workspace,element,type,role,direct_tree_open,floating_allowed,second_monitor
+WS-PROJECT,левое дерево,dock_widget,navigation,yes,yes,yes
+WS-PROJECT,правая панель свойств и помощи,dock_widget,inspector/help,n/a,yes,yes
+WS-PROJECT,нижняя строка состояния,dock_widget,status/progress,n/a,no,no
+WS-SUITE,левое дерево,dock_widget,navigation,yes,yes,yes
+WS-SUITE,правая панель свойств и помощи,dock_widget,inspector/help,n/a,yes,yes
+WS-SUITE,нижняя строка состояния,dock_widget,status/progress,n/a,no,no
+WS-BASELINE,левое дерево,dock_widget,navigation,yes,yes,yes
+WS-BASELINE,правая панель свойств и помощи,dock_widget,inspector/help,n/a,yes,yes
+WS-BASELINE,нижняя строка состояния,dock_widget,status/progress,n/a,no,no
+WS-ANALYSIS,левое дерево,dock_widget,navigation,yes,yes,yes
+WS-ANALYSIS,правая панель свойств и помощи,dock_widget,inspector/help,n/a,yes,yes
+WS-ANALYSIS,нижняя строка состояния,dock_widget,status/progress,n/a,no,no
+WS-ANIMATOR,левое дерево,dock_widget,navigation,yes,yes,yes
+WS-ANIMATOR,правая панель свойств и помощи,dock_widget,inspector/help,n/a,yes,yes
+WS-ANIMATOR,нижняя строка состояния,dock_widget,status/progress,n/a,no,no

@@ -1,0 +1,20 @@
+digraph G {
+  rankdir=LR;
+  graph [fontname="Arial", labelloc=t, fontsize=20, label="V19 current evidence-bound: Оптимизация"];
+  node [fontname="Arial", fontsize=10, style="rounded,filled", fillcolor=white];
+  edge [fontname="Arial", fontsize=9, color="#555555"];
+  subgraph cluster__evidence_bound_ {
+    label="Текущее evidence-bound состояние"; color="#cccccc"; style="rounded";
+    "TREE-WS-OPTIMIZATION" [label="Оптимизация", shape=tab, fillcolor="#134f5c"];
+    "CUR-OPT-HOME-SPLIT" [label="Оптимизация размазана между главной поверхностью и отдельной страницей", shape=octagon, fillcolor="#990000"];
+    "CUR-OPT-ENTRY" [label="Открыть страницу оптимизации", shape=tab, fillcolor="#134f5c"];
+    "CUR-OPT-MODE-CHOOSER" [label="Single-mode chooser на странице оптимизации", shape=box, fillcolor="#6fa8dc"];
+    "CUR-OPT-OBJECTIVE-DRIFT" [label="Контракт цели staged/distributed может читаться неравномерно", shape=octagon, fillcolor="#990000"];
+    "CUR-OPT-UNDERFILL-HIDDEN" [label="Причина недобора seed budget и promotion может читаться не сразу", shape=octagon, fillcolor="#990000"];
+  }
+  "TREE-WS-OPTIMIZATION" -> "CUR-OPT-HOME-SPLIT" [label="navigates / 1.20", color="#0b5394", penwidth=1, style=solid];
+  "CUR-OPT-HOME-SPLIT" -> "CUR-OPT-ENTRY" [label="task_flow / 1.00", color="#0b5394", penwidth=1, style=solid];
+  "CUR-OPT-ENTRY" -> "CUR-OPT-MODE-CHOOSER" [label="task_flow / 1.20", color="#0b5394", penwidth=1, style=solid];
+  "CUR-OPT-MODE-CHOOSER" -> "CUR-OPT-OBJECTIVE-DRIFT" [label="task_flow / 1.20", color="#0b5394", penwidth=1, style=solid];
+  "CUR-OPT-OBJECTIVE-DRIFT" -> "CUR-OPT-UNDERFILL-HIDDEN" [label="task_flow / 1.20", color="#0b5394", penwidth=1, style=solid];
+}

@@ -1,0 +1,39 @@
+digraph G {
+rankdir=LR;
+node [shape=box, style="rounded,filled", fillcolor=white, fontsize=10];
+"diag_open" [label="Открыть Диагностику", fillcolor="#dbeafe"];
+"diag_first" [label="Первый экран:\nhealth summary + состав архива + путь + свежесть", fillcolor="#dbeafe"];
+"diag_collect" [label="Primary action:\nСобрать диагностику", fillcolor="#dcfce7"];
+"diag_building" [label="Сбор архива выполняется", fillcolor="#fef3c7"];
+"diag_ready" [label="Архив готов", fillcolor="#dcfce7"];
+"diag_path" [label="Путь к архиву показан", fillcolor="#ede9fe"];
+"diag_contents" [label="Состав архива показан", fillcolor="#ede9fe"];
+"diag_send" [label="Secondary action:\nОтправить архив диагностики", fillcolor="#f3f4f6"];
+"diag_selfcheck" [label="Secondary action:\nЗапустить self-check", fillcolor="#f3f4f6"];
+"diag_open_folder" [label="Secondary action:\nОткрыть папку архива", fillcolor="#f3f4f6"];
+"diag_block_ws" [label="Блокировка:\nworkspace недоступен", fillcolor="#fee2e2"];
+"diag_block_runtime" [label="Блокировка:\nhelper runtime недоступен", fillcolor="#fee2e2"];
+"diag_block_missing" [label="Блокировка:\nmissing artifacts", fillcolor="#fee2e2"];
+"diag_warn" [label="Feedback:\nпредупреждения и triage видимы", fillcolor="#ede9fe"];
+"diag_back" [label="Возврат:\nк панели проекта или анализу", fillcolor="#e5e7eb"];
+
+"diag_open" -> "diag_first";
+"diag_first" -> "diag_collect" [label="главное действие"];
+"diag_first" -> "diag_selfcheck" [label="вторичное действие"];
+"diag_first" -> "diag_open_folder" [label="вторичное действие"];
+"diag_collect" -> "diag_building";
+"diag_building" -> "diag_block_ws";
+"diag_building" -> "diag_block_runtime";
+"diag_building" -> "diag_block_missing";
+"diag_building" -> "diag_ready";
+"diag_ready" -> "diag_path";
+"diag_ready" -> "diag_contents";
+"diag_ready" -> "diag_warn";
+"diag_ready" -> "diag_send";
+"diag_send" -> "diag_back";
+"diag_selfcheck" -> "diag_warn";
+"diag_open_folder" -> "diag_back";
+"diag_block_ws" -> "diag_first" [label="исправить и повторить"];
+"diag_block_runtime" -> "diag_first" [label="исправить и повторить"];
+"diag_block_missing" -> "diag_first" [label="исправить и повторить"];
+}

@@ -1,0 +1,24 @@
+digraph G {
+  rankdir=LR;
+  graph [fontname="Arial", labelloc=t, fontsize=20, label="V19 current evidence-bound: Исходные данные"];
+  node [fontname="Arial", fontsize=10, style="rounded,filled", fillcolor=white];
+  edge [fontname="Arial", fontsize=9, color="#555555"];
+  subgraph cluster__evidence_bound_ {
+    label="Текущее evidence-bound состояние"; color="#cccccc"; style="rounded";
+    "TREE-WS-INPUTS" [label="Исходные данные", shape=tab, fillcolor="#134f5c"];
+    "CUR-IN-HOME-LAUNCH" [label="Открыть редактор исходных данных", shape=tab, fillcolor="#134f5c"];
+    "CUR-IN-NUMERIC-ONLY" [label="Числовое редактирование без достаточной графической обратной связи", shape=box, fillcolor="#6fa8dc"];
+    "CUR-IN-C1C2-HIDDEN" [label="Неочевидно, что на угол выбраны две пружины", shape=octagon, fillcolor="#990000"];
+    "CUR-IN-LEVELING-HIDDEN" [label="Неочевидно, что включено выравнивание пружинами и как оно выполнено", shape=octagon, fillcolor="#990000"];
+    "CUR-IN-SYMMETRY-HIDDEN" [label="Неочевидна зеркальная симметрия лево/право", shape=octagon, fillcolor="#990000"];
+    "CUR-IN-TWIN-PARTIAL" [label="Графический двойник либо слабый, либо не синхронизирован полностью", shape=octagon, fillcolor="#990000"];
+    "CUR-IN-VALIDATE-SAVE" [label="Проверить и сохранить", shape=ellipse, fillcolor="#e69138"];
+  }
+  "TREE-WS-INPUTS" -> "CUR-IN-HOME-LAUNCH" [label="navigates / 1.00", color="#0b5394", penwidth=1, style=solid];
+  "CUR-IN-HOME-LAUNCH" -> "CUR-IN-NUMERIC-ONLY" [label="task_flow / 1.20", color="#0b5394", penwidth=1, style=solid];
+  "CUR-IN-NUMERIC-ONLY" -> "CUR-IN-C1C2-HIDDEN" [label="task_flow / 1.20", color="#0b5394", penwidth=1, style=solid];
+  "CUR-IN-C1C2-HIDDEN" -> "CUR-IN-LEVELING-HIDDEN" [label="task_flow / 1.20", color="#0b5394", penwidth=1, style=solid];
+  "CUR-IN-LEVELING-HIDDEN" -> "CUR-IN-SYMMETRY-HIDDEN" [label="task_flow / 1.20", color="#0b5394", penwidth=1, style=solid];
+  "CUR-IN-SYMMETRY-HIDDEN" -> "CUR-IN-TWIN-PARTIAL" [label="task_flow / 1.20", color="#0b5394", penwidth=1, style=solid];
+  "CUR-IN-TWIN-PARTIAL" -> "CUR-IN-VALIDATE-SAVE" [label="task_flow / 1.20", color="#0b5394", penwidth=1, style=solid];
+}

@@ -1,0 +1,17 @@
+{
+  "package_id": "pneumo_chat_consolidated_master_v1",
+  "goal": "Свести все значимые наработки этого чата в один архив без повторений и лишних промежуточных версий.",
+  "sections": {
+    "source_context": "prompt, проектный контекст, deep research",
+    "codex_spec_final": "финальная сводная спецификация для CODEX",
+    "repo_audit": "аудит repo и соответствия базе знаний",
+    "graph_analysis": "графовая ветка (reconciliation, subgraphs, path cost, entropy)",
+    "human_reports": "report-only ветка глазами пользователя"
+  },
+  "selected_major_versions": {
+    "codex_spec": "v38_actualized_with_v10",
+    "repo_audit": "v34",
+    "graph": "v17 + v19 + v20 + v21",
+    "human_reports": "v10..v16"
+  }
+}

@@ -218,3 +218,31 @@
 - Для новых parallel-chat starts после приемки 10 GUI handoffs, `7823dc2` resolution и V38+V10 import сначала сверять `docs/context/release_readiness/BRANCH_TREE_RECOVERY_AUDIT_2026-04-18.md`, `docs/context/release_readiness/QUARANTINE_7823DC2_RESOLUTION_2026-04-18.md`, `docs/context/release_readiness/V38_ACTUALIZED_WITH_V10_KB_IMPORT_AUDIT_2026-04-19.md`, active V38+V10 `GUI_SPEC.yaml`, `WORKSPACE_CONTRACT_MATRIX.csv`, `ACCEPTANCE_MATRIX.csv`, `PIPELINE_OPTIMIZED.dot`, `LAUNCHER_HIERARCHY_RECONCILIATION_V10.md` и использовать текущие GUI prompt packs; historical chat branches and worktrees are not working sources.
 - Imported JSON/DOT/CSV используются как reference artifacts, а не как единственный источник правды.
 - При конфликте между imported sources и текущим каноном приоритет у `17/18`.
+
+## Chat consolidated master V1 source set
+
+The KB also registers `docs/context/gui_spec_imports/chat_consolidated_master_v1/`
+as a consolidated master reference imported from `pneumo_chat_consolidated_master_v1.zip`.
+It should be read after `17/18` and foundations when a task needs the deduplicated
+chat-derived reading order, source provenance or superseded/excluded decisions.
+
+Registered entrypoints:
+
+- `docs/context/gui_spec_imports/chat_consolidated_master_v1/REPO_IMPORT_NOTE.md`
+- `docs/context/gui_spec_imports/chat_consolidated_master_v1/README.md`
+- `docs/context/gui_spec_imports/chat_consolidated_master_v1/06_INDEX/MASTER_EXEC_SUMMARY.json`
+- `docs/context/gui_spec_imports/chat_consolidated_master_v1/06_INDEX/INCLUDED_ARTIFACTS.csv`
+- `docs/context/gui_spec_imports/chat_consolidated_master_v1/06_INDEX/SUPERSEDED_AND_EXCLUDED.csv`
+- `docs/context/gui_spec_imports/chat_consolidated_master_v1/06_INDEX/LINEAGE_AND_READING_ORDER.md`
+- `docs/context/gui_spec_imports/chat_consolidated_master_v1/02_CODEX_SPEC_FINAL/v38_actualized_with_v10/TECHNICAL_SPECIFICATION.md`
+- `docs/context/gui_spec_imports/chat_consolidated_master_v1/03_REPO_AUDIT/v34_repo_audit/AUDIT_REPORT.md`
+- `docs/context/gui_spec_imports/chat_consolidated_master_v1/04_GRAPH_ANALYSIS/00_MASTER_SUMMARY.md`
+- `docs/context/gui_spec_imports/chat_consolidated_master_v1/04_GRAPH_ANALYSIS/01_reconciliation_v21/GRAPH_ANALYSIS_REPORT_V21.md`
+- `docs/context/gui_spec_imports/chat_consolidated_master_v1/04_GRAPH_ANALYSIS/02_workspace_graphs_v20/GRAPH_ANALYSIS_REPORT_V20.md`
+- `docs/context/gui_spec_imports/chat_consolidated_master_v1/04_GRAPH_ANALYSIS/04_cost_entropy_v17/GRAPH_ANALYSIS_REPORT_V17.md`
+- `docs/context/gui_spec_imports/chat_consolidated_master_v1/05_HUMAN_REPORTS/00_MASTER_SUMMARY.md`
+- `docs/context/release_readiness/CHAT_CONSOLIDATED_MASTER_V1_KB_IMPORT_AUDIT_2026-04-21.md`
+
+Boundary: `chat_consolidated_master_v1` is not runtime-closure proof. It is a
+consolidated reference/provenance layer for V38+V10, V34 audit, graph V17/V19/V20/V21
+and human reports V10-V16.

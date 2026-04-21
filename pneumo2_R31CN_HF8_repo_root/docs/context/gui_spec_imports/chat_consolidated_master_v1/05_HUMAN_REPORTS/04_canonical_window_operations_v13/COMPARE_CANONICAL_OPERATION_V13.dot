@@ -1,0 +1,27 @@
+digraph G {
+rankdir=LR;
+node [shape=box, style="rounded,filled", fillcolor=white, fontsize=10];
+"cmp_open" [label="Открыть подробное сравнение\nиз Анализа", fillcolor="#dbeafe"];
+"cmp_first" [label="Первый экран:\nлевый/правый контекст + compare mode + hashes", fillcolor="#dbeafe"];
+"cmp_select_left" [label="Выбрать левый контекст", fillcolor="#dcfce7"];
+"cmp_select_right" [label="Выбрать правый контекст", fillcolor="#dcfce7"];
+"cmp_check_contract" [label="Проверка:\nobjective/suite/lineage contracts", fillcolor="#fef3c7"];
+"cmp_block_mismatch" [label="Блокировка:\nконтракты несовместимы", fillcolor="#fee2e2"];
+"cmp_summary" [label="Feedback:\nsummary delta виден", fillcolor="#ede9fe"];
+"cmp_charts" [label="Провалиться в графики", fillcolor="#f3f4f6"];
+"cmp_table" [label="Провалиться в таблицы", fillcolor="#f3f4f6"];
+"cmp_export" [label="Экспортировать compare report", fillcolor="#f3f4f6"];
+"cmp_back_analysis" [label="Возврат в Анализ", fillcolor="#e5e7eb"];
+
+"cmp_open" -> "cmp_first";
+"cmp_first" -> "cmp_select_left";
+"cmp_select_left" -> "cmp_select_right";
+"cmp_select_right" -> "cmp_check_contract";
+"cmp_check_contract" -> "cmp_block_mismatch";
+"cmp_check_contract" -> "cmp_summary";
+"cmp_block_mismatch" -> "cmp_select_left" [label="сменить контекст"];
+"cmp_summary" -> "cmp_charts";
+"cmp_summary" -> "cmp_table";
+"cmp_summary" -> "cmp_export";
+"cmp_export" -> "cmp_back_analysis";
+}

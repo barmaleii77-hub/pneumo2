@@ -1,0 +1,6 @@
+workspace,tree_node,target,direct_open,intermediate_step,notes
+WS-PROJECT,WS-PROJECT_tree_entry,WS-PROJECT_root,yes,no,Открытие одним действием из дерева
+WS-SUITE,WS-SUITE_tree_entry,WS-SUITE_root,yes,no,Открытие одним действием из дерева
+WS-BASELINE,WS-BASELINE_tree_entry,WS-BASELINE_root,yes,no,Открытие одним действием из дерева
+WS-ANALYSIS,WS-ANALYSIS_tree_entry,WS-ANALYSIS_root,yes,no,Открытие одним действием из дерева
+WS-ANIMATOR,WS-ANIMATOR_tree_entry,WS-ANIMATOR_root,yes,no,Открытие одним действием из дерева

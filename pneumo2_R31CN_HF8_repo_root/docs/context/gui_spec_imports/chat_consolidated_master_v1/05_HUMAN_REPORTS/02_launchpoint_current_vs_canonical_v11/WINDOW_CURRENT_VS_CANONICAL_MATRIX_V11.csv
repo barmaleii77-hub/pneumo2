@@ -1,0 +1,5 @@
+window,current_status,current_entry,current_main_problem,canonical_role,canonical_name,primary_action,direct_tree_open,direct_command_search,send_results_role,priority
+GUI диагностики,launchpoint_only+subsystem_known_window_not_opened,home/launcher button,competes with send-results route,first_class_top_level_workspace,Диагностика,Собрать диагностику,yes,yes,secondary_inside_diagnostics,critical
+Compare Viewer,launchpoint_only,home/launcher button + embedded compare exists separately,duplicates compare route,advanced_direct_open_window_under_analysis,Подробное сравнение результатов,Открыть подробное сравнение,yes,yes,not_applicable,high
+Редактор исходных данных,launchpoint_only,home/launcher button,unclear master-copy role,first_class_top_level_workspace,Исходные данные проекта,Открыть исходные данные проекта,yes,yes,not_applicable,critical
+Центр тестов,launchpoint_only,home/launcher button,can be mistaken for second scenario editor,first_class_top_level_workspace,Набор испытаний,Открыть набор испытаний,yes,yes,not_applicable,critical

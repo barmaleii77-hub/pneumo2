@@ -1,0 +1,162 @@
+According to a document from (2026-04-02), в **R31CN** официально закрыт узкий runtime/UI-блокер страницы Optimization: падение на `st.experimental_rerun()` и двусмысленный экран, где одновременно торчали StageRunner- и coordinator-блоки.【213:0†R31CN_optimization_ui_rerun_single_mode_audit.md†L5-L23】  
+Но этот же свежий слой показывает и границу: проверенный официальный срез R31CN — это `py_compile`, `compileall` и targeted pytest по Optimization/release-sync, а не весь solver/export/animator фронт.【213:1†R31CN_release_build_report.md†L1-L17】 Изменённые файлы это тоже подтверждают: патч тронул UI/rerun/release-файлы, а не producer-side truth-contract слой.【146:5†CHANGED_FILES_R31CN_2026-04-02.txt†L1-L13】 Официальный pytest-лог для этого релиза — `24 passed`.【146:4†R31CN_targeted_pytest_log.txt†L1-L2】
+
+## 1. Verified state 🔍
+
+Я отделил **primary** от **secondary** и пошёл от живых файлов.
+
+**Primary, реально пригодные как источник истины сейчас:**
+- `PneumoApp_v6_80_R176_R31CN_2026-04-02.zip` — live source ZIP
+- `PneumoApp_R31CN_portable_20260402.zip`
+- `PneumoApp_R31CN_optimization_ui_rerun_single_mode_patch_20260402.zip`
+- `pneumo_release_r31cn_bundle.zip`
+- diff/log/hash/unzip-test файлы
+
+**Secondary, только как навигатор, не как доказательство:**
+- `R31CN_release_summary.md`
+- `R31CN_optimization_ui_rerun_single_mode_audit.md`
+- `pneumo_chat_handoff_prompt_2026-04-02.md`
+- wishlist/ledger слои
+
+Что я уже сделал по live tree:
+- распаковал source ZIP;
+- прочитал прямо из него канонические файлы: `00_READ_FIRST__ABSOLUTE_LAW.md`, `01_PARAMETER_REGISTRY.md`, `DATA_CONTRACT_UNIFIED_KEYS.md`, `docs/11_TODO.md`;
+- локально прогнал тесты на извлечённом дереве.
+
+**Что подтверждено:**
+- R31CN реально чинит именно Optimization rerun/single-mode слой, и только его официальный acceptance clean.  
+- В live source tree уже есть explicit export-contract слой: `anim_export_contract.py`, `npz_bundle.py`, `meta.solver_points`, `meta.hardpoints`, `meta.packaging`.
+- В live source tree уже есть canonical cylinder truth-layer:
+  - `desktop_animator/cylinder_truth_gate.py`
+  - `tools/validate_anim_export_contract.py`
+  - packaging passport export в `anim_export_contract.py`
+
+Моя локальная проверка:
+- `pytest -q tests/test_r31cn_streamlit_rerun_and_single_mode_ui.py` → **5 passed**
+- более широкий animator/truth-contract срез:
+  - `tests/test_r31bn_cylinder_truth_gate.py`
+  - `tests/test_anim_latest_solver_points_contract_gate.py`
+  - `tests/test_geometry_acceptance_solver_points.py`
+  - `tests/test_r48_solver_points_rigidity.py`
+  - `tests/test_r44_cylinder_packaging_contract_and_animator.py`
+  - `tests/test_r46_cylinder_housing_shell_honesty.py`
+  - `tests/test_r52_cylinder_sampling_and_rod_visibility.py`
+  - `tests/test_r57_animator_timeline_interp_and_web_idle.py`
+  
+  результат: **29 passed, 4 failed**
+
+Это уже не docs-only вывод. Это live-tree факт.
+
+---
+
+## 2. Open gaps / risks ⚠️
+
+Главный незакрытый слой по канону всё ещё не UI-косметика, а:
+- `solver -> export -> animator truth-contract`
+- `hardpoints / solver_points`
+- `cylinder packaging`
+- `measured web perf / trace`
+- `base canon cleanup`
+
+В extracted canonical docs это прямо продолжает держаться как рабочий фокус, и по нему я не вижу оснований объявлять победу.
+
+Самое важное из моего live прогона:
+
+### A. Acceptance drift в cylinder/animator слое
+Есть реальное противоречие внутри текущего дерева:
+- `tests/test_r44_cylinder_packaging_contract_and_animator.py` падает на ожидании, что rod должен начинаться уже **снаружи** housing.
+- Но текущая живая реализация в `desktop_animator/geom3d_helpers.py` делает другое: при текущем честном fallback рисует
+  - `housing_seg = top -> gland/body shell or full shell`
+  - `rod_seg = piston_center -> bot`
+  и отдельно держит прозрачную оболочку + внутренний rod/piston layer.
+- Это согласуется с более поздними тестами `r46` и частью `r52/r57`, но не согласуется со старым `r44`.
+
+То есть сейчас в live tree есть **нечистый acceptance слой**, и он прямо на P0-фронте cylinder packaging.
+
+### B. Animator regression slice не зелёный целиком
+Ещё 3 фейла идут из `r52/r57`:
+- это source-string / signature expectations против текущего `desktop_animator/app.py`;
+- по характеру похоже на drift тестов относительно текущего файла, а не на уже доказанную физическую регрессию;
+- но честный статус от этого не меняется: **green acceptance тут сейчас нет**.
+
+### C. Не подтверждён end-to-end Windows слой
+Я здесь **не** подтвердил:
+- свежий Windows visual acceptance,
+- свежий SEND bundle именно после R31CN/следующего патча,
+- measured browser perf trace acceptance,
+- закрытие explicit `gland/body-end` export point.
+
+---
+
+## 3. Next exact move 🎯
+
+**Один следующий правильный шаг:**
+### снять противоречие в live acceptance слое `export -> cylinder packaging -> animator`
+
+Не делать ещё один UI-фикс.  
+Не расширять wishlist.  
+Не писать новый summary.
+
+Нужно пройти цепочку:
+
+**requirement → code → evidence → patch/test**
+
+Конкретно сейчас:
+1. сверить canonical cylinder fallback из live canonical docs с текущими
+   - `anim_export_contract.py`
+   - `cylinder_truth_gate.py`
+   - `geom3d_helpers.py`
+   - `desktop_animator/app.py`
+2. после этого привести к одному контракту failing regression-slice:
+   - `r44`
+   - `r52`
+   - `r57`
+3. и только потом решать:
+   - правим **код**, если контракт реально нарушен,
+   - или правим **stale tests**, если код уже соответствует канону.
+
+Это сейчас самый правильный ход, потому что он убирает внутреннее противоречие именно на truth-contract фронте, а не лечит боковой симптом.
+
+---
+
+## 4. File-touch frontier
+
+**Producer-side truth first**
+- `pneumo_solver_ui/anim_export_contract.py`
+- `pneumo_solver_ui/npz_bundle.py`
+- `pneumo_solver_ui/solver_points_contract.py`
+- `pneumo_solver_ui/solver_points_geometry.py`
+- `pneumo_solver_ui/model_pneumo_v9_doublewishbone_camozzi.py`
+
+**Consumer/gate**
+- `pneumo_solver_ui/desktop_animator/cylinder_truth_gate.py`
+- `pneumo_solver_ui/desktop_animator/geom3d_helpers.py`
+- `pneumo_solver_ui/desktop_animator/app.py`
+- `pneumo_solver_ui/desktop_animator/self_checks.py`
+- `pneumo_solver_ui/tools/validate_anim_export_contract.py`
+
+**Immediate failing acceptance slice**
+- `tests/test_r44_cylinder_packaging_contract_and_animator.py`
+- `tests/test_r52_cylinder_sampling_and_rod_visibility.py`
+- `tests/test_r57_animator_timeline_interp_and_web_idle.py`
+- рядом проверить `tests/test_r46_cylinder_housing_shell_honesty.py`
+
+---
+
+## 5. Что не утверждается без проверки
+
+Я **не утверждаю**, что:
+- закрыт весь `solver_points / hardpoints` truth-contract;
+- закрыт весь `ANIM-CYL-07 / W-200`;
+- есть финальный PASS по Windows visual acceptance;
+- есть PASS по `WEB-PERF-05 / W-203`;
+- exporter уже даёт полный explicit `gland/body-end` point на текущем runtime bundle;
+- tree полностью зелёное по animator acceptance.
+
+Честный статус сейчас такой:
+
+**R31CN как Optimization hotfix — подтверждён.**  
+**R31CN как полный truth-contract closure — не подтверждён.**  
+**Live tree уже достаточно богат, чтобы идти в точечный code/test reconciliation, а не в новый прогрев.**
+
+Следующий ход — именно в reconciliation `r44/r52/r57` против live producer/export/animator contract.

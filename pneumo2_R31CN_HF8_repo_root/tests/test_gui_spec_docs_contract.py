@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import subprocess
 from pathlib import Path
@@ -36,6 +37,7 @@ IMPORTS_V38 = IMPORTS / "v38_github_kb_commit_ready"
 IMPORTS_V19 = IMPORTS / "v19_graph_iteration"
 IMPORTS_V15 = IMPORTS / "v15_state_continuity_repair_loops"
 IMPORTS_V16 = IMPORTS / "v16_visibility_priority"
+IMPORTS_CHAT_MASTER_V1 = IMPORTS / "chat_consolidated_master_v1"
 V32_COMPLETENESS = IMPORTS_V32 / "COMPLETENESS_ASSESSMENT.md"
 V32_WORKSTREAMS = IMPORTS_V32 / "PARALLEL_CHAT_WORKSTREAMS.md"
 V33_COMPLETENESS = IMPORTS_V33 / "COMPLETENESS_ASSESSMENT.md"
@@ -66,6 +68,11 @@ V16_IMPORT_AUDIT = (
     CONTEXT
     / "release_readiness"
     / "HUMAN_GUI_REPORT_ONLY_V16_VISIBILITY_PRIORITY_2026-04-21.md"
+)
+CHAT_MASTER_IMPORT_AUDIT = (
+    CONTEXT
+    / "release_readiness"
+    / "CHAT_CONSOLIDATED_MASTER_V1_KB_IMPORT_AUDIT_2026-04-21.md"
 )
 
 CANON_17 = DOCS / "17_WINDOWS_DESKTOP_CAD_GUI_CANON.md"
@@ -148,6 +155,126 @@ def _dirty_repo_paths_from_git_status() -> set[str]:
         else:
             dirty_paths.add(rel_path.replace("\\", "/").strip('"'))
     return dirty_paths
+
+
+def test_chat_consolidated_master_v1_import_layer_exists_and_is_registered() -> None:
+    required_root_and_index_files = {
+        "README.md",
+        "REPO_IMPORT_NOTE.md",
+        "06_INDEX/MASTER_EXEC_SUMMARY.json",
+        "06_INDEX/INCLUDED_ARTIFACTS.csv",
+        "06_INDEX/SUPERSEDED_AND_EXCLUDED.csv",
+        "06_INDEX/CONSOLIDATION_RATIONALE.md",
+        "06_INDEX/PACKAGE_MANIFEST.json",
+        "06_INDEX/PACKAGE_SELFCHECK_REPORT.json",
+        "06_INDEX/LINEAGE_AND_READING_ORDER.md",
+    }
+
+    assert IMPORTS_CHAT_MASTER_V1.exists()
+    assert CHAT_MASTER_IMPORT_AUDIT.exists()
+    for rel_path in required_root_and_index_files:
+        path = IMPORTS_CHAT_MASTER_V1 / rel_path
+        assert path.exists(), rel_path
+        assert path.stat().st_size > 0, rel_path
+
+    summary = json.loads(
+        (IMPORTS_CHAT_MASTER_V1 / "06_INDEX/MASTER_EXEC_SUMMARY.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    selected_versions = summary["selected_major_versions"]
+    assert summary["package_id"] == "pneumo_chat_consolidated_master_v1"
+    assert selected_versions == {
+        "codex_spec": "v38_actualized_with_v10",
+        "repo_audit": "v34",
+        "graph": "v17 + v19 + v20 + v21",
+        "human_reports": "v10..v16",
+    }
+
+    selfcheck = json.loads(
+        (IMPORTS_CHAT_MASTER_V1 / "06_INDEX/PACKAGE_SELFCHECK_REPORT.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert selfcheck["included_artifacts_count"] == 19
+    assert selfcheck["files_in_package"] == 168
+
+    included_rows = _load_csv_rows(
+        IMPORTS_CHAT_MASTER_V1 / "06_INDEX/INCLUDED_ARTIFACTS.csv"
+    )
+    excluded_rows = _load_csv_rows(
+        IMPORTS_CHAT_MASTER_V1 / "06_INDEX/SUPERSEDED_AND_EXCLUDED.csv"
+    )
+    assert len(included_rows) == 19
+    assert len(excluded_rows) == 119
+
+    included_targets = {row["included_as"] for row in included_rows}
+    assert "04_GRAPH_ANALYSIS/01_reconciliation_v21" in included_targets
+    assert "04_GRAPH_ANALYSIS/02_workspace_graphs_v20" in included_targets
+    assert "05_HUMAN_REPORTS/07_visibility_priority_v16" in included_targets
+    assert any(
+        row["artifact"] == "pneumo_gui_codex_package_v3"
+        and row["reason"] == "v38_actualized_with_v10"
+        for row in excluded_rows
+    )
+    assert any(
+        row["artifact"] == "pneumo_human_gui_report_only_v6"
+        and row["reason"] == "v10-v16 human report layers"
+        for row in excluded_rows
+    )
+
+    manifest = json.loads(
+        (IMPORTS_CHAT_MASTER_V1 / "06_INDEX/PACKAGE_MANIFEST.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert len(manifest) == 168
+    for item in manifest:
+        path = IMPORTS_CHAT_MASTER_V1 / item["path"]
+        assert path.exists(), item["path"]
+        assert path.stat().st_size == item["size_bytes"], item["path"]
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == item["sha256"]
+
+    key_files = {
+        "02_CODEX_SPEC_FINAL/v38_actualized_with_v10/TECHNICAL_SPECIFICATION.md",
+        "03_REPO_AUDIT/v34_repo_audit/AUDIT_REPORT.md",
+        "04_GRAPH_ANALYSIS/01_reconciliation_v21/GRAPH_ANALYSIS_REPORT_V21.md",
+        "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/GRAPH_ANALYSIS_REPORT_V20.md",
+        "04_GRAPH_ANALYSIS/04_cost_entropy_v17/GRAPH_ANALYSIS_REPORT_V17.md",
+        "05_HUMAN_REPORTS/00_MASTER_SUMMARY.md",
+    }
+    for rel_path in key_files:
+        path = IMPORTS_CHAT_MASTER_V1 / rel_path
+        assert path.exists(), rel_path
+        assert path.stat().st_size > 0, rel_path
+
+    docs_to_check = {
+        IMPORTS_README,
+        PROJECT_SOURCES,
+        PROJECT_KNOWLEDGE_BASE,
+        GUI_INDEX,
+        CANON_18,
+        LINEAGE_MD,
+        CHAT_MASTER_IMPORT_AUDIT,
+    }
+    for path in docs_to_check:
+        text = path.read_text(encoding="utf-8")
+        assert "chat_consolidated_master_v1" in text, path
+        assert "pneumo_chat_consolidated_master_v1.zip" in text, path
+        assert "runtime-closure proof" in text, path
+
+    richer_docs = {
+        IMPORTS_README,
+        PROJECT_SOURCES,
+        PROJECT_KNOWLEDGE_BASE,
+        CANON_18,
+        CHAT_MASTER_IMPORT_AUDIT,
+    }
+    for path in richer_docs:
+        text = path.read_text(encoding="utf-8")
+        assert "MASTER_EXEC_SUMMARY.json" in text, path
+        assert "SUPERSEDED_AND_EXCLUDED.csv" in text, path
+        assert "GRAPH_ANALYSIS_REPORT_V21.md" in text, path
 
 
 def test_v37_kb_supplement_import_layer_exists_and_loads_contracts() -> None:
@@ -994,6 +1121,7 @@ def test_v12_design_recovery_layer_and_lineage_inventory_are_registered() -> Non
         "v16_visibility_priority",
         "v37",
         "v38",
+        "chat_consolidated_master_v1",
     ]
     assert any(item["version"] == "PROMPT_V2" and item["repo_layer"] == "docs/context/gui_spec_imports/foundations/" for item in lineage_json)
     assert any(item["version"] == "v12" and item["repo_layer"] == "docs/context/gui_spec_imports/v12_design_recovery/" for item in lineage_json)
@@ -1020,6 +1148,12 @@ def test_v12_design_recovery_layer_and_lineage_inventory_are_registered() -> Non
         item["version"] == "v38"
         and item["repo_layer"] == "docs/context/gui_spec_imports/v38_github_kb_commit_ready/"
         and item["status"] == "current_successor_kb_commit_ready"
+        for item in lineage_json
+    )
+    assert any(
+        item["version"] == "chat_consolidated_master_v1"
+        and item["repo_layer"] == "docs/context/gui_spec_imports/chat_consolidated_master_v1/"
+        and item["status"] == "current_consolidated_master_reference"
         for item in lineage_json
     )
 
@@ -1687,6 +1821,10 @@ def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
         V15_IMPORT_AUDIT,
         IMPORTS_V16 / "README.md",
         V16_IMPORT_AUDIT,
+        IMPORTS_CHAT_MASTER_V1 / "README.md",
+        IMPORTS_CHAT_MASTER_V1 / "REPO_IMPORT_NOTE.md",
+        IMPORTS_CHAT_MASTER_V1 / "06_INDEX" / "LINEAGE_AND_READING_ORDER.md",
+        CHAT_MASTER_IMPORT_AUDIT,
         IMPORTS_V37 / "README.md",
         IMPORTS_V37 / "TECHNICAL_SPECIFICATION.md",
         IMPORTS_V37 / "REPO_GITHUB_KB_SUPPLEMENT.md",

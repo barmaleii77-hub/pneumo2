@@ -1,0 +1,842 @@
+[
+  {
+    "path": "01_SOURCE_CONTEXT/deep-research-report (5).md",
+    "size_bytes": 61507,
+    "sha256": "9cc1f35d3c19631c28a2cdd2d07f8c25949ee8fc72f293a1a2679ce6ea501dd7"
+  },
+  {
+    "path": "01_SOURCE_CONTEXT/prompt_for_codex_tz_spec_recipient_neutral_CANONICAL_2026-04-16_CONNECTOR_RECONCILED.md",
+    "size_bytes": 48876,
+    "sha256": "e0c9465ff2e209b1c1d06b6c5788652a15f5efa1282ff796b69f3a06b3ac097c"
+  },
+  {
+    "path": "01_SOURCE_CONTEXT/prompt_gui_windows_cad_pneumo_augmented_v2_2026-04-13.md",
+    "size_bytes": 55098,
+    "sha256": "a5c4abad92c82ee125438d78f42a77036d58ef4472de11bdf04fd1d674e5e3bb"
+  },
+  {
+    "path": "01_SOURCE_CONTEXT/Прогрев контекста проекта.txt",
+    "size_bytes": 4696,
+    "sha256": "fba825082afd63c138ba0be8ca5fa59e5283599b8e013d8716fa978617878383"
+  },
+  {
+    "path": "01_SOURCE_CONTEXT/Проектный релиз.txt",
+    "size_bytes": 8741,
+    "sha256": "b31dfad1beeb31286ea70cd7497e15d9e1b6309c9f56bf6a176760349e3dabe1"
+  },
+  {
+    "path": "01_SOURCE_CONTEXT/Разработка софта для подвески.txt",
+    "size_bytes": 9232,
+    "sha256": "0f2008ea68c71616ce55f330870b32c53dcd1fa60f009f9efa361f59ba7ae690"
+  },
+  {
+    "path": "02_CODEX_SPEC_FINAL/v38_actualized_with_v10/ACCEPTANCE_MATRIX.csv",
+    "size_bytes": 38712,
+    "sha256": "390256e4b5e8296577d9792579207519caed60a96c1853098a6fdeb3f7b477a5"
+  },
+  {
+    "path": "02_CODEX_SPEC_FINAL/v38_actualized_with_v10/GUI_SPEC.yaml",
+    "size_bytes": 18597,
+    "sha256": "4465eb1812b78a770fa8b9b238790ab4310e915bd1125f439c9a1092618878a5"
+  },
+  {
+    "path": "02_CODEX_SPEC_FINAL/v38_actualized_with_v10/LAUNCHER_HIERARCHY_RECONCILIATION_V10.md",
+    "size_bytes": 1286,
+    "sha256": "5b1c270afec22b478c26b06662f440f472eca7bf4dac8d3e4f947fc09c098848"
+  },
+  {
+    "path": "02_CODEX_SPEC_FINAL/v38_actualized_with_v10/REQUIREMENTS_MATRIX.csv",
+    "size_bytes": 42553,
+    "sha256": "f9161b27fda1d2eed675560d427f2465303c726ebe4698dc3bf27fa22b11d48f"
+  },
+  {
+    "path": "02_CODEX_SPEC_FINAL/v38_actualized_with_v10/TECHNICAL_SPECIFICATION.md",
+    "size_bytes": 23326,
+    "sha256": "a683e18bfeab4ab9b85acbe025ed303b0adbdad44705c860be4c3d23a67c5290"
+  },
+  {
+    "path": "02_CODEX_SPEC_FINAL/v38_actualized_with_v10/V10_ACTUALIZATION_REPORT.md",
+    "size_bytes": 1510,
+    "sha256": "da8656d02e55701184187a4f71252d73d4850d875e80261e230ff0681061a7d1"
+  },
+  {
+    "path": "02_CODEX_SPEC_FINAL/v38_actualized_with_v10/V10_RECONCILIATION_MATRIX.csv",
+    "size_bytes": 1411,
+    "sha256": "88364586be8949646d89b2f059045b7f3fe5082c1611830bb99fe78041540a44"
+  },
+  {
+    "path": "03_REPO_AUDIT/v34_repo_audit/AUDIT_REPORT.md",
+    "size_bytes": 2413,
+    "sha256": "517d3345d36a9aeee761d7a12fc7326a6af05f956e448e3a7a7e9ae4c835459a"
+  },
+  {
+    "path": "03_REPO_AUDIT/v34_repo_audit/COMPLIANCE_MATRIX_V33_AND_KB.csv",
+    "size_bytes": 2316,
+    "sha256": "02a7e10f2036c9651ec0a651c0b8d80e17d9313b68770e76b6a4b75403c206a2"
+  },
+  {
+    "path": "03_REPO_AUDIT/v34_repo_audit/FINDINGS_REGISTER.csv",
+    "size_bytes": 3845,
+    "sha256": "f2e7e1aca13a2f642bf7d30baf48d1117ded13bec493783281f16a9f256e7702"
+  },
+  {
+    "path": "03_REPO_AUDIT/v34_repo_audit/KNOWLEDGE_BASE_ALIGNMENT_MATRIX.csv",
+    "size_bytes": 1255,
+    "sha256": "1d164fdd586037e72f1c4fb4f6918ae99eed8bb479c09faf088b4efb9b9b63c7"
+  },
+  {
+    "path": "03_REPO_AUDIT/v34_repo_audit/LOCAL_STATE_AUDIT.md",
+    "size_bytes": 1596,
+    "sha256": "14fbd02d9b72ad0eab0555c66afc2f5fb1dc8b6520afc8a074ec0a1b51ed8589"
+  },
+  {
+    "path": "03_REPO_AUDIT/v34_repo_audit/REMOTE_STATE_AUDIT.md",
+    "size_bytes": 1725,
+    "sha256": "2956c36f1ce3e3a21481faecd9704976638d3958db9b07997c250ece060efc2a"
+  },
+  {
+    "path": "03_REPO_AUDIT/v34_repo_audit/REPO_REMOTE_EVIDENCE_EXTRACTS.md",
+    "size_bytes": 2689,
+    "sha256": "6f7f9b0c669801141e749cfc79d2aaa0a1fb04420762df7fed17df8caa8155a9"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/00_MASTER_SUMMARY.md",
+    "size_bytes": 1032,
+    "sha256": "d773ea0717f6759413d34267becafe02b94c4378c794b10f03782f95ba2124b2"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/01_reconciliation_v21/CURRENT_LIMITS_AND_EVIDENCE_V21.md",
+    "size_bytes": 2048,
+    "sha256": "e05c4da18a454d3e116a65aa232aea7cfe93fec8d8c5b28b670de58d2b7f1c79"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/01_reconciliation_v21/CURRENT_TARGET_DELTA_GRAPH_V21.dot",
+    "size_bytes": 3235,
+    "sha256": "f9dbc4c2f7575259af47091e6bf4532e05bd8feaf56b113e59972d3ec773f1a6"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/01_reconciliation_v21/CURRENT_TO_CANONICAL_RECONCILIATION_V21.csv",
+    "size_bytes": 5866,
+    "sha256": "acb8207089717096266ba59a5a736d477a9d68e2cb864b37716d5264a4af6a9a"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/01_reconciliation_v21/DIRECT_TREE_OPEN_ENFORCEMENT_V21.csv",
+    "size_bytes": 2360,
+    "sha256": "84c2a2b78ad8a558ac32524816b9c98783c2fed3ded438015426a4c6f089464e"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/01_reconciliation_v21/GRAPH_ANALYSIS_REPORT_V21.md",
+    "size_bytes": 4320,
+    "sha256": "c4b63f5fec47489c3ac28ed96e70ff2042774e3da333ebb53b243cd47fd1d8c9"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/01_reconciliation_v21/LAUNCHPOINT_ONLY_TRIAGE_V21.csv",
+    "size_bytes": 1311,
+    "sha256": "59f849ae28cce1c1c52da8470bd2145ab691e0d062067f7f1dc363dce14d858a"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/01_reconciliation_v21/ROUTE_COST_REBALANCING_V21.csv",
+    "size_bytes": 1340,
+    "sha256": "c6c2106ba4a7874ae621c154608e12f31cca91396045e08d477e86a716acce04"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/01_reconciliation_v21/SEMANTIC_REWRITE_PLAN_V21.csv",
+    "size_bytes": 4097,
+    "sha256": "18a7df13132b2dfe1092407e62bd09fb99c1852d25fecc4fa8556e84d76fb970"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/COGNITIVE_VISIBILITY_MATRIX_V20.csv",
+    "size_bytes": 9346,
+    "sha256": "2d383de805956ec78838c41c0d78a229396238222a8cd0b9d56465c8ae539c21"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/COMPLIANCE_MATRIX_V20.csv",
+    "size_bytes": 1192,
+    "sha256": "40431a57c885986997de7a9e90459dab1eab8afc44ef4f0ffff7e18457a142e7"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/CROSS_WORKSPACE_RETURN_LOOP_GRAPH_V20.dot",
+    "size_bytes": 6992,
+    "sha256": "49df2e2cb33adf8d26a7cb900875f6fd58d174278dfd4c68cda6efb7f69f6d6f"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/DOCK_WINDOW_AND_DOCK_WIDGET_MATRIX_V20.csv",
+    "size_bytes": 1451,
+    "sha256": "588926a8ff0ea4a03491bc4fd4d537dad315b486efb94da4a32d16e831c3d925"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/EDGE_CATALOG_V20.csv",
+    "size_bytes": 41319,
+    "sha256": "d0979eb5b9ad50f5886aef0ff1607effe15b17d6e08b430fa5aa5d5bc18cb634"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/GRAPH_ANALYSIS_REPORT_V20.md",
+    "size_bytes": 4737,
+    "sha256": "5b9494d3a36dfd8981b86bd6bc6690a1c974bfe43febea8ce28c6a1c2e00826f"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/GUI_LABEL_SEMANTIC_AUDIT_V20.csv",
+    "size_bytes": 3810,
+    "sha256": "f204d7db814de61b0d237922d2ccf9b8512dfa46d0cc43859a1b750261dd8660"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/NODE_CATALOG_V20.csv",
+    "size_bytes": 36558,
+    "sha256": "7a88c58306b121808a41e2847509f938e3b0c37857dc36851f468fbddeea9460"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/PATH_COST_SCENARIOS_V20.csv",
+    "size_bytes": 824,
+    "sha256": "6b9345b6a81ab701b08b76c49e779b0ef38c35c18b129d56d6939de2eb5e3015"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/SUBGRAPH_CURRENT_WS-ANALYSIS_V20.dot",
+    "size_bytes": 1885,
+    "sha256": "26312e54277f75b2ed6ae42276f2daa5547667836b60f50f64ea6f3ae767da4a"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/SUBGRAPH_CURRENT_WS-ANIMATOR_V20.dot",
+    "size_bytes": 973,
+    "sha256": "6fb598e8c1bc8e96e95431f94377ffe339b6cd356869186e05ea7f87a0c11f1d"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/SUBGRAPH_CURRENT_WS-BASELINE_V20.dot",
+    "size_bytes": 914,
+    "sha256": "41f8efce6c3508a3b64b8240ebfde5880577f9d58ec889aed76248219c5740af"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/SUBGRAPH_CURRENT_WS-PROJECT_V20.dot",
+    "size_bytes": 1866,
+    "sha256": "b12cfdbde6c4e2b13df2233b0bb8a97f9a7f2ed77891c0e34cb53a12ce1d113b"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/SUBGRAPH_CURRENT_WS-SUITE_V20.dot",
+    "size_bytes": 1345,
+    "sha256": "6aec277804563f4c91a824edf7f80d236aa3ca46c32fbd58831d39084c4b98cc"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/SUBGRAPH_OPTIMIZED_WS-ANALYSIS_V20.dot",
+    "size_bytes": 9463,
+    "sha256": "7c88c246adc042c3a9cc9f2b56d16e085ede2308e25858a48c3fdb40994fa082"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/SUBGRAPH_OPTIMIZED_WS-ANIMATOR_V20.dot",
+    "size_bytes": 9415,
+    "sha256": "c2d8a3446385bda649377d7fcecf27da07fc36c39602d2be82a337f0b65d1eab"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/SUBGRAPH_OPTIMIZED_WS-BASELINE_V20.dot",
+    "size_bytes": 9063,
+    "sha256": "50664728f9d379fbcb24488410f3184f125bff5dc8c3204d492f6d36f421d86d"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/SUBGRAPH_OPTIMIZED_WS-PROJECT_V20.dot",
+    "size_bytes": 9717,
+    "sha256": "e230f7ab9e50c26c90a1dd6e0f3e3387ac06102c1dcf1d50447d7ad247956dbb"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/SUBGRAPH_OPTIMIZED_WS-SUITE_V20.dot",
+    "size_bytes": 11563,
+    "sha256": "c3358185e209ee9ec23ff8a070054fbf797cc872a942737e669ce610eb369eed"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/TASK_CHECK_BLOCK_LOOP_MATRIX_V20.csv",
+    "size_bytes": 7838,
+    "sha256": "17f2eed2696885b4edc7a7f87a1e1207bb282dc584459b8bfe77d6d96c74fa9d"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/TREE_DIRECT_OPEN_MATRIX_V20.csv",
+    "size_bytes": 677,
+    "sha256": "cb068aec875df426896b7eb443d287a2d586f4625c6653201e2002dca9444f8c"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/02_workspace_graphs_v20/USER_ACTION_FEEDBACK_MATRIX_V20.csv",
+    "size_bytes": 26723,
+    "sha256": "4126bd62781082582a9d5e91bda937f50d04aacd320c7216f4f364567af0cb81"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/03_workspace_graphs_v19/COGNITIVE_VISIBILITY_MATRIX_V19.csv",
+    "size_bytes": 4886,
+    "sha256": "031b1529dbfa0b752429ae109129635f85f39d26a1e8c5c426887ab2aaee1717"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/03_workspace_graphs_v19/COMPLIANCE_MATRIX_V19.csv",
+    "size_bytes": 4565,
+    "sha256": "1ad58f9ccfd3876fdd25efbfc445457df6938de17684baea04f6f2f13e57d6c6"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/03_workspace_graphs_v19/DOCK_WINDOW_AND_DOCK_WIDGET_MATRIX_V19.csv",
+    "size_bytes": 2581,
+    "sha256": "deab8b76674023d001b35c19cfbcb0bbb633af2fe0d2c3b59b9eaec4ec86977d"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/03_workspace_graphs_v19/EDGE_CATALOG_V19.csv",
+    "size_bytes": 142811,
+    "sha256": "24759d1df464f6725f81a044d7b2b4cccb82e81dfcd68efce20b8c67adce55b4"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/03_workspace_graphs_v19/GRAPH_ANALYSIS_REPORT_V19.md",
+    "size_bytes": 5448,
+    "sha256": "7a2a13a644e68f130fd82e4e70a8ec0052137714b38218375c4493249034a8e6"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/03_workspace_graphs_v19/GUI_LABEL_SEMANTIC_AUDIT_V19.csv",
+    "size_bytes": 205284,
+    "sha256": "65cc9c967aae01fcda86049e17adbefcbb7dcb9d0be0832e419a9d8ca4133c44"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/03_workspace_graphs_v19/NODE_CATALOG_V19.csv",
+    "size_bytes": 190863,
+    "sha256": "270de022c6e626a6adf1849ac70d0b3f108f51a94402327763692d1fa2f6da24"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/03_workspace_graphs_v19/PATH_COST_SCENARIOS_V19.csv",
+    "size_bytes": 2981,
+    "sha256": "b5bbfac24605d7b7e024555bc57306a5d2c10b9d529cc1eddd4e6cb3068af86f"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/03_workspace_graphs_v19/SUBGRAPH_CURRENT_WS-DIAGNOSTICS_V19.dot",
+    "size_bytes": 1883,
+    "sha256": "4c77dea3d95328c5db08ad526e737bc9375783993e0f73f5217409acc950ba42"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/03_workspace_graphs_v19/SUBGRAPH_CURRENT_WS-INPUTS_V19.dot",
+    "size_bytes": 2504,
+    "sha256": "a00ee435a070a8b26b280f0428f062e7d1cecc86a59d4036adee9515160ae788"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/03_workspace_graphs_v19/SUBGRAPH_CURRENT_WS-OPTIMIZATION_V19.dot",
+    "size_bytes": 1919,
+    "sha256": "fda7c5ec89b141c89494a2e685807ff8aef278f43063661a0c728a75590c4f93"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/03_workspace_graphs_v19/SUBGRAPH_CURRENT_WS-RING_V19.dot",
+    "size_bytes": 1926,
+    "sha256": "48cfc246394aaacebc3192a35ad2712ecb7ac151ace3b50f23da476b97b947b8"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/03_workspace_graphs_v19/SUBGRAPH_OPTIMIZED_WS-DIAGNOSTICS_V19.dot",
+    "size_bytes": 59961,
+    "sha256": "96fe48892d92d481d319d62b6b9dc2a5f0aa0e01ad50a8309b638a655428e9aa"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/03_workspace_graphs_v19/SUBGRAPH_OPTIMIZED_WS-INPUTS_V19.dot",
+    "size_bytes": 58428,
+    "sha256": "068c8746ec59590bc8c40bbd04a39d2b13904e38895bcec162f810aa8ec2fd23"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/03_workspace_graphs_v19/SUBGRAPH_OPTIMIZED_WS-OPTIMIZATION_V19.dot",
+    "size_bytes": 60261,
+    "sha256": "d8085069f714d5d786cddfb34cb796e263d9c17bc5ac550d0bad68b74fafda2b"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/03_workspace_graphs_v19/SUBGRAPH_OPTIMIZED_WS-RING_V19.dot",
+    "size_bytes": 46457,
+    "sha256": "c65ffd9b6831277fffee5191148422cfa35815557f5abaa4f7f4875480ef25eb"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/03_workspace_graphs_v19/TASK_CHECK_BLOCK_LOOP_MATRIX_V19.csv",
+    "size_bytes": 28608,
+    "sha256": "c8736f46fcabfe6058ee9f77242c5c15141ceca2d1c4ddb26550fac5fa275fe1"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/03_workspace_graphs_v19/TREE_DIRECT_OPEN_MATRIX_V19.csv",
+    "size_bytes": 888,
+    "sha256": "30b6034e78feb4a64261537d9d968317198fbd224ed0700eb5f79f8809a48fb5"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/03_workspace_graphs_v19/USER_ACTION_FEEDBACK_MATRIX_V19.csv",
+    "size_bytes": 19037,
+    "sha256": "7215c57b23cdfa0ec1301e2c8cca918650f2798daf87d6bde2aa0f216b5d970a"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/04_cost_entropy_v17/COMPLIANCE_MATRIX_V17.csv",
+    "size_bytes": 998,
+    "sha256": "959bd387570cd7a0773ccce539771f6fc3b005af501e72718f008ea076304a39"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/04_cost_entropy_v17/CURRENT_ROUTE_BOTTLENECKS_V17.csv",
+    "size_bytes": 1871,
+    "sha256": "0ff98ab30bc55334102bc844a3d7505e75b98b86b08b6e85c7fb23f858042f1a"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/04_cost_entropy_v17/DECISION_ENTROPY_V17.csv",
+    "size_bytes": 2974,
+    "sha256": "71ee610d5cb13975de5f895da217dc0d029764caa7c106bc5d0e7d17e4231543"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/04_cost_entropy_v17/GRAPH_ANALYSIS_REPORT_V17.md",
+    "size_bytes": 4008,
+    "sha256": "1d0c3372dbf83bed3f93e77a58fa65c54715ab998e702126b2a11f608ccd3230"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/04_cost_entropy_v17/GUI_LABEL_SEMANTIC_AUDIT_V17.csv",
+    "size_bytes": 262949,
+    "sha256": "16ccd70949bc147a4cd8ad6219e3498dc33c2804e8f57c7618ce28139b65f9ed"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/04_cost_entropy_v17/PIPELINE_CURRENT_WEIGHTED_V17.dot",
+    "size_bytes": 28061,
+    "sha256": "594a6d72c0ffc422fa3bf740b4ee486df2e863f5424ca11f731f1f1f13ec6b7f"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/04_cost_entropy_v17/PIPELINE_OPTIMIZED_FOCUS_V17.dot",
+    "size_bytes": 4828,
+    "sha256": "2bf312ca5cd2702e68d2533ad4a08cae011faef587c8b0cb3708871c06ec69c1"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/04_cost_entropy_v17/PIPELINE_OPTIMIZED_WEIGHTED_V17.dot",
+    "size_bytes": 139875,
+    "sha256": "ab442e12caebd022c4e89cb20a5da3977e4744312b6cd63360b1ae921a8bc0da"
+  },
+  {
+    "path": "04_GRAPH_ANALYSIS/04_cost_entropy_v17/SCENARIO_PATH_COMPARISON_V17.csv",
+    "size_bytes": 665,
+    "sha256": "c57fe6c25ff11b1792371494a504cede8b89855b6f11e5d59475309d6ff2e2e6"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/00_MASTER_SUMMARY.md",
+    "size_bytes": 809,
+    "sha256": "f01f2aa617941ff62de1eded20a646decf509a5c2fec1a19f1b3ae120808174f"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/01_launcher_shell_v10/ACTIONS_TO_MOVE_INSIDE_OTHER_WINDOWS_V10.csv",
+    "size_bytes": 2244,
+    "sha256": "90d393f23154a1c92b0b4410502792dddf8b4c59cdb75783ac9c0f246aa9964d"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/01_launcher_shell_v10/EXEC_SUMMARY.md",
+    "size_bytes": 1948,
+    "sha256": "dfba2ec59da224ea5d75a87af4a06e8124269048d11a3f9a179c774f3d7f0b63"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/01_launcher_shell_v10/HOW_TO_FIX_V10.md",
+    "size_bytes": 1545,
+    "sha256": "a4816be6b19e368ba4ed0be3623ab9c81eaccd339eaf588e931d9c5e7139c26c"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/01_launcher_shell_v10/ISSUE_REGISTER_V10.csv",
+    "size_bytes": 1548,
+    "sha256": "b448efc9bc130abdb71dbb5ae3ac87f278ede50e3d79dc1225116d2c42a663ae"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/01_launcher_shell_v10/LAUNCHER_SHELL_HIERARCHY_V10.md",
+    "size_bytes": 2315,
+    "sha256": "e1a3176f567881e11b6d2c48427850d9482a2342d7aa29888b41f21b2b6b50f5"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/01_launcher_shell_v10/LIMITS_AND_NOT_OPENED_V10.md",
+    "size_bytes": 829,
+    "sha256": "c499c894a12faa2bc90179d7e721e2770d95233488eefc678d50dee27f960a49"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/01_launcher_shell_v10/TOP_LEVEL_WINDOW_DECISION_MATRIX_V10.csv",
+    "size_bytes": 6355,
+    "sha256": "614c29a8e31d9cf71b12f451904812f5c923d85d856fba8b4d4c033620c8b49d"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/01_launcher_shell_v10/USER_FIRST_15_MINUTES_V10.md",
+    "size_bytes": 1563,
+    "sha256": "54c45f2d4fba5daf7564196118d1d38b77aa2442e6a2cb2bd5701aae22ef913d"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/01_launcher_shell_v10/WHAT_IS_BAD_V10.md",
+    "size_bytes": 1085,
+    "sha256": "701648b0561f426fb26911e91874e2fcd4e8848ad18d56aff852ab1aa3fdde35"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/01_launcher_shell_v10/WHAT_IS_GOOD_V10.md",
+    "size_bytes": 880,
+    "sha256": "c2edda9788424e8a9a9e2389d5e9c9ebd355c6387dbc94f219b0d198baa01b13"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/02_launchpoint_current_vs_canonical_v11/CANONICAL_WINDOW_ROLES_V11.dot",
+    "size_bytes": 998,
+    "sha256": "866e2872866335a61f89db9c2ceda09a5518a0bb36b46db9f1d6029d4e1a1e67"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/02_launchpoint_current_vs_canonical_v11/CURRENT_LAUNCHPOINT_CLUSTER_V11.dot",
+    "size_bytes": 1107,
+    "sha256": "41a0795280e542e7022b233b970b5dc464348aeecfb3b0bc160427c10e269530"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/02_launchpoint_current_vs_canonical_v11/CURRENT_VS_CANONICAL_COMPARE_VIEWER_V11.md",
+    "size_bytes": 2554,
+    "sha256": "a01e28a984bf774df8fdffe35fc42dc76eb9b72792f3e4ca199d42e947248f1f"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/02_launchpoint_current_vs_canonical_v11/CURRENT_VS_CANONICAL_DIAGNOSTICS_V11.md",
+    "size_bytes": 3147,
+    "sha256": "af16de43d28471a17f6f7b5c3b4b1d9f9866049cae8d8b967ade8768b1786f52"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/02_launchpoint_current_vs_canonical_v11/CURRENT_VS_CANONICAL_INPUT_EDITOR_V11.md",
+    "size_bytes": 2525,
+    "sha256": "226565828659ea017c240d424e0ab7386a2a00136a3ca9b29e83f2e26548a68e"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/02_launchpoint_current_vs_canonical_v11/CURRENT_VS_CANONICAL_TEST_CENTER_V11.md",
+    "size_bytes": 2329,
+    "sha256": "806ef5256edebda0c6a96471f0fd2dba56fe6d6366c0feaabf3401adda027fec"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/02_launchpoint_current_vs_canonical_v11/EXEC_SUMMARY.md",
+    "size_bytes": 2088,
+    "sha256": "2c85756a311e27a9e22a9582e43486fafdfb47ff32e629dd460f2cde1d7c5718"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/02_launchpoint_current_vs_canonical_v11/LAUNCHER_HIERARCHY_AND_WINDOW_ROLE_V11.md",
+    "size_bytes": 1478,
+    "sha256": "ccedd86fefac551ccb570c00a4d7a1efdb36ff7b57f7c1b4e61f47e0883b94bb"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/02_launchpoint_current_vs_canonical_v11/LIMITS_AND_NOT_OPENED_V11.md",
+    "size_bytes": 748,
+    "sha256": "414500220eb2a8a4db781d258e40fff0dd1c67b0956c3f9f7546ae5e0874c565"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/02_launchpoint_current_vs_canonical_v11/NEXT_STEP_V11.md",
+    "size_bytes": 536,
+    "sha256": "9377efa37afc11f32fc5ec06e13d14bf888a44baad420f832671fb5689f51a79"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/02_launchpoint_current_vs_canonical_v11/PACKAGE_MANIFEST.json",
+    "size_bytes": 1953,
+    "sha256": "ac52f32f06f9cb49960b280174002d6a216ee4ed5f35db91f6919b80f7082884"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/02_launchpoint_current_vs_canonical_v11/ROUTE_CONFLICTS_V11.csv",
+    "size_bytes": 657,
+    "sha256": "5c8a9f303274abde2b85a6886bef597e0770d17121043c9d620917782c21f421"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/02_launchpoint_current_vs_canonical_v11/SEMANTIC_REWRITE_MATRIX_V11.csv",
+    "size_bytes": 2177,
+    "sha256": "5b1a30a4781e948723bf8d910e4bacd106d4927983bd1c59051c9500f8dbe278"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/02_launchpoint_current_vs_canonical_v11/WINDOW_CURRENT_VS_CANONICAL_MATRIX_V11.csv",
+    "size_bytes": 1262,
+    "sha256": "0a8ea7c1a0f57d18f6e3b9be074f4f442973d2992f7397dacf3be706f209c295"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/03_window_internal_routes_v12/COMPARE_ACTION_FEEDBACK_SUBGRAPH_V12.dot",
+    "size_bytes": 1318,
+    "sha256": "c5798549f44b3c00a74e37e476ba5d98a11b17ca2003c8eff59edfebb878bc56"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/03_window_internal_routes_v12/DIAGNOSTICS_ACTION_FEEDBACK_SUBGRAPH_V12.dot",
+    "size_bytes": 1431,
+    "sha256": "ff636ae077f373dede08a3d4e53280b92a7850506c293b1624ad22d9fdbdecac"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/03_window_internal_routes_v12/DIRECT_TREE_OPEN_AND_DOCK_ROLE_V12.csv",
+    "size_bytes": 1303,
+    "sha256": "8a8819d35543b8305f2a53c9c36ff2089bb46b65955d47d20f5fc24e8e31c146"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/03_window_internal_routes_v12/EXEC_SUMMARY.md",
+    "size_bytes": 2152,
+    "sha256": "8d380774c844f8c0839d59dc4d7bdeaaf24dd4bde1093b78f4cf672ce436b898"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/03_window_internal_routes_v12/INPUT_EDITOR_ACTION_FEEDBACK_SUBGRAPH_V12.dot",
+    "size_bytes": 1971,
+    "sha256": "a0ceeba0bbeebba90aa069e35452ae494c5c192ef994a4590f15f60257bb337b"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/03_window_internal_routes_v12/LIMITS_AND_NOT_OPENED_V12.md",
+    "size_bytes": 825,
+    "sha256": "59f9449e7e76eff2075612fd2ec5597c4a2e3279851c82448d480d69a9cea724"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/03_window_internal_routes_v12/SEMANTIC_REWRITE_MATRIX_V12.csv",
+    "size_bytes": 2172,
+    "sha256": "fc32f320bad6dde3a549837df89744f382d696c3f9d1ccb43956f876c464e643"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/03_window_internal_routes_v12/TEST_CENTER_ACTION_FEEDBACK_SUBGRAPH_V12.dot",
+    "size_bytes": 1294,
+    "sha256": "34bd03e879e08e46af0d64cca628c3e1942d819c4a10b8131b8571c47abdabb2"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/03_window_internal_routes_v12/WINDOW_ACTION_FEEDBACK_MATRIX_V12.csv",
+    "size_bytes": 2310,
+    "sha256": "82a8c376521eb31771ce9f5d7a89a84142f824ff0488a2a62fc3397517594afe"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/03_window_internal_routes_v12/WINDOW_FIRST_SCREEN_CONTRACT_V12.md",
+    "size_bytes": 4250,
+    "sha256": "f6e9e0acf39d99c67aca7e5488336468aa7907fbd69983bd72489f7f14d746e3"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/04_canonical_window_operations_v13/ACTION_FEEDBACK_CHECK_BLOCK_LOOP_V13.csv",
+    "size_bytes": 1281,
+    "sha256": "481749399d7ca057af2b8b4d15d3241c0483b2701883a3c6f1fda4b051ef408d"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/04_canonical_window_operations_v13/CANONICAL_WINDOW_OPERATION_CONTRACT_V13.md",
+    "size_bytes": 5627,
+    "sha256": "c4025276dc1f9aab5cfe658e6d0fec2391624a22ec195b4c2fc6c61c2f6c04f2"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/04_canonical_window_operations_v13/COGNITIVE_LOAD_BREAKPOINTS_V13.csv",
+    "size_bytes": 2290,
+    "sha256": "0029ca465c58270cecc2808a49f539b4643b4fcdf6e83e3007770a3e288583d6"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/04_canonical_window_operations_v13/COMPARE_CANONICAL_OPERATION_V13.dot",
+    "size_bytes": 1636,
+    "sha256": "3455b6703c32ba0ea582947deaaad47f4c70be884b5e8dc670e09e346196339f"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/04_canonical_window_operations_v13/CROSS_WINDOW_HANDOFFS_V13.dot",
+    "size_bytes": 1431,
+    "sha256": "1915018934df9132161c0a679348041caf91c610232d4eeb8436e0207f459f55"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/04_canonical_window_operations_v13/DIAGNOSTICS_CANONICAL_OPERATION_V13.dot",
+    "size_bytes": 2541,
+    "sha256": "6a90f83bf8cb09f231be95586c2bbcde1a692fcc0b5dc42d12e51a87457f6b82"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/04_canonical_window_operations_v13/EXEC_SUMMARY.md",
+    "size_bytes": 1606,
+    "sha256": "217ee3851796cce6f7be86fe1d09222dec83f57d6d37fc2cd59b5c068fff36ee"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/04_canonical_window_operations_v13/FIRST_3_SECONDS_V13.csv",
+    "size_bytes": 1082,
+    "sha256": "ef6deb2b135809ad6055357f858929426f665a4be8c099f6db86ccc7189968d4"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/04_canonical_window_operations_v13/INPUTS_CANONICAL_OPERATION_V13.dot",
+    "size_bytes": 1757,
+    "sha256": "e7866e27dd07bbc360f0738dac945b0471331e4c6c6848eaf5d1b7cfa7c3d727"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/04_canonical_window_operations_v13/LIMITS_AND_EVIDENCE_V13.md",
+    "size_bytes": 1558,
+    "sha256": "df68f31b4337d3e1038dcc7fc8a1ca01bad9427d1ec23c8f5f763827b777ccbe"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/04_canonical_window_operations_v13/SEMANTIC_REWRITE_MATRIX_V13.csv",
+    "size_bytes": 1289,
+    "sha256": "a4bdcf11bc6f81c8058b44d5979cd5b012ef4d17e3b72afb1f5998e5d7d14da7"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/04_canonical_window_operations_v13/SUITE_CANONICAL_OPERATION_V13.dot",
+    "size_bytes": 1839,
+    "sha256": "83db4bb12bdb382722e3f1f4b09c74a87e8a509de495bb7784f074faf222b621"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/04_canonical_window_operations_v13/WINDOW_ROLE_AND_PRIORITY_V13.csv",
+    "size_bytes": 517,
+    "sha256": "a2a1212dc139aa1c745642e83a4e62ae94e62d743ab1f3b45031eb727591dbb3"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/05_tree_dock_context_v14/COGNITIVE_REASSURANCE_MARKERS_V14.csv",
+    "size_bytes": 2020,
+    "sha256": "985c300f504eeabc0b3dcf8ee8f1fb9341268b706b7695f7c67b0ad076ab4ac1"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/05_tree_dock_context_v14/DOCK_WINDOW_DECISIONS_V14.csv",
+    "size_bytes": 1356,
+    "sha256": "55a3be64f487f1c584a61593d89f075c1831435fc1cf179158175514614e0935"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/05_tree_dock_context_v14/ENTRY_EXIT_AND_RETURN_ROUTES_V14.dot",
+    "size_bytes": 3019,
+    "sha256": "c6e7211b294d77ae4b30a4bceb50affff700f98e8f47f9e6d78fa8ea3a73808e"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/05_tree_dock_context_v14/EXEC_SUMMARY.md",
+    "size_bytes": 1768,
+    "sha256": "589ab0d65ff81a499e4c0cd370d8bb6151c2c29a2f4491451d23561ba61a916c"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/05_tree_dock_context_v14/HOW_TO_FIX_V14.md",
+    "size_bytes": 1031,
+    "sha256": "ab08711d337b886bfb3a0a5836ce7bfadf946e5d8102c7f8ed0017f5b4098851"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/05_tree_dock_context_v14/LIMITS_AND_EVIDENCE_V14.md",
+    "size_bytes": 883,
+    "sha256": "c325e49c24fae52eb2ab8f04872900818d6358bab039d31c29713553ae770054"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/05_tree_dock_context_v14/SELECTION_SYNC_AND_FEEDBACK_V14.csv",
+    "size_bytes": 1226,
+    "sha256": "9efea3907b9ab7828fc0e44bee7147eb67a57d9e01bda72497cba53e28d4a42e"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/05_tree_dock_context_v14/TREE_AND_DOCK_ENTRY_CONTRACT_V14.md",
+    "size_bytes": 5364,
+    "sha256": "fa3a15abec9ba047d1d6136afcb1f248bc04ff54b77d6f8596ac322684bcbb14"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/05_tree_dock_context_v14/WHAT_IS_BAD_V14.md",
+    "size_bytes": 1123,
+    "sha256": "02ff37fbf68ad6f20ecec25ae65622a03672f0270f3feb9058e14a2a4d257380"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/05_tree_dock_context_v14/WHAT_IS_GOOD_V14.md",
+    "size_bytes": 821,
+    "sha256": "35b06dac0947e64e333df69f2836f2f66a04e55fbb701ace75437879dfe78e86"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/05_tree_dock_context_v14/WINDOW_CONTEXT_PERSISTENCE_V14.csv",
+    "size_bytes": 982,
+    "sha256": "2c57c932f1e86937c07c23e6372d12c14d074b283d7b3da18650033ac88ebdda"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/05_tree_dock_context_v14/WINDOW_ENTRY_POLICY_V14.csv",
+    "size_bytes": 1737,
+    "sha256": "e243adae449e53c52e4ce2124094500a7dd58a036c2fde44b6395e11877d58f2"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/06_state_continuity_repair_loops_v15/ACTION_CONFIRMATION_AND_RESULT_VISIBILITY_V15.csv",
+    "size_bytes": 2193,
+    "sha256": "4ee833375769501fd808e49386bbe1bac140450d64b080e8c3ade35ca46e9d64"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/06_state_continuity_repair_loops_v15/CONTEXT_RESTORE_AND_RETURN_TARGETS_V15.csv",
+    "size_bytes": 1841,
+    "sha256": "c709a251fe78d81d6be91949c80bf0b5b52290c228625f1ff71a95ad24188ec5"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/06_state_continuity_repair_loops_v15/ENTRY_STATE_REPAIR_GRAPH_V15.dot",
+    "size_bytes": 3095,
+    "sha256": "47947f47b4b27a5386888af0520cdb58b02ed172bcf5589b0490022ced80719a"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/06_state_continuity_repair_loops_v15/EXEC_SUMMARY.md",
+    "size_bytes": 1812,
+    "sha256": "39d953d28024bc8137012114dfe370c86672b6b03825a56a130bcd7e687ce0e9"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/06_state_continuity_repair_loops_v15/HOW_TO_FIX_V15.md",
+    "size_bytes": 1007,
+    "sha256": "97f9b2165bdc822da9d420acd05627c462899e17d4e04f621131e94aed0e5438"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/06_state_continuity_repair_loops_v15/LIMITS_AND_EVIDENCE_V15.md",
+    "size_bytes": 953,
+    "sha256": "9e2fcad063841e4905173ec71f2a07730fe1e16d408fb5fd3f8678a7da2d8f67"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/06_state_continuity_repair_loops_v15/REPAIR_LOOP_POLICY_V15.csv",
+    "size_bytes": 1312,
+    "sha256": "2f4c882e92cbfa0d46831228b8ccb0b4b30a8ef1bc6722532e15ec9e7de0aa23"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/06_state_continuity_repair_loops_v15/STALE_DIRTY_MISMATCH_TRUTH_MATRIX_V15.csv",
+    "size_bytes": 1543,
+    "sha256": "43ddc80c0ee0558a0f088d7db6151be4d2914b557d75bac98590f3fe3e03f2be"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/06_state_continuity_repair_loops_v15/STATE_CONTINUITY_AND_REPAIR_LOOP_CONTRACT_V15.md",
+    "size_bytes": 3920,
+    "sha256": "e424d08b6c7e217d6c6e76c918444e2651fd6b01c79ce6ef89dd58d5711cc495"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/06_state_continuity_repair_loops_v15/WHAT_IS_BAD_V15.md",
+    "size_bytes": 1134,
+    "sha256": "b8883c5c2d216e69699108302516e5f23524075fa2356ab1d4bb88bb5df15989"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/06_state_continuity_repair_loops_v15/WHAT_IS_GOOD_V15.md",
+    "size_bytes": 1025,
+    "sha256": "22a0d1449dac3fe5d2d0882d31ceaad13165ada9ef1088959fe819f12f12c9f1"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/06_state_continuity_repair_loops_v15/WINDOW_STATE_MARKER_MATRIX_V15.csv",
+    "size_bytes": 8611,
+    "sha256": "4057785f2a58a41b9879ac00d5699b11a572336690230cfd23ad39e334bca983"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/07_visibility_priority_v16/ALWAYS_VISIBLE_CONDITIONAL_INSPECTOR_MATRIX_V16.csv",
+    "size_bytes": 9949,
+    "sha256": "0b06b277dfe8176933099ccb70d1b8495d4e3b2f24b38a7a23b4b389e9e0e529"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/07_visibility_priority_v16/COGNITIVE_LOAD_REDUCTION_V16.csv",
+    "size_bytes": 1233,
+    "sha256": "2fdb9c1d626c8baa439bbe8ad835d4ba984e73c508d6fcdc28864a47217ef496"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/07_visibility_priority_v16/DOCK_REGION_VISIBILITY_POLICY_V16.csv",
+    "size_bytes": 2009,
+    "sha256": "ceb4a961ffc45c6c9760ea774b13cbcd46cac9496567a6480b4283b53d72ea46"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/07_visibility_priority_v16/EXEC_SUMMARY.md",
+    "size_bytes": 1499,
+    "sha256": "1a9e726f4cb6771d8e9efdac9ee896cc3bdb2ea9b3755f7ef67c63992111dac8"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/07_visibility_priority_v16/HOW_TO_FIX_V16.md",
+    "size_bytes": 1141,
+    "sha256": "e406cfb93e98dad897df80278dcc507776fc611f3d5b2193f223253df80a3c76"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/07_visibility_priority_v16/LIMITS_AND_EVIDENCE_V16.md",
+    "size_bytes": 808,
+    "sha256": "296b93e4295eef768271134f1206ff63b72fd32cfb59b41dcffb3665525801a3"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/07_visibility_priority_v16/MUST_SEE_STATE_MATRIX_V16.csv",
+    "size_bytes": 17735,
+    "sha256": "b962d4e69f12da1db0e53e66bb5c9aa754322fee3a86173974adb642e6c98a1b"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/07_visibility_priority_v16/VISIBILITY_ESCALATION_GRAPH_V16.dot",
+    "size_bytes": 2086,
+    "sha256": "3cd02389339bb7173450e8b2396d0488bd80fbf862894252044462aaa9665864"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/07_visibility_priority_v16/VISIBILITY_PRIORITY_POLICY_V16.md",
+    "size_bytes": 3266,
+    "sha256": "04d1f2b4c7362835f7b00ba27b91d93f241a81486770868c78f63d43c73a10d1"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/07_visibility_priority_v16/WHAT_IS_BAD_V16.md",
+    "size_bytes": 1253,
+    "sha256": "b5a6b1b7376ba4ba8dab7208da575f5238f01c39173551f0ee5dfbb6b334e57f"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/07_visibility_priority_v16/WHAT_IS_GOOD_V16.md",
+    "size_bytes": 835,
+    "sha256": "14dc65dc815873a5a5f2733ff0c057bcefefe4741004b77a973091142b62cb00"
+  },
+  {
+    "path": "05_HUMAN_REPORTS/07_visibility_priority_v16/WORKSPACE_FIRST_5_SECONDS_V16.csv",
+    "size_bytes": 1602,
+    "sha256": "c3f2911fe9ec70a6babda618c426cb4557d76ebc296ed487c5dbde25f527233d"
+  },
+  {
+    "path": "06_INDEX/CONSOLIDATION_RATIONALE.md",
+    "size_bytes": 1226,
+    "sha256": "c1d6686365e9b71eefb4094a738af15c5529d208830b6ba47fc9b4ade5e936f8"
+  },
+  {
+    "path": "06_INDEX/INCLUDED_ARTIFACTS.csv",
+    "size_bytes": 2292,
+    "sha256": "5ef9bbf7bd659145e4a5e270d799119595c142dff4f80b1b1c22cd163ba6019c"
+  },
+  {
+    "path": "06_INDEX/MASTER_EXEC_SUMMARY.json",
+    "size_bytes": 907,
+    "sha256": "dd93607e7d5a1f2b2663da18710e3a0a1c24d3469a4d0fe9afe71d82091d2d6e"
+  },
+  {
+    "path": "06_INDEX/SUPERSEDED_AND_EXCLUDED.csv",
+    "size_bytes": 10614,
+    "sha256": "7b8168eec41656b39b24643d3fe7513d0dc0cc29002299c2c61b66544de7628e"
+  },
+  {
+    "path": "README.md",
+    "size_bytes": 1716,
+    "sha256": "45ce6b00ee0c416915cca9a5a75db22cf7f39902eb53d24a857606ff06acc351"
+  }
+]

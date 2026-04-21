@@ -1,0 +1,8 @@
+{
+  "included_artifacts_count": 19,
+  "files_in_package": 168,
+  "notes": [
+    "В архив включены только финальные/опорные слои.",
+    "Ранние и дублирующие версии не включены, но зафиксированы в SUPERSEDED_AND_EXCLUDED.csv."
+  ]
+}

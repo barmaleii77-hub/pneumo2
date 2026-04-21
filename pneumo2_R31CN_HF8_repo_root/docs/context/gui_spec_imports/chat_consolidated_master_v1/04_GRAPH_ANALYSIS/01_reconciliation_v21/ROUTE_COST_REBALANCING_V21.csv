@@ -1,0 +1,7 @@
+﻿user_goal,current_route_shape,target_route_shape,current_cost_estimate,target_cost_estimate,improvement,why_current_hurts
+Открыть исходные данные,home/grid launchpoint,tree direct-open,2.1,0.9,-57.1%,ранний выбор между сеткой окон и рабочими пространствами
+Открыть редактор кольца,under-signaled route,tree direct-open,2.6,1.0,-61.5%,"сценарный центр должен идти в основной цепочке, а не теряться"
+Открыть набор испытаний,launchpoint-only,tree direct-open,2.3,1.0,-56.5%,suite должен читаться как следующий шаг после сценариев
+Открыть оптимизацию,home + separate page split,single shell-route -> WS-OPTIMIZATION,2.5,1.1,-56.0%,нужен один маршрут к центру оптимизации
+Собрать диагностику,GUI диагностики vs GUI отправки результатов,one diagnostics route,2.4,1.1,-54.2%,убрать конкурирующие стартовые входы
+Подробное сравнение,embedded compare vs Compare Viewer,analysis primary + viewer advanced,2.6,1.4,-46.2%,убрать ложную пару primary-route/primary-route

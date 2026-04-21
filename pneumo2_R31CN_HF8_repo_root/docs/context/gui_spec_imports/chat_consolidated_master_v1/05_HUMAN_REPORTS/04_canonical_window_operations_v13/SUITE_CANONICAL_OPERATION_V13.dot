@@ -1,0 +1,29 @@
+digraph G {
+rankdir=LR;
+node [shape=box, style="rounded,filled", fillcolor=white, fontsize=10];
+"suite_open" [label="Открыть Набор испытаний", fillcolor="#dbeafe"];
+"suite_first" [label="Первый экран:\nтаблица строк + stage + enabled + stale markers", fillcolor="#dbeafe"];
+"suite_select" [label="Выбрать строку испытания", fillcolor="#dcfce7"];
+"suite_edit" [label="Изменить enabled/stage/dt/t_end/targets", fillcolor="#dcfce7"];
+"suite_check" [label="Primary action:\nПроверить snapshot", fillcolor="#fef3c7"];
+"suite_block_stale" [label="Блокировка:\nstale link / context stale", fillcolor="#fee2e2"];
+"suite_block_invalid" [label="Блокировка:\ninvalid dt/t_end or sidecars", fillcolor="#fee2e2"];
+"suite_feedback_stage" [label="Feedback:\nпервый вход по stage понятен", fillcolor="#ede9fe"];
+"suite_feedback_status" [label="Feedback:\nвалидность snapshot видна", fillcolor="#ede9fe"];
+"suite_save" [label="Primary action:\nСохранить validated snapshot", fillcolor="#dcfce7"];
+"suite_to_ring" [label="Возврат в Редактор кольца\nпо stale scenario link", fillcolor="#e5e7eb"];
+"suite_to_baseline" [label="Перейти к Базовому прогону", fillcolor="#f3f4f6"];
+
+"suite_open" -> "suite_first";
+"suite_first" -> "suite_select";
+"suite_select" -> "suite_edit";
+"suite_edit" -> "suite_check";
+"suite_edit" -> "suite_feedback_stage";
+"suite_check" -> "suite_block_stale";
+"suite_check" -> "suite_block_invalid";
+"suite_check" -> "suite_feedback_status";
+"suite_block_stale" -> "suite_to_ring";
+"suite_block_invalid" -> "suite_edit" [label="исправить строку"];
+"suite_feedback_status" -> "suite_save";
+"suite_save" -> "suite_to_baseline";
+}

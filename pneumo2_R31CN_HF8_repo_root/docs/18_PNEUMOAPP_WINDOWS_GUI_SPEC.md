@@ -1194,3 +1194,31 @@ Machine-readable и reference source set:
   runtime evidence, self-check или acceptance artifact.
 - При расхождении `v37` с `17/18` приоритет остаётся у human-readable канона,
   а конфликт фиксируется через assumptions/gaps, а не замалчивается.
+
+## Chat consolidated master V1 reference layer
+
+The archive `pneumo_chat_consolidated_master_v1.zip` is imported as
+`./context/gui_spec_imports/chat_consolidated_master_v1/`. It is the current
+consolidated master reference for chat-derived GUI/TZ/KB materials, but it does
+not replace this human-readable spec and is not runtime-closure proof.
+
+Reference entrypoints:
+
+- [REPO_IMPORT_NOTE.md](./context/gui_spec_imports/chat_consolidated_master_v1/REPO_IMPORT_NOTE.md)
+- [README.md](./context/gui_spec_imports/chat_consolidated_master_v1/README.md)
+- [MASTER_EXEC_SUMMARY.json](./context/gui_spec_imports/chat_consolidated_master_v1/06_INDEX/MASTER_EXEC_SUMMARY.json)
+- [LINEAGE_AND_READING_ORDER.md](./context/gui_spec_imports/chat_consolidated_master_v1/06_INDEX/LINEAGE_AND_READING_ORDER.md)
+- [INCLUDED_ARTIFACTS.csv](./context/gui_spec_imports/chat_consolidated_master_v1/06_INDEX/INCLUDED_ARTIFACTS.csv)
+- [SUPERSEDED_AND_EXCLUDED.csv](./context/gui_spec_imports/chat_consolidated_master_v1/06_INDEX/SUPERSEDED_AND_EXCLUDED.csv)
+- [TECHNICAL_SPECIFICATION.md](./context/gui_spec_imports/chat_consolidated_master_v1/02_CODEX_SPEC_FINAL/v38_actualized_with_v10/TECHNICAL_SPECIFICATION.md)
+- [AUDIT_REPORT.md](./context/gui_spec_imports/chat_consolidated_master_v1/03_REPO_AUDIT/v34_repo_audit/AUDIT_REPORT.md)
+- [GRAPH_ANALYSIS_REPORT_V21.md](./context/gui_spec_imports/chat_consolidated_master_v1/04_GRAPH_ANALYSIS/01_reconciliation_v21/GRAPH_ANALYSIS_REPORT_V21.md)
+- [GRAPH_ANALYSIS_REPORT_V20.md](./context/gui_spec_imports/chat_consolidated_master_v1/04_GRAPH_ANALYSIS/02_workspace_graphs_v20/GRAPH_ANALYSIS_REPORT_V20.md)
+- [GRAPH_ANALYSIS_REPORT_V17.md](./context/gui_spec_imports/chat_consolidated_master_v1/04_GRAPH_ANALYSIS/04_cost_entropy_v17/GRAPH_ANALYSIS_REPORT_V17.md)
+- [00_MASTER_SUMMARY.md](./context/gui_spec_imports/chat_consolidated_master_v1/05_HUMAN_REPORTS/00_MASTER_SUMMARY.md)
+- [CHAT_CONSOLIDATED_MASTER_V1_KB_IMPORT_AUDIT_2026-04-21.md](./context/release_readiness/CHAT_CONSOLIDATED_MASTER_V1_KB_IMPORT_AUDIT_2026-04-21.md)
+
+Use this layer to clarify consolidated lineage, V21 current-to-canonical gaps,
+V20 workspace subgraphs, V17 route-cost/entropy findings, V34 repo audit evidence
+and human reports V10-V16. Do not use it to close runtime, visual or release
+acceptance without separate evidence.

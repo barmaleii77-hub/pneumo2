@@ -1,0 +1,21 @@
+digraph G {
+rankdir=LR;
+node [shape=box, fontsize=10];
+"cur_project_home" [label="Главный экран проекта", style="filled", fillcolor="#dbeafe"];
+"cur_project_summary" [label="Сводка проекта", style="filled", fillcolor="#f3f4f6"];
+"cur_project_open" [label="Открыть проект", style="filled", fillcolor="#dcfce7"];
+"cur_project_recent" [label="Последний проект", style="filled", fillcolor="#ffffff"];
+"cur_project_next_action" [label="Следующее действие", style="filled", fillcolor="#ffffff"];
+"cur_project_opt_entry" [label="Вход в оптимизацию", style="filled", fillcolor="#fde68a"];
+"cur_project_diag_entry" [label="Диагностика", style="filled", fillcolor="#fde68a"];
+"cur_project_opt_entry_unknown_internal" [label="Внутренности окна неизвестны: Вход в оптимизацию", style="filled", fillcolor="#fecaca"];
+"cur_project_diag_entry_unknown_internal" [label="Внутренности окна неизвестны: Диагностика", style="filled", fillcolor="#fecaca"];
+"cur_project_home" -> "cur_project_summary" [label="клик_или_переход"];
+"cur_project_summary" -> "cur_project_open" [label="клик_или_переход"];
+"cur_project_open" -> "cur_project_recent" [label="клик_или_переход"];
+"cur_project_recent" -> "cur_project_next_action" [label="клик_или_переход"];
+"cur_project_next_action" -> "cur_project_opt_entry" [label="клик_или_переход"];
+"cur_project_opt_entry" -> "cur_project_diag_entry" [label="клик_или_переход"];
+"cur_project_opt_entry" -> "cur_project_opt_entry_unknown_internal" [label="открыть_окно"];
+"cur_project_diag_entry" -> "cur_project_diag_entry_unknown_internal" [label="открыть_окно"];
+}

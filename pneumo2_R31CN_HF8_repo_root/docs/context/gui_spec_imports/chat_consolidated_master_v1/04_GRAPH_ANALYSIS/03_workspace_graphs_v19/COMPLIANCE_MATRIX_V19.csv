@@ -1,0 +1,23 @@
+workspace,requirement,status,evidence,notes
+WS-INPUTS,Прямое открытие из дерева без промежуточного окна,covered,TREE node + direct_open edges + tree matrix,В optimized-layer обязательно.
+WS-INPUTS,Dock-окна и dock-виджеты как first-class shell-элементы,covered,dock matrix + shell nodes,"Левое дерево, правый inspector, нижний статус."
+WS-INPUTS,Action → feedback → check → block/loop описаны явно,covered,task/check/block/feedback/loop nodes,Внутренний action-feedback subgraph построен.
+WS-INPUTS,Семантическая нормализация надписей и сообщений,covered,GUI_LABEL_SEMANTIC_AUDIT_V19.csv,"Фокус на жаргоне, implementation leaks и неполной семантике."
+WS-INPUTS,Выбор двух пружин на угол виден явно,covered,IN-FEEDBACK-C1C2,Badge + схема + inspector.
+WS-INPUTS,Выравнивание пружинами показывает метод и остаток,covered,IN-FEEDBACK-LEVELING,"Не просто режим, но и результат в миллиметрах."
+WS-RING,Прямое открытие из дерева без промежуточного окна,covered,TREE node + direct_open edges + tree matrix,В optimized-layer обязательно.
+WS-RING,Dock-окна и dock-виджеты как first-class shell-элементы,covered,dock matrix + shell nodes,"Левое дерево, правый inspector, нижний статус."
+WS-RING,Action → feedback → check → block/loop описаны явно,covered,task/check/block/feedback/loop nodes,Внутренний action-feedback subgraph построен.
+WS-RING,Семантическая нормализация надписей и сообщений,covered,GUI_LABEL_SEMANTIC_AUDIT_V19.csv,"Фокус на жаргоне, implementation leaks и неполной семантике."
+WS-RING,Редактор кольца — единственный источник сценарной истины,covered,RG tasks + seam/export/handoff model,"Поворот явный, шов видим, export stale is explicit."
+WS-OPTIMIZATION,Прямое открытие из дерева без промежуточного окна,covered,TREE node + direct_open edges + tree matrix,В optimized-layer обязательно.
+WS-OPTIMIZATION,Dock-окна и dock-виджеты как first-class shell-элементы,covered,dock matrix + shell nodes,"Левое дерево, правый inspector, нижний статус."
+WS-OPTIMIZATION,Action → feedback → check → block/loop описаны явно,covered,task/check/block/feedback/loop nodes,Внутренний action-feedback subgraph построен.
+WS-OPTIMIZATION,Семантическая нормализация надписей и сообщений,covered,GUI_LABEL_SEMANTIC_AUDIT_V19.csv,"Фокус на жаргоне, implementation leaks и неполной семантике."
+WS-OPTIMIZATION,Один активный режим запуска за раз,covered,OPT-TASK-SELECT-MODE + OPT-CHECK-MODE,StageRunner и distributed coordinator больше не конкурируют как равноправные primary-route.
+WS-OPTIMIZATION,Objective contract и hard gate видны на текущем экране,covered,OPT-FEEDBACK-CONTRACT,До запуска и в history.
+WS-DIAGNOSTICS,Прямое открытие из дерева без промежуточного окна,covered,TREE node + direct_open edges + tree matrix,В optimized-layer обязательно.
+WS-DIAGNOSTICS,Dock-окна и dock-виджеты как first-class shell-элементы,covered,dock matrix + shell nodes,"Левое дерево, правый inspector, нижний статус."
+WS-DIAGNOSTICS,Action → feedback → check → block/loop описаны явно,covered,task/check/block/feedback/loop nodes,Внутренний action-feedback subgraph построен.
+WS-DIAGNOSTICS,Семантическая нормализация надписей и сообщений,covered,GUI_LABEL_SEMANTIC_AUDIT_V19.csv,"Фокус на жаргоне, implementation leaks и неполной семантике."
+WS-DIAGNOSTICS,Одна заметная команда «Собрать диагностику»,covered,DI-TASK-COLLECT + DI-FEEDBACK-SEND,Отправка только после collect.

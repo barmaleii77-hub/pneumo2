@@ -1,0 +1,69 @@
+digraph CURRENT_TARGET_DELTA_V21 {
+  rankdir=LR;
+  node [shape=box, style=rounded, fontsize=10];
+
+  subgraph cluster_current {
+    label="Current evidence-bound shell";
+    color=lightgrey;
+    CUR_START [label="Запуск"];
+    CUR_HOME [label="Главная heavy/home поверхность"];
+    CUR_GRID [label="Сетка отдельных окон"];
+    CUR_OPT [label="Отдельная страница\nОптимизация"];
+    CUR_DIAG [label="GUI диагностики"];
+    CUR_SEND [label="GUI отправки результатов"];
+    CUR_COMPARE [label="Compare Viewer"];
+    CUR_INPUTS [label="Редактор исходных данных"];
+    CUR_SUITE [label="Центр тестов"];
+    CUR_ANIM [label="Desktop Animator"];
+    CUR_MNEMO [label="Desktop Mnemo"];
+    CUR_TOOLS [label="Центр desktop-инструментов"];
+    CUR_RING_WEAK [label="Редактор кольца\nнедостаточно доминирует"];
+    CUR_HOME -> CUR_GRID [label="слишком много входов"];
+    CUR_HOME -> CUR_OPT [label="parallel primary"];
+    CUR_GRID -> CUR_DIAG;
+    CUR_GRID -> CUR_SEND;
+    CUR_GRID -> CUR_COMPARE;
+    CUR_GRID -> CUR_INPUTS;
+    CUR_GRID -> CUR_SUITE;
+    CUR_GRID -> CUR_ANIM;
+    CUR_GRID -> CUR_MNEMO;
+    CUR_GRID -> CUR_TOOLS;
+    CUR_HOME -> CUR_RING_WEAK [label="weak signal"];
+    CUR_START -> CUR_HOME;
+  }
+
+  subgraph cluster_target {
+    label="Canonical target shell";
+    color=lightblue;
+    T_SHELL [label="WS-SHELL"];
+    T_PROJECT [label="Панель проекта"];
+    T_INPUTS [label="Исходные данные"];
+    T_RING [label="Редактор кольца"];
+    T_SUITE [label="Набор испытаний"];
+    T_BASE [label="Базовый прогон"];
+    T_OPT [label="Оптимизация"];
+    T_ANALYSIS [label="Анализ"];
+    T_ANIM [label="Анимация"];
+    T_DIAG [label="Диагностика"];
+    T_COMPARE [label="Подробное сравнение"];
+    T_MNEMO [label="Мнемосхема"];
+    T_TOOLS [label="Инструменты"];
+    T_SHELL -> T_PROJECT -> T_INPUTS -> T_RING -> T_SUITE -> T_BASE -> T_OPT -> T_ANALYSIS -> T_ANIM -> T_DIAG;
+    T_ANALYSIS -> T_COMPARE [label="advanced"];
+    T_ANALYSIS -> T_ANIM [label="open animator"];
+    T_DIAG -> CUR_SEND [label="send inside diagnostics", style=dashed];
+    T_SHELL -> T_MNEMO [label="specialized", style=dashed];
+    T_SHELL -> T_TOOLS [label="service", style=dashed];
+  }
+
+  CUR_INPUTS -> T_INPUTS [style=dashed, color=blue, label="reconcile"];
+  CUR_SUITE -> T_SUITE [style=dashed, color=blue, label="reconcile"];
+  CUR_OPT -> T_OPT [style=dashed, color=blue, label="reconcile"];
+  CUR_DIAG -> T_DIAG [style=dashed, color=blue, label="reconcile"];
+  CUR_SEND -> T_DIAG [style=dashed, color=red, label="move inside"];
+  CUR_COMPARE -> T_COMPARE [style=dashed, color=blue, label="advanced only"];
+  CUR_ANIM -> T_ANIM [style=dashed, color=blue, label="keep top-level"];
+  CUR_MNEMO -> T_MNEMO [style=dashed, color=blue, label="keep specialized"];
+  CUR_TOOLS -> T_TOOLS [style=dashed, color=blue, label="service branch"];
+  CUR_RING_WEAK -> T_RING [style=dashed, color=red, label="promote"];
+}

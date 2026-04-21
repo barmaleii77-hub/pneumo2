@@ -1,0 +1,12 @@
+window,marker,must_be_visible_when,purpose
+Диагностика,Путь к последнему архиву,always,"пользователь понимает, что архив реально существует и где он"
+Диагностика,Свежесть архива,after bundle generation and on reopen,отличать актуальный bundle от старого
+Подробное сравнение результатов,Current / historical / stale banner,always when compare contexts differ,"пользователь понимает, что именно сравнивает"
+Подробное сравнение результатов,Mismatch banner,when contracts differ,не скрывать несовпадение контрактов
+Исходные данные проекта,Dirty-state,after any edit before save/commit,пользователь не теряет несохранённые правки
+Исходные данные проекта,Validation-state,after any edit and on open,"видно, можно ли идти дальше по pipeline"
+Исходные данные проекта,Две пружины на угол,when enabled,"видно, что реально активировано"
+Исходные данные проекта,Выравнивание пружинами активно,when enabled,"видно, что система работает в auto-level режиме"
+Исходные данные проекта,"Остаточная разница после выравнивания, миллиметры",when auto-level enabled,"видно, на сколько реально выровнено"
+Набор испытаний,Validated snapshot status,always,"видно, можно ли идти в baseline"
+Набор испытаний,Stale scenario/context marker,when link broken or upstream changed,"видно, что suite опирается на устаревший сценарный контекст"

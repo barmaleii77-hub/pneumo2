@@ -718,3 +718,32 @@ Operational note:
 - появляется новый рабочий backlog-слой;
 - меняется приоритет GUI/WEB направления;
 - добавляется новый существенный contract layer.
+
+## Chat consolidated master V1
+
+`docs/context/gui_spec_imports/chat_consolidated_master_v1/` is the repo-local
+import of `pneumo_chat_consolidated_master_v1.zip`. It gives the project one
+deduplicated reading order for the latest chat-derived GUI/TZ/KB materials.
+
+Read first:
+
+- `docs/context/gui_spec_imports/chat_consolidated_master_v1/REPO_IMPORT_NOTE.md`
+- `docs/context/gui_spec_imports/chat_consolidated_master_v1/README.md`
+- `docs/context/gui_spec_imports/chat_consolidated_master_v1/06_INDEX/MASTER_EXEC_SUMMARY.json`
+- `docs/context/gui_spec_imports/chat_consolidated_master_v1/06_INDEX/LINEAGE_AND_READING_ORDER.md`
+- `docs/context/gui_spec_imports/chat_consolidated_master_v1/06_INDEX/INCLUDED_ARTIFACTS.csv`
+- `docs/context/gui_spec_imports/chat_consolidated_master_v1/06_INDEX/SUPERSEDED_AND_EXCLUDED.csv`
+- `docs/context/release_readiness/CHAT_CONSOLIDATED_MASTER_V1_KB_IMPORT_AUDIT_2026-04-21.md`
+
+What it adds:
+
+- source context plus final `v38_actualized_with_v10`;
+- `v34_repo_audit` and KB alignment evidence;
+- graph layers `v17 + v19 + v20 + v21`, including `GRAPH_ANALYSIS_REPORT_V21.md`,
+  `GRAPH_ANALYSIS_REPORT_V20.md` and `GRAPH_ANALYSIS_REPORT_V17.md`;
+- human reports `v10..v16`;
+- explicit superseded/excluded register to avoid treating older noisy packages as active sources.
+
+Boundary: this layer is not runtime-closure proof. It is used for lineage,
+provenance and gap-finding; live GUI acceptance still needs separate runtime,
+visual and release evidence.

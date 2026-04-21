@@ -1,0 +1,8 @@
+surface,default_mode,can_float,must_support_second_monitor,dock_role,notes
+Левое дерево навигации,docked_left,yes,yes,navigation,главный путь входа в рабочие пространства и окна
+Правая панель свойств и помощи,docked_right,yes,yes,inspector/help,контекстная помощь и свойства выбранного объекта
+Нижняя строка состояния и прогресса,docked_bottom,no,no,status/progress,глобальные статусы без перекрытия рабочей области
+Диагностика,central_workspace,yes,yes,operational_surface,может быть top-level только как dedicated support workflow
+Подробное сравнение результатов,central_advanced_surface,yes,yes,advanced_surface,"по умолчанию secondary, но допускает отдельное окно"
+Исходные данные проекта,central_workspace,no,no,master_copy_workspace,не должно открываться как отдельный хаотичный плавающий редактор
+Набор испытаний,central_workspace,no,no,workflow_workspace,прямое открытие из дерева и синхронизация с ring/baseline

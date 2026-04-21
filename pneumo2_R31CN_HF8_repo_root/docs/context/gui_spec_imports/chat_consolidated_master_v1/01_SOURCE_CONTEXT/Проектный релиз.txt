@@ -1,0 +1,171 @@
+Разобрался. Тут было **две разные проблемы**, и я их закрыл в **R31BW** 🔧📦
+
+## Что реально ломалось
+
+### 1) Почему задаёшь `1`, а сохраняется `0`
+Это был **не пользовательский промах**, а баг логики нормализации стадий.
+
+В присланном диагностическом архиве у `ring_test_01` видно сразу три вещи:
+- в карточке редактора stage стоял **`1`**
+- в persisted `df_suite_edit` строка уже лежала со **`стадия = 0`**
+- при этом `_meta_stage_original = 1`
+
+То есть stage **не “показался” нулём**, а был **молча переписан** в ноль.  
+Подробный разбор я положил сюда: [R31BW stage semantics / settings audit](sandbox:/mnt/data/r31bw_release/R31BW_stage_semantics_and_settings_audit.md)
+
+### 2) Почему это происходило
+Корень был в `normalize_suite_stage_numbers()`:
+
+- если среди **enabled** тестов не было стадии `0`
+- функция считала suite “старым 1-based”
+- и вычитала глобальный bias
+
+То есть валидный явный suite:
+- `ring_test_01`, stage `1`
+
+превращался в:
+- `ring_test_01`, stage `0`
+
+Вот это и есть твой симптом.
+
+### 3) Почему стадии “мигрировали как хотят”
+Потому что в проекте смешивались **два разных смысла** слова “стадия”:
+
+#### A. `стадия` у строки suite
+Это **момент первого входа теста** в staged optimization.
+
+#### B. runtime stage plan
+Это сами execution tiers:
+- `stage0_relevance`
+- `stage1_long`
+- `stage2_final`
+
+Их семантика **накопительная**, а не независимая:
+
+- тест с `стадия = 0` идёт в `stage0`, `stage1`, `stage2`
+- тест с `стадия = 1` **не должен идти в stage0**, а должен впервые войти в `stage1`, потом остаться в `stage2`
+- тест с `стадия = 2` идёт только в финальную стадию
+
+Проблема была в том, что explicit `1` до runtime уже превращался в `0`.  
+Поэтому stage plan потом честно работал уже **с испорченным suite**.
+
+## Где сейчас все настройки оптимизации
+
+### Видимые в UI
+В этом bundle реально были выставлены такие настройки:
+- `ui_opt_minutes = 10.0`
+- `ui_jobs = 24`
+- `opt_use_staged = True`
+- `warmstart_mode = surrogate`
+- `surrogate_samples = 8000`
+- `surrogate_top_k = 64`
+- `ui_seed_candidates = 1`
+- `ui_seed_conditions = 1`
+- `sort_tests_by_cost = True`
+- `stop_pen_stage1 = 25.0`
+- `stop_pen_stage2 = 15.0`
+- `ui_flush_every = 20`
+- `ui_progress_every_sec = 1.0`
+- `ui_auto_refresh = True`
+- `ui_refresh_sec = 1.0`
+- `pareto_obj1 = цель1_устойчивость_инерция__с`
+- `pareto_obj2 = цель2_комфорт__RMS_ускор_м_с2`
+- `calib_mode_pick = minimal`
+- `ui_suite_preset = worldroad_flat`
+
+Это всё сведено в audit: [settings audit](sandbox:/mnt/data/r31bw_release/R31BW_stage_semantics_and_settings_audit.md)
+
+### Невидимые, но реально работающие
+Есть ещё stage-runner settings, которые сейчас **зашиты в код**, а не вынесены как отдельные UI-контролы:
+- `stage0_relevance / stage1_long / stage2_final`
+- `max_stage`
+- `scenario_ids`
+- `dt_scale`
+- `t_end_scale`
+- per-stage `minutes_budget`
+
+То есть UI сейчас показывает **не всё**.  
+Самые важные скрытые настройки — именно **fidelity scaling и scenario expansion по стадиям**.
+
+## Есть ли уже авто-корректировка точности дифференцирования
+**Нет, в staged path её сейчас нет.**
+
+Что есть по факту:
+- `system_influence_report_v1.py` умеет принимать **фиксированный** `--eps_rel`
+- дефолт там сейчас **`1e-2`**
+- но `opt_stage_runner_v1.py` этот `--eps_rel` **не прокидывает**
+- и в `pneumo_ui_app.py` **нет UI-настройки** ни для `eps_rel`, ни для adaptive epsilon
+- да, в некоторых старых autopilot calibration pipelines есть `--epsilon_adaptive`, но staged optimization path этим **не пользуется**
+
+Значит текущий ответ здесь жёсткий:  
+**автоматической корректировки точности дифференцирования по стадиям сейчас нет**.
+
+## Что я исправил в R31BW
+
+### 1) Больше нет молчаливого rebasing `1 -> 0`
+Теперь:
+- explicit non-negative `стадия` считается **авторитетной**
+- negative stage по-прежнему clamp в `0`
+- missing/NaN stage по-прежнему infer
+- но global bias rebasing выключен
+
+### 2) Empty earlier stage больше не валит StageRunner
+Если пользователь реально хочет:
+- stage0 пустой
+- тест впервые с stage1
+
+то runner теперь:
+- **не падает**
+- **не переписывает suite**
+- а **пропускает пустую раннюю стадию** и идёт дальше
+
+### 3) В UI теперь явнее написан смысл stage
+Я обновил help/подписи так, чтобы было ясно:
+- stage — это **момент первого входа**
+- логика **накопительная**
+- `stage 1` не должен молча превращаться в `0`
+
+## Готовые артефакты
+
+Главное:
+- [Portable runtime ZIP — R31BW](sandbox:/mnt/data/r31bw_release/PneumoApp_R31BW_portable_20260331.zip)
+- [Source ZIP — R31BW](sandbox:/mnt/data/r31bw_release/PneumoApp_v6_80_R176_R31BW_2026-03-31.zip)
+- [Patch ZIP — R31BW](sandbox:/mnt/data/r31bw_release/PneumoApp_R31BW_stage_semantics_patch_20260331.zip)
+- [Полный bundle релиза](sandbox:/mnt/data/pneumo_release_r31bw_bundle.zip)
+
+Разбор:
+- [Stage semantics / settings audit](sandbox:/mnt/data/r31bw_release/R31BW_stage_semantics_and_settings_audit.md)
+- [Release summary](sandbox:/mnt/data/r31bw_release/R31BW_release_summary.md)
+- [Release notes](sandbox:/mnt/data/r31bw_release/RELEASE_NOTES_R31BW_2026-03-31.md)
+- [Build report](sandbox:/mnt/data/r31bw_release/R31BW_release_build_report.md)
+- [Unified diff](sandbox:/mnt/data/r31bw_release/R31BW_stage_semantics_fix.diff)
+- [Changed files](sandbox:/mnt/data/r31bw_release/CHANGED_FILES_R31BW_2026-03-31.txt)
+
+Проверка:
+- [py_compile log](sandbox:/mnt/data/r31bw_release/R31BW_py_compile_log.txt)
+- [compileall log](sandbox:/mnt/data/r31bw_release/R31BW_compileall_log.txt)
+- [pytest log](sandbox:/mnt/data/r31bw_release/R31BW_targeted_pytest_log.txt)
+- [portable unzip test](sandbox:/mnt/data/r31bw_release/R31BW_portable_unzip_test.txt)
+- [source unzip test](sandbox:/mnt/data/r31bw_release/R31BW_source_unzip_test.txt)
+- [patch unzip test](sandbox:/mnt/data/r31bw_release/R31BW_patch_unzip_test.txt)
+
+SHA256:
+- [SHA256 portable](sandbox:/mnt/data/r31bw_release/PneumoApp_R31BW_portable_20260331.zip.sha256)
+- [SHA256 source](sandbox:/mnt/data/r31bw_release/PneumoApp_v6_80_R176_R31BW_2026-03-31.zip.sha256)
+- [SHA256 patch](sandbox:/mnt/data/r31bw_release/PneumoApp_R31BW_stage_semantics_patch_20260331.zip.sha256)
+- [SHA256 full bundle](sandbox:/mnt/data/pneumo_release_r31bw_bundle.zip.sha256)
+
+## Что проверено
+- `py_compile` — **PASS**
+- `compileall` — **PASS**
+- targeted `pytest` — **24 passed**
+
+## Честная граница
+В этот релиз я **не добавлял** adaptive differentiation accuracy.  
+То есть stage semantics я закрыл, а вот следующий узкий патч уже другой:
+
+- вынести `eps_rel` в UI/StageRunner
+- и отдельно добавить **adaptive epsilon** для `system_influence_report_v1`
+
+Сейчас брать надо **R31BW**, потому что именно он закрывает твой текущий корень:  
+**stage 1 больше не должен молча записываться как 0**.

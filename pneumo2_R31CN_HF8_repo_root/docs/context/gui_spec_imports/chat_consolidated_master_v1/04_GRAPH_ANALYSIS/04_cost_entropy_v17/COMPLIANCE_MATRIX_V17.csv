@@ -1,0 +1,6 @@
+requirement,status,evidence,what_missing
+Основной рабочий путь видим как единая цепочка,covered_partially,V16 full graph + V17 weighted shell overlay,current shell still shows multiple early parallel doors
+Одна заметная команда «Собрать диагностику»,covered_partially,V17 optimized focus makes diagnostics a single primary command,current shell still exposes send-results as parallel early action
+Compare primary route и advanced route разделены,covered_partially,V17 optimized focus nests Compare Viewer under Analysis,current shell still gives early separate viewer launch
+Один активный режим запуска оптимизации,covered,R31CN single-mode Optimization page,
+Редактор кольца доминирует как сценарный центр,covered_partially,V17 primary route promotes Ring before Suite,current launcher-shell still under-emphasises ring route

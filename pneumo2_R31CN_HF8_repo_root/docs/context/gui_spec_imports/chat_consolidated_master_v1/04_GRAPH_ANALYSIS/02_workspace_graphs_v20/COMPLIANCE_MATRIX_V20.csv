@@ -1,0 +1,9 @@
+requirement,status,notes
+основная_цепочка_видна,covered_partially,"в optimized-layer цепочка полная, current-layer всё ещё рано ветвится"
+левое_дерево_как_прямой_launcher,covered,optimized-layer держит прямое открытие без промежуточных шагов
+док_окна_и_док_виджеты_first_class,covered,введены как shell nodes и dock matrix
+редактор_кольца_как_единственный_source_of_truth,covered,закреплено в optimized-layer и cross-loops
+одна_заметная_команда_диагностики,covered,diagnostics route централизован
+никакой_потери_функций_при_миграции,covered_partially,"canonical target учитывает parity, current evidence ещё переходный"
+truth_state_графики_явно_видим,covered,cognitive visibility и analysis/animator states
+пользователь_видит_что_выбраны_две_пружины_и_как_выровнено,covered,введены отдельные visibility nodes и feedback

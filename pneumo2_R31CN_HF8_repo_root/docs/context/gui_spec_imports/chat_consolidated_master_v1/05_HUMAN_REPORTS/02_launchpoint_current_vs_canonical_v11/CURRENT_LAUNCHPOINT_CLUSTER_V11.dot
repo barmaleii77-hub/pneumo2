@@ -1,0 +1,19 @@
+digraph CURRENT_LAUNCHPOINT_CLUSTER_V11 {
+    rankdir=LR;
+    node [shape=box, fontsize=10];
+    HOME [label="Home / launcher-shell"];
+    DIAG [label="GUI диагностики\nlaunchpoint_only"];
+    SEND [label="GUI отправки результатов\nlaunchpoint_only"];
+    CMP_EMBED [label="embedded compare\ninside home/analysis surface"];
+    CMP_VIEW [label="Compare Viewer\nlaunchpoint_only"];
+    INPUTS [label="Редактор исходных данных\nlaunchpoint_only"];
+    TESTS [label="Центр тестов\nlaunchpoint_only"];
+    HOME -> DIAG [label="прямой запуск"];
+    HOME -> SEND [label="прямой запуск"];
+    HOME -> CMP_EMBED [label="встроенный путь"];
+    HOME -> CMP_VIEW [label="прямой запуск"];
+    HOME -> INPUTS [label="прямой запуск"];
+    HOME -> TESTS [label="прямой запуск"];
+    DIAG -> SEND [style=dashed,label="неясно: второй шаг или другое окно"];
+    CMP_EMBED -> CMP_VIEW [style=dashed,label="неясно: зачем отдельный viewer"];
+}

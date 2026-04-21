@@ -1,0 +1,24 @@
+digraph G {
+  rankdir=LR;
+  node [shape=box, fontsize=10];
+  TREE_COMPARE [label="Дерево: Подробное сравнение результатов"];
+  WIN_COMPARE [label="Окно: Подробное сравнение результатов"];
+  MODE_SELECT [label="Выбор режима сравнения"];
+  LEFT_SELECT [label="Левая сторона сравнения"];
+  RIGHT_SELECT [label="Правая сторона сравнения"];
+  BADGE_CONTEXT [label="Badge: current / historical / stale / mismatch"];
+  BTN_OPEN_COMPARE [label="Кнопка: Открыть сравнение"];
+  VIEW_OVERLAY [label="Экран: Overlay и графики различий"];
+  TABLE_DIFF [label="Вкладка: Таблица различий"];
+  WARN_MISSING [label="Feedback: Нет второго объекта сравнения"];
+  TREE_COMPARE -> WIN_COMPARE [label="прямое открытие из дерева"];
+  WIN_COMPARE -> MODE_SELECT;
+  MODE_SELECT -> LEFT_SELECT;
+  MODE_SELECT -> RIGHT_SELECT;
+  LEFT_SELECT -> BADGE_CONTEXT;
+  RIGHT_SELECT -> BADGE_CONTEXT;
+  BADGE_CONTEXT -> BTN_OPEN_COMPARE;
+  BTN_OPEN_COMPARE -> VIEW_OVERLAY [label="успех"];
+  BTN_OPEN_COMPARE -> WARN_MISSING [label="если выбор неполный"];
+  VIEW_OVERLAY -> TABLE_DIFF;
+}

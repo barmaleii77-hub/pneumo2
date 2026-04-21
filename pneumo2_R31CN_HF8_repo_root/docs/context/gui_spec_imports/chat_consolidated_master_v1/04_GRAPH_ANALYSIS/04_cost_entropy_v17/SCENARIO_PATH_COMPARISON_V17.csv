@@ -1,0 +1,7 @@
+scenario_id,goal_label,current_cost,optimized_cost,cost_delta,current_steps,optimized_steps,step_delta,cost_improvement_pct
+launch_anim,Открыть аниматор,5.912,3.5,-2.412,2,3,1,40.8
+launch_compare,Сравнить результаты,7.362,6.45,-0.912,2,6,4,12.4
+launch_diag,Собрать диагностику,6.962,5.7,-1.262,2,5,3,18.1
+launch_inputs,Открыть рабочий путь: исходные данные,5.212,3.05,-2.162,2,3,1,41.5
+launch_opt,Открыть оптимизацию,5.912,3.05,-2.862,2,3,1,48.4
+launch_ring,Открыть рабочий путь: сценарии кольца,5.912,3.05,-2.862,2,3,1,48.4

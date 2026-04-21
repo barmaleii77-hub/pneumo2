@@ -1,0 +1,15 @@
+digraph G {
+rankdir=LR;
+node [shape=box, fontsize=10];
+"cur_anim_home" [label="Окно аниматора", style="filled", fillcolor="#dbeafe"];
+"cur_anim_pointer" [label="anim_latest pointer", style="filled", fillcolor="#f3f4f6"];
+"cur_anim_follow" [label="Режим follow", style="filled", fillcolor="#f3f4f6"];
+"cur_anim_play" [label="Пуск/пауза", style="filled", fillcolor="#dcfce7"];
+"cur_anim_truth" [label="Truth-state", style="filled", fillcolor="#ffffff"];
+"cur_anim_capture" [label="Экспорт кадра", style="filled", fillcolor="#dcfce7"];
+"cur_anim_home" -> "cur_anim_pointer" [label="клик_или_переход"];
+"cur_anim_pointer" -> "cur_anim_follow" [label="клик_или_переход"];
+"cur_anim_follow" -> "cur_anim_play" [label="клик_или_переход"];
+"cur_anim_play" -> "cur_anim_truth" [label="клик_или_переход"];
+"cur_anim_truth" -> "cur_anim_capture" [label="клик_или_переход"];
+}

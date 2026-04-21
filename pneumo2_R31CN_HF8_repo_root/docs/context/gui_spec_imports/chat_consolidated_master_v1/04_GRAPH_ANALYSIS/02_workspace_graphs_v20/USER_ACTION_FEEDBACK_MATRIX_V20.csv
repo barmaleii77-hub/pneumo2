@@ -1,0 +1,192 @@
+workspace,layer,src,action,feedback,dst,notes
+WS-PROJECT,optimized,tree_root,выбрать_узел_в_дереве,узел_дерева_подсвечен,WS-PROJECT_tree_entry,
+WS-PROJECT,optimized,WS-PROJECT_tree_entry,открыть_рабочее_пространство,рабочее_пространство_открыто,WS-PROJECT_root,прямое открытие из дерева
+WS-PROJECT,optimized,WS-PROJECT_root,перейти_к_задаче,задача_активна,WS-PROJECT_task_1,
+WS-PROJECT,optimized,WS-PROJECT_task_1,перейти_к_задаче,задача_активна,WS-PROJECT_task_2,
+WS-PROJECT,optimized,WS-PROJECT_task_2,перейти_к_задаче,задача_активна,WS-PROJECT_task_3,
+WS-PROJECT,optimized,WS-PROJECT_task_3,перейти_к_задаче,задача_активна,WS-PROJECT_task_4,
+WS-PROJECT,optimized,WS-PROJECT_task_1,запустить_проверку,результат_проверки_получен,WS-PROJECT_check_1,
+WS-PROJECT,optimized,WS-PROJECT_task_2,запустить_проверку,результат_проверки_получен,WS-PROJECT_check_2,
+WS-PROJECT,optimized,WS-PROJECT_task_3,запустить_проверку,результат_проверки_получен,WS-PROJECT_check_3,
+WS-PROJECT,optimized,WS-PROJECT_task_4,запустить_проверку,результат_проверки_получен,WS-PROJECT_check_4,
+WS-PROJECT,optimized,WS-PROJECT_check_1,,блокировка_показана,WS-PROJECT_block_1,
+WS-PROJECT,optimized,WS-PROJECT_block_1,исправить_проблему,возврат_к_исправлению,WS-PROJECT_task_1,
+WS-PROJECT,optimized,WS-PROJECT_check_2,,блокировка_показана,WS-PROJECT_block_2,
+WS-PROJECT,optimized,WS-PROJECT_block_2,исправить_проблему,возврат_к_исправлению,WS-PROJECT_task_2,
+WS-PROJECT,optimized,WS-PROJECT_check_3,,блокировка_показана,WS-PROJECT_block_3,
+WS-PROJECT,optimized,WS-PROJECT_block_3,исправить_проблему,возврат_к_исправлению,WS-PROJECT_task_3,
+WS-PROJECT,optimized,WS-PROJECT_task_1,,проект открыт,WS-PROJECT_feedback_1,
+WS-PROJECT,optimized,WS-PROJECT_task_2,,последний проект восстановлен,WS-PROJECT_feedback_2,
+WS-PROJECT,optimized,WS-PROJECT_task_3,,здоровье проекта норма,WS-PROJECT_feedback_3,
+WS-PROJECT,optimized,WS-PROJECT_task_4,,следующее действие рекомендовано,WS-PROJECT_feedback_4,
+WS-PROJECT,optimized,WS-PROJECT_task_4,,несовместимость объяснена,WS-PROJECT_feedback_5,
+WS-PROJECT,optimized,WS-PROJECT_root,,проект сохранен,WS-PROJECT_msg_1,
+WS-PROJECT,optimized,WS-PROJECT_root,,проект открыт с предупреждением,WS-PROJECT_msg_2,
+WS-PROJECT,optimized,WS-PROJECT_root,,проект не может быть открыт,WS-PROJECT_msg_3,
+WS-PROJECT,current,cur_project_home,клик_или_переход,видимая_реакция_частично_подтверждена,cur_project_summary,evidence-bound
+WS-PROJECT,current,cur_project_summary,клик_или_переход,видимая_реакция_частично_подтверждена,cur_project_open,evidence-bound
+WS-PROJECT,current,cur_project_open,клик_или_переход,видимая_реакция_частично_подтверждена,cur_project_recent,evidence-bound
+WS-PROJECT,current,cur_project_recent,клик_или_переход,видимая_реакция_частично_подтверждена,cur_project_next_action,evidence-bound
+WS-PROJECT,current,cur_project_next_action,клик_или_переход,видимая_реакция_частично_подтверждена,cur_project_opt_entry,evidence-bound
+WS-PROJECT,current,cur_project_opt_entry,клик_или_переход,видимая_реакция_частично_подтверждена,cur_project_diag_entry,evidence-bound
+WS-PROJECT,current,cur_project_opt_entry,открыть_окно,дальнейшая_структура_не_доказана,cur_project_opt_entry_unknown_internal,launchpoint_only
+WS-PROJECT,current,cur_project_diag_entry,открыть_окно,дальнейшая_структура_не_доказана,cur_project_diag_entry_unknown_internal,launchpoint_only
+WS-SUITE,optimized,tree_root,выбрать_узел_в_дереве,узел_дерева_подсвечен,WS-SUITE_tree_entry,
+WS-SUITE,optimized,WS-SUITE_tree_entry,открыть_рабочее_пространство,рабочее_пространство_открыто,WS-SUITE_root,прямое открытие из дерева
+WS-SUITE,optimized,WS-SUITE_root,перейти_к_задаче,задача_активна,WS-SUITE_task_1,
+WS-SUITE,optimized,WS-SUITE_task_1,перейти_к_задаче,задача_активна,WS-SUITE_task_2,
+WS-SUITE,optimized,WS-SUITE_task_2,перейти_к_задаче,задача_активна,WS-SUITE_task_3,
+WS-SUITE,optimized,WS-SUITE_task_3,перейти_к_задаче,задача_активна,WS-SUITE_task_4,
+WS-SUITE,optimized,WS-SUITE_task_4,перейти_к_задаче,задача_активна,WS-SUITE_task_5,
+WS-SUITE,optimized,WS-SUITE_task_1,запустить_проверку,результат_проверки_получен,WS-SUITE_check_1,
+WS-SUITE,optimized,WS-SUITE_task_2,запустить_проверку,результат_проверки_получен,WS-SUITE_check_2,
+WS-SUITE,optimized,WS-SUITE_task_3,запустить_проверку,результат_проверки_получен,WS-SUITE_check_3,
+WS-SUITE,optimized,WS-SUITE_task_4,запустить_проверку,результат_проверки_получен,WS-SUITE_check_4,
+WS-SUITE,optimized,WS-SUITE_task_5,запустить_проверку,результат_проверки_получен,WS-SUITE_check_5,
+WS-SUITE,optimized,WS-SUITE_check_1,,блокировка_показана,WS-SUITE_block_1,
+WS-SUITE,optimized,WS-SUITE_block_1,исправить_проблему,возврат_к_исправлению,WS-SUITE_task_1,
+WS-SUITE,optimized,WS-SUITE_check_2,,блокировка_показана,WS-SUITE_block_2,
+WS-SUITE,optimized,WS-SUITE_block_2,исправить_проблему,возврат_к_исправлению,WS-SUITE_task_2,
+WS-SUITE,optimized,WS-SUITE_check_3,,блокировка_показана,WS-SUITE_block_3,
+WS-SUITE,optimized,WS-SUITE_block_3,исправить_проблему,возврат_к_исправлению,WS-SUITE_task_3,
+WS-SUITE,optimized,WS-SUITE_check_4,,блокировка_показана,WS-SUITE_block_4,
+WS-SUITE,optimized,WS-SUITE_block_4,исправить_проблему,возврат_к_исправлению,WS-SUITE_task_4,
+WS-SUITE,optimized,WS-SUITE_task_1,,таблица валидна,WS-SUITE_feedback_1,
+WS-SUITE,optimized,WS-SUITE_task_2,,ошибки валидации показаны,WS-SUITE_feedback_2,
+WS-SUITE,optimized,WS-SUITE_task_3,,валидированный suite snapshot сохранен,WS-SUITE_feedback_3,
+WS-SUITE,optimized,WS-SUITE_task_4,,stale link показан,WS-SUITE_feedback_4,
+WS-SUITE,optimized,WS-SUITE_task_5,,context stale показан,WS-SUITE_feedback_5,
+WS-SUITE,optimized,WS-SUITE_task_5,,строки по стадиям видимы,WS-SUITE_feedback_6,
+WS-SUITE,optimized,WS-SUITE_root,,набор испытаний валиден,WS-SUITE_msg_1,
+WS-SUITE,optimized,WS-SUITE_root,,набор испытаний содержит ошибки,WS-SUITE_msg_2,
+WS-SUITE,optimized,WS-SUITE_root,,валидированный snapshot сохранен,WS-SUITE_msg_3,
+WS-SUITE,current,cur_suite_home,клик_или_переход,видимая_реакция_частично_подтверждена,cur_suite_table,evidence-bound
+WS-SUITE,current,cur_suite_table,клик_или_переход,видимая_реакция_частично_подтверждена,cur_suite_stage,evidence-bound
+WS-SUITE,current,cur_suite_stage,клик_или_переход,видимая_реакция_частично_подтверждена,cur_suite_validate,evidence-bound
+WS-SUITE,current,cur_suite_validate,клик_или_переход,видимая_реакция_частично_подтверждена,cur_suite_export,evidence-bound
+WS-SUITE,current,cur_suite_export,клик_или_переход,видимая_реакция_частично_подтверждена,cur_suite_ring_link,evidence-bound
+WS-SUITE,current,cur_suite_ring_link,открыть_окно,дальнейшая_структура_не_доказана,cur_suite_ring_link_unknown_internal,launchpoint_only
+WS-BASELINE,optimized,tree_root,выбрать_узел_в_дереве,узел_дерева_подсвечен,WS-BASELINE_tree_entry,
+WS-BASELINE,optimized,WS-BASELINE_tree_entry,открыть_рабочее_пространство,рабочее_пространство_открыто,WS-BASELINE_root,прямое открытие из дерева
+WS-BASELINE,optimized,WS-BASELINE_root,перейти_к_задаче,задача_активна,WS-BASELINE_task_1,
+WS-BASELINE,optimized,WS-BASELINE_task_1,перейти_к_задаче,задача_активна,WS-BASELINE_task_2,
+WS-BASELINE,optimized,WS-BASELINE_task_2,перейти_к_задаче,задача_активна,WS-BASELINE_task_3,
+WS-BASELINE,optimized,WS-BASELINE_task_3,перейти_к_задаче,задача_активна,WS-BASELINE_task_4,
+WS-BASELINE,optimized,WS-BASELINE_task_4,перейти_к_задаче,задача_активна,WS-BASELINE_task_5,
+WS-BASELINE,optimized,WS-BASELINE_task_1,запустить_проверку,результат_проверки_получен,WS-BASELINE_check_1,
+WS-BASELINE,optimized,WS-BASELINE_task_2,запустить_проверку,результат_проверки_получен,WS-BASELINE_check_2,
+WS-BASELINE,optimized,WS-BASELINE_task_3,запустить_проверку,результат_проверки_получен,WS-BASELINE_check_3,
+WS-BASELINE,optimized,WS-BASELINE_task_4,запустить_проверку,результат_проверки_получен,WS-BASELINE_check_4,
+WS-BASELINE,optimized,WS-BASELINE_check_1,,блокировка_показана,WS-BASELINE_block_1,
+WS-BASELINE,optimized,WS-BASELINE_block_1,исправить_проблему,возврат_к_исправлению,WS-BASELINE_task_1,
+WS-BASELINE,optimized,WS-BASELINE_check_2,,блокировка_показана,WS-BASELINE_block_2,
+WS-BASELINE,optimized,WS-BASELINE_block_2,исправить_проблему,возврат_к_исправлению,WS-BASELINE_task_2,
+WS-BASELINE,optimized,WS-BASELINE_check_3,,блокировка_показана,WS-BASELINE_block_3,
+WS-BASELINE,optimized,WS-BASELINE_block_3,исправить_проблему,возврат_к_исправлению,WS-BASELINE_task_3,
+WS-BASELINE,optimized,WS-BASELINE_task_1,,baseline выполнен,WS-BASELINE_feedback_1,
+WS-BASELINE,optimized,WS-BASELINE_task_2,,лучший baseline обновлен,WS-BASELINE_feedback_2,
+WS-BASELINE,optimized,WS-BASELINE_task_3,,auto update статус видим,WS-BASELINE_feedback_3,
+WS-BASELINE,optimized,WS-BASELINE_task_4,,active baseline contract сохранен,WS-BASELINE_feedback_4,
+WS-BASELINE,optimized,WS-BASELINE_task_5,,источник baseline и hash видимы,WS-BASELINE_feedback_5,
+WS-BASELINE,optimized,WS-BASELINE_root,,baseline готов,WS-BASELINE_msg_1,
+WS-BASELINE,optimized,WS-BASELINE_root,,baseline устарел,WS-BASELINE_msg_2,
+WS-BASELINE,optimized,WS-BASELINE_root,,источник baseline не совместим,WS-BASELINE_msg_3,
+WS-BASELINE,current,cur_baseline_home,клик_или_переход,видимая_реакция_частично_подтверждена,cur_baseline_source,evidence-bound
+WS-BASELINE,current,cur_baseline_source,клик_или_переход,видимая_реакция_частично_подтверждена,cur_baseline_run,evidence-bound
+WS-BASELINE,current,cur_baseline_run,клик_или_переход,видимая_реакция_частично_подтверждена,cur_baseline_history,evidence-bound
+WS-BASELINE,current,cur_baseline_history,клик_или_переход,видимая_реакция_частично_подтверждена,cur_baseline_summary,evidence-bound
+WS-ANALYSIS,optimized,tree_root,выбрать_узел_в_дереве,узел_дерева_подсвечен,WS-ANALYSIS_tree_entry,
+WS-ANALYSIS,optimized,WS-ANALYSIS_tree_entry,открыть_рабочее_пространство,рабочее_пространство_открыто,WS-ANALYSIS_root,прямое открытие из дерева
+WS-ANALYSIS,optimized,WS-ANALYSIS_root,перейти_к_задаче,задача_активна,WS-ANALYSIS_task_1,
+WS-ANALYSIS,optimized,WS-ANALYSIS_task_1,перейти_к_задаче,задача_активна,WS-ANALYSIS_task_2,
+WS-ANALYSIS,optimized,WS-ANALYSIS_task_2,перейти_к_задаче,задача_активна,WS-ANALYSIS_task_3,
+WS-ANALYSIS,optimized,WS-ANALYSIS_task_3,перейти_к_задаче,задача_активна,WS-ANALYSIS_task_4,
+WS-ANALYSIS,optimized,WS-ANALYSIS_task_4,перейти_к_задаче,задача_активна,WS-ANALYSIS_task_5,
+WS-ANALYSIS,optimized,WS-ANALYSIS_task_5,перейти_к_задаче,задача_активна,WS-ANALYSIS_task_6,
+WS-ANALYSIS,optimized,WS-ANALYSIS_task_1,запустить_проверку,результат_проверки_получен,WS-ANALYSIS_check_1,
+WS-ANALYSIS,optimized,WS-ANALYSIS_task_2,запустить_проверку,результат_проверки_получен,WS-ANALYSIS_check_2,
+WS-ANALYSIS,optimized,WS-ANALYSIS_task_3,запустить_проверку,результат_проверки_получен,WS-ANALYSIS_check_3,
+WS-ANALYSIS,optimized,WS-ANALYSIS_task_4,запустить_проверку,результат_проверки_получен,WS-ANALYSIS_check_4,
+WS-ANALYSIS,optimized,WS-ANALYSIS_check_1,,блокировка_показана,WS-ANALYSIS_block_1,
+WS-ANALYSIS,optimized,WS-ANALYSIS_block_1,исправить_проблему,возврат_к_исправлению,WS-ANALYSIS_task_1,
+WS-ANALYSIS,optimized,WS-ANALYSIS_check_2,,блокировка_показана,WS-ANALYSIS_block_2,
+WS-ANALYSIS,optimized,WS-ANALYSIS_block_2,исправить_проблему,возврат_к_исправлению,WS-ANALYSIS_task_2,
+WS-ANALYSIS,optimized,WS-ANALYSIS_check_3,,блокировка_показана,WS-ANALYSIS_block_3,
+WS-ANALYSIS,optimized,WS-ANALYSIS_block_3,исправить_проблему,возврат_к_исправлению,WS-ANALYSIS_task_3,
+WS-ANALYSIS,optimized,WS-ANALYSIS_task_1,,текущий или исторический контекст виден,WS-ANALYSIS_feedback_1,
+WS-ANALYSIS,optimized,WS-ANALYSIS_task_2,,mismatch banner виден,WS-ANALYSIS_feedback_2,
+WS-ANALYSIS,optimized,WS-ANALYSIS_task_3,,compare mode подписан,WS-ANALYSIS_feedback_3,
+WS-ANALYSIS,optimized,WS-ANALYSIS_task_4,,run contract hash виден,WS-ANALYSIS_feedback_4,
+WS-ANALYSIS,optimized,WS-ANALYSIS_task_5,,report manifest готов,WS-ANALYSIS_feedback_5,
+WS-ANALYSIS,optimized,WS-ANALYSIS_root,,выбран исторический контекст,WS-ANALYSIS_msg_1,
+WS-ANALYSIS,optimized,WS-ANALYSIS_root,,контракт сравнения несовместим,WS-ANALYSIS_msg_2,
+WS-ANALYSIS,optimized,WS-ANALYSIS_root,,отчет экспортирован,WS-ANALYSIS_msg_3,
+WS-ANALYSIS,current,cur_analysis_home,клик_или_переход,видимая_реакция_частично_подтверждена,cur_analysis_run_picker,evidence-bound
+WS-ANALYSIS,current,cur_analysis_run_picker,клик_или_переход,видимая_реакция_частично_подтверждена,cur_analysis_compare,evidence-bound
+WS-ANALYSIS,current,cur_analysis_compare,клик_или_переход,видимая_реакция_частично_подтверждена,cur_analysis_plots,evidence-bound
+WS-ANALYSIS,current,cur_analysis_plots,клик_или_переход,видимая_реакция_частично_подтверждена,cur_analysis_export,evidence-bound
+WS-ANALYSIS,current,cur_analysis_export,клик_или_переход,видимая_реакция_частично_подтверждена,cur_analysis_anim_entry,evidence-bound
+WS-ANALYSIS,current,cur_analysis_anim_entry,клик_или_переход,видимая_реакция_частично_подтверждена,cur_analysis_diag_entry,evidence-bound
+WS-ANALYSIS,current,cur_analysis_anim_entry,открыть_окно,дальнейшая_структура_не_доказана,cur_analysis_anim_entry_unknown_internal,launchpoint_only
+WS-ANALYSIS,current,cur_analysis_diag_entry,открыть_окно,дальнейшая_структура_не_доказана,cur_analysis_diag_entry_unknown_internal,launchpoint_only
+WS-ANIMATOR,optimized,tree_root,выбрать_узел_в_дереве,узел_дерева_подсвечен,WS-ANIMATOR_tree_entry,
+WS-ANIMATOR,optimized,WS-ANIMATOR_tree_entry,открыть_рабочее_пространство,рабочее_пространство_открыто,WS-ANIMATOR_root,прямое открытие из дерева
+WS-ANIMATOR,optimized,WS-ANIMATOR_root,перейти_к_задаче,задача_активна,WS-ANIMATOR_task_1,
+WS-ANIMATOR,optimized,WS-ANIMATOR_task_1,перейти_к_задаче,задача_активна,WS-ANIMATOR_task_2,
+WS-ANIMATOR,optimized,WS-ANIMATOR_task_2,перейти_к_задаче,задача_активна,WS-ANIMATOR_task_3,
+WS-ANIMATOR,optimized,WS-ANIMATOR_task_3,перейти_к_задаче,задача_активна,WS-ANIMATOR_task_4,
+WS-ANIMATOR,optimized,WS-ANIMATOR_task_4,перейти_к_задаче,задача_активна,WS-ANIMATOR_task_5,
+WS-ANIMATOR,optimized,WS-ANIMATOR_task_5,перейти_к_задаче,задача_активна,WS-ANIMATOR_task_6,
+WS-ANIMATOR,optimized,WS-ANIMATOR_task_1,запустить_проверку,результат_проверки_получен,WS-ANIMATOR_check_1,
+WS-ANIMATOR,optimized,WS-ANIMATOR_task_2,запустить_проверку,результат_проверки_получен,WS-ANIMATOR_check_2,
+WS-ANIMATOR,optimized,WS-ANIMATOR_task_3,запустить_проверку,результат_проверки_получен,WS-ANIMATOR_check_3,
+WS-ANIMATOR,optimized,WS-ANIMATOR_task_4,запустить_проверку,результат_проверки_получен,WS-ANIMATOR_check_4,
+WS-ANIMATOR,optimized,WS-ANIMATOR_check_1,,блокировка_показана,WS-ANIMATOR_block_1,
+WS-ANIMATOR,optimized,WS-ANIMATOR_block_1,исправить_проблему,возврат_к_исправлению,WS-ANIMATOR_task_1,
+WS-ANIMATOR,optimized,WS-ANIMATOR_check_2,,блокировка_показана,WS-ANIMATOR_block_2,
+WS-ANIMATOR,optimized,WS-ANIMATOR_block_2,исправить_проблему,возврат_к_исправлению,WS-ANIMATOR_task_2,
+WS-ANIMATOR,optimized,WS-ANIMATOR_check_3,,блокировка_показана,WS-ANIMATOR_block_3,
+WS-ANIMATOR,optimized,WS-ANIMATOR_block_3,исправить_проблему,возврат_к_исправлению,WS-ANIMATOR_task_3,
+WS-ANIMATOR,optimized,WS-ANIMATOR_task_1,,axis only honesty mode виден,WS-ANIMATOR_feedback_1,
+WS-ANIMATOR,optimized,WS-ANIMATOR_task_2,,full truth mode виден,WS-ANIMATOR_feedback_2,
+WS-ANIMATOR,optimized,WS-ANIMATOR_task_3,,current vs historical banner виден,WS-ANIMATOR_feedback_3,
+WS-ANIMATOR,optimized,WS-ANIMATOR_task_4,,playback time видно,WS-ANIMATOR_feedback_4,
+WS-ANIMATOR,optimized,WS-ANIMATOR_task_5,,скорость и источник данных видны,WS-ANIMATOR_feedback_5,
+WS-ANIMATOR,optimized,WS-ANIMATOR_root,,показывается axis only mode,WS-ANIMATOR_msg_1,
+WS-ANIMATOR,optimized,WS-ANIMATOR_root,,packaging truth неполный,WS-ANIMATOR_msg_2,
+WS-ANIMATOR,optimized,WS-ANIMATOR_root,,кадр экспортирован,WS-ANIMATOR_msg_3,
+WS-ANIMATOR,current,cur_anim_home,клик_или_переход,видимая_реакция_частично_подтверждена,cur_anim_pointer,evidence-bound
+WS-ANIMATOR,current,cur_anim_pointer,клик_или_переход,видимая_реакция_частично_подтверждена,cur_anim_follow,evidence-bound
+WS-ANIMATOR,current,cur_anim_follow,клик_или_переход,видимая_реакция_частично_подтверждена,cur_anim_play,evidence-bound
+WS-ANIMATOR,current,cur_anim_play,клик_или_переход,видимая_реакция_частично_подтверждена,cur_anim_truth,evidence-bound
+WS-ANIMATOR,current,cur_anim_truth,клик_или_переход,видимая_реакция_частично_подтверждена,cur_anim_capture,evidence-bound
+WS-INPUTS,optimized,tree_root,выбрать_узел_в_дереве,узел_дерева_подсвечен,WS-INPUTS_tree_entry,
+WS-INPUTS,optimized,WS-INPUTS_tree_entry,открыть_рабочее_пространство,рабочее_пространство_открыто,WS-INPUTS_root,
+WS-RING,optimized,tree_root,выбрать_узел_в_дереве,узел_дерева_подсвечен,WS-RING_tree_entry,
+WS-RING,optimized,WS-RING_tree_entry,открыть_рабочее_пространство,рабочее_пространство_открыто,WS-RING_root,
+WS-OPTIMIZATION,optimized,tree_root,выбрать_узел_в_дереве,узел_дерева_подсвечен,WS-OPTIMIZATION_tree_entry,
+WS-OPTIMIZATION,optimized,WS-OPTIMIZATION_tree_entry,открыть_рабочее_пространство,рабочее_пространство_открыто,WS-OPTIMIZATION_root,
+WS-DIAGNOSTICS,optimized,tree_root,выбрать_узел_в_дереве,узел_дерева_подсвечен,WS-DIAGNOSTICS_tree_entry,
+WS-DIAGNOSTICS,optimized,WS-DIAGNOSTICS_tree_entry,открыть_рабочее_пространство,рабочее_пространство_открыто,WS-DIAGNOSTICS_root,
+CROSS,optimized,WS-PROJECT_root,перейти_по_основной_цепочке,следующий_этап_открыт,WS-INPUTS_root,
+CROSS,optimized,WS-INPUTS_root,перейти_по_основной_цепочке,следующий_этап_открыт,WS-RING_root,
+CROSS,optimized,WS-RING_root,перейти_по_основной_цепочке,следующий_этап_открыт,WS-SUITE_root,
+CROSS,optimized,WS-SUITE_root,перейти_по_основной_цепочке,следующий_этап_открыт,WS-BASELINE_root,
+CROSS,optimized,WS-BASELINE_root,перейти_по_основной_цепочке,следующий_этап_открыт,WS-OPTIMIZATION_root,
+CROSS,optimized,WS-OPTIMIZATION_root,перейти_по_основной_цепочке,следующий_этап_открыт,WS-ANALYSIS_root,
+CROSS,optimized,WS-ANALYSIS_root,перейти_по_основной_цепочке,следующий_этап_открыт,WS-ANIMATOR_root,
+CROSS,optimized,WS-ANIMATOR_root,перейти_по_основной_цепочке,следующий_этап_открыт,WS-DIAGNOSTICS_root,
+CROSS,optimized,WS-SUITE_block_2,вернуться_для_исправления,контекст_возврата_показан,WS-RING_root,битый sidecar требует возврата к сценариям
+CROSS,optimized,WS-SUITE_block_3,вернуться_для_исправления,контекст_возврата_показан,WS-RING_root,stage semantics требует правки сценариев/набора
+CROSS,optimized,WS-BASELINE_block_1,вернуться_для_исправления,контекст_возврата_показан,WS-SUITE_root,устаревший source baseline требует проверки suite
+CROSS,optimized,WS-BASELINE_block_2,вернуться_для_исправления,контекст_возврата_показан,WS-INPUTS_root,несовместимый snapshot требует возврата к входам
+CROSS,optimized,WS-ANALYSIS_block_2,вернуться_для_исправления,контекст_возврата_показан,WS-OPTIMIZATION_root,mismatch контрактов требует возврата к постановке
+CROSS,optimized,WS-ANIMATOR_block_2,вернуться_для_исправления,контекст_возврата_показан,WS-ANALYSIS_root,packaging incomplete требует возврата к анализу/диагностике
+CROSS,optimized,WS-DIAGNOSTICS_feedback_2,вернуться_для_исправления,контекст_возврата_показан,WS-PROJECT_root,после диагностики возможен возврат к проекту
+SHELL,optimized,shell_root,собрать_диагностику,route_to_diagnostics,diag_main_action,
+SHELL,current,cur_shell_home,хаотичный_выбор_окна,раннее_ветвление,cur_shell_window_grid,
+SHELL,current,cur_shell_home,перейти_на_страницу_оптимизации,ещё_одна_точка_входа,cur_shell_opt_page,
+SHELL,current,cur_shell_window_grid,клик_по_кнопке_окна,открыто_отдельное_окно,cur_shell_diag_btn,плоская сетка равноправных окон
+SHELL,current,cur_shell_window_grid,клик_по_кнопке_окна,открыто_отдельное_окно,cur_shell_send_btn,плоская сетка равноправных окон
+SHELL,current,cur_shell_window_grid,клик_по_кнопке_окна,открыто_отдельное_окно,cur_shell_compare_btn,плоская сетка равноправных окон
+SHELL,current,cur_shell_window_grid,клик_по_кнопке_окна,открыто_отдельное_окно,cur_shell_anim_btn,плоская сетка равноправных окон

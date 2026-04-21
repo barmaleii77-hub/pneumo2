@@ -1,0 +1,299 @@
+node_id,label,workspace,node_type,layer,provenance,group,status
+shell_root,Главное окно,SHELL,shell,optimized,canonical_prompt,shell,covered
+tree_root,Левое дерево навигации,SHELL,dock_widget,optimized,canonical_prompt,shell,covered
+inspector_root,Правая панель свойств и помощи,SHELL,dock_widget,optimized,canonical_prompt,shell,covered
+status_root,Нижняя строка состояния,SHELL,dock_widget,optimized,canonical_prompt,shell,covered
+command_search,Поиск команд,SHELL,shell_control,optimized,canonical_prompt,shell,covered
+diag_main_action,Собрать диагностику,SHELL,shell_action,optimized,canonical_prompt,shell,covered
+cur_shell_home,Главная поверхность,SHELL,current_screen,current,live_repo_evidence,shell,covered_partially
+cur_shell_window_grid,Сетка отдельных окон,SHELL,current_panel,current,live_repo_evidence,shell,covered_partially
+cur_shell_opt_page,Страница оптимизации,SHELL,current_screen,current,live_repo_evidence,shell,covered_partially
+cur_shell_diag_btn,GUI диагностики,SHELL,current_launchpoint,current,live_repo_evidence,shell,covered_partially
+cur_shell_send_btn,GUI отправки результатов,SHELL,current_launchpoint,current,live_repo_evidence,shell,covered_partially
+cur_shell_compare_btn,Compare Viewer,SHELL,current_launchpoint,current,live_repo_evidence,shell,covered_partially
+cur_shell_anim_btn,Desktop Animator,SHELL,current_launchpoint,current,live_repo_evidence,shell,covered_partially
+WS-PROJECT_root,Панель проекта,WS-PROJECT,workspace_root,optimized,canonical_prompt,workspace,covered
+WS-PROJECT_tree_entry,Дерево: Панель проекта,WS-PROJECT,tree_entry,optimized,canonical_prompt,tree,covered
+WS-PROJECT_container_левое_дерево,левое дерево,WS-PROJECT,container,optimized,canonical_prompt,container,covered
+WS-PROJECT_container_центральная_карточка,центральная карточка,WS-PROJECT,container,optimized,canonical_prompt,container,covered
+WS-PROJECT_container_правая_панель_свойств,правая панель свойств,WS-PROJECT,container,optimized,canonical_prompt,container,covered
+WS-PROJECT_container_нижняя_строка_состояния,нижняя строка состояния,WS-PROJECT,container,optimized,canonical_prompt,container,covered
+WS-PROJECT_task_1,открыть или создать проект,WS-PROJECT,task,optimized,canonical_prompt,task,covered
+WS-PROJECT_task_2,проверить здоровье проекта,WS-PROJECT,task,optimized,canonical_prompt,task,covered
+WS-PROJECT_task_3,восстановить последний проект,WS-PROJECT,task,optimized,canonical_prompt,task,covered
+WS-PROJECT_task_4,выбрать следующий шаг,WS-PROJECT,task,optimized,canonical_prompt,task,covered
+WS-PROJECT_check_1,путь проекта доступен,WS-PROJECT,check,optimized,canonical_prompt,check,covered
+WS-PROJECT_check_2,workspace доступен для записи,WS-PROJECT,check,optimized,canonical_prompt,check,covered
+WS-PROJECT_check_3,версия совместима,WS-PROJECT,check,optimized,canonical_prompt,check,covered
+WS-PROJECT_check_4,история проекта не повреждена,WS-PROJECT,check,optimized,canonical_prompt,check,covered
+WS-PROJECT_block_1,путь недоступен,WS-PROJECT,block,optimized,canonical_prompt,block,covered
+WS-PROJECT_block_2,проект поврежден,WS-PROJECT,block,optimized,canonical_prompt,block,covered
+WS-PROJECT_block_3,несовместимая версия,WS-PROJECT,block,optimized,canonical_prompt,block,covered
+WS-PROJECT_feedback_1,проект открыт,WS-PROJECT,feedback,optimized,canonical_prompt,feedback,covered
+WS-PROJECT_feedback_2,последний проект восстановлен,WS-PROJECT,feedback,optimized,canonical_prompt,feedback,covered
+WS-PROJECT_feedback_3,здоровье проекта норма,WS-PROJECT,feedback,optimized,canonical_prompt,feedback,covered
+WS-PROJECT_feedback_4,следующее действие рекомендовано,WS-PROJECT,feedback,optimized,canonical_prompt,feedback,covered
+WS-PROJECT_feedback_5,несовместимость объяснена,WS-PROJECT,feedback,optimized,canonical_prompt,feedback,covered
+WS-PROJECT_ctl_1,кнопка создать проект,WS-PROJECT,control,optimized,canonical_prompt,control,covered
+WS-PROJECT_ctl_2,кнопка открыть проект,WS-PROJECT,control,optimized,canonical_prompt,control,covered
+WS-PROJECT_ctl_3,кнопка последний проект,WS-PROJECT,control,optimized,canonical_prompt,control,covered
+WS-PROJECT_ctl_4,кнопка перейти к исходным данным,WS-PROJECT,control,optimized,canonical_prompt,control,covered
+WS-PROJECT_ctl_5,кнопка перейти к сценариям,WS-PROJECT,control,optimized,canonical_prompt,control,covered
+WS-PROJECT_ctl_6,кнопка перейти к набору испытаний,WS-PROJECT,control,optimized,canonical_prompt,control,covered
+WS-PROJECT_ctl_7,кнопка перейти к базовому прогону,WS-PROJECT,control,optimized,canonical_prompt,control,covered
+WS-PROJECT_ctl_8,кнопка перейти к оптимизации,WS-PROJECT,control,optimized,canonical_prompt,control,covered
+WS-PROJECT_ctl_9,кнопка перейти к анализу,WS-PROJECT,control,optimized,canonical_prompt,control,covered
+WS-PROJECT_ctl_10,кнопка перейти к анимации,WS-PROJECT,control,optimized,canonical_prompt,control,covered
+WS-PROJECT_ctl_11,кнопка собрать диагностику,WS-PROJECT,control,optimized,canonical_prompt,control,covered
+WS-PROJECT_field_1,имя проекта,WS-PROJECT,field,optimized,canonical_prompt,field,covered
+WS-PROJECT_field_2,путь проекта,WS-PROJECT,field,optimized,canonical_prompt,field,covered
+WS-PROJECT_field_3,дата последнего сохранения,WS-PROJECT,field,optimized,canonical_prompt,field,covered
+WS-PROJECT_field_4,активный inputs snapshot hash,WS-PROJECT,field,optimized,canonical_prompt,field,covered
+WS-PROJECT_field_5,активный suite snapshot hash,WS-PROJECT,field,optimized,canonical_prompt,field,covered
+WS-PROJECT_field_6,активный baseline hash,WS-PROJECT,field,optimized,canonical_prompt,field,covered
+WS-PROJECT_field_7,последний run id,WS-PROJECT,field,optimized,canonical_prompt,field,covered
+WS-PROJECT_field_8,последний bundle path,WS-PROJECT,field,optimized,canonical_prompt,field,covered
+WS-PROJECT_msg_1,проект сохранен,WS-PROJECT,message,optimized,canonical_prompt,message,covered
+WS-PROJECT_msg_2,проект открыт с предупреждением,WS-PROJECT,message,optimized,canonical_prompt,message,covered
+WS-PROJECT_msg_3,проект не может быть открыт,WS-PROJECT,message,optimized,canonical_prompt,message,covered
+cur_project_home,Главный экран проекта,WS-PROJECT,current_screen,current,live_repo_evidence,current,covered_partially
+cur_project_summary,Сводка проекта,WS-PROJECT,current_panel,current,live_repo_evidence,current,covered_partially
+cur_project_open,Открыть проект,WS-PROJECT,current_action,current,live_repo_evidence,current,covered_partially
+cur_project_recent,Последний проект,WS-PROJECT,current_state,current,live_repo_evidence,current,covered_partially
+cur_project_next_action,Следующее действие,WS-PROJECT,current_feedback,current,live_repo_evidence,current,covered_partially
+cur_project_opt_entry,Вход в оптимизацию,WS-PROJECT,current_launchpoint,current,live_repo_evidence,current,covered_partially
+cur_project_diag_entry,Диагностика,WS-PROJECT,current_launchpoint,current,live_repo_evidence,current,covered_partially
+cur_project_opt_entry_unknown_internal,Внутренности окна неизвестны: Вход в оптимизацию,WS-PROJECT,unknown_window_internal,current,not_opened_runtime,current,gap
+cur_project_diag_entry_unknown_internal,Внутренности окна неизвестны: Диагностика,WS-PROJECT,unknown_window_internal,current,not_opened_runtime,current,gap
+WS-SUITE_root,Набор испытаний,WS-SUITE,workspace_root,optimized,canonical_prompt,workspace,covered
+WS-SUITE_tree_entry,Дерево: Набор испытаний,WS-SUITE,tree_entry,optimized,canonical_prompt,tree,covered
+WS-SUITE_container_дерево_испытаний,дерево испытаний,WS-SUITE,container,optimized,canonical_prompt,container,covered
+WS-SUITE_container_таблица_suite,таблица suite,WS-SUITE,container,optimized,canonical_prompt,container,covered
+WS-SUITE_container_карточка_строки,карточка строки,WS-SUITE,container,optimized,canonical_prompt,container,covered
+WS-SUITE_container_правая_панель_help,правая панель help,WS-SUITE,container,optimized,canonical_prompt,container,covered
+WS-SUITE_container_нижняя_строка_валидации,нижняя строка валидации,WS-SUITE,container,optimized,canonical_prompt,container,covered
+WS-SUITE_task_1,включить или исключить испытание,WS-SUITE,task,optimized,canonical_prompt,task,covered
+WS-SUITE_task_2,назначить стадию входа,WS-SUITE,task,optimized,canonical_prompt,task,covered
+WS-SUITE_task_3,привязать сценарий и sidecar,WS-SUITE,task,optimized,canonical_prompt,task,covered
+WS-SUITE_task_4,проверить целевые показатели,WS-SUITE,task,optimized,canonical_prompt,task,covered
+WS-SUITE_task_5,сохранить валидированный набор,WS-SUITE,task,optimized,canonical_prompt,task,covered
+WS-SUITE_check_1,уникальные имена испытаний,WS-SUITE,check,optimized,canonical_prompt,check,covered
+WS-SUITE_check_2,валидные dt и t end,WS-SUITE,check,optimized,canonical_prompt,check,covered
+WS-SUITE_check_3,существуют sidecar файлы,WS-SUITE,check,optimized,canonical_prompt,check,covered
+WS-SUITE_check_4,stage семантика не сломана,WS-SUITE,check,optimized,canonical_prompt,check,covered
+WS-SUITE_check_5,scenario lineage полный,WS-SUITE,check,optimized,canonical_prompt,check,covered
+WS-SUITE_block_1,дубли имен,WS-SUITE,block,optimized,canonical_prompt,block,covered
+WS-SUITE_block_2,битый sidecar,WS-SUITE,block,optimized,canonical_prompt,block,covered
+WS-SUITE_block_3,несовместимая stage семантика,WS-SUITE,block,optimized,canonical_prompt,block,covered
+WS-SUITE_block_4,пустой валидный набор,WS-SUITE,block,optimized,canonical_prompt,block,covered
+WS-SUITE_feedback_1,таблица валидна,WS-SUITE,feedback,optimized,canonical_prompt,feedback,covered
+WS-SUITE_feedback_2,ошибки валидации показаны,WS-SUITE,feedback,optimized,canonical_prompt,feedback,covered
+WS-SUITE_feedback_3,валидированный suite snapshot сохранен,WS-SUITE,feedback,optimized,canonical_prompt,feedback,covered
+WS-SUITE_feedback_4,stale link показан,WS-SUITE,feedback,optimized,canonical_prompt,feedback,covered
+WS-SUITE_feedback_5,context stale показан,WS-SUITE,feedback,optimized,canonical_prompt,feedback,covered
+WS-SUITE_feedback_6,строки по стадиям видимы,WS-SUITE,feedback,optimized,canonical_prompt,feedback,covered
+WS-SUITE_ctl_1,кнопка добавить испытание,WS-SUITE,control,optimized,canonical_prompt,control,covered
+WS-SUITE_ctl_2,кнопка удалить испытание,WS-SUITE,control,optimized,canonical_prompt,control,covered
+WS-SUITE_ctl_3,кнопка дублировать испытание,WS-SUITE,control,optimized,canonical_prompt,control,covered
+WS-SUITE_ctl_4,флажок включено,WS-SUITE,control,optimized,canonical_prompt,control,covered
+WS-SUITE_ctl_5,поле имя,WS-SUITE,control,optimized,canonical_prompt,control,covered
+WS-SUITE_ctl_6,поле тип испытания,WS-SUITE,control,optimized,canonical_prompt,control,covered
+WS-SUITE_ctl_7,поле стадия входа,WS-SUITE,control,optimized,canonical_prompt,control,covered
+WS-SUITE_ctl_8,поле dt,WS-SUITE,control,optimized,canonical_prompt,control,covered
+WS-SUITE_ctl_9,поле t end,WS-SUITE,control,optimized,canonical_prompt,control,covered
+WS-SUITE_ctl_10,поле road csv,WS-SUITE,control,optimized,canonical_prompt,control,covered
+WS-SUITE_ctl_11,поле axay csv,WS-SUITE,control,optimized,canonical_prompt,control,covered
+WS-SUITE_ctl_12,поле scenario json,WS-SUITE,control,optimized,canonical_prompt,control,covered
+WS-SUITE_ctl_13,поле target rms,WS-SUITE,control,optimized,canonical_prompt,control,covered
+WS-SUITE_ctl_14,поле target roll,WS-SUITE,control,optimized,canonical_prompt,control,covered
+WS-SUITE_ctl_15,поле target contact loss,WS-SUITE,control,optimized,canonical_prompt,control,covered
+WS-SUITE_ctl_16,кнопка проверить набор,WS-SUITE,control,optimized,canonical_prompt,control,covered
+WS-SUITE_ctl_17,кнопка сохранить snapshot,WS-SUITE,control,optimized,canonical_prompt,control,covered
+WS-SUITE_ctl_18,кнопка открыть сценарий из дерева,WS-SUITE,control,optimized,canonical_prompt,control,covered
+WS-SUITE_field_1,suite snapshot hash,WS-SUITE,field,optimized,canonical_prompt,field,covered
+WS-SUITE_field_2,ring source hash,WS-SUITE,field,optimized,canonical_prompt,field,covered
+WS-SUITE_field_3,inputs snapshot hash,WS-SUITE,field,optimized,canonical_prompt,field,covered
+WS-SUITE_field_4,scenario lineage hash,WS-SUITE,field,optimized,canonical_prompt,field,covered
+WS-SUITE_field_5,количество enabled,WS-SUITE,field,optimized,canonical_prompt,field,covered
+WS-SUITE_field_6,количество stage0,WS-SUITE,field,optimized,canonical_prompt,field,covered
+WS-SUITE_field_7,количество stage1,WS-SUITE,field,optimized,canonical_prompt,field,covered
+WS-SUITE_field_8,количество stage2,WS-SUITE,field,optimized,canonical_prompt,field,covered
+WS-SUITE_field_9,статус stale link,WS-SUITE,field,optimized,canonical_prompt,field,covered
+WS-SUITE_field_10,статус context stale,WS-SUITE,field,optimized,canonical_prompt,field,covered
+WS-SUITE_msg_1,набор испытаний валиден,WS-SUITE,message,optimized,canonical_prompt,message,covered
+WS-SUITE_msg_2,набор испытаний содержит ошибки,WS-SUITE,message,optimized,canonical_prompt,message,covered
+WS-SUITE_msg_3,валидированный snapshot сохранен,WS-SUITE,message,optimized,canonical_prompt,message,covered
+cur_suite_home,Список испытаний,WS-SUITE,current_screen,current,live_repo_evidence,current,covered_partially
+cur_suite_table,Таблица испытаний,WS-SUITE,current_panel,current,live_repo_evidence,current,covered_partially
+cur_suite_stage,Колонка стадий,WS-SUITE,current_panel,current,live_repo_evidence,current,covered_partially
+cur_suite_validate,Проверка набора,WS-SUITE,current_action,current,live_repo_evidence,current,covered_partially
+cur_suite_export,Сохранить набор,WS-SUITE,current_action,current,live_repo_evidence,current,covered_partially
+cur_suite_ring_link,Связь со сценариями,WS-SUITE,current_launchpoint,current,live_repo_evidence,current,covered_partially
+cur_suite_ring_link_unknown_internal,Внутренности окна неизвестны: Связь со сценариями,WS-SUITE,unknown_window_internal,current,not_opened_runtime,current,gap
+WS-BASELINE_root,Базовый прогон,WS-BASELINE,workspace_root,optimized,canonical_prompt,workspace,covered
+WS-BASELINE_tree_entry,Дерево: Базовый прогон,WS-BASELINE,tree_entry,optimized,canonical_prompt,tree,covered
+WS-BASELINE_container_карточка_источника,карточка источника,WS-BASELINE,container,optimized,canonical_prompt,container,covered
+WS-BASELINE_container_панель_политики,панель политики,WS-BASELINE,container,optimized,canonical_prompt,container,covered
+WS-BASELINE_container_графики_baseline,графики baseline,WS-BASELINE,container,optimized,canonical_prompt,container,covered
+WS-BASELINE_container_история_baseline,история baseline,WS-BASELINE,container,optimized,canonical_prompt,container,covered
+WS-BASELINE_container_нижний_progress,нижний progress,WS-BASELINE,container,optimized,canonical_prompt,container,covered
+WS-BASELINE_task_1,выбрать источник baseline,WS-BASELINE,task,optimized,canonical_prompt,task,covered
+WS-BASELINE_task_2,запустить базовый прогон,WS-BASELINE,task,optimized,canonical_prompt,task,covered
+WS-BASELINE_task_3,сравнить с предыдущим baseline,WS-BASELINE,task,optimized,canonical_prompt,task,covered
+WS-BASELINE_task_4,принять или заморозить baseline,WS-BASELINE,task,optimized,canonical_prompt,task,covered
+WS-BASELINE_task_5,передать active baseline в оптимизацию,WS-BASELINE,task,optimized,canonical_prompt,task,covered
+WS-BASELINE_check_1,suite snapshot валиден,WS-BASELINE,check,optimized,canonical_prompt,check,covered
+WS-BASELINE_check_2,inputs lineage совместим,WS-BASELINE,check,optimized,canonical_prompt,check,covered
+WS-BASELINE_check_3,baseline policy задана,WS-BASELINE,check,optimized,canonical_prompt,check,covered
+WS-BASELINE_check_4,active baseline hash актуален,WS-BASELINE,check,optimized,canonical_prompt,check,covered
+WS-BASELINE_block_1,stale baseline source,WS-BASELINE,block,optimized,canonical_prompt,block,covered
+WS-BASELINE_block_2,несовместимый suite snapshot,WS-BASELINE,block,optimized,canonical_prompt,block,covered
+WS-BASELINE_block_3,run failed,WS-BASELINE,block,optimized,canonical_prompt,block,covered
+WS-BASELINE_feedback_1,baseline выполнен,WS-BASELINE,feedback,optimized,canonical_prompt,feedback,covered
+WS-BASELINE_feedback_2,лучший baseline обновлен,WS-BASELINE,feedback,optimized,canonical_prompt,feedback,covered
+WS-BASELINE_feedback_3,auto update статус видим,WS-BASELINE,feedback,optimized,canonical_prompt,feedback,covered
+WS-BASELINE_feedback_4,active baseline contract сохранен,WS-BASELINE,feedback,optimized,canonical_prompt,feedback,covered
+WS-BASELINE_feedback_5,источник baseline и hash видимы,WS-BASELINE,feedback,optimized,canonical_prompt,feedback,covered
+WS-BASELINE_ctl_1,переключатель источника baseline,WS-BASELINE,control,optimized,canonical_prompt,control,covered
+WS-BASELINE_ctl_2,переключатель auto update,WS-BASELINE,control,optimized,canonical_prompt,control,covered
+WS-BASELINE_ctl_3,кнопка запустить baseline,WS-BASELINE,control,optimized,canonical_prompt,control,covered
+WS-BASELINE_ctl_4,кнопка заморозить baseline,WS-BASELINE,control,optimized,canonical_prompt,control,covered
+WS-BASELINE_ctl_5,кнопка принять как active,WS-BASELINE,control,optimized,canonical_prompt,control,covered
+WS-BASELINE_ctl_6,кнопка открыть историю,WS-BASELINE,control,optimized,canonical_prompt,control,covered
+WS-BASELINE_ctl_7,кнопка сравнить с предыдущим,WS-BASELINE,control,optimized,canonical_prompt,control,covered
+WS-BASELINE_ctl_8,кнопка перейти к оптимизации,WS-BASELINE,control,optimized,canonical_prompt,control,covered
+WS-BASELINE_field_1,active baseline hash,WS-BASELINE,field,optimized,canonical_prompt,field,covered
+WS-BASELINE_field_2,baseline policy mode,WS-BASELINE,field,optimized,canonical_prompt,field,covered
+WS-BASELINE_field_3,baseline source kind,WS-BASELINE,field,optimized,canonical_prompt,field,covered
+WS-BASELINE_field_4,suite snapshot hash,WS-BASELINE,field,optimized,canonical_prompt,field,covered
+WS-BASELINE_field_5,inputs snapshot hash,WS-BASELINE,field,optimized,canonical_prompt,field,covered
+WS-BASELINE_field_6,run dir baseline,WS-BASELINE,field,optimized,canonical_prompt,field,covered
+WS-BASELINE_field_7,время последнего baseline,WS-BASELINE,field,optimized,canonical_prompt,field,covered
+WS-BASELINE_msg_1,baseline готов,WS-BASELINE,message,optimized,canonical_prompt,message,covered
+WS-BASELINE_msg_2,baseline устарел,WS-BASELINE,message,optimized,canonical_prompt,message,covered
+WS-BASELINE_msg_3,источник baseline не совместим,WS-BASELINE,message,optimized,canonical_prompt,message,covered
+cur_baseline_home,Экран базового прогона,WS-BASELINE,current_screen,current,live_repo_evidence,current,covered_partially
+cur_baseline_source,Источник baseline,WS-BASELINE,current_panel,current,live_repo_evidence,current,covered_partially
+cur_baseline_run,Кнопка базового прогона,WS-BASELINE,current_action,current,live_repo_evidence,current,covered_partially
+cur_baseline_history,История baseline,WS-BASELINE,current_panel,current,live_repo_evidence,current,covered_partially
+cur_baseline_summary,Сводка baseline,WS-BASELINE,current_feedback,current,live_repo_evidence,current,covered_partially
+WS-ANALYSIS_root,Анализ результатов,WS-ANALYSIS,workspace_root,optimized,canonical_prompt,workspace,covered
+WS-ANALYSIS_tree_entry,Дерево: Анализ результатов,WS-ANALYSIS,tree_entry,optimized,canonical_prompt,tree,covered
+WS-ANALYSIS_container_run_picker,run picker,WS-ANALYSIS,container,optimized,canonical_prompt,container,covered
+WS-ANALYSIS_container_compare_bar,compare bar,WS-ANALYSIS,container,optimized,canonical_prompt,container,covered
+WS-ANALYSIS_container_графики,графики,WS-ANALYSIS,container,optimized,canonical_prompt,container,covered
+WS-ANALYSIS_container_таблица_метрик,таблица метрик,WS-ANALYSIS,container,optimized,canonical_prompt,container,covered
+WS-ANALYSIS_container_правый_inspector,правый inspector,WS-ANALYSIS,container,optimized,canonical_prompt,container,covered
+WS-ANALYSIS_container_нижняя_полоса_контекста,нижняя полоса контекста,WS-ANALYSIS,container,optimized,canonical_prompt,container,covered
+WS-ANALYSIS_task_1,выбрать прогон,WS-ANALYSIS,task,optimized,canonical_prompt,task,covered
+WS-ANALYSIS_task_2,выбрать режим сравнения,WS-ANALYSIS,task,optimized,canonical_prompt,task,covered
+WS-ANALYSIS_task_3,отфильтровать по испытанию или сегменту,WS-ANALYSIS,task,optimized,canonical_prompt,task,covered
+WS-ANALYSIS_task_4,прочитать графики и таблицы,WS-ANALYSIS,task,optimized,canonical_prompt,task,covered
+WS-ANALYSIS_task_5,экспортировать отчет,WS-ANALYSIS,task,optimized,canonical_prompt,task,covered
+WS-ANALYSIS_task_6,открыть подробное сравнение,WS-ANALYSIS,task,optimized,canonical_prompt,task,covered
+WS-ANALYSIS_check_1,selected run contract полный,WS-ANALYSIS,check,optimized,canonical_prompt,check,covered
+WS-ANALYSIS_check_2,compare contract валиден,WS-ANALYSIS,check,optimized,canonical_prompt,check,covered
+WS-ANALYSIS_check_3,lineage совместим,WS-ANALYSIS,check,optimized,canonical_prompt,check,covered
+WS-ANALYSIS_check_4,objective contract совместим,WS-ANALYSIS,check,optimized,canonical_prompt,check,covered
+WS-ANALYSIS_block_1,run not selected,WS-ANALYSIS,block,optimized,canonical_prompt,block,covered
+WS-ANALYSIS_block_2,mismatch contracts,WS-ANALYSIS,block,optimized,canonical_prompt,block,covered
+WS-ANALYSIS_block_3,compare context invalid,WS-ANALYSIS,block,optimized,canonical_prompt,block,covered
+WS-ANALYSIS_feedback_1,текущий или исторический контекст виден,WS-ANALYSIS,feedback,optimized,canonical_prompt,feedback,covered
+WS-ANALYSIS_feedback_2,mismatch banner виден,WS-ANALYSIS,feedback,optimized,canonical_prompt,feedback,covered
+WS-ANALYSIS_feedback_3,compare mode подписан,WS-ANALYSIS,feedback,optimized,canonical_prompt,feedback,covered
+WS-ANALYSIS_feedback_4,run contract hash виден,WS-ANALYSIS,feedback,optimized,canonical_prompt,feedback,covered
+WS-ANALYSIS_feedback_5,report manifest готов,WS-ANALYSIS,feedback,optimized,canonical_prompt,feedback,covered
+WS-ANALYSIS_ctl_1,список прогонов,WS-ANALYSIS,control,optimized,canonical_prompt,control,covered
+WS-ANALYSIS_ctl_2,переключатель compare mode,WS-ANALYSIS,control,optimized,canonical_prompt,control,covered
+WS-ANALYSIS_ctl_3,фильтр по испытанию,WS-ANALYSIS,control,optimized,canonical_prompt,control,covered
+WS-ANALYSIS_ctl_4,фильтр по сегменту,WS-ANALYSIS,control,optimized,canonical_prompt,control,covered
+WS-ANALYSIS_ctl_5,кнопка открыть compare viewer,WS-ANALYSIS,control,optimized,canonical_prompt,control,covered
+WS-ANALYSIS_ctl_6,кнопка экспорт отчета,WS-ANALYSIS,control,optimized,canonical_prompt,control,covered
+WS-ANALYSIS_ctl_7,кнопка открыть аниматор,WS-ANALYSIS,control,optimized,canonical_prompt,control,covered
+WS-ANALYSIS_ctl_8,кнопка открыть диагностику,WS-ANALYSIS,control,optimized,canonical_prompt,control,covered
+WS-ANALYSIS_field_1,selected run id,WS-ANALYSIS,field,optimized,canonical_prompt,field,covered
+WS-ANALYSIS_field_2,selected run contract hash,WS-ANALYSIS,field,optimized,canonical_prompt,field,covered
+WS-ANALYSIS_field_3,compare contract hash,WS-ANALYSIS,field,optimized,canonical_prompt,field,covered
+WS-ANALYSIS_field_4,objective contract hash,WS-ANALYSIS,field,optimized,canonical_prompt,field,covered
+WS-ANALYSIS_field_5,suite snapshot hash,WS-ANALYSIS,field,optimized,canonical_prompt,field,covered
+WS-ANALYSIS_field_6,scenario lineage hash,WS-ANALYSIS,field,optimized,canonical_prompt,field,covered
+WS-ANALYSIS_field_7,stale or current state,WS-ANALYSIS,field,optimized,canonical_prompt,field,covered
+WS-ANALYSIS_msg_1,выбран исторический контекст,WS-ANALYSIS,message,optimized,canonical_prompt,message,covered
+WS-ANALYSIS_msg_2,контракт сравнения несовместим,WS-ANALYSIS,message,optimized,canonical_prompt,message,covered
+WS-ANALYSIS_msg_3,отчет экспортирован,WS-ANALYSIS,message,optimized,canonical_prompt,message,covered
+cur_analysis_home,Экран анализа,WS-ANALYSIS,current_screen,current,live_repo_evidence,current,covered_partially
+cur_analysis_run_picker,Выбор прогона,WS-ANALYSIS,current_panel,current,live_repo_evidence,current,covered_partially
+cur_analysis_compare,Сравнение,WS-ANALYSIS,current_action,current,live_repo_evidence,current,covered_partially
+cur_analysis_plots,Графики анализа,WS-ANALYSIS,current_panel,current,live_repo_evidence,current,covered_partially
+cur_analysis_export,Экспорт отчета,WS-ANALYSIS,current_action,current,live_repo_evidence,current,covered_partially
+cur_analysis_anim_entry,Открыть аниматор,WS-ANALYSIS,current_launchpoint,current,live_repo_evidence,current,covered_partially
+cur_analysis_diag_entry,Открыть диагностику,WS-ANALYSIS,current_launchpoint,current,live_repo_evidence,current,covered_partially
+cur_analysis_anim_entry_unknown_internal,Внутренности окна неизвестны: Открыть аниматор,WS-ANALYSIS,unknown_window_internal,current,not_opened_runtime,current,gap
+cur_analysis_diag_entry_unknown_internal,Внутренности окна неизвестны: Открыть диагностику,WS-ANALYSIS,unknown_window_internal,current,not_opened_runtime,current,gap
+WS-ANIMATOR_root,Анимация,WS-ANIMATOR,workspace_root,optimized,canonical_prompt,workspace,covered
+WS-ANIMATOR_tree_entry,Дерево: Анимация,WS-ANIMATOR,tree_entry,optimized,canonical_prompt,tree,covered
+WS-ANIMATOR_container_viewport,viewport,WS-ANIMATOR,container,optimized,canonical_prompt,container,covered
+WS-ANIMATOR_container_левая_панель_сцены,левая панель сцены,WS-ANIMATOR,container,optimized,canonical_prompt,container,covered
+WS-ANIMATOR_container_правая_панель_truth,правая панель truth,WS-ANIMATOR,container,optimized,canonical_prompt,container,covered
+WS-ANIMATOR_container_нижняя_панель_playback,нижняя панель playback,WS-ANIMATOR,container,optimized,canonical_prompt,container,covered
+WS-ANIMATOR_container_dock_диагностики_аниматора,dock диагностики аниматора,WS-ANIMATOR,container,optimized,canonical_prompt,container,covered
+WS-ANIMATOR_task_1,открыть контекст анимации,WS-ANIMATOR,task,optimized,canonical_prompt,task,covered
+WS-ANIMATOR_task_2,включить проигрывание,WS-ANIMATOR,task,optimized,canonical_prompt,task,covered
+WS-ANIMATOR_task_3,изменить скорость,WS-ANIMATOR,task,optimized,canonical_prompt,task,covered
+WS-ANIMATOR_task_4,выбрать вид,WS-ANIMATOR,task,optimized,canonical_prompt,task,covered
+WS-ANIMATOR_task_5,прочитать truth state,WS-ANIMATOR,task,optimized,canonical_prompt,task,covered
+WS-ANIMATOR_task_6,экспортировать кадр или видео,WS-ANIMATOR,task,optimized,canonical_prompt,task,covered
+WS-ANIMATOR_check_1,artifact pointer существует,WS-ANIMATOR,check,optimized,canonical_prompt,check,covered
+WS-ANIMATOR_check_2,analysis context совместим,WS-ANIMATOR,check,optimized,canonical_prompt,check,covered
+WS-ANIMATOR_check_3,packaging truth complete,WS-ANIMATOR,check,optimized,canonical_prompt,check,covered
+WS-ANIMATOR_check_4,overlay contract разрешен,WS-ANIMATOR,check,optimized,canonical_prompt,check,covered
+WS-ANIMATOR_block_1,pointer missing,WS-ANIMATOR,block,optimized,canonical_prompt,block,covered
+WS-ANIMATOR_block_2,packaging incomplete,WS-ANIMATOR,block,optimized,canonical_prompt,block,covered
+WS-ANIMATOR_block_3,overlay invalid,WS-ANIMATOR,block,optimized,canonical_prompt,block,covered
+WS-ANIMATOR_feedback_1,axis only honesty mode виден,WS-ANIMATOR,feedback,optimized,canonical_prompt,feedback,covered
+WS-ANIMATOR_feedback_2,full truth mode виден,WS-ANIMATOR,feedback,optimized,canonical_prompt,feedback,covered
+WS-ANIMATOR_feedback_3,current vs historical banner виден,WS-ANIMATOR,feedback,optimized,canonical_prompt,feedback,covered
+WS-ANIMATOR_feedback_4,playback time видно,WS-ANIMATOR,feedback,optimized,canonical_prompt,feedback,covered
+WS-ANIMATOR_feedback_5,скорость и источник данных видны,WS-ANIMATOR,feedback,optimized,canonical_prompt,feedback,covered
+WS-ANIMATOR_ctl_1,кнопка пуск,WS-ANIMATOR,control,optimized,canonical_prompt,control,covered
+WS-ANIMATOR_ctl_2,кнопка пауза,WS-ANIMATOR,control,optimized,canonical_prompt,control,covered
+WS-ANIMATOR_ctl_3,ползунок времени,WS-ANIMATOR,control,optimized,canonical_prompt,control,covered
+WS-ANIMATOR_ctl_4,поле скорость,WS-ANIMATOR,control,optimized,canonical_prompt,control,covered
+WS-ANIMATOR_ctl_5,кнопка домой вид,WS-ANIMATOR,control,optimized,canonical_prompt,control,covered
+WS-ANIMATOR_ctl_6,кнопка viewcube,WS-ANIMATOR,control,optimized,canonical_prompt,control,covered
+WS-ANIMATOR_ctl_7,переключатель overlay,WS-ANIMATOR,control,optimized,canonical_prompt,control,covered
+WS-ANIMATOR_ctl_8,кнопка экспорт кадра,WS-ANIMATOR,control,optimized,canonical_prompt,control,covered
+WS-ANIMATOR_ctl_9,кнопка открыть диагностику,WS-ANIMATOR,control,optimized,canonical_prompt,control,covered
+WS-ANIMATOR_field_1,selected analysis context,WS-ANIMATOR,field,optimized,canonical_prompt,field,covered
+WS-ANIMATOR_field_2,truth state,WS-ANIMATOR,field,optimized,canonical_prompt,field,covered
+WS-ANIMATOR_field_3,pointer path,WS-ANIMATOR,field,optimized,canonical_prompt,field,covered
+WS-ANIMATOR_field_4,anim source timestamp,WS-ANIMATOR,field,optimized,canonical_prompt,field,covered
+WS-ANIMATOR_field_5,speed factor,WS-ANIMATOR,field,optimized,canonical_prompt,field,covered
+WS-ANIMATOR_field_6,sampled time s,WS-ANIMATOR,field,optimized,canonical_prompt,field,covered
+WS-ANIMATOR_field_7,packaging contract status,WS-ANIMATOR,field,optimized,canonical_prompt,field,covered
+WS-ANIMATOR_field_8,geometry acceptance state,WS-ANIMATOR,field,optimized,canonical_prompt,field,covered
+WS-ANIMATOR_msg_1,показывается axis only mode,WS-ANIMATOR,message,optimized,canonical_prompt,message,covered
+WS-ANIMATOR_msg_2,packaging truth неполный,WS-ANIMATOR,message,optimized,canonical_prompt,message,covered
+WS-ANIMATOR_msg_3,кадр экспортирован,WS-ANIMATOR,message,optimized,canonical_prompt,message,covered
+cur_anim_home,Окно аниматора,WS-ANIMATOR,current_screen,current,live_repo_evidence,current,covered_partially
+cur_anim_pointer,anim_latest pointer,WS-ANIMATOR,current_panel,current,live_repo_evidence,current,covered_partially
+cur_anim_follow,Режим follow,WS-ANIMATOR,current_panel,current,live_repo_evidence,current,covered_partially
+cur_anim_play,Пуск/пауза,WS-ANIMATOR,current_action,current,live_repo_evidence,current,covered_partially
+cur_anim_truth,Truth-state,WS-ANIMATOR,current_feedback,current,live_repo_evidence,current,covered_partially
+cur_anim_capture,Экспорт кадра,WS-ANIMATOR,current_action,current,live_repo_evidence,current,covered_partially
+task_route_inputs,Основной путь: к исходным данным,CROSS,cross_task,optimized,canonical_prompt,cross,covered
+task_route_ring,Основной путь: к редактору кольца,CROSS,cross_task,optimized,canonical_prompt,cross,covered
+task_route_suite,Основной путь: к набору испытаний,CROSS,cross_task,optimized,canonical_prompt,cross,covered
+task_route_baseline,Основной путь: к базовому прогону,CROSS,cross_task,optimized,canonical_prompt,cross,covered
+task_route_optimization,Основной путь: к оптимизации,CROSS,cross_task,optimized,canonical_prompt,cross,covered
+task_route_analysis,Основной путь: к анализу,CROSS,cross_task,optimized,canonical_prompt,cross,covered
+task_route_animator,Основной путь: к анимации,CROSS,cross_task,optimized,canonical_prompt,cross,covered
+task_route_diagnostics,Основной путь: к диагностике,CROSS,cross_task,optimized,canonical_prompt,cross,covered
+WS-INPUTS_root,Исходные данные,WS-INPUTS,workspace_root,optimized,canonical_prompt,workspace,covered
+WS-INPUTS_tree_entry,Дерево: Исходные данные,WS-INPUTS,tree_entry,optimized,canonical_prompt,tree,covered
+WS-RING_root,Редактор кольца,WS-RING,workspace_root,optimized,canonical_prompt,workspace,covered
+WS-RING_tree_entry,Дерево: Редактор кольца,WS-RING,tree_entry,optimized,canonical_prompt,tree,covered
+WS-OPTIMIZATION_root,Оптимизация,WS-OPTIMIZATION,workspace_root,optimized,canonical_prompt,workspace,covered
+WS-OPTIMIZATION_tree_entry,Дерево: Оптимизация,WS-OPTIMIZATION,tree_entry,optimized,canonical_prompt,tree,covered
+WS-DIAGNOSTICS_root,Диагностика,WS-DIAGNOSTICS,workspace_root,optimized,canonical_prompt,workspace,covered
+WS-DIAGNOSTICS_tree_entry,Дерево: Диагностика,WS-DIAGNOSTICS,tree_entry,optimized,canonical_prompt,tree,covered

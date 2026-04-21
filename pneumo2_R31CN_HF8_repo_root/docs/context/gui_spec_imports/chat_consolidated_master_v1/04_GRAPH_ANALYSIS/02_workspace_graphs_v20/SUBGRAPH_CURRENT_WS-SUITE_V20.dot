@@ -1,0 +1,17 @@
+digraph G {
+rankdir=LR;
+node [shape=box, fontsize=10];
+"cur_suite_home" [label="Список испытаний", style="filled", fillcolor="#dbeafe"];
+"cur_suite_table" [label="Таблица испытаний", style="filled", fillcolor="#f3f4f6"];
+"cur_suite_stage" [label="Колонка стадий", style="filled", fillcolor="#f3f4f6"];
+"cur_suite_validate" [label="Проверка набора", style="filled", fillcolor="#dcfce7"];
+"cur_suite_export" [label="Сохранить набор", style="filled", fillcolor="#dcfce7"];
+"cur_suite_ring_link" [label="Связь со сценариями", style="filled", fillcolor="#fde68a"];
+"cur_suite_ring_link_unknown_internal" [label="Внутренности окна неизвестны: Связь со сценариями", style="filled", fillcolor="#fecaca"];
+"cur_suite_home" -> "cur_suite_table" [label="клик_или_переход"];
+"cur_suite_table" -> "cur_suite_stage" [label="клик_или_переход"];
+"cur_suite_stage" -> "cur_suite_validate" [label="клик_или_переход"];
+"cur_suite_validate" -> "cur_suite_export" [label="клик_или_переход"];
+"cur_suite_export" -> "cur_suite_ring_link" [label="клик_или_переход"];
+"cur_suite_ring_link" -> "cur_suite_ring_link_unknown_internal" [label="открыть_окно"];
+}

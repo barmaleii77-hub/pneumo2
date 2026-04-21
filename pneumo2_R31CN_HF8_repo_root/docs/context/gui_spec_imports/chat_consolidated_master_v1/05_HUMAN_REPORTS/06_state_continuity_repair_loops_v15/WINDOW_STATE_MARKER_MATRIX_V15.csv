@@ -1,0 +1,31 @@
+workspace_id,state_id,primary_marker_text,severity,blocking_mode,primary_action,secondary_action,return_target,preserved_context
+WS-INPUTS,dirty_inputs,Есть несохранённые изменения исходных данных,info,no,Сохранить snapshot,Отменить изменения,WS-INPUTS,selected_group|selected_field|scroll
+WS-INPUTS,invalid_inputs,Есть ошибки в исходных данных,error,yes_for_handoff,Перейти к первому проблемному полю,Открыть пояснение по ошибке,WS-INPUTS,selected_group|selected_field|scroll
+WS-INPUTS,double_springs_enabled,На угол установлены две пружины: контур C1 и контур C2,info,no,Показать схему угла,Открыть параметры пружин угла,WS-INPUTS,selected_corner|selected_spring_family
+WS-INPUTS,spring_leveling_active,Выравнивание кузова пружинами активно,info,no,Показать способ выравнивания,"Показать остаточную разницу после выравнивания, миллиметры",WS-INPUTS,selected_leveling_block
+WS-INPUTS,visual_twin_outdated,Графическое представление не обновлено под текущий ввод,warning,no,Обновить графическое представление,Открыть причины расхождения,WS-INPUTS,selected_group|scroll
+WS-RING,ring_draft_dirty,Редактор кольца содержит несохранённые изменения,info,no,Сохранить черновик кольца,Отменить изменения,WS-RING,selected_segment|selected_view
+WS-RING,seam_invalid,Шов кольца не согласован,error,yes_for_export,Перейти к параметрам сегмента 0 и последнего сегмента,Показать диагностику шва,WS-RING,selected_segment|selected_view
+WS-RING,export_missing,Канонический экспорт сценария отсутствует,warning,yes_for_downstream,Выполнить экспорт сценария,Показать состав обязательных sidecar-файлов,WS-RING,selected_segment|selected_view
+WS-RING,export_stale_by_ring_edit,Экспорт сценария устарел после изменения сегментов,warning,yes_for_downstream,Переэкспортировать сценарий,Сравнить изменения сегментов,WS-RING,selected_segment|selected_view
+WS-RING,export_stale_by_input_context,Экспорт сценария устарел после изменения исходных данных,warning,yes_for_downstream,Пересчитать и переэкспортировать сценарий,Показать upstream-изменения,WS-RING,selected_segment|selected_view
+WS-SUITE,suite_snapshot_missing,Валидированный snapshot набора испытаний отсутствует,warning,yes_for_baseline,Создать валидированный snapshot,Открыть причины невозможности валидации,WS-SUITE,selected_row|active_filter
+WS-SUITE,suite_link_stale,Связь набора испытаний с каноническим сценарием устарела,warning,yes_for_baseline,Перейти в Редактор кольца,Показать затронутые строки испытаний,WS-RING,selected_row|active_filter
+WS-SUITE,context_stale,Исходные данные изменились после подготовки набора испытаний,warning,yes_for_baseline,Пересобрать snapshot набора испытаний,Показать upstream-изменения,WS-SUITE,selected_row|active_filter
+WS-BASELINE,baseline_source_mismatch,Активный baseline собран на другом snapshot или baseline source,warning,yes_for_optimization,Открыть активный baseline contract,Выбрать другой baseline,WS-BASELINE,selected_run|active_filter
+WS-BASELINE,baseline_policy_conflict,Политика baseline конфликтует с текущим режимом обновления,warning,no,Сменить политику baseline,Открыть историю baseline,WS-BASELINE,selected_policy
+WS-BASELINE,history_restore_pending,"Выбран исторический baseline, но он ещё не восстановлен как активный",info,no,Сделать baseline активным,Сравнить с текущим baseline,WS-BASELINE,selected_history_entry
+WS-OPTIMIZATION,objective_contract_mismatch,Текущий run использует другой контракт целевых показателей или hard gate,warning,no,Открыть contract diff,Запустить новый run с текущим контрактом,WS-OPTIMIZATION,selected_run|selected_mode
+WS-OPTIMIZATION,stage_underfill,Стадия не добрала бюджет кандидатов,warning,no,Показать underfill и gate reasons,Открыть policy текущей стадии,WS-OPTIMIZATION,selected_stage|selected_run
+WS-OPTIMIZATION,stage_blocked,Стадия заблокирована hard gate или policy,error,no,Показать причину блокировки,Вернуться к baseline/suite/input,WS-OPTIMIZATION,selected_stage|selected_run
+WS-OPTIMIZATION,staged_progress_stale,Экран показывает устаревший progress относительно CSV/JSON run-артефактов,warning,no,Обновить progress и summary,Показать источник расхождения,WS-OPTIMIZATION,selected_run|selected_stage
+WS-ANALYSIS,historical_context_active,"Открыт исторический run, а не текущий проектный контекст",info,no,Показать provenance run,Переключиться на текущий проектный run,WS-ANALYSIS,selected_run|selected_plot
+WS-ANALYSIS,compare_contract_mismatch,Сравниваются результаты с разным objective/suite/baseline contract,warning,no,Открыть compare contract,Сменить один из контекстов сравнения,WS-ANALYSIS,left_pick|right_pick|selected_plot
+WS-ANALYSIS,result_artifact_missing,Часть артефактов анализа отсутствует,warning,no,Открыть список отсутствующих артефактов,Перейти в Диагностику,WS-DIAGNOSTICS,selected_run|selected_plot
+WS-ANIMATOR,truth_degraded,Аниматор работает в честном условном режиме по неполным данным,warning,no,"Показать, чего не хватает для полного truth-mode",Открыть provenance и source list,WS-ANIMATOR,selected_run|selected_view
+WS-ANIMATOR,current_vs_historical_mismatch,"Открыт исторический контекст, а overlay пытается использовать текущие данные",warning,yes_for_overlay,Отключить текущий overlay,Открыть historical provenance,WS-ANALYSIS,selected_run|selected_view
+WS-ANIMATOR,pointer_stale,Указатель anim_latest или sidecar-файлы устарели,warning,no,Обновить указатель и sidecar,Открыть Diagnostics,WS-DIAGNOSTICS,selected_run|selected_view
+WS-DIAGNOSTICS,bundle_missing,Архив диагностики ещё не собран,info,no,Собрать диагностику,"Показать, что войдёт в архив",WS-DIAGNOSTICS,selected_bundle_config
+WS-DIAGNOSTICS,bundle_stale,Последний архив диагностики устарел относительно проекта или run,warning,no,Пересобрать диагностику,Открыть diff источников,WS-DIAGNOSTICS,selected_bundle_config
+WS-DIAGNOSTICS,helper_runtime_mismatch,Helper runtime не совпадает с ожидаемым окружением,warning,no,Показать interpreter provenance,Повторить selfcheck,WS-DIAGNOSTICS,selected_selfcheck
+WS-DIAGNOSTICS,health_unavailable,Health report недоступен или собран в degraded/fallback режиме,warning,no,Открыть причину unavailable,Собрать archive ещё раз,WS-DIAGNOSTICS,selected_bundle_config

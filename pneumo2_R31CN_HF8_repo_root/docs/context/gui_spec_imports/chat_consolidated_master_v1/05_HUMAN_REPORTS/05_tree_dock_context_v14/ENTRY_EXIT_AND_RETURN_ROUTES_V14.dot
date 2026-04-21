@@ -1,0 +1,57 @@
+digraph G {
+rankdir=LR;
+node [shape=box, style="rounded,filled", fillcolor=white, fontsize=10];
+
+TREE [label="Левое дерево\nfirst-class launcher", fillcolor="#dbeafe"];
+SEARCH [label="Поиск команд", fillcolor="#dbeafe"];
+INSP [label="Правая панель\nсвойств и помощи", fillcolor="#fef3c7"];
+STATUS [label="Нижняя полоса\nстатуса и прогресса", fillcolor="#fef3c7"];
+
+PRJ [label="Панель проекта", fillcolor="#e0f2fe"];
+INP [label="Исходные данные проекта", fillcolor="#dcfce7"];
+RING [label="Редактор кольца", fillcolor="#dcfce7"];
+SUITE [label="Набор испытаний", fillcolor="#dcfce7"];
+BASE [label="Базовый прогон", fillcolor="#dcfce7"];
+AN [label="Анализ результатов", fillcolor="#dcfce7"];
+CMP [label="Подробное сравнение результатов", fillcolor="#f3f4f6"];
+DIAG [label="Диагностика", fillcolor="#f3f4f6"];
+
+TREE -> PRJ [label="открыть проект"];
+TREE -> INP [label="прямое открытие"];
+TREE -> RING [label="прямое открытие"];
+TREE -> SUITE [label="прямое открытие"];
+TREE -> BASE [label="прямое открытие"];
+TREE -> AN [label="прямое открытие"];
+TREE -> CMP [label="прямое открытие advanced compare"];
+TREE -> DIAG [label="прямое открытие диагностики"];
+
+SEARCH -> INP [label="найти и открыть"];
+SEARCH -> SUITE [label="найти и открыть"];
+SEARCH -> CMP [label="найти и открыть"];
+SEARCH -> DIAG [label="найти и открыть"];
+
+INP -> INSP [label="группа/поле/подсказка"];
+INP -> STATUS [label="dirty/validation"];
+INP -> RING [label="сценарная геометрия редактируется не здесь"];
+
+RING -> SUITE [label="saved source-of-truth"];
+SUITE -> INSP [label="row/preview/properties"];
+SUITE -> STATUS [label="validated snapshot / stale state"];
+SUITE -> RING [label="stale link / context stale"];
+SUITE -> BASE [label="после validated snapshot"];
+
+BASE -> AN [label="после baseline run"];
+AN -> CMP [label="нужен advanced compare"];
+AN -> DIAG [label="нужен evidence bundle"];
+CMP -> INSP [label="compare properties/help"];
+CMP -> STATUS [label="mismatch/current-historical"];
+CMP -> AN [label="возврат к анализу"];
+DIAG -> INSP [label="health/provenance/help"];
+DIAG -> STATUS [label="bundle freshness/path"];
+DIAG -> PRJ [label="возврат к обзору проекта"];
+
+CENTER_BAD [label="Запрещённый путь:\nцентр окон / launcher grid", fillcolor="#fee2e2"];
+CENTER_BAD -> DIAG [style=dashed, label="нельзя как первый путь"];
+CENTER_BAD -> CMP [style=dashed, label="нельзя как основной compare"];
+CENTER_BAD -> SUITE [style=dashed, label="нельзя через лишний launcher"];
+}

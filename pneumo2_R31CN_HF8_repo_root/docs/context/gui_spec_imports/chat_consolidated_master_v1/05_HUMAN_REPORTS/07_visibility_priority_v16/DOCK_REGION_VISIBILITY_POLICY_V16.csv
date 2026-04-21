@@ -1,0 +1,9 @@
+region_id,region_type,visibility_policy,main_purpose,canonical_rule,anti_pattern
+left_navigation_tree,dock_widget,Всегда видимый или быстро разворачиваемый,Прямое открытие рабочих пространств и окон,Tree first-class launcher,Не прятать в отдельный центр окон
+right_inspector_help,dock_widget,Контекстно видимый,"Свойства, provenance, help, вторичные детали",Не primary route,"Сюда уводить детали, а не must-see конфликт"
+bottom_status_progress,dock_widget,Всегда видимый тонкий strip,"Ход операций, состояние, playback, сообщения","Низкая высота, без перекрытия центра",Критичные конфликты не только сюда
+message_bar_top,inline_shell_region,Показывать при конфликте/деградации,Global stale/current/historical/truth warnings,Крупнее статус-бара,Должна уметь вести в repair-route
+center_workspace_surface,document/viewport,Всегда главный,Основной контент и primary actions,Максимум площади,Не забивать вторичными панелями
+floating_compare_viewer,top_level_window,Secondary advanced,Подробное сравнение результатов,Прямой вход из дерева допустим,Не competing primary compare
+floating_mnemo,top_level_window,Secondary advanced,Мнемосхема/специализированная визуализация,Прямой вход из дерева допустим,Не на первом плане старта
+floating_tools,top_level_window,Secondary advanced,Инструменты/редкие служебные вещи,Через дерево и поиск команд,Не держать как first-minute surface

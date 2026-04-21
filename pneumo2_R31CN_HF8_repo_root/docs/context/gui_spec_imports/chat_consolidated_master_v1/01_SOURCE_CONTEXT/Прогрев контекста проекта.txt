@@ -1,0 +1,63 @@
+Сделал. Это уже **точечный patch по корню проблемы**, не косметика 🔧
+
+## Что исправлено
+
+### 1) Цилиндры больше не торчат вверх от точки крепления к раме
+Нашёл точную причину: у explicit capped mesh цилиндра была **двойная центровка** перед поворотом в ось `+Y`.  
+Из-за этого весь сегмент смещался **на полдлины мимо mount point**, поэтому корпус реально мог “вылезать” вверх от рамы.
+
+Я это починил:
+- для actuator mesh теперь используется **поворот уже центрированного цилиндра без повторного сдвига**;
+- крепление корпуса снова сидит на frame-eye, а не уезжает выше него.
+
+### 2) Шток теперь видно **внутри прозрачного цилиндра**
+Нашёл вторую причину: rod mesh рисовался только как **наружный участок gland → рычаг**.  
+То есть внутри прозрачного корпуса шток просто обрывался, из-за чего выглядел “отдельно от рычагов”.
+
+Я поменял контракт рендера:
+- rod теперь идёт **от поршня до точки на рычаге**;
+- значит он виден и **внутри прозрачного корпуса**, и снаружи до arm-eye.
+
+### 3) На скорости `1.0` добавил **sub-frame sampling**
+Тут важный вывод: проблема была не в том, что solver/export не дал кадров.  
+В свежем bundle source time step уже около **0.00543 s**, то есть примерно **184.2 Hz**.  
+Проблема была в renderer-side playback: 3D привязывался к **ближайшей integer source row**.
+
+Я добавил:
+- **continuous playhead sampling** для 3D geometry;
+- линейную интерполяцию между соседними source rows по реальному playhead time.
+
+Итог:
+- x1.0 больше не должен выглядеть как “кадров не хватает” из-за snapping;
+- геометрия теперь сэмплится между экспортированными точками, а не прыгает по целым индексам.
+
+## Готовые артефакты
+
+Главное:
+- [Patch pack ZIP](sandbox:/mnt/data/pneumo_cylinder_sampling_patch_r31ao.zip)
+- [Полный patched source ZIP](sandbox:/mnt/data/pneumo_cylinder_sampling_patch_r31ao/PneumoApp_v6_80_R176_R31AO_cylinder_sampling_patch_2026-03-27.zip)
+- [Unified diff](sandbox:/mnt/data/pneumo_cylinder_sampling_patch_r31ao/R31AO_cylinder_sampling_patch.diff)
+
+Разбор и проверка:
+- [Summary](sandbox:/mnt/data/pneumo_cylinder_sampling_patch_r31ao/R31AO_cylinder_sampling_patch_summary.md)
+- [Аудит root cause на свежем SEND bundle](sandbox:/mnt/data/pneumo_cylinder_sampling_patch_r31ao/R31AO_cylinder_orientation_and_sampling_audit.md)
+- [Changed files](sandbox:/mnt/data/pneumo_cylinder_sampling_patch_r31ao/CHANGED_FILES_R31AO_cylinder_sampling_patch.txt)
+- [py_compile log](sandbox:/mnt/data/pneumo_cylinder_sampling_patch_r31ao/R31AO_pyc_compile_log.txt)
+- [targeted pytest log](sandbox:/mnt/data/pneumo_cylinder_sampling_patch_r31ao/R31AO_targeted_pytest_log.txt)
+
+Контрольные суммы:
+- [SHA256 source ZIP](sandbox:/mnt/data/pneumo_cylinder_sampling_patch_r31ao/PneumoApp_v6_80_R176_R31AO_cylinder_sampling_patch_2026-03-27.zip.sha256)
+- [SHA256 patch pack](sandbox:/mnt/data/pneumo_cylinder_sampling_patch_r31ao.zip.sha256)
+
+## Что проверено
+
+- `py_compile`: PASS ✅
+- targeted pytest: **17 passed** ✅
+
+## Честно по статусу
+
+Я **не прогонял этот patch на живом Windows UI** внутри этой среды.  
+То есть кодовый фикс и тестовый gate уже готовы, но финальный вердикт по визуалу должен дать **новый Windows SEND bundle / скрин / видео** на этом patched build.
+
+Следующий жёсткий шаг — прогон именно этого **R31AO** на Windows и проверка трёх вещей разом:  
+**anchoring корпуса**, **видимость штока внутри корпуса**, **smooth x1.0 playback**.

@@ -1,0 +1,11 @@
+workspace,must_be_understood_in_first_5_seconds
+SHELL,"Имя проекта, текущий workspace, одна кнопка диагностики, текущий шаг pipeline, глобальный конфликтный banner при наличии"
+WS-PROJECT,"Следующее рекомендуемое действие, состояние проекта dirty/saved, краткий health/state summary"
+WS-INPUTS,"Активный вариант входов, симметрия, две пружины на угол, режим выравнивания, truth-state графики"
+WS-RING,"Выбранный сегмент, прямо/влево/вправо, длина, высота конца, поперечный уклон, шов если broken"
+WS-SUITE,"Выбранное испытание, первая стадия, enabled, stale-link если есть, validated snapshot status"
+WS-BASELINE,"Активный baseline, источник, автообновление, mismatch если есть"
+WS-OPTIMIZATION,"Активный режим, objective stack, hard gate, текущая стадия/прогресс, underfill/gate preview при наличии"
+WS-ANALYSIS,"Выбранный run, compare mode, mismatch banner, basis и единицы графиков"
+WS-ANIMATOR,"Truth-state, режим цилиндров, playback time/speed, current/historical marker"
+WS-DIAGNOSTICS,"Кнопка «Собрать диагностику», health summary, свежесть последнего bundle, путь и состояние отправки"

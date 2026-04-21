@@ -1,0 +1,21 @@
+digraph G {
+rankdir=LR;
+node [shape=box, fontsize=10];
+"cur_analysis_home" [label="Экран анализа", style="filled", fillcolor="#dbeafe"];
+"cur_analysis_run_picker" [label="Выбор прогона", style="filled", fillcolor="#f3f4f6"];
+"cur_analysis_compare" [label="Сравнение", style="filled", fillcolor="#dcfce7"];
+"cur_analysis_plots" [label="Графики анализа", style="filled", fillcolor="#f3f4f6"];
+"cur_analysis_export" [label="Экспорт отчета", style="filled", fillcolor="#dcfce7"];
+"cur_analysis_anim_entry" [label="Открыть аниматор", style="filled", fillcolor="#fde68a"];
+"cur_analysis_diag_entry" [label="Открыть диагностику", style="filled", fillcolor="#fde68a"];
+"cur_analysis_anim_entry_unknown_internal" [label="Внутренности окна неизвестны: Открыть аниматор", style="filled", fillcolor="#fecaca"];
+"cur_analysis_diag_entry_unknown_internal" [label="Внутренности окна неизвестны: Открыть диагностику", style="filled", fillcolor="#fecaca"];
+"cur_analysis_home" -> "cur_analysis_run_picker" [label="клик_или_переход"];
+"cur_analysis_run_picker" -> "cur_analysis_compare" [label="клик_или_переход"];
+"cur_analysis_compare" -> "cur_analysis_plots" [label="клик_или_переход"];
+"cur_analysis_plots" -> "cur_analysis_export" [label="клик_или_переход"];
+"cur_analysis_export" -> "cur_analysis_anim_entry" [label="клик_или_переход"];
+"cur_analysis_anim_entry" -> "cur_analysis_diag_entry" [label="клик_или_переход"];
+"cur_analysis_anim_entry" -> "cur_analysis_anim_entry_unknown_internal" [label="открыть_окно"];
+"cur_analysis_diag_entry" -> "cur_analysis_diag_entry_unknown_internal" [label="открыть_окно"];
+}

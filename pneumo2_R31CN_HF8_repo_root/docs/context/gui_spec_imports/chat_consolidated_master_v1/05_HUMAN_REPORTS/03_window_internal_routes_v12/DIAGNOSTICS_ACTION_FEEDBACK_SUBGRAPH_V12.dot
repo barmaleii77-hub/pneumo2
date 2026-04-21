@@ -1,0 +1,27 @@
+digraph G {
+  rankdir=LR;
+  node [shape=box, fontsize=10];
+  TREE_DIAGNOSTICS [label="Дерево: Диагностика"];
+  WIN_DIAGNOSTICS [label="Окно: Диагностика"];
+  CARD_HEALTH [label="Карточка: Состояние системы"];
+  CARD_LAST_BUNDLE [label="Карточка: Последний архив диагностики"];
+  BTN_COLLECT [label="Кнопка: Собрать диагностику"];
+  PROGRESS_COLLECT [label="Feedback: Идёт сборка диагностики"];
+  STATE_READY [label="Feedback: Архив готов
+(путь, время, размер, хэш)"];
+  BTN_OPEN_FOLDER [label="Кнопка: Открыть папку"];
+  BTN_COPY_PATH [label="Кнопка: Скопировать путь"];
+  BTN_SEND [label="Кнопка: Отправить архив диагностики
+(secondary)"];
+  STATE_FALLBACK [label="Feedback: Собран fallback bundle"];
+  TREE_DIAGNOSTICS -> WIN_DIAGNOSTICS [label="прямое открытие из дерева"];
+  WIN_DIAGNOSTICS -> CARD_HEALTH;
+  WIN_DIAGNOSTICS -> CARD_LAST_BUNDLE;
+  WIN_DIAGNOSTICS -> BTN_COLLECT [label="primary action"];
+  BTN_COLLECT -> PROGRESS_COLLECT [label="клик"];
+  PROGRESS_COLLECT -> STATE_READY [label="успех"];
+  PROGRESS_COLLECT -> STATE_FALLBACK [label="degraded"];
+  STATE_READY -> BTN_OPEN_FOLDER;
+  STATE_READY -> BTN_COPY_PATH;
+  STATE_READY -> BTN_SEND;
+}
