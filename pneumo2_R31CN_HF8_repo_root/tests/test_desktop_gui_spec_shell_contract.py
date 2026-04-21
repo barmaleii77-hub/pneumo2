@@ -96,6 +96,14 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert commands["optimization.center.open"].route_label == "Окна -> Оптимизация -> Настройка и запуск"
     assert commands["results.center.open"].title == "Анализировать результаты"
     assert commands["results.center.open"].route_label == "Окна -> Анализ результатов -> Графики и проверка"
+    assert commands["results.center.open"].kind == "hosted_action"
+    assert commands["results.center.open"].module is None
+    assert commands["results.center.open"].automation_id == "RS-BTN-OPEN-ANALYTICS"
+    assert commands["results.compare.prepare"].kind == "hosted_action"
+    assert commands["results.evidence.prepare"].kind == "hosted_action"
+    assert commands["results.legacy_center.open"].kind == "launch_module"
+    assert commands["results.legacy_center.open"].module == "pneumo_solver_ui.tools.desktop_results_center"
+    assert commands["results.legacy_center.open"].launch_surface == "legacy_bridge"
     assert commands["baseline.center.open"].kind == "open_workspace"
     assert commands["baseline.center.open"].target_workspace_id == "baseline_run"
     assert commands["baseline.center.open"].automation_id == "BL-BTN-RUN"
@@ -136,7 +144,7 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert commands["test.center.open"].launch_surface == "legacy_bridge"
     assert commands["baseline.center.open"].launch_surface == "workspace"
     assert commands["optimization.center.open"].launch_surface == "workspace"
-    assert commands["results.center.open"].launch_surface == "legacy_bridge"
+    assert commands["results.center.open"].launch_surface == "workspace"
     assert commands["diagnostics.legacy_center.open"].launch_surface == "legacy_bridge"
     assert commands["diagnostics.legacy_center.open"].module == "pneumo_solver_ui.tools.desktop_diagnostics_center"
     assert workspaces["baseline_run"].quick_action_ids[0] == "baseline.run_setup.open"
@@ -149,6 +157,10 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert "workspace.baseline_run.open" in workspaces["optimization"].quick_action_ids
     assert "optimization.center.open" in workspaces["optimization"].quick_action_ids
     assert "optimization.legacy_center.open" not in workspaces["optimization"].quick_action_ids
+    assert "results.center.open" in workspaces["results_analysis"].quick_action_ids
+    assert "results.compare.prepare" in workspaces["results_analysis"].quick_action_ids
+    assert "results.evidence.prepare" in workspaces["results_analysis"].quick_action_ids
+    assert "results.legacy_center.open" not in workspaces["results_analysis"].quick_action_ids
     assert workspaces["overview"].quick_action_ids == (
         "workspace.input_data.open",
         "workspace.ring_editor.open",
@@ -246,6 +258,7 @@ def test_gui_spec_shell_covers_shared_desktop_launch_catalog_without_duplicate_g
     assert "tools.spec_shell.open" in tools_workspace.quick_action_ids
     assert "animation.mnemo.open" in tools_workspace.quick_action_ids
     assert "animation.animator.open" in tools_workspace.quick_action_ids
+    assert "results.legacy_center.open" in tools_workspace.quick_action_ids
     assert "results.compare.open" in tools_workspace.quick_action_ids
 
 

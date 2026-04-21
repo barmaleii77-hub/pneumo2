@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 from typing import Any, Callable, Iterable
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
+from pneumo_solver_ui.desktop_results_runtime import DesktopResultsRuntime
 from pneumo_solver_ui.desktop_suite_runtime import (
     build_desktop_suite_snapshot_context,
     write_desktop_suite_handoff_snapshot,
@@ -38,6 +40,7 @@ from .workspace_runtime import (
     build_optimization_workspace_summary,
     build_results_workspace_summary,
     build_ring_workspace_summary,
+    _operator_result_text,
 )
 from .v19_guidance_widgets import build_v19_action_feedback_box
 from .v16_guidance_widgets import build_v16_visibility_priority_box
@@ -1820,6 +1823,8 @@ class ResultsWorkspacePage(RuntimeWorkspacePage):
         python_executable: str | None = None,
         parent: QtWidgets.QWidget | None = None,
     ) -> None:
+        self.repo_root = Path(repo_root)
+        self.python_executable = python_executable
         super().__init__(
             workspace,
             action_commands,
@@ -1830,6 +1835,274 @@ class ResultsWorkspacePage(RuntimeWorkspacePage):
             ),
             parent,
         )
+        self.setObjectName("WS-ANALYSIS-HOSTED-PAGE")
+
+    def _build_extra_controls(self, layout: QtWidgets.QVBoxLayout) -> None:
+        self.results_analysis_box = QtWidgets.QGroupBox("Анализ результатов и сравнение")
+        self.results_analysis_box.setObjectName("RS-LEADERBOARD")
+        self.results_analysis_box.setFocusPolicy(QtCore.Qt.StrongFocus)
+        analysis_layout = QtWidgets.QVBoxLayout(self.results_analysis_box)
+        analysis_layout.setSpacing(8)
+
+        intro = QtWidgets.QLabel(
+            "Здесь собраны последние результаты, проверки, материалы сравнения и передача в проверку проекта. "
+            "Внешние окна остаются расширенными инструментами, а основной обзор живёт в этом рабочем шаге."
+        )
+        intro.setWordWrap(True)
+        analysis_layout.addWidget(intro)
+
+        self.results_context_label = QtWidgets.QLabel("")
+        self.results_context_label.setObjectName("RS-CONTEXT-SUMMARY")
+        self.results_context_label.setWordWrap(True)
+        self.results_context_label.setStyleSheet("color: #405060;")
+        analysis_layout.addWidget(self.results_context_label)
+
+        self.results_overview_table = QtWidgets.QTableWidget(0, 4)
+        self.results_overview_table.setObjectName("RS-OVERVIEW-TABLE")
+        self.results_overview_table.setHorizontalHeaderLabels(
+            ("Проверка", "Состояние", "Что видно", "Следующий шаг")
+        )
+        self.results_overview_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.results_overview_table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.results_overview_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.results_overview_table.verticalHeader().setVisible(False)
+        self.results_overview_table.horizontalHeader().setStretchLastSection(True)
+        analysis_layout.addWidget(self.results_overview_table)
+
+        self.results_artifacts_table = QtWidgets.QTableWidget(0, 3)
+        self.results_artifacts_table.setObjectName("RS-ARTIFACTS-TABLE")
+        self.results_artifacts_table.setHorizontalHeaderLabels(
+            ("Материал", "Тип", "Файл или папка")
+        )
+        self.results_artifacts_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.results_artifacts_table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.results_artifacts_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.results_artifacts_table.verticalHeader().setVisible(False)
+        self.results_artifacts_table.horizontalHeader().setStretchLastSection(True)
+        analysis_layout.addWidget(self.results_artifacts_table)
+
+        self.results_compare_label = QtWidgets.QLabel("")
+        self.results_compare_label.setObjectName("RS-COMPARE-SUMMARY")
+        self.results_compare_label.setWordWrap(True)
+        analysis_layout.addWidget(self.results_compare_label)
+
+        button_row = QtWidgets.QHBoxLayout()
+        self.results_refresh_button = QtWidgets.QPushButton("Обновить анализ")
+        self.results_refresh_button.setObjectName("RS-BTN-REFRESH")
+        self.results_refresh_button.clicked.connect(self.refresh_view)
+        self.results_prepare_compare_button = QtWidgets.QPushButton("Подготовить сравнение")
+        self.results_prepare_compare_button.setObjectName("RS-BTN-PREPARE-COMPARE")
+        self.results_prepare_compare_button.setToolTip(
+            "Собрать текущий контекст сравнения для выбранных результатов."
+        )
+        self.results_prepare_compare_button.clicked.connect(
+            lambda: self.on_command("results.compare.prepare")
+        )
+        self.results_prepare_evidence_button = QtWidgets.QPushButton("Подготовить материалы проверки")
+        self.results_prepare_evidence_button.setObjectName("RS-BTN-PREPARE-EVIDENCE")
+        self.results_prepare_evidence_button.setToolTip(
+            "Собрать материалы анализа для проверки проекта."
+        )
+        self.results_prepare_evidence_button.clicked.connect(
+            lambda: self.on_command("results.evidence.prepare")
+        )
+        self.results_compare_window_button = QtWidgets.QPushButton("Окно сравнения")
+        self.results_compare_window_button.setObjectName("RS-BTN-OPEN-COMPARE")
+        self.results_compare_window_button.setToolTip(
+            "Открыть отдельное окно сравнения, если нужен подробный графический просмотр."
+        )
+        self.results_compare_window_button.clicked.connect(
+            lambda: self.on_command("results.compare.open")
+        )
+        self.results_advanced_button = QtWidgets.QPushButton("Расширенный анализ")
+        self.results_advanced_button.setObjectName("RS-BTN-ADVANCED")
+        self.results_advanced_button.setToolTip(
+            "Открыть подробный анализ для специальных сценариев."
+        )
+        self.results_advanced_button.clicked.connect(
+            lambda: self.on_command("results.legacy_center.open")
+        )
+        for button in (
+            self.results_refresh_button,
+            self.results_prepare_compare_button,
+            self.results_prepare_evidence_button,
+            self.results_compare_window_button,
+            self.results_advanced_button,
+        ):
+            button_row.addWidget(button)
+        button_row.addStretch(1)
+        analysis_layout.addLayout(button_row)
+
+        self.results_action_label = QtWidgets.QLabel("")
+        self.results_action_label.setObjectName("RS-ACTION-RESULT")
+        self.results_action_label.setWordWrap(True)
+        self.results_action_label.setStyleSheet("color: #576574;")
+        analysis_layout.addWidget(self.results_action_label)
+
+        layout.addWidget(self.results_analysis_box)
+
+    def _results_runtime(self) -> DesktopResultsRuntime:
+        return DesktopResultsRuntime(
+            repo_root=self.repo_root,
+            python_executable=str(self.python_executable or sys.executable),
+        )
+
+    @staticmethod
+    def _status_text(raw: object) -> str:
+        text = " ".join(str(raw or "").replace("_", " ").split()).strip()
+        labels = {
+            "PASS": "норма",
+            "FAIL": "ошибка",
+            "WARN": "предупреждение",
+            "READY": "готово",
+            "MISSING": "нет данных",
+            "BLOCKED": "заблокировано",
+            "CRITICAL": "критично",
+            "PARTIAL": "частично",
+            "INFO": "справка",
+            "CURRENT": "актуально",
+            "HISTORICAL": "исторические данные",
+            "STALE": "устарело",
+            "UNKNOWN": "нет данных",
+        }
+        return labels.get(text.upper(), text.lower() if text else "нет данных")
+
+    @staticmethod
+    def _category_text(raw: object) -> str:
+        text = " ".join(str(raw or "").replace("_", " ").split()).strip().casefold()
+        labels = {
+            "bundle": "архив проекта",
+            "validation": "проверка",
+            "triage": "разбор",
+            "results": "результаты",
+            "anim latest": "анимация",
+            "runs": "прогоны",
+            "evidence": "материалы",
+        }
+        return labels.get(text, text or "материал")
+
+    @staticmethod
+    def _short_text(raw: object, *, fallback: str = "нет данных", limit: int = 96) -> str:
+        text = _operator_result_text(raw)
+        text = " ".join(str(text or "").split()).strip()
+        if not text:
+            return fallback
+        if len(text) <= limit:
+            return text
+        return text[: limit - 1].rstrip() + "…"
+
+    @staticmethod
+    def _path_label(path: Path | None) -> str:
+        if path is None:
+            return "нет файла"
+        if path.is_dir():
+            return "папка найдена"
+        return "файл найден"
+
+    def _refresh_results_controls(self) -> None:
+        if not hasattr(self, "results_analysis_box"):
+            return
+        try:
+            runtime = self._results_runtime()
+            snapshot = runtime.snapshot()
+        except Exception as exc:
+            message = f"Сводка анализа временно недоступна: {exc}"
+            self.results_context_label.setText(message)
+            self.results_compare_label.setText(message)
+            self.results_overview_table.setRowCount(0)
+            self.results_artifacts_table.setRowCount(0)
+            return
+
+        context_state = self._status_text(snapshot.result_context_state)
+        self.results_context_label.setText(
+            f"Результаты расчёта: {context_state}. "
+            f"{self._short_text(snapshot.result_context_banner, fallback='Свежие результаты пока не найдены.')}"
+        )
+
+        rows = tuple(snapshot.validation_overview_rows)
+        self.results_overview_table.setRowCount(len(rows))
+        for row_index, row in enumerate(rows):
+            values = (
+                row.title,
+                self._status_text(row.status),
+                self._short_text(row.detail),
+                self._short_text(row.next_action, fallback="обновить анализ"),
+            )
+            for column, value in enumerate(values):
+                item = QtWidgets.QTableWidgetItem(value)
+                self.results_overview_table.setItem(row_index, column, item)
+        self.results_overview_table.resizeColumnsToContents()
+
+        artifacts = tuple(snapshot.recent_artifacts[:8])
+        self.results_artifacts_table.setRowCount(len(artifacts))
+        for row_index, artifact in enumerate(artifacts):
+            values = (
+                artifact.title,
+                self._category_text(artifact.category),
+                self._path_label(artifact.path),
+            )
+            for column, value in enumerate(values):
+                item = QtWidgets.QTableWidgetItem(value)
+                item.setToolTip(str(artifact.path))
+                self.results_artifacts_table.setItem(row_index, column, item)
+        self.results_artifacts_table.resizeColumnsToContents()
+
+        compare_ready = snapshot.latest_npz_path is not None
+        selected_state = self._status_text(snapshot.selected_run_contract_status)
+        self.results_compare_label.setText(
+            "Сравнение готово - "
+            + ("да" if compare_ready else "нет")
+            + f". Выбранный прогон оптимизации: {selected_state}. "
+            + self._short_text(snapshot.selected_run_contract_banner, fallback="Выберите результат перед сравнением.")
+        )
+        self.results_compare_window_button.setEnabled(compare_ready)
+        self.results_compare_window_button.setToolTip(
+            "Открыть отдельное окно сравнения."
+            if compare_ready
+            else "Сначала нужен файл результата для сравнения."
+        )
+
+    def _activate_results_panel(self, message: str = "") -> None:
+        self._refresh_results_controls()
+        self.results_analysis_box.setFocus(QtCore.Qt.OtherFocusReason)
+        if message:
+            self.results_action_label.setText(message)
+
+    def _prepare_compare_context(self) -> Path:
+        runtime = self._results_runtime()
+        snapshot = runtime.snapshot()
+        path = runtime.write_compare_current_context_sidecar(snapshot)
+        self._refresh_results_controls()
+        self.results_action_label.setText(
+            f"Сравнение подготовлено: {self._path_label(path)}."
+        )
+        return path
+
+    def _prepare_evidence_manifest(self) -> Path:
+        runtime = self._results_runtime()
+        snapshot = runtime.snapshot()
+        path = runtime.write_diagnostics_evidence_manifest(snapshot)
+        self._refresh_results_controls()
+        self.results_action_label.setText(
+            f"Материалы проверки подготовлены: {self._path_label(path)}."
+        )
+        return path
+
+    def refresh_view(self) -> None:
+        super().refresh_view()
+        self._refresh_results_controls()
+
+    def handle_command(self, command_id: str) -> None:
+        if command_id == "results.center.open":
+            self._activate_results_panel(
+                "Анализ результатов открыт в рабочем шаге анализа."
+            )
+            return
+        if command_id == "results.compare.prepare":
+            self._prepare_compare_context()
+            return
+        if command_id == "results.evidence.prepare":
+            self._prepare_evidence_manifest()
 
 
 class DiagnosticsWorkspacePage(RuntimeWorkspacePage):

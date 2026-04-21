@@ -183,6 +183,7 @@ def test_gui_spec_main_window_uses_hosted_pages_for_runtime_and_control_hubs_for
         assert isinstance(window._page_widget_by_workspace_id["optimization"], OptimizationWorkspacePage)
         assert window._page_widget_by_workspace_id["optimization"].objectName() == "WS-OPTIMIZATION-HOSTED-PAGE"
         assert isinstance(window._page_widget_by_workspace_id["results_analysis"], ResultsWorkspacePage)
+        assert window._page_widget_by_workspace_id["results_analysis"].objectName() == "WS-ANALYSIS-HOSTED-PAGE"
         assert isinstance(window._page_widget_by_workspace_id["diagnostics"], DiagnosticsWorkspacePage)
         assert callable(getattr(window._page_widget_by_workspace_id["overview"], "refresh_view", None))
     finally:
@@ -257,6 +258,35 @@ def test_optimization_workspace_page_hosts_primary_launch_controls() -> None:
         app.processEvents()
         assert page.optimization_result_label.text()
         assert "optimization.primary_launch.prepare" in window.recent_command_ids
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_results_workspace_page_hosts_analysis_and_compare_controls() -> None:
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        page = window._page_widget_by_workspace_id["results_analysis"]
+        assert isinstance(page, ResultsWorkspacePage)
+        window.run_command("results.center.open")
+        app.processEvents()
+
+        assert page.results_analysis_box.objectName() == "RS-LEADERBOARD"
+        visible_buttons = {button.text() for button in page.findChildren(QtWidgets.QPushButton)}
+        assert "Обновить анализ" in visible_buttons
+        assert "Подготовить сравнение" in visible_buttons
+        assert "Подготовить материалы проверки" in visible_buttons
+        assert "Расширенный анализ" in visible_buttons
+        assert "Анализ результатов открыт" in page.results_action_label.text()
+        assert page.results_overview_table.columnCount() == 4
+        assert page.results_artifacts_table.columnCount() == 3
+
+        window.run_command("results.evidence.prepare")
+        app.processEvents()
+        assert "Материалы проверки подготовлены" in page.results_action_label.text()
+        assert "results.evidence.prepare" in window.recent_command_ids
     finally:
         window.close()
         window.deleteLater()

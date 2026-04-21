@@ -12,6 +12,7 @@ from pneumo_solver_ui.desktop_spec_shell.workspace_runtime import build_ring_wor
 from pneumo_solver_ui.desktop_spec_shell.workspace_pages import (
     BaselineWorkspacePage,
     OptimizationWorkspacePage,
+    ResultsWorkspacePage,
     RingWorkspacePage,
     SuiteWorkspacePage,
 )
@@ -216,6 +217,33 @@ def test_main_window_routes_optimization_setup_to_hosted_page(tmp_path, monkeypa
         window.run_command("optimization.readiness.check")
         app.processEvents()
         assert "Проверка готовности" in page.optimization_result_label.text()
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_main_window_routes_results_analysis_to_hosted_page(tmp_path, monkeypatch) -> None:
+    settings_path = tmp_path / "desktop_spec_shell_results_state.ini"
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
+
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        window.run_command("results.center.open")
+        app.processEvents()
+
+        assert window._current_workspace_id == "results_analysis"
+        page = window._page_widget_by_workspace_id["results_analysis"]
+        assert isinstance(page, ResultsWorkspacePage)
+        assert page.objectName() == "WS-ANALYSIS-HOSTED-PAGE"
+        assert page.results_analysis_box.objectName() == "RS-LEADERBOARD"
+        assert "Анализ результатов открыт" in page.results_action_label.text()
+        assert "results.center.open" in window.recent_command_ids
+
+        window.run_command("results.compare.prepare")
+        app.processEvents()
+        assert "Сравнение подготовлено" in page.results_action_label.text()
     finally:
         window.close()
         window.deleteLater()
