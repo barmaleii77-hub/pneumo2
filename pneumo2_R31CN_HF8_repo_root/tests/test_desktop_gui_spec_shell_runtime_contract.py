@@ -121,13 +121,18 @@ def test_main_window_hosts_ring_workspace_without_legacy_bridge_surface(tmp_path
     app = _app()
     window = DesktopGuiSpecMainWindow()
     try:
-        window.open_workspace("ring_editor")
+        window.run_command("ring.editor.open")
         app.processEvents()
 
+        assert window._current_workspace_id == "ring_editor"
         page = window._page_widget_by_workspace_id["ring_editor"]
         assert isinstance(page, RingWorkspacePage)
         assert page.objectName() == "WS-RING-HOSTED-PAGE"
+        assert page.ring_editor_box.objectName() == "RG-SEGMENT-LIST"
+        assert page.ring_segment_table.rowCount() > 0
         assert "Циклический сценарий" in page.headline_label.text()
+        assert "Редактор циклического сценария открыт" in page.ring_action_label.text()
+        assert "ring.editor.open" in window.recent_command_ids
         action_ids = tuple(command.command_id for command in page.action_commands)
         assert action_ids == ("ring.editor.open", "workspace.test_matrix.open")
     finally:

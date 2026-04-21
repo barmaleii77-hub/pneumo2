@@ -23,7 +23,8 @@ Status: actionable implementation audit after importing `pneumo_chat_consolidate
 - `diagnostics` is already a hosted workspace. `diagnostics.collect_bundle`, `diagnostics.verify_bundle` and `diagnostics.send_results` are hosted actions, while `diagnostics.legacy_center.open` remains a fallback.
 - `input_data` now has a hosted editable parameter table. `input.editor.open` is routed through `InputWorkspacePage`, while `input.legacy_editor.open` remains an explicit fallback for the old detailed editor.
 - `baseline_run` has hosted run setup, readiness check and review/adopt/restore surfaces. The old `desktop_run_setup_center` remains available as an explicit advanced fallback command.
-- `ring_editor` and `test_matrix` are hosted workspace surfaces with legacy fallback commands for detailed tools.
+- `ring_editor` now has a hosted segment-editing surface. `ring.editor.open` is routed through `RingWorkspacePage`, while `ring.legacy_editor.open` remains an explicit fallback for the old detailed ring editor.
+- `test_matrix` is a hosted workspace surface with the legacy test center kept as a fallback command.
 - `optimization` now has a hosted primary setup/readiness surface. The old `desktop_optimizer_center` remains available as an explicit advanced fallback command.
 - `results_analysis` now has a hosted analysis/compare preparation surface. The old `desktop_results_center` remains available as an explicit advanced fallback command.
 - `animation` now has a hosted route-aware animation/mnemo readiness hub. The separate Animator and Mnemo windows remain available as explicit advanced fallback commands.
@@ -57,8 +58,9 @@ The second implementation change starts the route-critical migration after the o
 - `ring_editor.launch_surface` is now `workspace`, so the canonical shell treats WS-RING as a hosted route surface.
 - `DesktopGuiSpecMainWindow` creates `RingWorkspacePage` for `ring_editor` instead of falling through to the generic bridge/control hub.
 - The new WS-RING page reads state through `desktop_ring_editor_model` and `desktop_ring_editor_runtime`, then shows source-of-truth, segment/event counts, ring length/time, seam/closure status, validation status and the next route.
-- `ring.editor.open` remains a legacy fallback command for detailed editing; it is no longer the only visible implementation of the workspace.
-- The ring workspace quick actions are now the fallback editor plus the route-forward handoff to `workspace.test_matrix.open`.
+- `ring.editor.open` is now the hosted active action: it opens the native segment table, supports segment add/duplicate/delete, editable duration/speed/turn/road columns, seam check and source save.
+- `ring.legacy_editor.open` keeps the old detailed editor available as an explicit advanced fallback command.
+- The ring workspace quick actions are now the hosted editor plus the route-forward handoff to `workspace.test_matrix.open`.
 
 ## Follow-Up Applied: Hosted WS-SUITE
 
@@ -116,32 +118,34 @@ The seventh implementation change makes animation a first-class route step inste
 
 | Gap | Master V1 source | Current state | Next action |
 | --- | --- | --- | --- |
-| Ring editor must dominate as step 2 | V21 `CUR-RING-NOT-DOMINANT`, V20/V19 ring graphs, V13 ring migration | hosted summary/control surface; legacy editor fallback remains | expand WS-RING from control surface to native editor once source mutation rules are ready |
+| Ring editor must dominate as step 2 | V21 `CUR-RING-NOT-DOMINANT`, V20/V19 ring graphs, V13 ring migration | hosted segment-editing surface; legacy editor fallback remains | extend native WS-RING with advanced road/event editors when those panels are safe to re-host |
 | Suite must read as consumer after ring | V21 `CUR-WIN-SUITE`, V20 `WS-SUITE` graph | hosted table/check/snapshot surface; legacy test center fallback remains | expand native suite editing beyond enable/check/save once mutation rules are ready |
 | Baseline setup must not be a side launcher | V20 `WS-BASELINE`, route cost scenarios | setup/readiness hosted; actual heavy run execution still delegated to advanced center | wire native execution once subprocess contract is isolated from Tk editor state |
 | Optimization needs one primary route | V21 `CUR-SHELL-OPT-PAGE`, V17 path-cost data | setup/readiness hosted; heavy execution remains in advanced optimizer center | wire native execution once launch subprocess state is separated from the detailed optimizer center |
 | Analysis compare must be primary inside analysis | V21 `CUR-WIN-COMPARE` | analysis/compare preparation hosted; detailed plots still delegated to advanced windows | wire native compare chart/table once plotting state is separated from external viewers |
 | Animation is route-visible but still external | V20 `WS-ANIMATOR` | route-aware readiness hub hosted; detailed graphics still delegated to advanced windows | re-host core scene controls once the graphics runtime exposes a safe embedded surface |
-| Ring and suite mutation depth is still partial | V21 route dominance notes, V20 workspace graphs | input editing is now hosted; ring and suite still keep detailed mutation in fallback windows | apply the same hosted-first pattern to ring segment editing and suite row/detail mutation |
+| Ring and suite mutation depth is still partial | V21 route dominance notes, V20 workspace graphs | input editing and ring segment editing are now hosted; suite still keeps detailed mutation in fallback windows | apply the same hosted-first pattern to suite row/detail mutation |
 
 ## Next Implementation Order
 
 1. Finish route-first overview hardening and keep tests that prevent legacy/external launchpoints from returning to the overview quick-action row.
-2. Implement hosted `WS-RING` as the next route-critical workspace. Done as hosted summary/control surface.
+2. Implement hosted `WS-RING` as the next route-critical workspace. Done as hosted segment-editing surface; advanced road/event panels remain fallback.
 3. Implement hosted `WS-SUITE` as consumer of the ring/source snapshot. Done as hosted table/check/snapshot surface.
 4. Move baseline run setup into hosted `WS-BASELINE`. Done as hosted setup/readiness surface; native execution wiring remains next.
 5. Move StageRunner-first optimization controls into hosted `WS-OPTIMIZATION`. Done as hosted setup/readiness surface; native execution wiring remains next.
 6. Move latest results and primary compare summary into hosted `WS-ANALYSIS`. Done as hosted analysis/compare-preparation surface; native plots remain next.
 7. Convert `WS-ANIMATOR` from external-window hub to hosted control hub. Done as hosted readiness hub; full scene/mnemo re-host remains next.
-8. Continue removing legacy primary actions from route-critical workspaces. Started with hosted `WS-INPUTS` editing; next candidates are native WS-RING mutation and native WS-SUITE detail editing.
+8. Continue removing legacy primary actions from route-critical workspaces. `WS-INPUTS` editing and `WS-RING` segment editing are hosted; next candidate is native WS-SUITE detail editing.
 
 ## Validation Added
 
 - `tests/test_desktop_gui_spec_shell_contract.py` now asserts that overview quick actions are workspace-only.
 - The same test asserts that overview result and diagnostics cards open workspaces, not legacy/action commands.
 - Existing diagnostics hosted tests remain responsible for proving that `diagnostics.collect_bundle` still works from the diagnostics lane and global command routing.
-- `tests/test_desktop_gui_spec_shell_contract.py` now asserts that WS-RING is a hosted workspace while `ring.editor.open` remains a legacy fallback.
+- `tests/test_desktop_gui_spec_shell_contract.py` now asserts that WS-RING is a hosted workspace and its active editor command is hosted.
 - `tests/test_desktop_gui_spec_shell_runtime_contract.py` now opens `ring_editor` offscreen and verifies that the shell hosts `RingWorkspacePage`.
+- `tests/test_desktop_gui_spec_shell_contract.py` now asserts that `ring.editor.open` is hosted while `ring.legacy_editor.open` remains the fallback launch command.
+- `tests/test_desktop_gui_spec_shell_runtime_contract.py` and `tests/test_desktop_gui_spec_workspace_pages_contract.py` now verify the hosted ring segment table, object names and command routing.
 - `tests/test_desktop_gui_spec_shell_contract.py` now asserts that WS-SUITE is a hosted workspace while `test.center.open` remains a legacy fallback.
 - `tests/test_desktop_gui_spec_shell_runtime_contract.py` and `tests/test_desktop_gui_spec_workspace_pages_contract.py` now verify the hosted suite page, route-forward baseline action and advanced fallback action.
 - `tests/test_desktop_gui_spec_shell_contract.py` now asserts that baseline setup is hosted while `baseline.legacy_run_setup.open` remains the advanced fallback.

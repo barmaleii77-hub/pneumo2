@@ -179,6 +179,7 @@ def test_gui_spec_main_window_uses_hosted_pages_for_runtime_and_control_hubs_for
         assert isinstance(window._page_widget_by_workspace_id["input_data"], InputWorkspacePage)
         assert window._page_widget_by_workspace_id["input_data"].objectName() == "WS-INPUTS-HOSTED-PAGE"
         assert isinstance(window._page_widget_by_workspace_id["ring_editor"], RingWorkspacePage)
+        assert window._page_widget_by_workspace_id["ring_editor"].objectName() == "WS-RING-HOSTED-PAGE"
         assert isinstance(window._page_widget_by_workspace_id["test_matrix"], SuiteWorkspacePage)
         assert isinstance(window._page_widget_by_workspace_id["animation"], AnimationWorkspacePage)
         assert window._page_widget_by_workspace_id["animation"].objectName() == "WS-ANIMATOR-HOSTED-PAGE"
@@ -453,6 +454,30 @@ def test_hosted_input_workspace_page_keeps_runtime_summary_and_route_actions() -
         visible_buttons = {button.text() for button in page.findChildren(QtWidgets.QPushButton)}
         assert "Сохранить рабочую копию" in visible_buttons
         assert "Зафиксировать снимок для маршрута" in visible_buttons
+        assert "Расширенный редактор" in visible_buttons
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_ring_workspace_page_hosts_segment_editor_controls() -> None:
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        page = window._page_widget_by_workspace_id["ring_editor"]
+        assert isinstance(page, RingWorkspacePage)
+        window.run_command("ring.editor.open")
+        app.processEvents()
+
+        assert page.ring_editor_box.objectName() == "RG-SEGMENT-LIST"
+        assert page.ring_segment_table.columnCount() == 7
+        assert page.ring_segment_table.rowCount() > 0
+        visible_buttons = {button.text() for button in page.findChildren(QtWidgets.QPushButton)}
+        assert "Добавить сегмент" in visible_buttons
+        assert "Дублировать сегмент" in visible_buttons
+        assert "Сохранить сценарий" in visible_buttons
+        assert "Проверить шов" in visible_buttons
         assert "Расширенный редактор" in visible_buttons
     finally:
         window.close()

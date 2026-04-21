@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import sys
+import copy
 from typing import Any, Callable, Iterable
 
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -14,6 +15,20 @@ from pneumo_solver_ui.desktop_input_model import (
     save_base_payload,
     save_desktop_inputs_snapshot,
 )
+from pneumo_solver_ui.desktop_ring_editor_model import (
+    ROAD_MODES,
+    TURN_DIRECTIONS,
+    build_blank_segment,
+    build_segment_flow_rows,
+    clone_segment,
+    ensure_road_defaults,
+    get_segments,
+    normalize_spec,
+    safe_float,
+    safe_int,
+    save_spec_to_path,
+)
+from pneumo_solver_ui.desktop_ring_editor_runtime import build_ring_editor_diagnostics
 from pneumo_solver_ui.desktop_results_runtime import DesktopResultsRuntime
 from pneumo_solver_ui.desktop_suite_runtime import (
     build_desktop_suite_snapshot_context,
@@ -48,6 +63,7 @@ from .workspace_runtime import (
     build_optimization_workspace_summary,
     build_results_workspace_summary,
     build_ring_workspace_summary,
+    _load_ring_spec_for_workspace,
     _operator_result_text,
 )
 from .v19_guidance_widgets import build_v19_action_feedback_box
@@ -1712,6 +1728,12 @@ class RingWorkspacePage(RuntimeWorkspacePage):
         python_executable: str | None = None,
         parent: QtWidgets.QWidget | None = None,
     ) -> None:
+        self.repo_root = Path(repo_root)
+        self.python_executable = python_executable
+        self._ring_spec: dict[str, Any] = {}
+        self._ring_source_path: Path | None = None
+        self._refreshing_ring_table = False
+        self._ring_dirty = False
         super().__init__(
             workspace,
             action_commands,
@@ -1723,6 +1745,291 @@ class RingWorkspacePage(RuntimeWorkspacePage):
             parent,
         )
         self.setObjectName("WS-RING-HOSTED-PAGE")
+
+    def _build_extra_controls(self, layout: QtWidgets.QVBoxLayout) -> None:
+        self.ring_editor_box = QtWidgets.QGroupBox("Сегменты циклического сценария")
+        self.ring_editor_box.setObjectName("RG-SEGMENT-LIST")
+        self.ring_editor_box.setFocusPolicy(QtCore.Qt.StrongFocus)
+        editor_layout = QtWidgets.QVBoxLayout(self.ring_editor_box)
+        editor_layout.setSpacing(8)
+
+        intro = QtWidgets.QLabel(
+            "Здесь редактируется основной сценарий кольца: сегменты, длительность, скорость, профиль дороги и события. "
+            "После проверки сохраните сценарий и переходите к набору испытаний."
+        )
+        intro.setWordWrap(True)
+        editor_layout.addWidget(intro)
+
+        self.ring_source_label = QtWidgets.QLabel("")
+        self.ring_source_label.setObjectName("RG-SOURCE-LABEL")
+        self.ring_source_label.setWordWrap(True)
+        self.ring_source_label.setStyleSheet("color: #405060;")
+        editor_layout.addWidget(self.ring_source_label)
+
+        self.ring_segment_table = QtWidgets.QTableWidget(0, 7)
+        self.ring_segment_table.setObjectName("RG-SEGMENT-TABLE")
+        self.ring_segment_table.setHorizontalHeaderLabels(
+            ("#", "Сегмент", "Длительность, с", "Скорость выхода, км/ч", "Манёвр", "Профиль дороги", "События")
+        )
+        self.ring_segment_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.ring_segment_table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.ring_segment_table.setEditTriggers(
+            QtWidgets.QAbstractItemView.DoubleClicked
+            | QtWidgets.QAbstractItemView.EditKeyPressed
+            | QtWidgets.QAbstractItemView.SelectedClicked
+        )
+        self.ring_segment_table.verticalHeader().setVisible(False)
+        self.ring_segment_table.horizontalHeader().setStretchLastSection(True)
+        self.ring_segment_table.itemChanged.connect(self._on_ring_item_changed)
+        editor_layout.addWidget(self.ring_segment_table)
+
+        actions = QtWidgets.QHBoxLayout()
+        self.ring_refresh_button = QtWidgets.QPushButton("Обновить сценарий")
+        self.ring_refresh_button.setObjectName("RG-BTN-REFRESH")
+        self.ring_refresh_button.clicked.connect(self._refresh_ring_editor_controls)
+        actions.addWidget(self.ring_refresh_button)
+
+        self.ring_add_button = QtWidgets.QPushButton("Добавить сегмент")
+        self.ring_add_button.setObjectName("RG-BTN-ADD-SEGMENT")
+        self.ring_add_button.clicked.connect(self._add_ring_segment)
+        actions.addWidget(self.ring_add_button)
+
+        self.ring_dup_button = QtWidgets.QPushButton("Дублировать сегмент")
+        self.ring_dup_button.setObjectName("RG-BTN-DUP-SEGMENT")
+        self.ring_dup_button.clicked.connect(self._duplicate_ring_segment)
+        actions.addWidget(self.ring_dup_button)
+
+        self.ring_delete_button = QtWidgets.QPushButton("Удалить сегмент")
+        self.ring_delete_button.setObjectName("RG-BTN-DELETE-SEGMENT")
+        self.ring_delete_button.clicked.connect(self._delete_ring_segment)
+        actions.addWidget(self.ring_delete_button)
+
+        self.ring_save_button = QtWidgets.QPushButton("Сохранить сценарий")
+        self.ring_save_button.setObjectName("RG-BTN-SAVE-SOURCE")
+        self.ring_save_button.clicked.connect(self._save_ring_source)
+        actions.addWidget(self.ring_save_button)
+
+        self.ring_check_button = QtWidgets.QPushButton("Проверить шов")
+        self.ring_check_button.setObjectName("RG-SEAM-DIAGNOSTICS")
+        self.ring_check_button.clicked.connect(self._check_ring_source)
+        actions.addWidget(self.ring_check_button)
+        editor_layout.addLayout(actions)
+
+        route_actions = QtWidgets.QHBoxLayout()
+        self.ring_to_suite_button = QtWidgets.QPushButton("Перейти к набору испытаний")
+        self.ring_to_suite_button.setObjectName("RG-BTN-ADD-TO-SUITE")
+        self.ring_to_suite_button.clicked.connect(
+            lambda _checked=False: self.on_command("workspace.test_matrix.open")
+        )
+        route_actions.addWidget(self.ring_to_suite_button)
+
+        self.ring_advanced_button = QtWidgets.QPushButton("Расширенный редактор")
+        self.ring_advanced_button.setObjectName("RG-BTN-LEGACY-EDITOR")
+        self.ring_advanced_button.clicked.connect(
+            lambda _checked=False: self.on_command("ring.legacy_editor.open")
+        )
+        route_actions.addWidget(self.ring_advanced_button)
+        editor_layout.addLayout(route_actions)
+
+        self.ring_action_label = QtWidgets.QLabel("")
+        self.ring_action_label.setObjectName("RG-ACTION-RESULT")
+        self.ring_action_label.setWordWrap(True)
+        self.ring_action_label.setStyleSheet("color: #576574;")
+        editor_layout.addWidget(self.ring_action_label)
+
+        layout.addWidget(self.ring_editor_box)
+
+    def refresh_view(self) -> None:
+        super().refresh_view()
+        self._refresh_ring_editor_controls()
+
+    def _default_ring_source_path(self) -> Path:
+        return self.repo_root / "pneumo_solver_ui" / "workspace" / "ring_source_of_truth.json"
+
+    def _load_ring_spec(self) -> None:
+        spec, source_path, _source_kind = _load_ring_spec_for_workspace(self.repo_root)
+        self._ring_spec = normalize_spec(spec)
+        self._ring_source_path = source_path if source_path is not None else self._default_ring_source_path()
+        self._ring_dirty = False
+
+    def _selected_ring_row(self) -> int:
+        selected = self.ring_segment_table.selectionModel().selectedRows()
+        if not selected:
+            return max(0, self.ring_segment_table.currentRow())
+        return int(selected[0].row())
+
+    def _ring_segments(self) -> list[dict[str, Any]]:
+        return get_segments(self._ring_spec)
+
+    def _ring_table_item(
+        self,
+        row: int,
+        column: int,
+        text: str,
+        *,
+        editable: bool = False,
+    ) -> None:
+        item = QtWidgets.QTableWidgetItem(text)
+        flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled
+        if editable:
+            flags |= QtCore.Qt.ItemIsEditable
+        item.setFlags(flags)
+        self.ring_segment_table.setItem(row, column, item)
+
+    def _refresh_ring_editor_controls(self) -> None:
+        if not hasattr(self, "ring_segment_table"):
+            return
+        self._refreshing_ring_table = True
+        try:
+            self._load_ring_spec()
+            rows = build_segment_flow_rows(self._ring_spec)
+            diagnostics = build_ring_editor_diagnostics(self._ring_spec)
+            self.ring_source_label.setText(
+                f"Основной файл сценария: {self._ring_source_path}. Ошибки проверки {len(diagnostics.errors)}; предупреждения {len(diagnostics.warnings)}."
+            )
+            self.ring_segment_table.setRowCount(len(rows))
+            for row_index, row in enumerate(rows):
+                self._ring_table_item(row_index, 0, str(row_index + 1))
+                self._ring_table_item(row_index, 1, str(row.get("name") or f"S{row_index + 1}"), editable=True)
+                self._ring_table_item(row_index, 2, f"{float(row.get('duration_s', 0.0) or 0.0):.3f}", editable=True)
+                self._ring_table_item(row_index, 3, f"{float(row.get('speed_end_kph', 0.0) or 0.0):.2f}", editable=True)
+                self._ring_table_item(row_index, 4, str(row.get("turn_direction") or "STRAIGHT"), editable=True)
+                self._ring_table_item(row_index, 5, str(row.get("road_mode") or "ISO8608"), editable=True)
+                self._ring_table_item(row_index, 6, str(int(row.get("event_count", 0) or 0)))
+            self.ring_segment_table.resizeColumnsToContents()
+        except Exception as exc:
+            self.ring_segment_table.setRowCount(0)
+            self.ring_action_label.setText(f"Не удалось прочитать циклический сценарий: {exc}")
+        finally:
+            self._refreshing_ring_table = False
+
+    def _apply_ring_table_to_spec(self) -> dict[str, Any]:
+        spec = normalize_spec(copy.deepcopy(self._ring_spec))
+        segments = get_segments(spec)
+        for row_index in range(min(self.ring_segment_table.rowCount(), len(segments))):
+            segment = segments[row_index]
+            name_item = self.ring_segment_table.item(row_index, 1)
+            duration_item = self.ring_segment_table.item(row_index, 2)
+            speed_item = self.ring_segment_table.item(row_index, 3)
+            turn_item = self.ring_segment_table.item(row_index, 4)
+            road_item = self.ring_segment_table.item(row_index, 5)
+            if name_item is not None:
+                segment["name"] = " ".join(name_item.text().split()) or f"S{row_index + 1}"
+            if duration_item is not None:
+                segment["duration_s"] = max(0.05, safe_float(duration_item.text().replace(",", "."), segment.get("duration_s", 3.0)))
+            if speed_item is not None:
+                segment["speed_end_kph"] = max(0.0, safe_float(speed_item.text().replace(",", "."), segment.get("speed_end_kph", 40.0)))
+            if turn_item is not None:
+                turn = str(turn_item.text() or "").strip().upper()
+                segment["turn_direction"] = turn if turn in TURN_DIRECTIONS else str(segment.get("turn_direction") or "STRAIGHT")
+            road = ensure_road_defaults(segment)
+            if road_item is not None:
+                mode = str(road_item.text() or "").strip().upper()
+                road["mode"] = mode if mode in ROAD_MODES else str(road.get("mode") or "ISO8608")
+                segment["road"] = ensure_road_defaults(segment)
+        spec["segments"] = segments
+        return normalize_spec(spec)
+
+    def _mark_ring_dirty(self, message: str) -> None:
+        self._ring_dirty = True
+        self.ring_action_label.setText(message)
+
+    def _on_ring_item_changed(self, item: QtWidgets.QTableWidgetItem) -> None:
+        if self._refreshing_ring_table or item.column() not in {1, 2, 3, 4, 5}:
+            return
+        self._mark_ring_dirty(
+            "Есть несохранённые изменения в сценарии. Сохраните основной файл перед переходом к набору испытаний."
+        )
+
+    def _add_ring_segment(self) -> None:
+        self._ring_spec = self._apply_ring_table_to_spec()
+        segments = self._ring_segments()
+        insert_at = min(max(0, self._selected_ring_row()) + 1, len(segments))
+        segments.insert(insert_at, build_blank_segment(seed=safe_int(self._ring_spec.get("seed", 123), 123)))
+        self._mark_ring_dirty("Добавлен новый сегмент. Проверьте длительность, скорость и профиль дороги.")
+        self._render_current_ring_spec(selected_row=insert_at)
+
+    def _duplicate_ring_segment(self) -> None:
+        self._ring_spec = self._apply_ring_table_to_spec()
+        segments = self._ring_segments()
+        if not segments:
+            self._add_ring_segment()
+            return
+        source_index = min(max(0, self._selected_ring_row()), len(segments) - 1)
+        segments.insert(source_index + 1, clone_segment(segments[source_index]))
+        self._mark_ring_dirty("Сегмент продублирован. Сохраните сценарий после проверки.")
+        self._render_current_ring_spec(selected_row=source_index + 1)
+
+    def _delete_ring_segment(self) -> None:
+        self._ring_spec = self._apply_ring_table_to_spec()
+        segments = self._ring_segments()
+        if len(segments) <= 1:
+            self.ring_action_label.setText("В циклическом сценарии должен остаться хотя бы один сегмент.")
+            return
+        delete_at = min(max(0, self._selected_ring_row()), len(segments) - 1)
+        segments.pop(delete_at)
+        self._mark_ring_dirty("Сегмент удалён. Сохраните сценарий после проверки маршрута.")
+        self._render_current_ring_spec(selected_row=max(0, delete_at - 1))
+
+    def _render_current_ring_spec(self, *, selected_row: int = 0) -> None:
+        self._refreshing_ring_table = True
+        try:
+            rows = build_segment_flow_rows(self._ring_spec)
+            self.ring_segment_table.setRowCount(len(rows))
+            for row_index, row in enumerate(rows):
+                self._ring_table_item(row_index, 0, str(row_index + 1))
+                self._ring_table_item(row_index, 1, str(row.get("name") or f"S{row_index + 1}"), editable=True)
+                self._ring_table_item(row_index, 2, f"{float(row.get('duration_s', 0.0) or 0.0):.3f}", editable=True)
+                self._ring_table_item(row_index, 3, f"{float(row.get('speed_end_kph', 0.0) or 0.0):.2f}", editable=True)
+                self._ring_table_item(row_index, 4, str(row.get("turn_direction") or "STRAIGHT"), editable=True)
+                self._ring_table_item(row_index, 5, str(row.get("road_mode") or "ISO8608"), editable=True)
+                self._ring_table_item(row_index, 6, str(int(row.get("event_count", 0) or 0)))
+            self.ring_segment_table.resizeColumnsToContents()
+            if rows:
+                self.ring_segment_table.selectRow(min(max(0, selected_row), len(rows) - 1))
+        finally:
+            self._refreshing_ring_table = False
+
+    def _save_ring_source(self) -> None:
+        try:
+            self._ring_spec = self._apply_ring_table_to_spec()
+            target = self._ring_source_path or self._default_ring_source_path()
+            target.parent.mkdir(parents=True, exist_ok=True)
+            saved = save_spec_to_path(self._ring_spec, target)
+            self._ring_source_path = saved
+            self._ring_dirty = False
+            diagnostics = build_ring_editor_diagnostics(self._ring_spec)
+            self.ring_action_label.setText(
+                f"Сценарий сохранён: {saved}. Ошибки проверки {len(diagnostics.errors)}; предупреждения {len(diagnostics.warnings)}."
+            )
+            self.refresh_view()
+        except Exception as exc:
+            self.ring_action_label.setText(f"Не удалось сохранить циклический сценарий: {exc}")
+
+    def _check_ring_source(self) -> None:
+        try:
+            spec = self._apply_ring_table_to_spec()
+            diagnostics = build_ring_editor_diagnostics(spec)
+            if diagnostics.errors:
+                self.ring_action_label.setText(f"Проверка шва: есть ошибки: {diagnostics.errors[0]}")
+                return
+            if diagnostics.warnings:
+                self.ring_action_label.setText(f"Проверка шва: есть предупреждения: {diagnostics.warnings[0]}")
+                return
+            metrics = diagnostics.metrics
+            self.ring_action_label.setText(
+                f"Проверка шва пройдена. Длина круга {float(metrics.get('ring_length_m', 0.0) or 0.0):.2f} м; максимальный шов {float(metrics.get('seam_max_mm', 0.0) or 0.0):.2f} мм."
+            )
+        except Exception as exc:
+            self.ring_action_label.setText(f"Не удалось проверить циклический сценарий: {exc}")
+
+    def handle_command(self, command_id: str) -> None:
+        if command_id == "ring.editor.open":
+            self._refresh_ring_editor_controls()
+            self.ring_editor_box.setFocus(QtCore.Qt.OtherFocusReason)
+            self.ring_action_label.setText(
+                "Редактор циклического сценария открыт в рабочем шаге. Измените сегменты, сохраните основной файл и переходите к набору испытаний."
+            )
 
 
 class OptimizationWorkspacePage(RuntimeWorkspacePage):

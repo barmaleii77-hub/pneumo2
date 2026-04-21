@@ -99,6 +99,13 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert commands["input.legacy_editor.open"].kind == "launch_module"
     assert commands["input.legacy_editor.open"].module == "pneumo_solver_ui.tools.desktop_input_editor"
     assert commands["input.legacy_editor.open"].launch_surface == "legacy_bridge"
+    assert commands["ring.editor.open"].kind == "hosted_action"
+    assert commands["ring.editor.open"].module is None
+    assert commands["ring.editor.open"].launch_surface == "workspace"
+    assert commands["ring.editor.open"].automation_id == "RG-SEGMENT-LIST"
+    assert commands["ring.legacy_editor.open"].kind == "launch_module"
+    assert commands["ring.legacy_editor.open"].module == "pneumo_solver_ui.tools.desktop_ring_scenario_editor"
+    assert commands["ring.legacy_editor.open"].launch_surface == "legacy_bridge"
     assert commands["optimization.center.open"].title == "Настроить оптимизацию"
     assert commands["optimization.center.open"].route_label == "Окна -> Оптимизация -> Настройка и запуск"
     assert commands["results.center.open"].title == "Анализировать результаты"
@@ -158,7 +165,6 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert commands["workspace.ring_editor.open"].target_workspace_id == "ring_editor"
     assert commands["workspace.test_matrix.open"].kind == "open_workspace"
     assert commands["workspace.test_matrix.open"].target_workspace_id == "test_matrix"
-    assert commands["ring.editor.open"].launch_surface == "legacy_bridge"
     assert commands["test.center.open"].launch_surface == "legacy_bridge"
     assert commands["baseline.center.open"].launch_surface == "workspace"
     assert commands["optimization.center.open"].launch_surface == "workspace"
@@ -167,6 +173,8 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert commands["diagnostics.legacy_center.open"].module == "pneumo_solver_ui.tools.desktop_diagnostics_center"
     assert workspaces["input_data"].quick_action_ids[0] == "input.editor.open"
     assert "input.legacy_editor.open" not in workspaces["input_data"].quick_action_ids
+    assert workspaces["ring_editor"].quick_action_ids[0] == "ring.editor.open"
+    assert "ring.legacy_editor.open" not in workspaces["ring_editor"].quick_action_ids
     assert workspaces["baseline_run"].quick_action_ids[0] == "baseline.run_setup.open"
     assert "baseline.review" in workspaces["baseline_run"].quick_action_ids
     assert "baseline.adopt" in workspaces["baseline_run"].quick_action_ids
@@ -283,6 +291,8 @@ def test_gui_spec_shell_covers_shared_desktop_launch_catalog_without_duplicate_g
     assert "tools.spec_shell.open" in tools_workspace.quick_action_ids
     assert "input.legacy_editor.open" in tools_workspace.quick_action_ids
     assert "input.editor.open" not in tools_workspace.quick_action_ids
+    assert "ring.legacy_editor.open" in tools_workspace.quick_action_ids
+    assert "ring.editor.open" not in tools_workspace.quick_action_ids
     assert "animation.legacy_mnemo.open" in tools_workspace.quick_action_ids
     assert "animation.legacy_animator.open" in tools_workspace.quick_action_ids
     assert "results.legacy_center.open" in tools_workspace.quick_action_ids
