@@ -1,0 +1,9 @@
+state_id,source_of_truth,what_changed,user_visible_statement,repair_policy
+dirty_inputs,input_snapshot,current edits not saved,Несохранённые изменения исходных данных,save / discard required
+export_stale_by_ring_edit,ring_export,segment graph changed after export,Экспорт сценария устарел после изменения сегментов,re-export required for downstream
+suite_link_stale,validated_suite_snapshot,ring source hash changed,Набор испытаний связан с устаревшим сценарием,return to ring
+baseline_source_mismatch,active_baseline_contract,baseline hash != current suite/baseline source,Активный baseline не соответствует текущему snapshot,choose or activate baseline
+objective_contract_mismatch,optimization_run_contract,objective/hard gate differs,Этот run собран на другом контракте целей/ограничений,open contract diff
+historical_context_active,selected_run_contract,selected run is historical,Открыт исторический run,do not confuse with current
+truth_degraded,animator_truth_state,packaging/sidecar incomplete,Графика работает в условном режиме по неполным данным,"warning, provenance, reduced actions"
+bundle_stale,diagnostics_bundle,source hashes changed after bundle creation,Архив диагностики устарел относительно проекта,rebuild bundle

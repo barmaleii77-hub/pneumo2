@@ -1,0 +1,13 @@
+marker_id,user_must_understand,workspace,where_visible,priority
+double_springs_enabled,"Если пользователь выбрал две пружины на угол, он обязан увидеть это сразу",WS-INPUTS,Карточка угла + схема подвески + inspector,high
+spring_leveling_active,"Если выравнивание пружинами активно, это должно быть видно как отдельный режим",WS-INPUTS,Header section + scheme badge,high
+spring_leveling_delta_mm,"Пользователь должен видеть, на сколько миллиметров выполнено выравнивание",WS-INPUTS,Inspector metric row + summary card,high
+mirror_mode,"Пользователь должен видеть, включена ли зеркальная симметрия лево/право",WS-INPUTS,Mode chip + scheme legend,high
+ring_seam_status,Пользователь должен видеть состояние шва кольца,WS-RING,Top banner + seam diagnostics panel,high
+suite_link_freshness,"Пользователь должен видеть, что набор испытаний связан с актуальным сценарием",WS-SUITE,Top banner + row badge,high
+baseline_source_truth,Пользователь должен видеть источник активного baseline,WS-BASELINE,Source card,medium
+objective_contract_visible,Пользователь должен видеть objective stack и hard gate,WS-OPTIMIZATION,Top contract block,high
+stage_underfill_reason,"Пользователь должен видеть, почему стадия недобрала seed budget",WS-OPTIMIZATION,Live stage summary,high
+historical_run_marker,"Пользователь должен видеть, что открыт historical run",WS-ANALYSIS,Top info banner,high
+animator_truth_state,Пользователь должен видеть truth-state графики,WS-ANIMATOR,Viewport warning strip,high
+diagnostics_bundle_freshness,Пользователь должен видеть свежесть последнего архива диагностики,WS-DIAGNOSTICS,Bundle status card,high

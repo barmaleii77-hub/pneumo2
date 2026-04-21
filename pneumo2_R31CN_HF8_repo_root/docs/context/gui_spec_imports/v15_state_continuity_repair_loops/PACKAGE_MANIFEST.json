@@ -1,0 +1,77 @@
+[
+  {
+    "file": "ACTION_CONFIRMATION_AND_RESULT_VISIBILITY_V15.csv",
+    "sha256": "4ee833375769501fd808e49386bbe1bac140450d64b080e8c3ade35ca46e9d64",
+    "bytes": 2193
+  },
+  {
+    "file": "COGNITIVE_BREAKPOINTS_V15.csv",
+    "sha256": "03cd5b8eb7931c11579e7858290dd6594aeb57417cfca8ca1ffc8e325b891cce",
+    "bytes": 1394
+  },
+  {
+    "file": "COGNITIVE_MUST_SEE_MARKERS_V15.csv",
+    "sha256": "6b28b0edf8759a257705e1eacee79f86314aef78be3eb81dfe2b21fef19d4cb0",
+    "bytes": 2249
+  },
+  {
+    "file": "CONTEXT_RESTORE_AND_RETURN_TARGETS_V15.csv",
+    "sha256": "c709a251fe78d81d6be91949c80bf0b5b52290c228625f1ff71a95ad24188ec5",
+    "bytes": 1841
+  },
+  {
+    "file": "ENTRY_STATE_REPAIR_GRAPH_V15.dot",
+    "sha256": "47947f47b4b27a5386888af0520cdb58b02ed172bcf5589b0490022ced80719a",
+    "bytes": 3095
+  },
+  {
+    "file": "EXEC_SUMMARY.md",
+    "sha256": "39d953d28024bc8137012114dfe370c86672b6b03825a56a130bcd7e687ce0e9",
+    "bytes": 1812
+  },
+  {
+    "file": "HOW_TO_FIX_V15.md",
+    "sha256": "97f9b2165bdc822da9d420acd05627c462899e17d4e04f621131e94aed0e5438",
+    "bytes": 1007
+  },
+  {
+    "file": "LIMITS_AND_EVIDENCE_V15.md",
+    "sha256": "9e2fcad063841e4905173ec71f2a07730fe1e16d408fb5fd3f8678a7da2d8f67",
+    "bytes": 953
+  },
+  {
+    "file": "REPAIR_LOOP_POLICY_V15.csv",
+    "sha256": "2f4c882e92cbfa0d46831228b8ccb0b4b30a8ef1bc6722532e15ec9e7de0aa23",
+    "bytes": 1312
+  },
+  {
+    "file": "STALE_DIRTY_MISMATCH_TRUTH_MATRIX_V15.csv",
+    "sha256": "43ddc80c0ee0558a0f088d7db6151be4d2914b557d75bac98590f3fe3e03f2be",
+    "bytes": 1543
+  },
+  {
+    "file": "STATE_CONTINUITY_AND_REPAIR_LOOP_CONTRACT_V15.md",
+    "sha256": "e424d08b6c7e217d6c6e76c918444e2651fd6b01c79ce6ef89dd58d5711cc495",
+    "bytes": 3920
+  },
+  {
+    "file": "WHAT_IS_BAD_V15.md",
+    "sha256": "b8883c5c2d216e69699108302516e5f23524075fa2356ab1d4bb88bb5df15989",
+    "bytes": 1134
+  },
+  {
+    "file": "WHAT_IS_GOOD_V15.md",
+    "sha256": "22a0d1449dac3fe5d2d0882d31ceaad13165ada9ef1088959fe819f12f12c9f1",
+    "bytes": 1025
+  },
+  {
+    "file": "WINDOW_ENTRY_POLICY_V15.csv",
+    "sha256": "2a7da9ad0a215be5d89bfe8c338cdb32e6e6ac15e6a071ab612a8345cc3a4ad3",
+    "bytes": 1699
+  },
+  {
+    "file": "WINDOW_STATE_MARKER_MATRIX_V15.csv",
+    "sha256": "4057785f2a58a41b9879ac00d5699b11a572336690230cfd23ad39e334bca983",
+    "bytes": 8611
+  }
+]

@@ -21,6 +21,10 @@ knowledge-base слоями.
   совпадающим номером V12. Он не входит в линейку `v1…v13` как replacement для
   `v12_design_recovery`; его роль - уточнить first-screen/internal-route
   contracts четырех текущих окон.
+- `v15_state_continuity_repair_loops` — отдельный report-only слой после V12/V19.
+  Он не входит в линейку `v1…v13` как replacement; его роль - уточнить state
+  continuity, stale/dirty/mismatch/degraded markers, repair loops and context
+  restore/return targets.
 - `v37` — predecessor import-ready GitHub KB/TZ/spec supplement. Он поднимает
   consolidated technical specification, workspace/parameter/acceptance
   matrices и open gaps в repo-local knowledge-base layer, но не является
@@ -156,6 +160,25 @@ knowledge-base слоями.
 - Ограничение: не runtime-closure proof и не доказательство визуальной приемки
   live current-окон.
 
+### v15_state_continuity_repair_loops
+
+- Роль: report-only addendum по state continuity, visible state markers and
+  repair loops.
+- Архив:
+  `pneumo_human_gui_report_only_v15_state_continuity_repair_loops.zip`.
+- Что добавляет: `STATE_CONTINUITY_AND_REPAIR_LOOP_CONTRACT_V15.md`,
+  `WINDOW_STATE_MARKER_MATRIX_V15.csv`, `REPAIR_LOOP_POLICY_V15.csv`,
+  `STALE_DIRTY_MISMATCH_TRUTH_MATRIX_V15.csv`,
+  `CONTEXT_RESTORE_AND_RETURN_TARGETS_V15.csv`,
+  `WINDOW_ENTRY_POLICY_V15.csv`, `COGNITIVE_MUST_SEE_MARKERS_V15.csv` and
+  `ENTRY_STATE_REPAIR_GRAPH_V15.dot`.
+- Статус: current report-only refinement в
+  `docs/context/gui_spec_imports/v15_state_continuity_repair_loops/` с
+  локальной KB-сводкой
+  `docs/context/release_readiness/HUMAN_GUI_REPORT_ONLY_V15_STATE_CONTINUITY_REPAIR_LOOPS_2026-04-21.md`.
+- Ограничение: не runtime-closure proof и не доказательство live state/repair
+  acceptance текущего GUI.
+
 ### v13
 
 - Роль: специализированный ring-editor migration addendum.
@@ -210,13 +233,15 @@ knowledge-base слоями.
 5. `docs/context/release_readiness/V38_KB_IMPORT_AUDIT_2026-04-18.md`
 6. `docs/context/gui_spec_imports/v12_window_internal_routes/*` для
    first-screen/internal-route уточнений четырех окон
-6. `docs/context/gui_spec_imports/v37_github_kb_supplement/*`
-7. `docs/context/gui_spec_imports/v3/*`
-8. `docs/context/gui_spec_imports/v13_ring_editor_migration/*` для `WS-RING`
+7. `docs/context/gui_spec_imports/v15_state_continuity_repair_loops/*` для
+   state-continuity/repair-loop уточнений stale/dirty/mismatch/degraded states
+8. `docs/context/gui_spec_imports/v37_github_kb_supplement/*`
+9. `docs/context/gui_spec_imports/v3/*`
+10. `docs/context/gui_spec_imports/v13_ring_editor_migration/*` для `WS-RING`
    и ring-to-suite handoff
-9. `docs/context/gui_spec_imports/v12_design_recovery/*`
-10. lineage `PROMPT_V2 + v1…v13 + v37 + v38`
-11. прочие historical imports и implementation archives
+11. `docs/context/gui_spec_imports/v12_design_recovery/*`
+12. lineage `PROMPT_V2 + v1…v13 + v37 + v38`
+13. прочие historical imports и implementation archives
 
 ## Практическое правило
 

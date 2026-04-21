@@ -1064,6 +1064,45 @@ Reference source set:
   service jargon вроде `GUI`, `bundle`, `hash`, `hard gate`, `underfill` в
   основном пользовательском слое, если рядом нет понятного русского объяснения.
 
+## Ц. V15 state continuity and repair-loop layer
+
+`v15_state_continuity_repair_loops` импортирован из
+`pneumo_human_gui_report_only_v15_state_continuity_repair_loops.zip` как
+report-only refinement layer для непрерывности состояния, видимых state markers
+и repair-route. Он не заменяет `17/18`, `v38_actualized_with_v10`,
+`v19_graph_iteration` или `v12_window_internal_routes` и не является
+runtime-closure proof.
+
+Reference source set:
+
+- [README.md](./context/gui_spec_imports/v15_state_continuity_repair_loops/README.md)
+- [STATE_CONTINUITY_AND_REPAIR_LOOP_CONTRACT_V15.md](./context/gui_spec_imports/v15_state_continuity_repair_loops/STATE_CONTINUITY_AND_REPAIR_LOOP_CONTRACT_V15.md)
+- [WINDOW_STATE_MARKER_MATRIX_V15.csv](./context/gui_spec_imports/v15_state_continuity_repair_loops/WINDOW_STATE_MARKER_MATRIX_V15.csv)
+- [REPAIR_LOOP_POLICY_V15.csv](./context/gui_spec_imports/v15_state_continuity_repair_loops/REPAIR_LOOP_POLICY_V15.csv)
+- [STALE_DIRTY_MISMATCH_TRUTH_MATRIX_V15.csv](./context/gui_spec_imports/v15_state_continuity_repair_loops/STALE_DIRTY_MISMATCH_TRUTH_MATRIX_V15.csv)
+- [CONTEXT_RESTORE_AND_RETURN_TARGETS_V15.csv](./context/gui_spec_imports/v15_state_continuity_repair_loops/CONTEXT_RESTORE_AND_RETURN_TARGETS_V15.csv)
+- [WINDOW_ENTRY_POLICY_V15.csv](./context/gui_spec_imports/v15_state_continuity_repair_loops/WINDOW_ENTRY_POLICY_V15.csv)
+- [COGNITIVE_MUST_SEE_MARKERS_V15.csv](./context/gui_spec_imports/v15_state_continuity_repair_loops/COGNITIVE_MUST_SEE_MARKERS_V15.csv)
+- [ENTRY_STATE_REPAIR_GRAPH_V15.dot](./context/gui_spec_imports/v15_state_continuity_repair_loops/ENTRY_STATE_REPAIR_GRAPH_V15.dot)
+- [HUMAN_GUI_REPORT_ONLY_V15_STATE_CONTINUITY_REPAIR_LOOPS_2026-04-21.md](./context/release_readiness/HUMAN_GUI_REPORT_ONLY_V15_STATE_CONTINUITY_REPAIR_LOOPS_2026-04-21.md)
+
+### Что уточняет V15
+
+- Каждый route-critical workspace должен показывать, можно ли доверять текущему
+  состоянию: `dirty`, `invalid`, `stale`, `mismatch` и `degraded` не должны
+  прятаться в логах или вторичных окнах.
+- У каждого проблемного состояния должен быть один главный repair-action,
+  видимый marker/banner/card и ожидаемый resolved-state.
+- Repair-route обязан вести в правильный upstream workspace напрямую:
+  stale suite -> `WS-RING`, baseline/source mismatch -> `WS-BASELINE`,
+  objective mismatch -> `WS-OPTIMIZATION`, stale diagnostics bundle ->
+  `WS-DIAGNOSTICS`.
+- После repair-route shell должен восстановить selection, focus, compare/overlay
+  context and scroll там, где это указано в
+  `CONTEXT_RESTORE_AND_RETURN_TARGETS_V15.csv`.
+- Historical/current context и degraded truth должны быть видимыми состояниями,
+  а не неявной технической деталью.
+
 ## Ф. V37 GitHub KB supplement predecessor
 
 `v37_github_kb_supplement` импортирован из

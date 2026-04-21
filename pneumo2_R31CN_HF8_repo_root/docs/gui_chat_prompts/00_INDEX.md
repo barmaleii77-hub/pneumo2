@@ -28,6 +28,13 @@
    — active graph/action-feedback refinement for `WS-INPUTS`, `WS-RING`,
    `WS-OPTIMIZATION` and `WS-DIAGNOSTICS`; читать после V38/V10 для GUI-работ
    внутри этих workspace-ов, не как runtime-closure proof.
+6. [gui_spec_imports/v15_state_continuity_repair_loops/README.md](../context/gui_spec_imports/v15_state_continuity_repair_loops/README.md),
+   [STATE_CONTINUITY_AND_REPAIR_LOOP_CONTRACT_V15.md](../context/gui_spec_imports/v15_state_continuity_repair_loops/STATE_CONTINUITY_AND_REPAIR_LOOP_CONTRACT_V15.md),
+   [WINDOW_STATE_MARKER_MATRIX_V15.csv](../context/gui_spec_imports/v15_state_continuity_repair_loops/WINDOW_STATE_MARKER_MATRIX_V15.csv)
+   и [REPAIR_LOOP_POLICY_V15.csv](../context/gui_spec_imports/v15_state_continuity_repair_loops/REPAIR_LOOP_POLICY_V15.csv)
+   — report-only continuity/repair-loop refinement для `dirty`, `invalid`,
+   `stale`, `mismatch`, `degraded`, restore targets and visible markers; читать
+   после V19/V12, не как runtime-closure proof.
 5. [gui_spec_imports/v37_github_kb_supplement/README.md](../context/gui_spec_imports/v37_github_kb_supplement/README.md),
    [TECHNICAL_SPECIFICATION.md](../context/gui_spec_imports/v37_github_kb_supplement/TECHNICAL_SPECIFICATION.md)
    и [GUI_SPEC.yaml](../context/gui_spec_imports/v37_github_kb_supplement/GUI_SPEC.yaml)
@@ -203,6 +210,9 @@
   schema contract, screen blueprints, element/field catalogs, state machine,
   user pipeline, ring-level migration matrix, acceptance gates и suite-link
   contract.
+- `v15_state_continuity_repair_loops` задаёт report-only continuity layer:
+  visible state markers, repair actions, context restore and return targets for
+  stale/dirty/mismatch/degraded flows; он не закрывает runtime acceptance.
 - `v12_design_recovery` задаёт historical recovery layer:
   ring-editor precursor contract, optimization control plane, truthful graphics
   и workspace recovery delta.

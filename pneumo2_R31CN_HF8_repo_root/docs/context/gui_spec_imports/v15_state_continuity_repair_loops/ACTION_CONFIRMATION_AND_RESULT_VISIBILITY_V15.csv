@@ -1,0 +1,11 @@
+user_action,immediate_feedback,persistent_marker,where_visible,semantic_note
+Сохранить исходные данные,Плашка: snapshot сохранён,Маркер: inputs_saved + hash,Низ статуса + правый provenance,dirty_inputs -> cleared
+Включить две пружины на угол,Карточка угла показывает: активны C1 и C2,Маркер: double_springs_enabled,На схеме угла и в inspector,must-see state
+Включить выравнивание пружинами,"Показывается: выравнивание активно, способ, остаточная разница",Маркер: spring_leveling_active,На схеме + в inspector + в summary,must-see state
+Изменить сегмент в Редакторе кольца,Плашка: экспорт устарел,Маркер: export_stale_by_ring_edit,Верхний banner + дерево сценариев,stale repair loop
+Собрать snapshot набора испытаний,Плашка: snapshot валиден,Маркер: suite_snapshot_valid,Таблица + правый provenance,ready for baseline
+Выбрать baseline из истории,Показывается: historical baseline selected,Маркер: history_restore_pending,Baseline header,requires make active
+Запустить оптимизацию,"Показывается: active mode, objective stack, hard gate, stage progress",Маркер: optimization_running,Центр + низ статуса,no hidden progress
+Открыть исторический run в Анализе,Плашка: исторический контекст,Маркер: historical_context_active,Верхний info banner,must not look current
+Открыть Аниматор,Показывается truth-state и provenance,Маркер: truth_degraded or solver_confirmed,Viewport header + right pane,must-see state
+Собрать диагностику,Показывается состав архива и путь к последнему bundle,Маркер: bundle_freshness,Diagnostics header + status strip,single primary diagnostics route

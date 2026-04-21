@@ -1,0 +1,8 @@
+transition,problem,required_marker,priority
+launch_to_inputs,"Сразу не видно, текущий ли это snapshot и сохранены ли правки",Постоянная верхняя карточка состояния snapshot,high
+inputs_to_ring,"После изменения входов пользователь не понимает, что ring/export устарели",Banner + stale badge у Редактора кольца,high
+ring_to_suite,"Пользователь не понимает, почему snapshot suite нельзя использовать дальше",Suite stale-link banner с прямым переходом в Редактор кольца,high
+baseline_to_optimization,"Пользователь не понимает, на каком baseline идёт optimization",Baseline source card + objective contract block,high
+analysis_to_animator,"Пользователь не понимает, current это run или historical",Historical/current banner + provenance block,high
+animator_degraded,"Пользователь видит графику, но не понимает, что это degraded mode",Viewport warning strip + explanation pane,high
+diagnostics_after_change,"Пользователь не понимает, что архив устарел после изменения проекта",Bundle freshness card,high

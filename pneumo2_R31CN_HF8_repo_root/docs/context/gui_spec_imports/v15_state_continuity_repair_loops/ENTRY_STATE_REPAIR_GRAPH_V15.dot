@@ -1,0 +1,48 @@
+digraph G {
+  rankdir=LR;
+  node [shape=box, style="rounded"];
+  InputsClean [label="WS-INPUTS\nсохранённый snapshot"];
+  InputsDirty [label="WS-INPUTS\nнесохранённые изменения"];
+  InputsInvalid [label="WS-INPUTS\nошибки в полях"];
+  RingClean [label="WS-RING\nсогласованный сценарий"];
+  RingSeamInvalid [label="WS-RING\nошибка шва"];
+  RingExportStale [label="WS-RING\nэкспорт устарел"];
+  SuiteFresh [label="WS-SUITE\nвалидный snapshot"];
+  SuiteStale [label="WS-SUITE\nstale link/context"];
+  BaselineReady [label="WS-BASELINE\nактивный baseline"];
+  BaselineMismatch [label="WS-BASELINE\nsource mismatch"];
+  OptReady [label="WS-OPTIMIZATION\nконтракт согласован"];
+  OptUnderfill [label="WS-OPTIMIZATION\nunderfill / gate"];
+  AnalysisCurrent [label="WS-ANALYSIS\nтекущий run"];
+  AnalysisHistorical [label="WS-ANALYSIS\nhistorical run"];
+  AnimatorTruth [label="WS-ANIMATOR\nsolver/source truth"];
+  AnimatorDegraded [label="WS-ANIMATOR\ndegraded truth"];
+  DiagnosticsFresh [label="WS-DIAGNOSTICS\nbundle свежий"];
+  DiagnosticsStale [label="WS-DIAGNOSTICS\nbundle устарел"];
+
+  InputsDirty -> InputsClean [label="Сохранить snapshot"];
+  InputsInvalid -> InputsDirty [label="Исправить поля"];
+  InputsClean -> RingClean [label="Открыть из дерева"];
+  RingClean -> RingSeamInvalid [label="Проверка шва failed"];
+  RingSeamInvalid -> RingClean [label="Исправить сегменты"];
+  RingClean -> RingExportStale [label="Изменить сегмент"];
+  RingExportStale -> RingClean [label="Переэкспортировать"];
+  RingClean -> SuiteFresh [label="Сформировать snapshot"];
+  SuiteFresh -> SuiteStale [label="Ring/input drift"];
+  SuiteStale -> RingClean [label="Вернуться в Редактор кольца"];
+  SuiteFresh -> BaselineReady [label="Сформировать baseline"];
+  BaselineReady -> BaselineMismatch [label="Source/hash drift"];
+  BaselineMismatch -> BaselineReady [label="Сделать baseline активным"];
+  BaselineReady -> OptReady [label="Запустить оптимизацию"];
+  OptReady -> OptUnderfill [label="Gate/underfill"];
+  OptUnderfill -> OptReady [label="Принять или скорректировать policy"];
+  OptReady -> AnalysisCurrent [label="Открыть run"];
+  AnalysisCurrent -> AnalysisHistorical [label="Выбрать historical run"];
+  AnalysisHistorical -> AnalysisCurrent [label="Вернуться к текущему run"];
+  AnalysisCurrent -> AnimatorTruth [label="Есть полный truth"];
+  AnalysisCurrent -> AnimatorDegraded [label="Packaging/sidecar incomplete"];
+  AnimatorDegraded -> AnalysisCurrent [label="Открыть provenance"];
+  AnalysisCurrent -> DiagnosticsFresh [label="Собрать bundle"];
+  DiagnosticsFresh -> DiagnosticsStale [label="Run/project changed"];
+  DiagnosticsStale -> DiagnosticsFresh [label="Пересобрать"];
+}

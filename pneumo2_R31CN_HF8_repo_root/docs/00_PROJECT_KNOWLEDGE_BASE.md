@@ -85,6 +85,12 @@ Operational note:
 26. [docs/context/gui_spec_imports/v12_window_internal_routes/SEMANTIC_REWRITE_MATRIX_V12.csv](./context/gui_spec_imports/v12_window_internal_routes/SEMANTIC_REWRITE_MATRIX_V12.csv)
 27. [docs/context/gui_spec_imports/v12_window_internal_routes/DIRECT_TREE_OPEN_AND_DOCK_ROLE_V12.csv](./context/gui_spec_imports/v12_window_internal_routes/DIRECT_TREE_OPEN_AND_DOCK_ROLE_V12.csv)
 28. [docs/context/release_readiness/HUMAN_GUI_REPORT_ONLY_V12_WINDOW_INTERNAL_ROUTES_2026-04-20.md](./context/release_readiness/HUMAN_GUI_REPORT_ONLY_V12_WINDOW_INTERNAL_ROUTES_2026-04-20.md)
+29. [docs/context/gui_spec_imports/v15_state_continuity_repair_loops/README.md](./context/gui_spec_imports/v15_state_continuity_repair_loops/README.md)
+30. [docs/context/gui_spec_imports/v15_state_continuity_repair_loops/STATE_CONTINUITY_AND_REPAIR_LOOP_CONTRACT_V15.md](./context/gui_spec_imports/v15_state_continuity_repair_loops/STATE_CONTINUITY_AND_REPAIR_LOOP_CONTRACT_V15.md)
+31. [docs/context/gui_spec_imports/v15_state_continuity_repair_loops/WINDOW_STATE_MARKER_MATRIX_V15.csv](./context/gui_spec_imports/v15_state_continuity_repair_loops/WINDOW_STATE_MARKER_MATRIX_V15.csv)
+32. [docs/context/gui_spec_imports/v15_state_continuity_repair_loops/REPAIR_LOOP_POLICY_V15.csv](./context/gui_spec_imports/v15_state_continuity_repair_loops/REPAIR_LOOP_POLICY_V15.csv)
+33. [docs/context/gui_spec_imports/v15_state_continuity_repair_loops/CONTEXT_RESTORE_AND_RETURN_TARGETS_V15.csv](./context/gui_spec_imports/v15_state_continuity_repair_loops/CONTEXT_RESTORE_AND_RETURN_TARGETS_V15.csv)
+34. [docs/context/release_readiness/HUMAN_GUI_REPORT_ONLY_V15_STATE_CONTINUITY_REPAIR_LOOPS_2026-04-21.md](./context/release_readiness/HUMAN_GUI_REPORT_ONLY_V15_STATE_CONTINUITY_REPAIR_LOOPS_2026-04-21.md)
 14. [docs/context/gui_spec_imports/v38_github_kb_commit_ready/README.md](./context/gui_spec_imports/v38_github_kb_commit_ready/README.md)
 15. [docs/context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md](./context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md)
 16. [docs/context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml](./context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml)
@@ -198,11 +204,11 @@ Operational note:
 - локальные digests и snapshots AI-контекста;
 - current imported V38 actualized with V10 GUI/TZ/spec knowledge-base layer,
   with previous V38/V10 layers retained as provenance and evidence;
-- human GUI simulation/report-only audits V5/V6/V10/V12 as evidence-first,
+- human GUI simulation/report-only audits V5/V6/V10/V12/V15 as evidence-first,
   route-hierarchy and first-screen/action-feedback clarification layers for
   launcher hierarchy, first-class `Редактор кольца`, archive check/send route,
   compare differentiation, truth-state markers, direct tree open and
-  under-proven window internals;
+  under-proven window internals, state continuity and repair loops;
 - connector-reconciled GUI/TZ digest v33, with v32 retained as previous
   workstream/release-gate evidence layer;
 - внешние архивы и Google Drive как контекст и история;

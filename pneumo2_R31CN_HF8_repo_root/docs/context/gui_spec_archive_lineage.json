@@ -192,6 +192,24 @@
     "repo_layer": "docs/context/gui_spec_imports/v13_ring_editor_migration/"
   },
   {
+    "version": "v15_state_continuity_repair_loops",
+    "archive_name": "pneumo_human_gui_report_only_v15_state_continuity_repair_loops.zip",
+    "phase": "report_only_state_continuity",
+    "status": "current_report_only_refinement",
+    "role": "state continuity, visible state markers, repair-loop policy and context restore/return targets without runtime-closure proof",
+    "main_artifacts": [
+      "STATE_CONTINUITY_AND_REPAIR_LOOP_CONTRACT_V15.md",
+      "WINDOW_STATE_MARKER_MATRIX_V15.csv",
+      "REPAIR_LOOP_POLICY_V15.csv",
+      "STALE_DIRTY_MISMATCH_TRUTH_MATRIX_V15.csv",
+      "CONTEXT_RESTORE_AND_RETURN_TARGETS_V15.csv",
+      "WINDOW_ENTRY_POLICY_V15.csv",
+      "COGNITIVE_MUST_SEE_MARKERS_V15.csv",
+      "ENTRY_STATE_REPAIR_GRAPH_V15.dot"
+    ],
+    "repo_layer": "docs/context/gui_spec_imports/v15_state_continuity_repair_loops/"
+  },
+  {
     "version": "v37",
     "archive_name": "pneumo_codex_tz_spec_connector_reconciled_v37_github_kb_supplement.zip",
     "phase": "knowledge_base_reconciliation",

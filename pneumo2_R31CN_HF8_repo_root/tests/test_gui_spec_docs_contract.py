@@ -34,6 +34,7 @@ IMPORTS_V33 = IMPORTS / "v33_connector_reconciled"
 IMPORTS_V37 = IMPORTS / "v37_github_kb_supplement"
 IMPORTS_V38 = IMPORTS / "v38_github_kb_commit_ready"
 IMPORTS_V19 = IMPORTS / "v19_graph_iteration"
+IMPORTS_V15 = IMPORTS / "v15_state_continuity_repair_loops"
 V32_COMPLETENESS = IMPORTS_V32 / "COMPLETENESS_ASSESSMENT.md"
 V32_WORKSTREAMS = IMPORTS_V32 / "PARALLEL_CHAT_WORKSTREAMS.md"
 V33_COMPLETENESS = IMPORTS_V33 / "COMPLETENESS_ASSESSMENT.md"
@@ -55,6 +56,11 @@ V32_16_ACCEPTANCE_NOTE = CONTEXT / "release_readiness" / "V32_16_ACCEPTANCE_NOTE
 SELF_CHECK_WARNINGS_JSON = ROOT / "REPORTS" / "SELF_CHECK_SILENT_WARNINGS.json"
 SELF_CHECK_WARNINGS_MD = ROOT / "REPORTS" / "SELF_CHECK_SILENT_WARNINGS.md"
 V38_KB_IMPORT_AUDIT = CONTEXT / "release_readiness" / "V38_KB_IMPORT_AUDIT_2026-04-18.md"
+V15_IMPORT_AUDIT = (
+    CONTEXT
+    / "release_readiness"
+    / "HUMAN_GUI_REPORT_ONLY_V15_STATE_CONTINUITY_REPAIR_LOOPS_2026-04-21.md"
+)
 
 CANON_17 = DOCS / "17_WINDOWS_DESKTOP_CAD_GUI_CANON.md"
 CANON_18 = DOCS / "18_PNEUMOAPP_WINDOWS_GUI_SPEC.md"
@@ -438,6 +444,93 @@ def test_v19_graph_iteration_is_registered_in_gui_knowledge_stack() -> None:
     )
 
 
+def test_v15_state_continuity_repair_loop_layer_exists_and_is_registered() -> None:
+    required_files = {
+        "README.md",
+        "ACTION_CONFIRMATION_AND_RESULT_VISIBILITY_V15.csv",
+        "COGNITIVE_BREAKPOINTS_V15.csv",
+        "COGNITIVE_MUST_SEE_MARKERS_V15.csv",
+        "CONTEXT_RESTORE_AND_RETURN_TARGETS_V15.csv",
+        "ENTRY_STATE_REPAIR_GRAPH_V15.dot",
+        "EXEC_SUMMARY.md",
+        "HOW_TO_FIX_V15.md",
+        "LIMITS_AND_EVIDENCE_V15.md",
+        "PACKAGE_MANIFEST.json",
+        "REPAIR_LOOP_POLICY_V15.csv",
+        "STALE_DIRTY_MISMATCH_TRUTH_MATRIX_V15.csv",
+        "STATE_CONTINUITY_AND_REPAIR_LOOP_CONTRACT_V15.md",
+        "WHAT_IS_BAD_V15.md",
+        "WHAT_IS_GOOD_V15.md",
+        "WINDOW_ENTRY_POLICY_V15.csv",
+        "WINDOW_STATE_MARKER_MATRIX_V15.csv",
+    }
+
+    assert IMPORTS_V15.exists()
+    actual_files = {path.name for path in IMPORTS_V15.iterdir() if path.is_file()}
+    assert required_files <= actual_files
+    for file_name in required_files:
+        assert (IMPORTS_V15 / file_name).stat().st_size > 0, file_name
+
+    manifest = json.loads((IMPORTS_V15 / "PACKAGE_MANIFEST.json").read_text(encoding="utf-8-sig"))
+    assert len(manifest) == 15
+    assert {item["file"] for item in manifest} == required_files - {
+        "README.md",
+        "PACKAGE_MANIFEST.json",
+    }
+
+    marker_rows = _load_csv_rows(IMPORTS_V15 / "WINDOW_STATE_MARKER_MATRIX_V15.csv")
+    repair_rows = _load_csv_rows(IMPORTS_V15 / "REPAIR_LOOP_POLICY_V15.csv")
+    entry_rows = _load_csv_rows(IMPORTS_V15 / "WINDOW_ENTRY_POLICY_V15.csv")
+    restore_rows = _load_csv_rows(IMPORTS_V15 / "CONTEXT_RESTORE_AND_RETURN_TARGETS_V15.csv")
+    must_see_rows = _load_csv_rows(IMPORTS_V15 / "COGNITIVE_MUST_SEE_MARKERS_V15.csv")
+
+    assert len(marker_rows) == 30
+    assert len(repair_rows) == 11
+    assert len(entry_rows) == 9
+    assert len(restore_rows) == 12
+    assert len(must_see_rows) == 12
+    assert any(row["state_id"] == "dirty_inputs" and row["workspace_id"] == "WS-INPUTS" for row in marker_rows)
+    assert any(
+        row["state_id"] == "bundle_stale"
+        and row["repair_action"] == "rebuild_bundle"
+        and row["workspace"] == "WS-DIAGNOSTICS"
+        for row in repair_rows
+    )
+    assert any(
+        row["window_or_workspace"] == "WS-DIAGNOSTICS"
+        and row["direct_tree_open_required"] == "yes"
+        for row in entry_rows
+    )
+    assert "InputsDirty -> InputsClean" in (IMPORTS_V15 / "ENTRY_STATE_REPAIR_GRAPH_V15.dot").read_text(
+        encoding="utf-8-sig"
+    )
+
+    imports_readme = IMPORTS_README.read_text(encoding="utf-8")
+    project_sources_text = PROJECT_SOURCES.read_text(encoding="utf-8")
+    project_kb_text = PROJECT_KNOWLEDGE_BASE.read_text(encoding="utf-8")
+    index_text = GUI_INDEX.read_text(encoding="utf-8")
+    canon_18 = CANON_18.read_text(encoding="utf-8")
+    audit_text = V15_IMPORT_AUDIT.read_text(encoding="utf-8")
+
+    for text in (
+        imports_readme,
+        project_sources_text,
+        project_kb_text,
+        index_text,
+        canon_18,
+        audit_text,
+    ):
+        assert "v15_state_continuity_repair_loops" in text
+        assert "STATE_CONTINUITY_AND_REPAIR_LOOP_CONTRACT_V15.md" in text
+        assert "WINDOW_STATE_MARKER_MATRIX_V15.csv" in text
+        assert "REPAIR_LOOP_POLICY_V15.csv" in text
+        assert "runtime-closure proof" in text
+
+    assert project_sources_text.index("v12_window_internal_routes") < project_sources_text.index(
+        "v15_state_continuity_repair_loops"
+    )
+
+
 def test_v13_import_layer_exists_and_matches_manifest() -> None:
     manifest_path = IMPORTS_V13 / "manifest.json"
     readme_path = IMPORTS_V13 / "README.md"
@@ -797,12 +890,19 @@ def test_v12_design_recovery_layer_and_lineage_inventory_are_registered() -> Non
         "v11",
         "v12",
         "v13",
+        "v15_state_continuity_repair_loops",
         "v37",
         "v38",
     ]
     assert any(item["version"] == "PROMPT_V2" and item["repo_layer"] == "docs/context/gui_spec_imports/foundations/" for item in lineage_json)
     assert any(item["version"] == "v12" and item["repo_layer"] == "docs/context/gui_spec_imports/v12_design_recovery/" for item in lineage_json)
     assert any(item["version"] == "v13" and item["repo_layer"] == "docs/context/gui_spec_imports/v13_ring_editor_migration/" for item in lineage_json)
+    assert any(
+        item["version"] == "v15_state_continuity_repair_loops"
+        and item["repo_layer"] == "docs/context/gui_spec_imports/v15_state_continuity_repair_loops/"
+        and item["status"] == "current_report_only_refinement"
+        for item in lineage_json
+    )
     assert any(
         item["version"] == "v37"
         and item["repo_layer"] == "docs/context/gui_spec_imports/v37_github_kb_supplement/"
@@ -1476,6 +1576,8 @@ def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
         IMPORTS_V38 / "REPO_GITHUB_KB_SUPPLEMENT_SUMMARY.md",
         IMPORTS_V38 / "NON_RUNTIME_CLOSURE_NOTICE.md",
         IMPORTS_V19 / "README.md",
+        IMPORTS_V15 / "README.md",
+        V15_IMPORT_AUDIT,
         IMPORTS_V37 / "README.md",
         IMPORTS_V37 / "TECHNICAL_SPECIFICATION.md",
         IMPORTS_V37 / "REPO_GITHUB_KB_SUPPLEMENT.md",

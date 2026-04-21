@@ -37,6 +37,13 @@
   action-feedback маршруты для поверхности проверки и отправки архива,
   подробного сравнения результатов, исходных данных проекта и набора испытаний.
   Это не тот же слой, что `v12_design_recovery`, и не `runtime-closure proof`;
+- `v15_state_continuity_repair_loops/` — current report-only state-continuity
+  and repair-loop layer из
+  `pneumo_human_gui_report_only_v15_state_continuity_repair_loops.zip`.
+  Слой уточняет user-visible markers для `dirty`, `invalid`, `stale`,
+  `mismatch` и `degraded`, единственный основной repair-route, restore/return
+  targets и graph состояния после входа в workspace. Это reference layer, а не
+  `runtime-closure proof`;
 - `v38_github_kb_commit_ready/` — predecessor import-ready successor
   knowledge-base commit-ready layer из
   `pneumo_codex_tz_spec_connector_reconciled_v38_github_kb_commit_ready.zip`.
@@ -116,6 +123,16 @@
    `../release_readiness/HUMAN_GUI_REPORT_ONLY_V12_WINDOW_INTERNAL_ROUTES_2026-04-20.md`.
    Этот слой уточняет first-screen/internal-route contracts, но не доказывает
    live runtime acceptance.
+6. Если задача касается сохранения контекста, stale/dirty/mismatch/degraded
+   состояний или repair-route, читать
+   `v15_state_continuity_repair_loops/README.md`,
+   `STATE_CONTINUITY_AND_REPAIR_LOOP_CONTRACT_V15.md`,
+   `WINDOW_STATE_MARKER_MATRIX_V15.csv`,
+   `REPAIR_LOOP_POLICY_V15.csv`,
+   `CONTEXT_RESTORE_AND_RETURN_TARGETS_V15.csv` and
+   `../release_readiness/HUMAN_GUI_REPORT_ONLY_V15_STATE_CONTINUITY_REPAIR_LOOPS_2026-04-21.md`.
+   Этот слой фиксирует continuity/repair-loop contract, но не доказывает live
+   runtime acceptance.
 5. Затем читать `v38_github_kb_commit_ready/README.md`,
    `v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md`,
    `v38_github_kb_commit_ready/GUI_SPEC.yaml`, V38 catalog/matrix files and
@@ -185,6 +202,9 @@
   `v12_window_internal_routes/*` как first-screen/internal-route report-only
   refinement для проверки и отправки архива, подробного сравнения, исходных
   данных и набора испытаний, затем у
+  `v15_state_continuity_repair_loops/*` как state-continuity/repair-loop
+  report-only refinement для stale/dirty/mismatch/degraded states, restore
+  targets and user-visible markers, затем у
   `v38_github_kb_commit_ready/*` and
   `V38_KB_IMPORT_AUDIT_2026-04-18.md` as predecessor V38 layer, затем у
   `v37_github_kb_supplement/*` as predecessor KB/TZ/spec layer, затем у
