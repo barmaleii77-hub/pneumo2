@@ -10,8 +10,19 @@ from pneumo_solver_ui.desktop_suite_runtime import (
     write_desktop_suite_handoff_snapshot,
 )
 from pneumo_solver_ui.desktop_suite_snapshot import load_suite_rows
+from pneumo_solver_ui.desktop_run_setup_model import (
+    DESKTOP_RUN_CACHE_POLICY_OPTIONS,
+    DESKTOP_RUN_PROFILE_OPTIONS,
+    DESKTOP_RUN_RUNTIME_POLICY_OPTIONS,
+    DesktopRunSetupSnapshot,
+    describe_plain_launch_availability,
+    describe_run_launch_target,
+    describe_run_setup_snapshot,
+    recommended_run_launch_action,
+)
 from pneumo_solver_ui.optimization_baseline_source import (
     apply_baseline_center_action,
+    baseline_suite_handoff_launch_gate,
     build_baseline_center_surface,
 )
 
@@ -109,6 +120,35 @@ def _baseline_reason_label(reason: str) -> str:
     }
     text = str(reason or "").strip()
     return labels.get(text, "требуется повторная проверка")
+
+
+def _baseline_launch_gate_text(raw: object) -> str:
+    text = " ".join(str(raw or "").split()).strip()
+    replacements = (
+        ("включено=", "включено "),
+        ("не хватает ссылок=", "не хватает ссылок "),
+        ("ошибок владения данными=", "ошибок владения данными "),
+        ("отклонено изменений=", "отклонено изменений "),
+        ("с контролем=", "с контролем "),
+        ("baseline_launch_allowed=", "запуск опорного прогона "),
+        ("handoff_ready=", "передача набора "),
+        ("True", "да"),
+        ("False", "нет"),
+        ("true", "да"),
+        ("false", "нет"),
+        ("missing_validated_suite_snapshot", "снимок набора не найден"),
+        ("unsupported_validated_suite_snapshot_schema", "неподдерживаемый формат снимка набора"),
+        ("suite_validation_failed", "набор испытаний не прошёл проверку"),
+        ("missing_upstream_handoff_refs", "не хватает ссылок на исходные данные или сценарий"),
+        ("rejected_suite_overrides", "часть изменений набора отклонена"),
+        ("snapshot", "снимок"),
+        ("handoff", "передача"),
+        ("baseline", "опорный прогон"),
+        ("suite", "набор испытаний"),
+    )
+    for old, new in replacements:
+        text = text.replace(old, new)
+    return text
 
 
 def _workspace_owner_text(raw: str) -> str:
@@ -840,6 +880,7 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
         self._selected_history_id = ""
         self._last_surface: dict[str, Any] = {}
         self._refreshing_baseline_controls = False
+        self._run_setup_snapshot: dict[str, Any] = dict(vars(DesktopRunSetupSnapshot()))
         super().__init__(
             workspace,
             action_commands,
@@ -850,8 +891,11 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
             ),
             parent,
         )
+        self.setObjectName("WS-BASELINE-HOSTED-PAGE")
 
     def _build_extra_controls(self, layout: QtWidgets.QVBoxLayout) -> None:
+        self._build_run_setup_controls(layout)
+
         self.baseline_center_box = QtWidgets.QGroupBox("Базовый прогон: просмотр, принятие, восстановление")
         center_layout = QtWidgets.QVBoxLayout(self.baseline_center_box)
         center_layout.setSpacing(8)
@@ -928,6 +972,97 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
 
         layout.addWidget(self.baseline_center_box)
 
+    def _build_run_setup_controls(self, layout: QtWidgets.QVBoxLayout) -> None:
+        self.run_setup_box = QtWidgets.QGroupBox("Базовый прогон: настройка и запуск")
+        self.run_setup_box.setObjectName("BL-RUN-SETUP-PANEL")
+        self.run_setup_box.setFocusPolicy(QtCore.Qt.StrongFocus)
+        setup_layout = QtWidgets.QVBoxLayout(self.run_setup_box)
+        setup_layout.setSpacing(8)
+
+        intro = QtWidgets.QLabel(
+            "Здесь фиксируется профиль расчёта перед опорным прогоном: режим, повторное использование результата, "
+            "обязательная проверка и готовность снимка набора испытаний."
+        )
+        intro.setWordWrap(True)
+        setup_layout.addWidget(intro)
+
+        form = QtWidgets.QFormLayout()
+        self.run_profile_combo = QtWidgets.QComboBox()
+        self.run_profile_combo.setObjectName("BL-RUN-PROFILE")
+        self.run_cache_policy_combo = QtWidgets.QComboBox()
+        self.run_cache_policy_combo.setObjectName("BL-RUN-CACHE-POLICY")
+        self.run_runtime_policy_combo = QtWidgets.QComboBox()
+        self.run_runtime_policy_combo.setObjectName("BL-RUN-RUNTIME-POLICY")
+        for combo, options in (
+            (self.run_profile_combo, DESKTOP_RUN_PROFILE_OPTIONS),
+            (self.run_cache_policy_combo, DESKTOP_RUN_CACHE_POLICY_OPTIONS),
+            (self.run_runtime_policy_combo, DESKTOP_RUN_RUNTIME_POLICY_OPTIONS),
+        ):
+            for key, label, description in options:
+                combo.addItem(label, key)
+                combo.setItemData(combo.count() - 1, description, QtCore.Qt.ToolTipRole)
+            combo.currentIndexChanged.connect(lambda _index=0: self._refresh_run_setup_controls())
+        form.addRow("Профиль запуска", self.run_profile_combo)
+        form.addRow("Повторное использование", self.run_cache_policy_combo)
+        form.addRow("Режим выполнения", self.run_runtime_policy_combo)
+        self._set_combo_data(self.run_profile_combo, self._run_setup_snapshot.get("launch_profile"))
+        self._set_combo_data(self.run_cache_policy_combo, self._run_setup_snapshot.get("cache_policy"))
+        self._set_combo_data(self.run_runtime_policy_combo, self._run_setup_snapshot.get("runtime_policy"))
+        setup_layout.addLayout(form)
+
+        self.run_setup_summary_label = QtWidgets.QLabel("")
+        self.run_setup_summary_label.setWordWrap(True)
+        self.run_setup_summary_label.setStyleSheet("color: #334455;")
+        setup_layout.addWidget(self.run_setup_summary_label)
+
+        self.run_setup_gate_label = QtWidgets.QLabel("")
+        self.run_setup_gate_label.setObjectName("BL-RUN-GATE")
+        self.run_setup_gate_label.setWordWrap(True)
+        setup_layout.addWidget(self.run_setup_gate_label)
+
+        self.run_setup_launch_hint_label = QtWidgets.QLabel("")
+        self.run_setup_launch_hint_label.setObjectName("BL-RUN-LAUNCH-HINT")
+        self.run_setup_launch_hint_label.setWordWrap(True)
+        self.run_setup_launch_hint_label.setStyleSheet("color: #1f5d50;")
+        setup_layout.addWidget(self.run_setup_launch_hint_label)
+
+        button_row = QtWidgets.QHBoxLayout()
+        self.run_setup_check_button = QtWidgets.QPushButton("Проверить готовность")
+        self.run_setup_check_button.setObjectName("BL-BTN-RUN-CHECK")
+        self.run_setup_check_button.clicked.connect(lambda: self.handle_command("baseline.run_setup.verify"))
+        self.run_setup_checked_launch_button = QtWidgets.QPushButton("Проверить и подготовить запуск")
+        self.run_setup_checked_launch_button.setObjectName("BL-BTN-RUN-CHECKED")
+        self.run_setup_checked_launch_button.clicked.connect(
+            lambda: self.handle_command("baseline.run_setup.prepare_checked")
+        )
+        self.run_setup_plain_launch_button = QtWidgets.QPushButton("Подготовить запуск")
+        self.run_setup_plain_launch_button.setObjectName("BL-BTN-RUN-PLAIN")
+        self.run_setup_plain_launch_button.clicked.connect(
+            lambda: self.handle_command("baseline.run_setup.prepare")
+        )
+        self.run_setup_advanced_button = QtWidgets.QPushButton("Расширенный центр запуска")
+        self.run_setup_advanced_button.setObjectName("BL-BTN-RUN-ADVANCED")
+        self.run_setup_advanced_button.clicked.connect(
+            lambda: self.on_command("baseline.legacy_run_setup.open")
+        )
+        for button in (
+            self.run_setup_check_button,
+            self.run_setup_checked_launch_button,
+            self.run_setup_plain_launch_button,
+            self.run_setup_advanced_button,
+        ):
+            button_row.addWidget(button)
+        button_row.addStretch(1)
+        setup_layout.addLayout(button_row)
+
+        self.run_setup_result_label = QtWidgets.QLabel("")
+        self.run_setup_result_label.setObjectName("BL-RUN-ACTION-RESULT")
+        self.run_setup_result_label.setWordWrap(True)
+        self.run_setup_result_label.setStyleSheet("color: #576574;")
+        setup_layout.addWidget(self.run_setup_result_label)
+
+        layout.addWidget(self.run_setup_box)
+
     def _surface(self) -> dict[str, Any]:
         explicit = bool(
             getattr(self, "explicit_confirmation_checkbox", None)
@@ -939,8 +1074,135 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
             explicit_confirmation=explicit,
         )
 
+    def _set_combo_data(self, combo: QtWidgets.QComboBox, value: object) -> None:
+        wanted = str(value or "").strip()
+        for index in range(combo.count()):
+            if str(combo.itemData(index) or "").strip() == wanted:
+                combo.setCurrentIndex(index)
+                return
+
+    def _combo_data(self, combo: QtWidgets.QComboBox, fallback: str) -> str:
+        value = str(combo.currentData() or "").strip()
+        return value or fallback
+
+    def _current_run_setup_snapshot(self) -> dict[str, Any]:
+        snapshot = dict(self._run_setup_snapshot)
+        if hasattr(self, "run_profile_combo"):
+            snapshot["launch_profile"] = self._combo_data(self.run_profile_combo, "detail")
+            snapshot["cache_policy"] = self._combo_data(self.run_cache_policy_combo, "reuse")
+            snapshot["runtime_policy"] = self._combo_data(self.run_runtime_policy_combo, "balanced")
+        self._run_setup_snapshot = snapshot
+        return snapshot
+
+    def _run_setup_gate(self) -> dict[str, Any]:
+        snapshot = self._current_run_setup_snapshot()
+        return baseline_suite_handoff_launch_gate(
+            launch_profile=str(snapshot.get("launch_profile") or "detail"),
+            runtime_policy=str(snapshot.get("runtime_policy") or "balanced"),
+            repo_root=self.repo_root,
+        )
+
+    def _refresh_run_setup_controls(self) -> None:
+        if not hasattr(self, "run_setup_summary_label"):
+            return
+        snapshot = self._current_run_setup_snapshot()
+        summary = describe_run_setup_snapshot(
+            snapshot,
+            scenario_label="дорожный сценарий",
+            preview_surface_label="ровная дорога",
+            snapshot_enabled=True,
+            snapshot_name="снимок перед запуском",
+        )
+        gate = self._run_setup_gate()
+        launch_target = describe_run_launch_target(
+            launch_profile_key=str(snapshot.get("launch_profile") or "detail"),
+            scenario_key="worldroad",
+            scenario_label="дорожный сценарий",
+        )
+        recommendation = recommended_run_launch_action(
+            auto_check_enabled=bool(snapshot.get("auto_check", True)),
+            summary=None,
+            report_exists=False,
+        )
+        plain_state = describe_plain_launch_availability(
+            auto_check_enabled=bool(snapshot.get("auto_check", True)),
+            runtime_policy_key=str(snapshot.get("runtime_policy") or "balanced"),
+            summary=None,
+            report_exists=False,
+        )
+        gate_allowed = bool(gate.get("baseline_launch_allowed", False))
+        gate_banner = _baseline_launch_gate_text(gate.get("banner"))
+        self.run_setup_summary_label.setText(
+            "\n".join(
+                part
+                for part in (
+                    summary.get("headline", ""),
+                    summary.get("detail_line", ""),
+                    summary.get("runtime_line", ""),
+                    summary.get("cost_summary", ""),
+                )
+                if part
+            )
+        )
+        gate_state = "готов к запуску" if gate_allowed else "требует подготовки"
+        self.run_setup_gate_label.setText(
+            f"Готовность набора испытаний: {gate_state}. {gate_banner}"
+        )
+        self.run_setup_gate_label.setStyleSheet(
+            "background: #e8f7ee; color: #1f5f3a; padding: 8px; border: 1px solid #64b883;"
+            if gate_allowed
+            else "background: #fff4e5; color: #6f4e00; padding: 8px; border: 1px solid #d9822b;"
+        )
+        plain_detail = str(plain_state.get("detail") or "").strip()
+        recommendation_text = (
+            "рекомендуется обычная подготовка"
+            if recommendation == "plain_launch"
+            else "рекомендуется проверка перед подготовкой"
+        )
+        self.run_setup_launch_hint_label.setText(
+            f"{launch_target.get('hint_line') or 'Целевой запуск: опорный прогон.'} "
+            f"{recommendation_text}. Обычный запуск: {plain_detail}."
+        )
+        self.run_setup_plain_launch_button.setEnabled(gate_allowed)
+        self.run_setup_plain_launch_button.setToolTip(
+            "Доступно после актуального снимка набора испытаний."
+            if gate_allowed
+            else "Сначала обновите и сохраните снимок набора испытаний."
+        )
+
+    def _activate_run_setup_panel(self, message: str = "") -> None:
+        self._refresh_run_setup_controls()
+        self.run_setup_box.setFocus(QtCore.Qt.OtherFocusReason)
+        if message:
+            self.run_setup_result_label.setText(message)
+
+    def _verify_run_setup_gate(self) -> dict[str, Any]:
+        gate = self._run_setup_gate()
+        self._refresh_run_setup_controls()
+        state = "готов" if bool(gate.get("baseline_launch_allowed", False)) else "не готов"
+        self.run_setup_result_label.setText(
+            f"Проверка готовности: {state}. {_baseline_launch_gate_text(gate.get('banner'))}"
+        )
+        return gate
+
+    def _prepare_run_setup_launch(self, *, checked: bool) -> dict[str, Any]:
+        gate = self._verify_run_setup_gate()
+        if checked:
+            self.run_setup_result_label.setText(
+                "Проверка перед запуском запрошена. "
+                + self.run_setup_result_label.text()
+            )
+            return {"action": "prepare_checked", "allowed": bool(gate.get("baseline_launch_allowed", False))}
+        if bool(gate.get("baseline_launch_allowed", False)):
+            self.run_setup_result_label.setText(
+                "Запуск подготовлен: профиль, режим выполнения и снимок набора испытаний согласованы."
+            )
+        return {"action": "prepare", "allowed": bool(gate.get("baseline_launch_allowed", False))}
+
     def refresh_view(self) -> None:
         super().refresh_view()
+        if hasattr(self, "run_setup_summary_label"):
+            self._refresh_run_setup_controls()
         if hasattr(self, "baseline_history_table"):
             self._refresh_baseline_center_controls()
 
@@ -1177,6 +1439,18 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
         return ". ".join(bits) + "."
 
     def handle_command(self, command_id: str) -> None:
+        if command_id == "baseline.run_setup.open":
+            self._activate_run_setup_panel("Настройка запуска открыта в рабочем шаге базового прогона.")
+            return
+        if command_id == "baseline.run_setup.verify":
+            self._verify_run_setup_gate()
+            return
+        if command_id == "baseline.run_setup.prepare_checked":
+            self._prepare_run_setup_launch(checked=True)
+            return
+        if command_id == "baseline.run_setup.prepare":
+            self._prepare_run_setup_launch(checked=False)
+            return
         if command_id == "baseline.center.open":
             self.refresh_view()
             return

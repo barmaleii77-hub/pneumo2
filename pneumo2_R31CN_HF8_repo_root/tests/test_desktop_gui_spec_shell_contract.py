@@ -99,10 +99,17 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert commands["baseline.center.open"].kind == "open_workspace"
     assert commands["baseline.center.open"].target_workspace_id == "baseline_run"
     assert commands["baseline.center.open"].automation_id == "BL-BTN-RUN"
-    assert commands["baseline.run_setup.open"].kind == "launch_module"
-    assert commands["baseline.run_setup.open"].module == "pneumo_solver_ui.tools.desktop_run_setup_center"
-    assert commands["baseline.run_setup.open"].title == "Настроить и запустить базовый прогон"
-    assert commands["baseline.run_setup.open"].route_label == "Окна -> Базовый прогон -> Настройка и запуск"
+    assert commands["baseline.run_setup.open"].kind == "hosted_action"
+    assert commands["baseline.run_setup.open"].module is None
+    assert commands["baseline.run_setup.open"].launch_surface == "workspace"
+    assert commands["baseline.run_setup.open"].title == "Настроить базовый прогон"
+    assert commands["baseline.run_setup.open"].route_label == "Окна -> Базовый прогон -> Настройка запуска"
+    assert commands["baseline.run_setup.verify"].kind == "hosted_action"
+    assert commands["baseline.run_setup.prepare_checked"].kind == "hosted_action"
+    assert commands["baseline.run_setup.prepare"].kind == "hosted_action"
+    assert commands["baseline.legacy_run_setup.open"].kind == "launch_module"
+    assert commands["baseline.legacy_run_setup.open"].module == "pneumo_solver_ui.tools.desktop_run_setup_center"
+    assert commands["baseline.legacy_run_setup.open"].launch_surface == "legacy_bridge"
     assert commands["baseline.review"].kind == "hosted_action"
     assert commands["baseline.review"].automation_id == "BL-BTN-REVIEW"
     assert commands["baseline.adopt"].kind == "hosted_action"
@@ -131,6 +138,7 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert "baseline.restore" in workspaces["baseline_run"].quick_action_ids
     assert "baseline.center.open" not in workspaces["baseline_run"].quick_action_ids
     assert "baseline.legacy_launch.open" not in workspaces["baseline_run"].quick_action_ids
+    assert "baseline.legacy_run_setup.open" not in workspaces["baseline_run"].quick_action_ids
     assert "workspace.baseline_run.open" in workspaces["optimization"].quick_action_ids
     assert workspaces["overview"].quick_action_ids == (
         "workspace.input_data.open",
@@ -274,7 +282,11 @@ def test_gui_spec_shell_search_indexes_migration_aliases_and_visual_routes() -> 
     assert mnemo_hits
     assert any(hit.command_id == "animation.mnemo.open" for hit in mnemo_hits)
     assert baseline_hits
-    assert baseline_hits[0].command_id in {"baseline.center.open", "workspace.baseline_run.open"}
+    assert baseline_hits[0].command_id in {
+        "baseline.run_setup.open",
+        "baseline.center.open",
+        "workspace.baseline_run.open",
+    }
     assert baseline_review_hits
     assert any(hit.command_id == "baseline.review" for hit in baseline_review_hits)
     assert v19_springs_hits

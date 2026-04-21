@@ -9,7 +9,11 @@ from PySide6 import QtCore, QtWidgets
 from pneumo_solver_ui.desktop_ring_editor_model import build_default_ring_spec
 from pneumo_solver_ui.desktop_spec_shell.main_window import DesktopGuiSpecMainWindow
 from pneumo_solver_ui.desktop_spec_shell.workspace_runtime import build_ring_workspace_summary
-from pneumo_solver_ui.desktop_spec_shell.workspace_pages import RingWorkspacePage, SuiteWorkspacePage
+from pneumo_solver_ui.desktop_spec_shell.workspace_pages import (
+    BaselineWorkspacePage,
+    RingWorkspacePage,
+    SuiteWorkspacePage,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -157,6 +161,33 @@ def test_main_window_hosts_suite_workspace_as_ring_consumer(tmp_path, monkeypatc
         visible_buttons = {button.text() for button in page.findChildren(QtWidgets.QPushButton)}
         assert "Перейти к базовому прогону" in visible_buttons
         assert "Расширенная настройка набора" in visible_buttons
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_main_window_routes_baseline_setup_to_hosted_page(tmp_path, monkeypatch) -> None:
+    settings_path = tmp_path / "desktop_spec_shell_baseline_setup_state.ini"
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
+
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        window.run_command("baseline.run_setup.open")
+        app.processEvents()
+
+        assert window._current_workspace_id == "baseline_run"
+        page = window._page_widget_by_workspace_id["baseline_run"]
+        assert isinstance(page, BaselineWorkspacePage)
+        assert page.objectName() == "WS-BASELINE-HOSTED-PAGE"
+        assert page.run_setup_box.objectName() == "BL-RUN-SETUP-PANEL"
+        assert "Настройка запуска открыта" in page.run_setup_result_label.text()
+        assert "baseline.run_setup.open" in window.recent_command_ids
+
+        window.run_command("baseline.run_setup.verify")
+        app.processEvents()
+        assert "Проверка готовности" in page.run_setup_result_label.text()
     finally:
         window.close()
         window.deleteLater()

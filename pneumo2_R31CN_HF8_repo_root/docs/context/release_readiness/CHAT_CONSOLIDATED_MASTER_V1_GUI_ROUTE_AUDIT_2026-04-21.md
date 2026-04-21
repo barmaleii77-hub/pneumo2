@@ -21,7 +21,7 @@ Status: actionable implementation audit after importing `pneumo_chat_consolidate
 
 - `pneumo_solver_ui/desktop_spec_shell/registry.py` exposes 11 top-level workspaces in the canonical route order.
 - `diagnostics` is already a hosted workspace. `diagnostics.collect_bundle`, `diagnostics.verify_bundle` and `diagnostics.send_results` are hosted actions, while `diagnostics.legacy_center.open` remains a fallback.
-- `baseline_run` has hosted review/adopt/restore actions, but the actual run setup still launches `desktop_run_setup_center` as a legacy bridge.
+- `baseline_run` has hosted run setup, readiness check and review/adopt/restore surfaces. The old `desktop_run_setup_center` remains available as an explicit advanced fallback command.
 - `ring_editor` and `test_matrix` are hosted workspace surfaces with legacy fallback commands for detailed tools.
 - `optimization` and `results_analysis` are still mostly `legacy_bridge` surfaces.
 - `animation` is route-visible, but its main actions still launch external Animator and Mnemo windows.
@@ -58,13 +58,23 @@ The third implementation change promotes the suite lane into the active route af
 - `workspace.baseline_run.open` is visible as the route-forward handoff after suite validation.
 - `test.center.open` remains a legacy fallback/advanced command instead of the only implementation of the workspace.
 
+## Follow-Up Applied: Hosted WS-BASELINE Setup
+
+The fourth implementation change starts closing the baseline side-launcher gap:
+
+- `baseline.run_setup.open` is now a hosted action routed through `BaselineWorkspacePage`, not a direct module launch.
+- `BaselineWorkspacePage` now exposes `WS-BASELINE-HOSTED-PAGE` plus a native `BL-RUN-SETUP-PANEL` for profile, cache policy, runtime policy, suite readiness and launch preparation.
+- `baseline.run_setup.verify`, `baseline.run_setup.prepare_checked` and `baseline.run_setup.prepare` are command-search-visible hosted actions for readiness and launch preparation.
+- `baseline.legacy_run_setup.open` keeps the old Tk run setup center available as an explicit advanced fallback.
+- The active route now reads as `WS-SUITE -> WS-BASELINE` without forcing the user into an external setup window before seeing baseline state.
+
 ## Remaining Gaps Against Master V1
 
 | Gap | Master V1 source | Current state | Next action |
 | --- | --- | --- | --- |
 | Ring editor must dominate as step 2 | V21 `CUR-RING-NOT-DOMINANT`, V20/V19 ring graphs, V13 ring migration | hosted summary/control surface; legacy editor fallback remains | expand WS-RING from control surface to native editor once source mutation rules are ready |
 | Suite must read as consumer after ring | V21 `CUR-WIN-SUITE`, V20 `WS-SUITE` graph | hosted table/check/snapshot surface; legacy test center fallback remains | expand native suite editing beyond enable/check/save once mutation rules are ready |
-| Baseline setup must not be a side launcher | V20 `WS-BASELINE`, route cost scenarios | baseline state hosted, setup still legacy bridge | host run setup and single-run handoff |
+| Baseline setup must not be a side launcher | V20 `WS-BASELINE`, route cost scenarios | setup/readiness hosted; actual heavy run execution still delegated to advanced center | wire native execution once subprocess contract is isolated from Tk editor state |
 | Optimization needs one primary route | V21 `CUR-SHELL-OPT-PAGE`, V17 path-cost data | workspace exists, optimizer center still legacy bridge | host StageRunner/contract summary and keep distributed mode advanced |
 | Analysis compare must be primary inside analysis | V21 `CUR-WIN-COMPARE` | results workspace exists, results center and compare viewer are launchers | host latest result/compare summary first, keep viewer advanced |
 | Animation is route-visible but still external | V20 `WS-ANIMATOR` | workspace exists, Animator/Mnemo external | host route-aware animation hub before native re-host |
@@ -74,7 +84,7 @@ The third implementation change promotes the suite lane into the active route af
 1. Finish route-first overview hardening and keep tests that prevent legacy/external launchpoints from returning to the overview quick-action row.
 2. Implement hosted `WS-RING` as the next route-critical workspace. Done as hosted summary/control surface.
 3. Implement hosted `WS-SUITE` as consumer of the ring/source snapshot. Done as hosted table/check/snapshot surface.
-4. Move baseline run setup into hosted `WS-BASELINE`.
+4. Move baseline run setup into hosted `WS-BASELINE`. Done as hosted setup/readiness surface; native execution wiring remains next.
 5. Move StageRunner-first optimization controls into hosted `WS-OPTIMIZATION`.
 6. Move latest results and primary compare summary into hosted `WS-ANALYSIS`.
 7. Convert `WS-ANIMATOR` from external-window hub to hosted control hub, then re-host Animator/Mnemo surfaces when runtime evidence is ready.
@@ -88,3 +98,5 @@ The third implementation change promotes the suite lane into the active route af
 - `tests/test_desktop_gui_spec_shell_runtime_contract.py` now opens `ring_editor` offscreen and verifies that the shell hosts `RingWorkspacePage`.
 - `tests/test_desktop_gui_spec_shell_contract.py` now asserts that WS-SUITE is a hosted workspace while `test.center.open` remains a legacy fallback.
 - `tests/test_desktop_gui_spec_shell_runtime_contract.py` and `tests/test_desktop_gui_spec_workspace_pages_contract.py` now verify the hosted suite page, route-forward baseline action and advanced fallback action.
+- `tests/test_desktop_gui_spec_shell_contract.py` now asserts that baseline setup is hosted while `baseline.legacy_run_setup.open` remains the advanced fallback.
+- `tests/test_desktop_gui_spec_shell_runtime_contract.py` and `tests/test_desktop_gui_spec_workspace_pages_contract.py` now verify the hosted baseline setup panel and command routing.

@@ -453,6 +453,25 @@ def test_hosted_baseline_workspace_page_requires_explicit_action_before_restore(
     try:
         app.processEvents()
 
+        assert page.objectName() == "WS-BASELINE-HOSTED-PAGE"
+        assert page.run_setup_box.objectName() == "BL-RUN-SETUP-PANEL"
+        assert page.run_setup_box.title() == "Базовый прогон: настройка и запуск"
+        assert page.run_profile_combo.objectName() == "BL-RUN-PROFILE"
+        assert page.run_cache_policy_combo.objectName() == "BL-RUN-CACHE-POLICY"
+        assert page.run_runtime_policy_combo.objectName() == "BL-RUN-RUNTIME-POLICY"
+        assert page.run_setup_check_button.text() == "Проверить готовность"
+        assert page.run_setup_checked_launch_button.text() == "Проверить и подготовить запуск"
+        assert page.run_setup_plain_launch_button.text() == "Подготовить запуск"
+        assert page.run_setup_advanced_button.text() == "Расширенный центр запуска"
+        assert "Профиль запуска" in page.run_setup_summary_label.text()
+        assert "Готовность набора испытаний" in page.run_setup_gate_label.text()
+        page.handle_command("baseline.run_setup.open")
+        assert "Настройка запуска открыта" in page.run_setup_result_label.text()
+        page.handle_command("baseline.run_setup.verify")
+        assert "Проверка готовности" in page.run_setup_result_label.text()
+        page.handle_command("baseline.run_setup.prepare")
+        assert page.run_setup_result_label.text()
+
         assert page.baseline_center_box.title() == "Базовый прогон: просмотр, принятие, восстановление"
         assert page.review_button.text() == "Просмотреть"
         assert page.adopt_button.text() == "Принять"
