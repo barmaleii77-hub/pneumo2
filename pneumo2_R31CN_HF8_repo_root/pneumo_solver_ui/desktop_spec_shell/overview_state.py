@@ -175,15 +175,15 @@ def build_overview_snapshot(repo_root: Path | None = None) -> OverviewSnapshot:
             title="Последние результаты",
             value=_safe_relative(result_path, root) if result_path else "Пока нет файлов результатов",
             detail="Результаты и сравнение доступны в анализе результатов.",
-            command_id="results.center.open",
+            command_id="workspace.results_analysis.open",
             action_text="Открыть анализ результатов",
         ),
         OverviewCardState(
             title="Последний архив проекта",
             value=str(bundle_path.name) if bundle_path else "Архив пока не найден",
             detail=str(bundle_path.parent) if bundle_path else "Проверка проекта и архив должны оставаться доступными из любого рабочего шага приложения.",
-            command_id="diagnostics.collect_bundle",
-            action_text="Сохранить архив проекта",
+            command_id="workspace.diagnostics.open",
+            action_text="Открыть проверку проекта",
         ),
         OverviewCardState(
             title="Проверка готовности",

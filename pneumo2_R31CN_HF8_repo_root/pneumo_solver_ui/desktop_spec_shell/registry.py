@@ -303,11 +303,12 @@ def build_shell_workspaces() -> tuple[DesktopWorkspaceSpec, ...]:
             quick_action_ids=(
                 "workspace.input_data.open",
                 "workspace.ring_editor.open",
+                "workspace.test_matrix.open",
                 "workspace.baseline_run.open",
                 "workspace.optimization.open",
-                "results.center.open",
-                "animation.animator.open",
-                "diagnostics.collect_bundle",
+                "workspace.results_analysis.open",
+                "workspace.animation.open",
+                "workspace.diagnostics.open",
             ),
         ),
         DesktopWorkspaceSpec(

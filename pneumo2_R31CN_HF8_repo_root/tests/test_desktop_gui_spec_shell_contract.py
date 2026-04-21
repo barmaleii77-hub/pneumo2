@@ -117,6 +117,19 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert "baseline.center.open" not in workspaces["baseline_run"].quick_action_ids
     assert "baseline.legacy_launch.open" not in workspaces["baseline_run"].quick_action_ids
     assert "workspace.baseline_run.open" in workspaces["optimization"].quick_action_ids
+    assert workspaces["overview"].quick_action_ids == (
+        "workspace.input_data.open",
+        "workspace.ring_editor.open",
+        "workspace.test_matrix.open",
+        "workspace.baseline_run.open",
+        "workspace.optimization.open",
+        "workspace.results_analysis.open",
+        "workspace.animation.open",
+        "workspace.diagnostics.open",
+    )
+    assert "results.center.open" not in workspaces["overview"].quick_action_ids
+    assert "animation.animator.open" not in workspaces["overview"].quick_action_ids
+    assert "diagnostics.collect_bundle" not in workspaces["overview"].quick_action_ids
     visible_registry_text = "\n".join(
         [
             *(
@@ -394,7 +407,12 @@ def test_gui_spec_shell_overview_snapshot_exposes_project_baseline_results_and_d
     actions = {card.title: card.action_text for card in snapshot.cards}
     assert actions["Текущий проект"] == "Открыть исходные данные"
     assert actions["Активный опорный прогон"] == "Открыть базовый прогон"
-    assert actions["Последний архив проекта"] == "Сохранить архив проекта"
+    assert actions["Последний архив проекта"] == "Открыть проверку проекта"
+    command_ids = {card.title: card.command_id for card in snapshot.cards}
+    assert command_ids["Последние результаты"] == "workspace.results_analysis.open"
+    assert command_ids["Последний архив проекта"] == "workspace.diagnostics.open"
+    assert "results.center.open" not in command_ids.values()
+    assert "diagnostics.collect_bundle" not in command_ids.values()
 
     visible_text = "\n".join(
         part

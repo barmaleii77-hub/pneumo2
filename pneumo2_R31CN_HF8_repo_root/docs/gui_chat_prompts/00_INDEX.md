@@ -302,6 +302,8 @@ For new GUI lanes that need the latest consolidated chat-derived context from
 `docs/context/gui_spec_imports/chat_consolidated_master_v1/06_INDEX/LINEAGE_AND_READING_ORDER.md`,
 `docs/context/gui_spec_imports/chat_consolidated_master_v1/06_INDEX/SUPERSEDED_AND_EXCLUDED.csv`
 and `docs/context/release_readiness/CHAT_CONSOLIDATED_MASTER_V1_KB_IMPORT_AUDIT_2026-04-21.md`.
+For implementation sequencing, also read
+`docs/context/release_readiness/CHAT_CONSOLIDATED_MASTER_V1_GUI_ROUTE_AUDIT_2026-04-21.md`.
 
 This layer is a reference/provenance layer, not a lane prompt and not runtime-closure proof.
 It consolidates source context, `v38_actualized_with_v10`, `v34_repo_audit`,

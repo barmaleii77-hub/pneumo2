@@ -734,6 +734,7 @@ Read first:
 - `docs/context/gui_spec_imports/chat_consolidated_master_v1/06_INDEX/INCLUDED_ARTIFACTS.csv`
 - `docs/context/gui_spec_imports/chat_consolidated_master_v1/06_INDEX/SUPERSEDED_AND_EXCLUDED.csv`
 - `docs/context/release_readiness/CHAT_CONSOLIDATED_MASTER_V1_KB_IMPORT_AUDIT_2026-04-21.md`
+- `docs/context/release_readiness/CHAT_CONSOLIDATED_MASTER_V1_GUI_ROUTE_AUDIT_2026-04-21.md`
 
 What it adds:
 
@@ -747,3 +748,9 @@ What it adds:
 Boundary: this layer is not runtime-closure proof. It is used for lineage,
 provenance and gap-finding; live GUI acceptance still needs separate runtime,
 visual and release evidence.
+
+Implementation follow-up: `CHAT_CONSOLIDATED_MASTER_V1_GUI_ROUTE_AUDIT_2026-04-21.md`
+is the current bridge from the consolidated master archive to desktop GUI work.
+It records the V21 route-level finding, the current `desktop_spec_shell` evidence,
+and the decision that overview quick actions must open workspaces instead of
+legacy or external launchpoints.

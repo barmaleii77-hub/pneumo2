@@ -1217,8 +1217,14 @@ Reference entrypoints:
 - [GRAPH_ANALYSIS_REPORT_V17.md](./context/gui_spec_imports/chat_consolidated_master_v1/04_GRAPH_ANALYSIS/04_cost_entropy_v17/GRAPH_ANALYSIS_REPORT_V17.md)
 - [00_MASTER_SUMMARY.md](./context/gui_spec_imports/chat_consolidated_master_v1/05_HUMAN_REPORTS/00_MASTER_SUMMARY.md)
 - [CHAT_CONSOLIDATED_MASTER_V1_KB_IMPORT_AUDIT_2026-04-21.md](./context/release_readiness/CHAT_CONSOLIDATED_MASTER_V1_KB_IMPORT_AUDIT_2026-04-21.md)
+- [CHAT_CONSOLIDATED_MASTER_V1_GUI_ROUTE_AUDIT_2026-04-21.md](./context/release_readiness/CHAT_CONSOLIDATED_MASTER_V1_GUI_ROUTE_AUDIT_2026-04-21.md)
 
 Use this layer to clarify consolidated lineage, V21 current-to-canonical gaps,
 V20 workspace subgraphs, V17 route-cost/entropy findings, V34 repo audit evidence
 and human reports V10-V16. Do not use it to close runtime, visual or release
 acceptance without separate evidence.
+
+Current implementation follow-up: `CHAT_CONSOLIDATED_MASTER_V1_GUI_ROUTE_AUDIT_2026-04-21.md`
+maps V21 route findings to `desktop_spec_shell` and records that overview must
+open workspaces first, while legacy/external launchpoints stay inside their
+owning workspaces or tools.

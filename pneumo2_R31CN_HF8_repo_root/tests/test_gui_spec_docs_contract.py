@@ -74,6 +74,11 @@ CHAT_MASTER_IMPORT_AUDIT = (
     / "release_readiness"
     / "CHAT_CONSOLIDATED_MASTER_V1_KB_IMPORT_AUDIT_2026-04-21.md"
 )
+CHAT_MASTER_GUI_ROUTE_AUDIT = (
+    CONTEXT
+    / "release_readiness"
+    / "CHAT_CONSOLIDATED_MASTER_V1_GUI_ROUTE_AUDIT_2026-04-21.md"
+)
 
 CANON_17 = DOCS / "17_WINDOWS_DESKTOP_CAD_GUI_CANON.md"
 CANON_18 = DOCS / "18_PNEUMOAPP_WINDOWS_GUI_SPEC.md"
@@ -172,6 +177,7 @@ def test_chat_consolidated_master_v1_import_layer_exists_and_is_registered() -> 
 
     assert IMPORTS_CHAT_MASTER_V1.exists()
     assert CHAT_MASTER_IMPORT_AUDIT.exists()
+    assert CHAT_MASTER_GUI_ROUTE_AUDIT.exists()
     for rel_path in required_root_and_index_files:
         path = IMPORTS_CHAT_MASTER_V1 / rel_path
         assert path.exists(), rel_path
@@ -256,6 +262,7 @@ def test_chat_consolidated_master_v1_import_layer_exists_and_is_registered() -> 
         CANON_18,
         LINEAGE_MD,
         CHAT_MASTER_IMPORT_AUDIT,
+        CHAT_MASTER_GUI_ROUTE_AUDIT,
     }
     for path in docs_to_check:
         text = path.read_text(encoding="utf-8")
@@ -269,12 +276,21 @@ def test_chat_consolidated_master_v1_import_layer_exists_and_is_registered() -> 
         PROJECT_KNOWLEDGE_BASE,
         CANON_18,
         CHAT_MASTER_IMPORT_AUDIT,
+        CHAT_MASTER_GUI_ROUTE_AUDIT,
     }
     for path in richer_docs:
         text = path.read_text(encoding="utf-8")
         assert "MASTER_EXEC_SUMMARY.json" in text, path
         assert "SUPERSEDED_AND_EXCLUDED.csv" in text, path
         assert "GRAPH_ANALYSIS_REPORT_V21.md" in text, path
+
+    route_audit = CHAT_MASTER_GUI_ROUTE_AUDIT.read_text(encoding="utf-8")
+    assert "overview.quick_action_ids" in route_audit
+    assert "results.center.open" in route_audit
+    assert "animation.animator.open" in route_audit
+    assert "diagnostics.collect_bundle" in route_audit
+    assert "workspace.results_analysis.open" in route_audit
+    assert "workspace.diagnostics.open" in route_audit
 
 
 def test_v37_kb_supplement_import_layer_exists_and_loads_contracts() -> None:
@@ -1825,6 +1841,7 @@ def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
         IMPORTS_CHAT_MASTER_V1 / "REPO_IMPORT_NOTE.md",
         IMPORTS_CHAT_MASTER_V1 / "06_INDEX" / "LINEAGE_AND_READING_ORDER.md",
         CHAT_MASTER_IMPORT_AUDIT,
+        CHAT_MASTER_GUI_ROUTE_AUDIT,
         IMPORTS_V37 / "README.md",
         IMPORTS_V37 / "TECHNICAL_SPECIFICATION.md",
         IMPORTS_V37 / "REPO_GITHUB_KB_SUPPLEMENT.md",

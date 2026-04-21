@@ -242,7 +242,12 @@ Registered entrypoints:
 - `docs/context/gui_spec_imports/chat_consolidated_master_v1/04_GRAPH_ANALYSIS/04_cost_entropy_v17/GRAPH_ANALYSIS_REPORT_V17.md`
 - `docs/context/gui_spec_imports/chat_consolidated_master_v1/05_HUMAN_REPORTS/00_MASTER_SUMMARY.md`
 - `docs/context/release_readiness/CHAT_CONSOLIDATED_MASTER_V1_KB_IMPORT_AUDIT_2026-04-21.md`
+- `docs/context/release_readiness/CHAT_CONSOLIDATED_MASTER_V1_GUI_ROUTE_AUDIT_2026-04-21.md`
 
 Boundary: `chat_consolidated_master_v1` is not runtime-closure proof. It is a
 consolidated reference/provenance layer for V38+V10, V34 audit, graph V17/V19/V20/V21
 and human reports V10-V16.
+
+Implementation follow-up: `CHAT_CONSOLIDATED_MASTER_V1_GUI_ROUTE_AUDIT_2026-04-21.md`
+maps V21/V20/V17 findings to the current `desktop_spec_shell` runtime and records
+the route-first overview hardening decision.
