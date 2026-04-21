@@ -159,6 +159,7 @@ def _operator_result_text(raw: Any) -> str:
         ("архив готов=", "архив готов "),
         ("no_reference", "нет эталона"),
         ("trace_bundle_ready", "архив трассы готов"),
+        ("архив трассы готов=", "архив трассы готов "),
         ("regression_checked", "регрессия проверена"),
         ("MISSING", "не найдено"),
         ("missing", "не найдено"),
@@ -171,6 +172,8 @@ def _operator_result_text(raw: Any) -> str:
         ("False", "нет"),
         ("true", "да"),
         ("false", "нет"),
+        ("готово=нет", "не готово"),
+        ("готово=да", "готово"),
         ("Проверка:", "Проверка результата -"),
         ("Разбор замечаний:", "Разбор замечаний -"),
         ("Последние прогоны:", "Последние прогоны -"),
@@ -195,6 +198,7 @@ def _operator_result_text(raw: Any) -> str:
     )
     for old, new in replacements:
         text = text.replace(old, new)
+    text = text.replace("готово=нет", "не готово").replace("готово=да", "готово")
     text = text.replace(" / ", "; ").replace(" | ", "; ")
     text = text.replace("_", " ")
     return " ".join(text.split()).strip()
@@ -386,9 +390,9 @@ def build_ring_workspace_summary(
     error_count = len(diagnostics.errors)
     source_text = _path_text(source_path) if source_path is not None else "демо-сценарий по умолчанию"
     source_detail = (
-        "Найден repo-local source-of-truth JSON для WS-RING."
+        "Найден файл сценария в проекте."
         if source_path is not None and source_kind in {"source", "nested"}
-        else "Сохраните сценарий из редактора, чтобы downstream-окна читали один и тот же источник."
+        else "Сохраните сценарий из редактора, чтобы следующие окна читали один и тот же источник."
     )
     state_text = (
         "требует исправления"
@@ -433,15 +437,15 @@ def build_ring_workspace_summary(
         WorkspaceSummaryFact(
             "Следующий шаг",
             "перейти к набору испытаний",
-            "WS-SUITE потребляет сценарий как HO-004 handoff и не становится вторым редактором кольца.",
+            "Набор испытаний читает зафиксированный сценарий и не становится вторым редактором кольца.",
         ),
     )
     evidence_lines = _dedupe_lines(
         (
-            "Runtime source: desktop_ring_editor_model.normalize_spec + desktop_ring_editor_runtime.build_ring_editor_diagnostics.",
-            f"Source file: {source_text}.",
-            "Fallback editor command: ring.editor.open.",
-            "Primary next route: workspace.test_matrix.open.",
+            "Сводка собрана через модель и проверку редактора циклического сценария.",
+            f"Файл сценария: {source_text}.",
+            "Детальный редактор остаётся доступен из действий страницы.",
+            "Следующий рабочий шаг: набор испытаний.",
         ),
         tuple(str(item) for item in diagnostics.errors[:3]),
         tuple(str(item) for item in diagnostics.warnings[:3]),
@@ -450,8 +454,8 @@ def build_ring_workspace_summary(
         f"Циклический сценарий: {segment_count} сегментов, {event_count} событий, состояние - {state_text}"
     )
     detail = (
-        "WS-RING теперь открыт как hosted рабочая страница: shell показывает состояние сценария, provenance и безопасный переход дальше, "
-        "а старый редактор остаётся отдельным fallback-действием для детального редактирования."
+        "Страница показывает состояние сценария, происхождение данных и безопасный переход дальше. "
+        "Старый редактор остаётся отдельным инструментом для детального редактирования."
     )
     return WorkspaceSummaryState(
         headline=headline,

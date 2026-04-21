@@ -17,6 +17,7 @@ from pneumo_solver_ui.desktop_spec_shell.workspace_pages import (
     InputWorkspacePage,
     OptimizationWorkspacePage,
     ResultsWorkspacePage,
+    RingWorkspacePage,
     SuiteWorkspacePage,
     _operator_catalog_text,
 )
@@ -175,7 +176,7 @@ def test_gui_spec_main_window_uses_hosted_pages_for_runtime_and_control_hubs_for
     window = DesktopGuiSpecMainWindow()
     try:
         assert isinstance(window._page_widget_by_workspace_id["input_data"], InputWorkspacePage)
-        assert isinstance(window._page_widget_by_workspace_id["ring_editor"], ControlHubWorkspacePage)
+        assert isinstance(window._page_widget_by_workspace_id["ring_editor"], RingWorkspacePage)
         assert isinstance(window._page_widget_by_workspace_id["test_matrix"], SuiteWorkspacePage)
         assert isinstance(window._page_widget_by_workspace_id["animation"], ControlHubWorkspacePage)
         assert isinstance(window._page_widget_by_workspace_id["baseline_run"], BaselineWorkspacePage)
@@ -195,6 +196,7 @@ def test_suite_workspace_page_shows_test_rows_without_launcher_shell() -> None:
     try:
         page = window._page_widget_by_workspace_id["test_matrix"]
         assert isinstance(page, SuiteWorkspacePage)
+        assert page.objectName() == "WS-SUITE-HOSTED-PAGE"
         page.refresh_view()
         app.processEvents()
 
@@ -221,6 +223,8 @@ def test_suite_workspace_page_shows_test_rows_without_launcher_shell() -> None:
             ]
         )
         assert "Связано с редактором циклического сценария" in visible_text
+        assert "Перейти к базовому прогону" in visible_text
+        assert "Расширенная настройка набора" in visible_text
         assert "Смысл и правила окна" not in visible_text
         assert "Открытие:" not in visible_text
         assert "stage" not in visible_text
@@ -393,14 +397,14 @@ def test_control_hub_pages_render_catalog_surface_summary_and_actions() -> None:
     app = _app()
     window = DesktopGuiSpecMainWindow()
     try:
-        page = window._page_widget_by_workspace_id["ring_editor"]
+        page = window._page_widget_by_workspace_id["animation"]
         assert isinstance(page, ControlHubWorkspacePage)
         page.refresh_view()
         app.processEvents()
 
         assert page.surface_box.title() == "Ключевые элементы рабочего шага"
         assert page.actions_box.title() == "Основные действия"
-        assert page.workspace.workspace_id == "ring_editor"
+        assert page.workspace.workspace_id == "animation"
         assert len(page.action_commands) >= 1
     finally:
         window.close()

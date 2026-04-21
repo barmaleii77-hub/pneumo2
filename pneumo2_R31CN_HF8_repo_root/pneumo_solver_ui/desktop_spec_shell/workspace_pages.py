@@ -588,6 +588,7 @@ class SuiteWorkspacePage(QtWidgets.QWidget):
         parent: QtWidgets.QWidget | None = None,
     ) -> None:
         super().__init__(parent)
+        self.setObjectName("WS-SUITE-HOSTED-PAGE")
         self.workspace = workspace
         self.action_commands = tuple(action_commands)
         self.on_command = on_command
@@ -670,6 +671,17 @@ class SuiteWorkspacePage(QtWidgets.QWidget):
             lambda _checked=False: self.on_command("workspace.ring_editor.open")
         )
         actions_layout.addWidget(scenario_button)
+        baseline_command = next(
+            (command for command in self.action_commands if command.command_id == "workspace.baseline_run.open"),
+            None,
+        )
+        if baseline_command is not None:
+            baseline_button = QtWidgets.QPushButton(baseline_command.title)
+            baseline_button.setToolTip(baseline_command.summary)
+            baseline_button.clicked.connect(
+                lambda _checked=False, cid=baseline_command.command_id: self.on_command(cid)
+            )
+            actions_layout.addWidget(baseline_button)
         for command in self.action_commands:
             if command.command_id != "test.center.open":
                 continue

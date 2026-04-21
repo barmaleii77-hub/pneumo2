@@ -22,7 +22,8 @@ Status: actionable implementation audit after importing `pneumo_chat_consolidate
 - `pneumo_solver_ui/desktop_spec_shell/registry.py` exposes 11 top-level workspaces in the canonical route order.
 - `diagnostics` is already a hosted workspace. `diagnostics.collect_bundle`, `diagnostics.verify_bundle` and `diagnostics.send_results` are hosted actions, while `diagnostics.legacy_center.open` remains a fallback.
 - `baseline_run` has hosted review/adopt/restore actions, but the actual run setup still launches `desktop_run_setup_center` as a legacy bridge.
-- `ring_editor`, `test_matrix`, `optimization` and `results_analysis` are still mostly `legacy_bridge` surfaces.
+- `ring_editor` and `test_matrix` are hosted workspace surfaces with legacy fallback commands for detailed tools.
+- `optimization` and `results_analysis` are still mostly `legacy_bridge` surfaces.
 - `animation` is route-visible, but its main actions still launch external Animator and Mnemo windows.
 - `tools` is a support workspace and keeps legacy/tooling entrypoints available for fallback.
 
@@ -47,12 +48,22 @@ The second implementation change starts the route-critical migration after the o
 - `ring.editor.open` remains a legacy fallback command for detailed editing; it is no longer the only visible implementation of the workspace.
 - The ring workspace quick actions are now the fallback editor plus the route-forward handoff to `workspace.test_matrix.open`.
 
+## Follow-Up Applied: Hosted WS-SUITE
+
+The third implementation change promotes the suite lane into the active route after WS-RING:
+
+- `test_matrix.launch_surface` is now `workspace`, matching the existing native `SuiteWorkspacePage`.
+- `SuiteWorkspacePage` exposes a stable `WS-SUITE-HOSTED-PAGE` object name for smoke/contract tests.
+- The page remains the active HO-005 surface: it shows test rows, checks upstream WS-INPUTS/WS-RING links and can save the validated suite snapshot for baseline run setup.
+- `workspace.baseline_run.open` is visible as the route-forward handoff after suite validation.
+- `test.center.open` remains a legacy fallback/advanced command instead of the only implementation of the workspace.
+
 ## Remaining Gaps Against Master V1
 
 | Gap | Master V1 source | Current state | Next action |
 | --- | --- | --- | --- |
 | Ring editor must dominate as step 2 | V21 `CUR-RING-NOT-DOMINANT`, V20/V19 ring graphs, V13 ring migration | hosted summary/control surface; legacy editor fallback remains | expand WS-RING from control surface to native editor once source mutation rules are ready |
-| Suite must read as consumer after ring | V21 `CUR-WIN-SUITE`, V20 `WS-SUITE` graph | route-visible, still legacy bridge | host suite summary/list/detail and validation snapshot |
+| Suite must read as consumer after ring | V21 `CUR-WIN-SUITE`, V20 `WS-SUITE` graph | hosted table/check/snapshot surface; legacy test center fallback remains | expand native suite editing beyond enable/check/save once mutation rules are ready |
 | Baseline setup must not be a side launcher | V20 `WS-BASELINE`, route cost scenarios | baseline state hosted, setup still legacy bridge | host run setup and single-run handoff |
 | Optimization needs one primary route | V21 `CUR-SHELL-OPT-PAGE`, V17 path-cost data | workspace exists, optimizer center still legacy bridge | host StageRunner/contract summary and keep distributed mode advanced |
 | Analysis compare must be primary inside analysis | V21 `CUR-WIN-COMPARE` | results workspace exists, results center and compare viewer are launchers | host latest result/compare summary first, keep viewer advanced |
@@ -61,8 +72,8 @@ The second implementation change starts the route-critical migration after the o
 ## Next Implementation Order
 
 1. Finish route-first overview hardening and keep tests that prevent legacy/external launchpoints from returning to the overview quick-action row.
-2. Implement hosted `WS-RING` as the next route-critical workspace.
-3. Implement hosted `WS-SUITE` as consumer of the ring/source snapshot.
+2. Implement hosted `WS-RING` as the next route-critical workspace. Done as hosted summary/control surface.
+3. Implement hosted `WS-SUITE` as consumer of the ring/source snapshot. Done as hosted table/check/snapshot surface.
 4. Move baseline run setup into hosted `WS-BASELINE`.
 5. Move StageRunner-first optimization controls into hosted `WS-OPTIMIZATION`.
 6. Move latest results and primary compare summary into hosted `WS-ANALYSIS`.
@@ -75,3 +86,5 @@ The second implementation change starts the route-critical migration after the o
 - Existing diagnostics hosted tests remain responsible for proving that `diagnostics.collect_bundle` still works from the diagnostics lane and global command routing.
 - `tests/test_desktop_gui_spec_shell_contract.py` now asserts that WS-RING is a hosted workspace while `ring.editor.open` remains a legacy fallback.
 - `tests/test_desktop_gui_spec_shell_runtime_contract.py` now opens `ring_editor` offscreen and verifies that the shell hosts `RingWorkspacePage`.
+- `tests/test_desktop_gui_spec_shell_contract.py` now asserts that WS-SUITE is a hosted workspace while `test.center.open` remains a legacy fallback.
+- `tests/test_desktop_gui_spec_shell_runtime_contract.py` and `tests/test_desktop_gui_spec_workspace_pages_contract.py` now verify the hosted suite page, route-forward baseline action and advanced fallback action.

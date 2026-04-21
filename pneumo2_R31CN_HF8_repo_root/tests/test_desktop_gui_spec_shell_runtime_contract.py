@@ -9,7 +9,7 @@ from PySide6 import QtCore, QtWidgets
 from pneumo_solver_ui.desktop_ring_editor_model import build_default_ring_spec
 from pneumo_solver_ui.desktop_spec_shell.main_window import DesktopGuiSpecMainWindow
 from pneumo_solver_ui.desktop_spec_shell.workspace_runtime import build_ring_workspace_summary
-from pneumo_solver_ui.desktop_spec_shell.workspace_pages import RingWorkspacePage
+from pneumo_solver_ui.desktop_spec_shell.workspace_pages import RingWorkspacePage, SuiteWorkspacePage
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -132,6 +132,35 @@ def test_ring_workspace_summary_prefers_source_of_truth_over_newer_meta(tmp_path
 
     assert str(source_path.resolve()) in visible_text
     assert str(meta_path.resolve()) not in visible_text
+
+
+def test_main_window_hosts_suite_workspace_as_ring_consumer(tmp_path, monkeypatch) -> None:
+    settings_path = tmp_path / "desktop_spec_shell_suite_state.ini"
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
+
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        window.open_workspace("test_matrix")
+        app.processEvents()
+
+        page = window._page_widget_by_workspace_id["test_matrix"]
+        assert isinstance(page, SuiteWorkspacePage)
+        assert page.objectName() == "WS-SUITE-HOSTED-PAGE"
+        assert page.suite_table.rowCount() > 0
+        action_ids = tuple(command.command_id for command in page.action_commands)
+        assert action_ids == (
+            "test.center.open",
+            "workspace.baseline_run.open",
+            "workspace.ring_editor.open",
+        )
+        visible_buttons = {button.text() for button in page.findChildren(QtWidgets.QPushButton)}
+        assert "Перейти к базовому прогону" in visible_buttons
+        assert "Расширенная настройка набора" in visible_buttons
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
 
 
 def test_main_window_cycles_focus_by_f6_region_order(tmp_path, monkeypatch) -> None:

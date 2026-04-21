@@ -71,6 +71,12 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
         "ring.editor.open",
         "workspace.test_matrix.open",
     )
+    assert workspaces["test_matrix"].launch_surface == "workspace"
+    assert workspaces["test_matrix"].quick_action_ids == (
+        "test.center.open",
+        "workspace.baseline_run.open",
+        "workspace.ring_editor.open",
+    )
 
     assert commands["diagnostics.collect_bundle"].kind == "hosted_action"
     assert commands["diagnostics.collect_bundle"].automation_id == "DG-BTN-COLLECT"
@@ -110,6 +116,8 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert commands["input.editor.open"].launch_surface == "legacy_bridge"
     assert commands["workspace.ring_editor.open"].kind == "open_workspace"
     assert commands["workspace.ring_editor.open"].target_workspace_id == "ring_editor"
+    assert commands["workspace.test_matrix.open"].kind == "open_workspace"
+    assert commands["workspace.test_matrix.open"].target_workspace_id == "test_matrix"
     assert commands["ring.editor.open"].launch_surface == "legacy_bridge"
     assert commands["test.center.open"].launch_surface == "legacy_bridge"
     assert commands["baseline.center.open"].launch_surface == "workspace"
