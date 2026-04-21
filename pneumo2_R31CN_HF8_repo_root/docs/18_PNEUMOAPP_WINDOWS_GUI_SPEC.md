@@ -1103,6 +1103,48 @@ Reference source set:
 - Historical/current context и degraded truth должны быть видимыми состояниями,
   а не неявной технической деталью.
 
+## Ч. V16 visibility priority and must-see state layer
+
+`v16_visibility_priority` импортирован из
+`pneumo_human_gui_report_only_v16_visibility_priority.zip` как report-only
+refinement layer для visibility priority, must-see state markers,
+first-5-seconds comprehension and inspector/help boundaries. Он не заменяет
+`17/18`, `v38_actualized_with_v10`, `v19_graph_iteration`,
+`v12_window_internal_routes` или `v15_state_continuity_repair_loops` и не
+является runtime-closure proof.
+
+Reference source set:
+
+- [README.md](./context/gui_spec_imports/v16_visibility_priority/README.md)
+- [VISIBILITY_PRIORITY_POLICY_V16.md](./context/gui_spec_imports/v16_visibility_priority/VISIBILITY_PRIORITY_POLICY_V16.md)
+- [MUST_SEE_STATE_MATRIX_V16.csv](./context/gui_spec_imports/v16_visibility_priority/MUST_SEE_STATE_MATRIX_V16.csv)
+- [ALWAYS_VISIBLE_CONDITIONAL_INSPECTOR_MATRIX_V16.csv](./context/gui_spec_imports/v16_visibility_priority/ALWAYS_VISIBLE_CONDITIONAL_INSPECTOR_MATRIX_V16.csv)
+- [DOCK_REGION_VISIBILITY_POLICY_V16.csv](./context/gui_spec_imports/v16_visibility_priority/DOCK_REGION_VISIBILITY_POLICY_V16.csv)
+- [WORKSPACE_FIRST_5_SECONDS_V16.csv](./context/gui_spec_imports/v16_visibility_priority/WORKSPACE_FIRST_5_SECONDS_V16.csv)
+- [COGNITIVE_LOAD_REDUCTION_V16.csv](./context/gui_spec_imports/v16_visibility_priority/COGNITIVE_LOAD_REDUCTION_V16.csv)
+- [VISIBILITY_ESCALATION_GRAPH_V16.dot](./context/gui_spec_imports/v16_visibility_priority/VISIBILITY_ESCALATION_GRAPH_V16.dot)
+- [HUMAN_GUI_REPORT_ONLY_V16_VISIBILITY_PRIORITY_2026-04-21.md](./context/release_readiness/HUMAN_GUI_REPORT_ONLY_V16_VISIBILITY_PRIORITY_2026-04-21.md)
+
+### Что уточняет V16
+
+- Каждый workspace должен за первые 3-5 секунд объяснять пользователю, где он
+  находится, какой контекст/источник активен, какое состояние главное, есть ли
+  конфликт или недоверие к данным, и какой следующий шаг рекомендован.
+- Must-see states нельзя прятать только в right inspector, help pane, tooltip,
+  log или secondary window, если они влияют на доверие, интерпретацию результата,
+  repair-route или следующий шаг.
+- Visibility hierarchy делится на `always visible`, `conditionally escalated`
+  and `inspector/help/details`. Inspector-only допустим только для деталей,
+  которые не меняют первое решение пользователя.
+- Top/header, message bar, inline cards and bottom status отвечают за active
+  project, current route, conflict, blocker, progress and repair visibility.
+  Right inspector отвечает за provenance/help/details и не должен становиться
+  мусорным ящиком для критичных состояний.
+- Нельзя скрывать из primary surface две пружины на угол, spring leveling,
+  active baseline, objective stack, hard gate, animation truth-state,
+  historical/current mismatch, stale diagnostics bundle, ring seam status и
+  stale suite link.
+
 ## Ф. V37 GitHub KB supplement predecessor
 
 `v37_github_kb_supplement` импортирован из

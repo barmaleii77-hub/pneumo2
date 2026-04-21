@@ -35,6 +35,7 @@ IMPORTS_V37 = IMPORTS / "v37_github_kb_supplement"
 IMPORTS_V38 = IMPORTS / "v38_github_kb_commit_ready"
 IMPORTS_V19 = IMPORTS / "v19_graph_iteration"
 IMPORTS_V15 = IMPORTS / "v15_state_continuity_repair_loops"
+IMPORTS_V16 = IMPORTS / "v16_visibility_priority"
 V32_COMPLETENESS = IMPORTS_V32 / "COMPLETENESS_ASSESSMENT.md"
 V32_WORKSTREAMS = IMPORTS_V32 / "PARALLEL_CHAT_WORKSTREAMS.md"
 V33_COMPLETENESS = IMPORTS_V33 / "COMPLETENESS_ASSESSMENT.md"
@@ -60,6 +61,11 @@ V15_IMPORT_AUDIT = (
     CONTEXT
     / "release_readiness"
     / "HUMAN_GUI_REPORT_ONLY_V15_STATE_CONTINUITY_REPAIR_LOOPS_2026-04-21.md"
+)
+V16_IMPORT_AUDIT = (
+    CONTEXT
+    / "release_readiness"
+    / "HUMAN_GUI_REPORT_ONLY_V16_VISIBILITY_PRIORITY_2026-04-21.md"
 )
 
 CANON_17 = DOCS / "17_WINDOWS_DESKTOP_CAD_GUI_CANON.md"
@@ -531,6 +537,100 @@ def test_v15_state_continuity_repair_loop_layer_exists_and_is_registered() -> No
     )
 
 
+def test_v16_visibility_priority_layer_exists_and_is_registered() -> None:
+    required_files = {
+        "README.md",
+        "ALWAYS_VISIBLE_CONDITIONAL_INSPECTOR_MATRIX_V16.csv",
+        "COGNITIVE_LOAD_REDUCTION_V16.csv",
+        "DOCK_REGION_VISIBILITY_POLICY_V16.csv",
+        "EXEC_SUMMARY.md",
+        "HOW_TO_FIX_V16.md",
+        "LIMITS_AND_EVIDENCE_V16.md",
+        "MUST_SEE_STATE_MATRIX_V16.csv",
+        "VISIBILITY_ESCALATION_GRAPH_V16.dot",
+        "VISIBILITY_PRIORITY_POLICY_V16.md",
+        "WHAT_IS_BAD_V16.md",
+        "WHAT_IS_GOOD_V16.md",
+        "WORKSPACE_FIRST_5_SECONDS_V16.csv",
+    }
+
+    assert IMPORTS_V16.exists()
+    actual_files = {path.name for path in IMPORTS_V16.iterdir() if path.is_file()}
+    assert required_files <= actual_files
+    for file_name in required_files:
+        assert (IMPORTS_V16 / file_name).stat().st_size > 0, file_name
+
+    must_see_rows = _load_csv_rows(IMPORTS_V16 / "MUST_SEE_STATE_MATRIX_V16.csv")
+    placement_rows = _load_csv_rows(
+        IMPORTS_V16 / "ALWAYS_VISIBLE_CONDITIONAL_INSPECTOR_MATRIX_V16.csv"
+    )
+    dock_rows = _load_csv_rows(IMPORTS_V16 / "DOCK_REGION_VISIBILITY_POLICY_V16.csv")
+    first_seconds_rows = _load_csv_rows(
+        IMPORTS_V16 / "WORKSPACE_FIRST_5_SECONDS_V16.csv"
+    )
+    cognitive_rows = _load_csv_rows(
+        IMPORTS_V16 / "COGNITIVE_LOAD_REDUCTION_V16.csv"
+    )
+    dot_text = (IMPORTS_V16 / "VISIBILITY_ESCALATION_GRAPH_V16.dot").read_text(
+        encoding="utf-8-sig"
+    )
+
+    assert len(must_see_rows) == 45
+    assert len(placement_rows) == 45
+    assert len(dock_rows) == 8
+    assert len(first_seconds_rows) == 10
+    assert len(cognitive_rows) == 5
+    assert any(
+        row["workspace"] == "SHELL"
+        and row["state_id"] == "STATE-SH-001"
+        and row["visibility_policy"] == "always"
+        and row["primary_region"] == "top_bar"
+        for row in must_see_rows
+    )
+    assert any(
+        row["state_id"] == "STATE-SH-001"
+        and row["default_region"] == "top_bar"
+        and row["can_live_only_in_inspector"].startswith("нет")
+        for row in placement_rows
+    )
+    assert any(
+        row["region_id"] == "left_navigation_tree"
+        and row["canonical_rule"] == "Tree first-class launcher"
+        for row in dock_rows
+    )
+    assert any(row["workspace"] == "SHELL" for row in first_seconds_rows)
+    assert "hidden_result -> inspector_only" in dot_text
+    assert "message_bar -> blocker" in dot_text
+
+    imports_readme = IMPORTS_README.read_text(encoding="utf-8")
+    project_sources_text = PROJECT_SOURCES.read_text(encoding="utf-8")
+    project_kb_text = PROJECT_KNOWLEDGE_BASE.read_text(encoding="utf-8")
+    index_text = GUI_INDEX.read_text(encoding="utf-8")
+    canon_18 = CANON_18.read_text(encoding="utf-8")
+    audit_text = V16_IMPORT_AUDIT.read_text(encoding="utf-8")
+
+    for text in (
+        imports_readme,
+        project_sources_text,
+        project_kb_text,
+        index_text,
+        canon_18,
+        audit_text,
+    ):
+        assert "v16_visibility_priority" in text
+        assert "VISIBILITY_PRIORITY_POLICY_V16.md" in text
+        assert "MUST_SEE_STATE_MATRIX_V16.csv" in text
+        assert "WORKSPACE_FIRST_5_SECONDS_V16.csv" in text
+        assert "runtime-closure proof" in text
+
+    assert project_sources_text.index("v15_state_continuity_repair_loops") < project_sources_text.index(
+        "v16_visibility_priority"
+    )
+    assert imports_readme.index("v15_state_continuity_repair_loops") < imports_readme.index(
+        "v16_visibility_priority"
+    )
+
+
 def test_v13_import_layer_exists_and_matches_manifest() -> None:
     manifest_path = IMPORTS_V13 / "manifest.json"
     readme_path = IMPORTS_V13 / "README.md"
@@ -891,6 +991,7 @@ def test_v12_design_recovery_layer_and_lineage_inventory_are_registered() -> Non
         "v12",
         "v13",
         "v15_state_continuity_repair_loops",
+        "v16_visibility_priority",
         "v37",
         "v38",
     ]
@@ -900,6 +1001,12 @@ def test_v12_design_recovery_layer_and_lineage_inventory_are_registered() -> Non
     assert any(
         item["version"] == "v15_state_continuity_repair_loops"
         and item["repo_layer"] == "docs/context/gui_spec_imports/v15_state_continuity_repair_loops/"
+        and item["status"] == "current_report_only_refinement"
+        for item in lineage_json
+    )
+    assert any(
+        item["version"] == "v16_visibility_priority"
+        and item["repo_layer"] == "docs/context/gui_spec_imports/v16_visibility_priority/"
         and item["status"] == "current_report_only_refinement"
         for item in lineage_json
     )
@@ -1578,6 +1685,8 @@ def test_touched_gui_spec_docs_have_no_strong_mojibake() -> None:
         IMPORTS_V19 / "README.md",
         IMPORTS_V15 / "README.md",
         V15_IMPORT_AUDIT,
+        IMPORTS_V16 / "README.md",
+        V16_IMPORT_AUDIT,
         IMPORTS_V37 / "README.md",
         IMPORTS_V37 / "TECHNICAL_SPECIFICATION.md",
         IMPORTS_V37 / "REPO_GITHUB_KB_SUPPLEMENT.md",

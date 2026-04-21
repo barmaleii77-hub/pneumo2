@@ -210,6 +210,22 @@
     "repo_layer": "docs/context/gui_spec_imports/v15_state_continuity_repair_loops/"
   },
   {
+    "version": "v16_visibility_priority",
+    "archive_name": "pneumo_human_gui_report_only_v16_visibility_priority.zip",
+    "phase": "report_only_visibility_priority",
+    "status": "current_report_only_refinement",
+    "role": "visibility priority hierarchy, must-see state matrix, first-5-seconds workspace meaning and inspector/help boundary without runtime-closure proof",
+    "main_artifacts": [
+      "VISIBILITY_PRIORITY_POLICY_V16.md",
+      "MUST_SEE_STATE_MATRIX_V16.csv",
+      "ALWAYS_VISIBLE_CONDITIONAL_INSPECTOR_MATRIX_V16.csv",
+      "DOCK_REGION_VISIBILITY_POLICY_V16.csv",
+      "WORKSPACE_FIRST_5_SECONDS_V16.csv",
+      "VISIBILITY_ESCALATION_GRAPH_V16.dot"
+    ],
+    "repo_layer": "docs/context/gui_spec_imports/v16_visibility_priority/"
+  },
+  {
     "version": "v37",
     "archive_name": "pneumo_codex_tz_spec_connector_reconciled_v37_github_kb_supplement.zip",
     "phase": "knowledge_base_reconciliation",

@@ -91,6 +91,13 @@ Operational note:
 32. [docs/context/gui_spec_imports/v15_state_continuity_repair_loops/REPAIR_LOOP_POLICY_V15.csv](./context/gui_spec_imports/v15_state_continuity_repair_loops/REPAIR_LOOP_POLICY_V15.csv)
 33. [docs/context/gui_spec_imports/v15_state_continuity_repair_loops/CONTEXT_RESTORE_AND_RETURN_TARGETS_V15.csv](./context/gui_spec_imports/v15_state_continuity_repair_loops/CONTEXT_RESTORE_AND_RETURN_TARGETS_V15.csv)
 34. [docs/context/release_readiness/HUMAN_GUI_REPORT_ONLY_V15_STATE_CONTINUITY_REPAIR_LOOPS_2026-04-21.md](./context/release_readiness/HUMAN_GUI_REPORT_ONLY_V15_STATE_CONTINUITY_REPAIR_LOOPS_2026-04-21.md)
+35. [docs/context/gui_spec_imports/v16_visibility_priority/README.md](./context/gui_spec_imports/v16_visibility_priority/README.md)
+36. [docs/context/gui_spec_imports/v16_visibility_priority/VISIBILITY_PRIORITY_POLICY_V16.md](./context/gui_spec_imports/v16_visibility_priority/VISIBILITY_PRIORITY_POLICY_V16.md)
+37. [docs/context/gui_spec_imports/v16_visibility_priority/MUST_SEE_STATE_MATRIX_V16.csv](./context/gui_spec_imports/v16_visibility_priority/MUST_SEE_STATE_MATRIX_V16.csv)
+38. [docs/context/gui_spec_imports/v16_visibility_priority/ALWAYS_VISIBLE_CONDITIONAL_INSPECTOR_MATRIX_V16.csv](./context/gui_spec_imports/v16_visibility_priority/ALWAYS_VISIBLE_CONDITIONAL_INSPECTOR_MATRIX_V16.csv)
+39. [docs/context/gui_spec_imports/v16_visibility_priority/DOCK_REGION_VISIBILITY_POLICY_V16.csv](./context/gui_spec_imports/v16_visibility_priority/DOCK_REGION_VISIBILITY_POLICY_V16.csv)
+40. [docs/context/gui_spec_imports/v16_visibility_priority/WORKSPACE_FIRST_5_SECONDS_V16.csv](./context/gui_spec_imports/v16_visibility_priority/WORKSPACE_FIRST_5_SECONDS_V16.csv)
+41. [docs/context/release_readiness/HUMAN_GUI_REPORT_ONLY_V16_VISIBILITY_PRIORITY_2026-04-21.md](./context/release_readiness/HUMAN_GUI_REPORT_ONLY_V16_VISIBILITY_PRIORITY_2026-04-21.md)
 14. [docs/context/gui_spec_imports/v38_github_kb_commit_ready/README.md](./context/gui_spec_imports/v38_github_kb_commit_ready/README.md)
 15. [docs/context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md](./context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md)
 16. [docs/context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml](./context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml)
@@ -204,11 +211,12 @@ Operational note:
 - локальные digests и snapshots AI-контекста;
 - current imported V38 actualized with V10 GUI/TZ/spec knowledge-base layer,
   with previous V38/V10 layers retained as provenance and evidence;
-- human GUI simulation/report-only audits V5/V6/V10/V12/V15 as evidence-first,
+- human GUI simulation/report-only audits V5/V6/V10/V12/V15/V16 as evidence-first,
   route-hierarchy and first-screen/action-feedback clarification layers for
   launcher hierarchy, first-class `Редактор кольца`, archive check/send route,
   compare differentiation, truth-state markers, direct tree open and
-  under-proven window internals, state continuity and repair loops;
+  under-proven window internals, state continuity, repair loops, visibility
+  priority and first-5-seconds comprehension;
 - connector-reconciled GUI/TZ digest v33, with v32 retained as previous
   workstream/release-gate evidence layer;
 - внешние архивы и Google Drive как контекст и история;
@@ -399,6 +407,22 @@ Operational note:
   после готового архива диагностики;
 - V19 не является runtime-closure proof: current internals для этих workspace-ов
   остаются evidence-bound до отдельного runtime/visual artifact.
+
+Что добавляет V16 visibility-priority report-only layer:
+
+- V16 уточняет, какие состояния обязаны быть видимы сразу, какие должны
+  эскалироваться при конфликте и какие можно оставлять только в inspector/help.
+- Must-see states не должны жить только в правом инспекторе, подсказке или логе,
+  если они меняют доверие к данным, интерпретацию результата, repair-route или
+  следующий шаг пользователя.
+- Первый экран каждого workspace должен за 3-5 секунд объяснять, где находится
+  пользователь, с каким контекстом он работает, какое главное состояние важно,
+  есть ли конфликт/недоверие и что делать дальше.
+- Top/message/bottom/inline surfaces отвечают за active project, route,
+  conflict, blocker, progress and repair visibility; right inspector остаётся
+  слоем provenance/help/details, а не местом для скрытия критичных состояний.
+- V16 не является runtime-closure proof: он фиксирует целевую visibility policy,
+  но не доказывает live visual/runtime acceptance текущего GUI.
 
 Что остаётся от V38 commit-ready KB layer:
 

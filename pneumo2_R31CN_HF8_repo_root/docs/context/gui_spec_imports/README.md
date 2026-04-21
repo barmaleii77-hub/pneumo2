@@ -44,6 +44,13 @@
   `mismatch` и `degraded`, единственный основной repair-route, restore/return
   targets и graph состояния после входа в workspace. Это reference layer, а не
   `runtime-closure proof`;
+- `v16_visibility_priority/` — current report-only visibility-priority and
+  must-see state layer из
+  `pneumo_human_gui_report_only_v16_visibility_priority.zip`. Слой уточняет
+  `always visible`, `conditionally escalated` and `inspector/help/details`
+  политику, first 3-5 seconds понимание workspace, dock-region visibility и
+  escalation graph для hidden/inline/message/blocker states. Это reference
+  layer, а не `runtime-closure proof`;
 - `v38_github_kb_commit_ready/` — predecessor import-ready successor
   knowledge-base commit-ready layer из
   `pneumo_codex_tz_spec_connector_reconciled_v38_github_kb_commit_ready.zip`.
@@ -133,6 +140,18 @@
    `../release_readiness/HUMAN_GUI_REPORT_ONLY_V15_STATE_CONTINUITY_REPAIR_LOOPS_2026-04-21.md`.
    Этот слой фиксирует continuity/repair-loop contract, но не доказывает live
    runtime acceptance.
+7. Если задача касается visibility priority, first-5-seconds понимания,
+   границы inspector/help-only details, message/banner escalation или того, что
+   нельзя прятать из primary workspace surface, читать
+   `v16_visibility_priority/README.md`,
+   `VISIBILITY_PRIORITY_POLICY_V16.md`,
+   `MUST_SEE_STATE_MATRIX_V16.csv`,
+   `ALWAYS_VISIBLE_CONDITIONAL_INSPECTOR_MATRIX_V16.csv`,
+   `DOCK_REGION_VISIBILITY_POLICY_V16.csv`,
+   `WORKSPACE_FIRST_5_SECONDS_V16.csv` and
+   `../release_readiness/HUMAN_GUI_REPORT_ONLY_V16_VISIBILITY_PRIORITY_2026-04-21.md`.
+   Этот слой фиксирует must-see visibility contract, но не доказывает live
+   runtime acceptance.
 5. Затем читать `v38_github_kb_commit_ready/README.md`,
    `v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md`,
    `v38_github_kb_commit_ready/GUI_SPEC.yaml`, V38 catalog/matrix files and
@@ -205,6 +224,10 @@
   `v15_state_continuity_repair_loops/*` как state-continuity/repair-loop
   report-only refinement для stale/dirty/mismatch/degraded states, restore
   targets and user-visible markers, затем у
+  `v16_visibility_priority/*` как visibility-priority/must-see state
+  report-only refinement для always-visible, conditionally escalated,
+  inspector/help-only boundaries, first-5-seconds comprehension and
+  message/banner escalation, затем у
   `v38_github_kb_commit_ready/*` and
   `V38_KB_IMPORT_AUDIT_2026-04-18.md` as predecessor V38 layer, затем у
   `v37_github_kb_supplement/*` as predecessor KB/TZ/spec layer, затем у

@@ -25,6 +25,10 @@ knowledge-base слоями.
   Он не входит в линейку `v1…v13` как replacement; его роль - уточнить state
   continuity, stale/dirty/mismatch/degraded markers, repair loops and context
   restore/return targets.
+- `v16_visibility_priority` — отдельный report-only слой после V15. Он не
+  входит в линейку `v1…v13` как replacement; его роль - уточнить visibility
+  hierarchy, must-see states, first 3-5 seconds workspace comprehension and
+  inspector/help-only boundaries.
 - `v37` — predecessor import-ready GitHub KB/TZ/spec supplement. Он поднимает
   consolidated technical specification, workspace/parameter/acceptance
   matrices и open gaps в repo-local knowledge-base layer, но не является
@@ -179,6 +183,26 @@ knowledge-base слоями.
 - Ограничение: не runtime-closure proof и не доказательство live state/repair
   acceptance текущего GUI.
 
+### v16_visibility_priority
+
+- Роль: report-only addendum по visibility priority, must-see states and
+  inspector/help boundaries.
+- Архив:
+  `pneumo_human_gui_report_only_v16_visibility_priority.zip`.
+- Что добавляет: `VISIBILITY_PRIORITY_POLICY_V16.md`,
+  `MUST_SEE_STATE_MATRIX_V16.csv`,
+  `ALWAYS_VISIBLE_CONDITIONAL_INSPECTOR_MATRIX_V16.csv`,
+  `DOCK_REGION_VISIBILITY_POLICY_V16.csv`,
+  `WORKSPACE_FIRST_5_SECONDS_V16.csv`,
+  `COGNITIVE_LOAD_REDUCTION_V16.csv` and
+  `VISIBILITY_ESCALATION_GRAPH_V16.dot`.
+- Статус: current report-only refinement в
+  `docs/context/gui_spec_imports/v16_visibility_priority/` с локальной
+  KB-сводкой
+  `docs/context/release_readiness/HUMAN_GUI_REPORT_ONLY_V16_VISIBILITY_PRIORITY_2026-04-21.md`.
+- Ограничение: не runtime-closure proof и не доказательство live
+  visibility/first-screen acceptance текущего GUI.
+
 ### v13
 
 - Роль: специализированный ring-editor migration addendum.
@@ -235,13 +259,15 @@ knowledge-base слоями.
    first-screen/internal-route уточнений четырех окон
 7. `docs/context/gui_spec_imports/v15_state_continuity_repair_loops/*` для
    state-continuity/repair-loop уточнений stale/dirty/mismatch/degraded states
-8. `docs/context/gui_spec_imports/v37_github_kb_supplement/*`
-9. `docs/context/gui_spec_imports/v3/*`
-10. `docs/context/gui_spec_imports/v13_ring_editor_migration/*` для `WS-RING`
+8. `docs/context/gui_spec_imports/v16_visibility_priority/*` для
+   visibility-priority/must-see state and inspector/help boundary уточнений
+9. `docs/context/gui_spec_imports/v37_github_kb_supplement/*`
+10. `docs/context/gui_spec_imports/v3/*`
+11. `docs/context/gui_spec_imports/v13_ring_editor_migration/*` для `WS-RING`
    и ring-to-suite handoff
-11. `docs/context/gui_spec_imports/v12_design_recovery/*`
-12. lineage `PROMPT_V2 + v1…v13 + v37 + v38`
-13. прочие historical imports и implementation archives
+12. `docs/context/gui_spec_imports/v12_design_recovery/*`
+13. lineage `PROMPT_V2 + v1…v13 + v37 + v38`
+14. прочие historical imports и implementation archives
 
 ## Практическое правило
 

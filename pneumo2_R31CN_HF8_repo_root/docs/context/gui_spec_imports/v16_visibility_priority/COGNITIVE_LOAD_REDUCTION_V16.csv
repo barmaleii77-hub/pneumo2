@@ -1,0 +1,6 @@
+issue_id,current_cognitive_problem,visibility_change,expected_effect,workspace
+issue-001,"Входные режимы работают, но не материализуют результат",Сразу показывать факт режима + способ + величину результата,понимание выросло до первого взгляда,WS-INPUTS
+issue-002,Сценарный шов прячется в глубине редактора,Banner + jump to seam + selected segment sync,ремонт быстрее и без поиска,WS-RING
+issue-003,"StageRunner живёт, но underfill/gate reason не видно",Показывать underfill и gate reason в текущем progress block,снижается ложное ощущение зависания,WS-OPTIMIZATION
+issue-004,"Animator красивый, но truth-state неясен",Truth marker + axis-only overlay + historical banner,снижается риск неверной интерпретации,WS-ANIMATOR
+issue-005,Diagnostics и send competing,"Одна primary action, send только после bundle ready",маршрут становится одношаговым и понятным,WS-DIAGNOSTICS

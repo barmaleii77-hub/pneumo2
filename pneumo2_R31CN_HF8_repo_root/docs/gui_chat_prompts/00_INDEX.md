@@ -35,6 +35,14 @@
    — report-only continuity/repair-loop refinement для `dirty`, `invalid`,
    `stale`, `mismatch`, `degraded`, restore targets and visible markers; читать
    после V19/V12, не как runtime-closure proof.
+7. [gui_spec_imports/v16_visibility_priority/README.md](../context/gui_spec_imports/v16_visibility_priority/README.md),
+   [VISIBILITY_PRIORITY_POLICY_V16.md](../context/gui_spec_imports/v16_visibility_priority/VISIBILITY_PRIORITY_POLICY_V16.md),
+   [MUST_SEE_STATE_MATRIX_V16.csv](../context/gui_spec_imports/v16_visibility_priority/MUST_SEE_STATE_MATRIX_V16.csv),
+   [ALWAYS_VISIBLE_CONDITIONAL_INSPECTOR_MATRIX_V16.csv](../context/gui_spec_imports/v16_visibility_priority/ALWAYS_VISIBLE_CONDITIONAL_INSPECTOR_MATRIX_V16.csv)
+   и [WORKSPACE_FIRST_5_SECONDS_V16.csv](../context/gui_spec_imports/v16_visibility_priority/WORKSPACE_FIRST_5_SECONDS_V16.csv)
+   — report-only visibility-priority refinement: must-see states, first
+   3-5 seconds, message/banner escalation and inspector/help boundaries; читать
+   после V15, не как runtime-closure proof.
 5. [gui_spec_imports/v37_github_kb_supplement/README.md](../context/gui_spec_imports/v37_github_kb_supplement/README.md),
    [TECHNICAL_SPECIFICATION.md](../context/gui_spec_imports/v37_github_kb_supplement/TECHNICAL_SPECIFICATION.md)
    и [GUI_SPEC.yaml](../context/gui_spec_imports/v37_github_kb_supplement/GUI_SPEC.yaml)
@@ -213,6 +221,10 @@
 - `v15_state_continuity_repair_loops` задаёт report-only continuity layer:
   visible state markers, repair actions, context restore and return targets for
   stale/dirty/mismatch/degraded flows; он не закрывает runtime acceptance.
+- `v16_visibility_priority` задаёт report-only visibility layer:
+  must-see states, always/conditional/inspector-only hierarchy, first 3-5
+  seconds workspace comprehension and message/banner escalation; он не
+  закрывает runtime acceptance.
 - `v12_design_recovery` задаёт historical recovery layer:
   ring-editor precursor contract, optimization control plane, truthful graphics
   и workspace recovery delta.
@@ -272,7 +284,10 @@
   и lineage `v1…v13`;
 - при конфликте приоритет у `17/18`, затем у `foundations`, затем у
   `v38_github_kb_commit_ready` плюс `V38_KB_IMPORT_AUDIT_2026-04-18.md`, затем
-  у `v37_github_kb_supplement`, затем у `v33_connector_reconciled`, затем
+  у `v19_graph_iteration`, `v12_window_internal_routes`,
+  `v15_state_continuity_repair_loops` и `v16_visibility_priority` как
+  report-only refinements в пределах их тем, затем у `v37_github_kb_supplement`,
+  затем у `v33_connector_reconciled`, затем
   у `v32_connector_reconciled`, затем у `v3`, затем у специализированного
   `v13_ring_editor_migration`, затем у `v12_design_recovery`, затем у
   historical imports.
