@@ -35,6 +35,7 @@ from pneumo_solver_ui.optimization_baseline_source import baseline_center_eviden
 from .catalogs import get_tooltip, get_ui_element
 from .contracts import DesktopWorkspaceSpec
 from .help_registry import _operator_text
+from .v16_guidance_widgets import build_v16_visibility_priority_box
 from .v19_guidance_widgets import build_v19_action_feedback_box
 from .workspace_runtime import build_diagnostics_workspace_summary
 
@@ -609,6 +610,10 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         self.source_label.setWordWrap(True)
         self.source_label.setStyleSheet("color: #405060;")
         layout.addWidget(self.source_label)
+
+        v16_box = build_v16_visibility_priority_box(workspace)
+        if v16_box is not None:
+            layout.addWidget(v16_box)
 
         v19_box = build_v19_action_feedback_box(workspace)
         if v19_box is not None:

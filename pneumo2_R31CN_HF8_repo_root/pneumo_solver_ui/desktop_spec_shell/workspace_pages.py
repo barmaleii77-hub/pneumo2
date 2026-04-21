@@ -27,6 +27,7 @@ from .workspace_runtime import (
     build_results_workspace_summary,
 )
 from .v19_guidance_widgets import build_v19_action_feedback_box
+from .v16_guidance_widgets import build_v16_visibility_priority_box
 
 
 def _clear_layout(layout: QtWidgets.QLayout) -> None:
@@ -344,6 +345,10 @@ class RuntimeWorkspacePage(QtWidgets.QWidget):
         self.evidence_layout = QtWidgets.QVBoxLayout(self.evidence_box)
         layout.addWidget(self.evidence_box)
 
+        v16_box = build_v16_visibility_priority_box(workspace)
+        if v16_box is not None:
+            layout.addWidget(v16_box)
+
         v19_box = build_v19_action_feedback_box(workspace)
         if v19_box is not None:
             layout.addWidget(v19_box)
@@ -460,6 +465,10 @@ class ControlHubWorkspacePage(QtWidgets.QWidget):
         contract_layout.addRow("Следующий шаг", QtWidgets.QLabel(workspace.next_step))
         contract_layout.addRow("Обязательное условие", QtWidgets.QLabel(workspace.hard_gate))
         layout.addWidget(contract_box)
+
+        v16_box = build_v16_visibility_priority_box(workspace)
+        if v16_box is not None:
+            layout.addWidget(v16_box)
 
         v19_box = build_v19_action_feedback_box(workspace)
         if v19_box is not None:
@@ -671,6 +680,10 @@ class SuiteWorkspacePage(QtWidgets.QWidget):
             actions_layout.addWidget(advanced_button)
             break
         layout.addWidget(actions_box)
+
+        v16_box = build_v16_visibility_priority_box(workspace)
+        if v16_box is not None:
+            layout.addWidget(v16_box)
 
         v19_box = build_v19_action_feedback_box(workspace)
         if v19_box is not None:

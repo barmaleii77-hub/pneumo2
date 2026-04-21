@@ -8,6 +8,7 @@ from .catalogs import (
     get_ui_element,
     legacy_key_aliases,
     migration_hints_by_workspace_code,
+    v16_search_hints_by_workspace_code,
     v19_search_hints_by_workspace_code,
 )
 from .contracts import DesktopShellCommandSpec, DesktopWorkspaceSpec
@@ -36,7 +37,7 @@ WORKSPACE_CODE_BY_ID: dict[str, tuple[str, ...]] = {
 }
 
 WORKSPACE_CATALOG_ALIAS_CODES_BY_ID: dict[str, tuple[str, ...]] = {
-    "overview": ("WS-PROJECT", "общие_регионы"),
+    "overview": ("SHELL", "WS-PROJECT", "общие_регионы"),
     "results_analysis": (
         "WS-RESULTS",
         "WS-ANALYTICS",
@@ -229,6 +230,20 @@ def _v19_aliases_for_workspace(workspace_id: str) -> tuple[str, ...]:
     return _sanitize_v19_search_aliases(values)
 
 
+def _v16_aliases_for_workspace(workspace_id: str) -> tuple[str, ...]:
+    hints_by_code = v16_search_hints_by_workspace_code()
+    values: list[str] = []
+    codes = _dedupe(
+        [
+            *WORKSPACE_CODE_BY_ID.get(workspace_id, ()),
+            *WORKSPACE_CATALOG_ALIAS_CODES_BY_ID.get(workspace_id, ()),
+        ]
+    )
+    for code in codes:
+        values.extend(hints_by_code.get(code, ()))
+    return _sanitize_v19_search_aliases(values)
+
+
 def _bind_workspace_catalog(spec: DesktopWorkspaceSpec) -> DesktopWorkspaceSpec:
     element = get_ui_element(WORKSPACE_ELEMENT_BY_ID.get(spec.workspace_id))
     return replace(
@@ -248,6 +263,7 @@ def _bind_workspace_catalog(spec: DesktopWorkspaceSpec) -> DesktopWorkspaceSpec:
                 *spec.search_aliases,
                 *_migration_aliases_for_workspace(spec.workspace_id),
                 *_v19_aliases_for_workspace(spec.workspace_id),
+                *_v16_aliases_for_workspace(spec.workspace_id),
             ]
         ),
         quick_action_ids=ROUTE_QUICK_ACTIONS_BY_WORKSPACE.get(spec.workspace_id, spec.quick_action_ids),

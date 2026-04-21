@@ -46,6 +46,9 @@ def test_main_window_applies_v3_shortcuts_and_docking_contracts(tmp_path, monkey
         assert window.inspector_dock.property("spec_can_second_monitor") is True
         assert window.status_primary_label.property("ui_state_id") == "STATE-VALID"
         assert window.warning_label.property("ui_state_id") == "STATE-WARNING"
+        assert window.findChild(QtWidgets.QGroupBox, "V16-VISIBILITY-WS-PROJECT") is not None
+        assert window.findChild(QtWidgets.QGroupBox, "V16-VISIBILITY-WS-INPUTS") is not None
+        assert window.findChild(QtWidgets.QGroupBox, "V16-VISIBILITY-WS-DIAGNOSTICS") is not None
     finally:
         window.close()
         window.deleteLater()

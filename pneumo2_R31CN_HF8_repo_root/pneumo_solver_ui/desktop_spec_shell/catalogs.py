@@ -30,6 +30,10 @@ V19_TREE_DIRECT_OPEN_PATH = V19_GRAPH_IMPORT_ROOT / "TREE_DIRECT_OPEN_MATRIX_V19
 V19_NOT_PROVEN_CURRENT_WINDOWS_PATH = V19_GRAPH_IMPORT_ROOT / "NOT_PROVEN_CURRENT_WINDOWS_V19.csv"
 V19_PATH_COST_SCENARIOS_PATH = V19_GRAPH_IMPORT_ROOT / "PATH_COST_SCENARIOS_V19.csv"
 V19_GUI_LABEL_SEMANTIC_AUDIT_PATH = V19_GRAPH_IMPORT_ROOT / "GUI_LABEL_SEMANTIC_AUDIT_V19.csv"
+V16_VISIBILITY_IMPORT_ROOT = _repo_root() / "docs" / "context" / "gui_spec_imports" / "v16_visibility_priority"
+V16_MUST_SEE_STATE_PATH = V16_VISIBILITY_IMPORT_ROOT / "MUST_SEE_STATE_MATRIX_V16.csv"
+V16_PLACEMENT_POLICY_PATH = V16_VISIBILITY_IMPORT_ROOT / "ALWAYS_VISIBLE_CONDITIONAL_INSPECTOR_MATRIX_V16.csv"
+V16_WORKSPACE_FIRST_SECONDS_PATH = V16_VISIBILITY_IMPORT_ROOT / "WORKSPACE_FIRST_5_SECONDS_V16.csv"
 
 
 @dataclass(frozen=True)
@@ -176,6 +180,42 @@ class V19SemanticLabelEntry:
     semantic_quality_score: int | None
 
 
+@dataclass(frozen=True)
+class V16MustSeeStateEntry:
+    workspace: str
+    state_id: str
+    state_name: str
+    user_question: str
+    severity: str
+    visibility_policy: str
+    primary_region: str
+    trigger: str
+    why_must_be_visible: str
+    risk_if_hidden: str
+    recommended_ui_pattern: str
+
+
+@dataclass(frozen=True)
+class V16PlacementPolicyEntry:
+    workspace: str
+    state_id: str
+    state_name: str
+    visibility_policy: str
+    required_treatment: str
+    default_region: str
+    can_live_only_in_inspector: str
+
+
+@dataclass(frozen=True)
+class V16WorkspaceVisibilityGuidance:
+    workspace: str
+    first_seconds: str
+    always_visible_lines: tuple[str, ...]
+    conditional_lines: tuple[str, ...]
+    inspector_boundary_lines: tuple[str, ...]
+    search_hints: tuple[str, ...]
+
+
 def _load_csv_rows(path: Path) -> tuple[dict[str, str], ...]:
     if not path.exists():
         return ()
@@ -237,6 +277,93 @@ def _safe_int(raw: Any) -> int | None:
 def _split_workspace_codes(raw: str) -> tuple[str, ...]:
     values = [part.strip() for part in str(raw or "").replace(",", ";").split(";")]
     return tuple(part for part in values if part)
+
+
+def _v16_region_text(raw: str) -> str:
+    text = _safe_text(raw)
+    replacements = (
+        ("top_bar", "верхняя панель"),
+        ("left_tree", "левое дерево"),
+        ("message_bar", "полоса предупреждений"),
+        ("center_primary_action", "основное действие в центре"),
+        ("center_contents", "состав в центре"),
+        ("secondary_action", "вторичное действие"),
+        ("center_summary", "сводка в центре"),
+        ("center_graphic_header", "заголовок графики"),
+        ("center_graphic", "графика в центре"),
+        ("top_strip", "верхняя лента"),
+        ("bottom_status", "нижняя строка состояния"),
+        ("inspector", "правая панель"),
+        ("+", " + "),
+    )
+    for old, new in replacements:
+        text = text.replace(old, new)
+    return " ".join(text.split())
+
+
+def _operator_v16_text(raw: Any) -> str:
+    text = _operator_v19_text(raw)
+    replacements = (
+        ("Собрать " "диаг" "ностику", "Сохранить архив проекта"),
+        ("собрать " "диаг" "ностику", "сохранить архив проекта"),
+        ("Диаг" "ностика", "Проверка проекта"),
+        ("диаг" "ностика", "проверка проекта"),
+        ("диаг" "ностику", "проверку проекта"),
+        ("cross-workspace", "между окнами"),
+        ("dirty", "есть несохранённые изменения"),
+        ("stale", "устаревший"),
+        ("mismatch", "расхождение"),
+        ("degraded", "сниженная достоверность"),
+        ("conflict", "конфликт"),
+        ("Freshness + path + time", "Свежесть, путь и время"),
+        ("Visible архив contents list", "Видимый список состава архива"),
+        ("report", "отчёт"),
+        ("card", "карточка"),
+        ("Health", "Состояние"),
+        ("health", "состояние"),
+        ("first-class surface", "основное окно"),
+        ("first маршрутs", "основных маршрута"),
+        ("first маршрут", "основной маршрут"),
+        ("primary button", "основная кнопка"),
+        ("Primary button", "Основная кнопка"),
+        ("primary", "основной"),
+        ("Primary", "Основной"),
+        ("button", "кнопка"),
+        ("Button", "Кнопка"),
+        ("Packaging", "Упаковка"),
+        ("packaging", "упаковка"),
+        ("intersection", "пересечение"),
+        ("Master-copy", "Главная копия"),
+        ("master-copy", "главная копия"),
+        ("Truth-state", "состояние достоверности"),
+        ("truth-state", "состояние достоверности"),
+        ("inspector/help", "правая панель и справка"),
+        ("inspector", "правая панель"),
+        ("help", "справка"),
+        ("summary", "сводка"),
+        ("banner", "предупреждение"),
+        ("inline", "прямо в окне"),
+    )
+    for old, new in replacements:
+        text = text.replace(old, new)
+    polish_replacements = (
+        ("Свежесть архив", "Свежесть архива"),
+        ("Состав архив", "Состав архива"),
+        ("последнего архив", "последнего архива"),
+        ("готовности архив", "готовности архива"),
+        ("архиваа", "архива"),
+        ("состояние сводка", "сводка состояния"),
+        ("Состояние сводка", "Сводка состояния"),
+        ("состояние/state", "состояние"),
+        ("Главная копия входов должен", "Главная копия входов должна"),
+        ("Главная копия входов должна быть явным", "Главная копия входов должна быть явной"),
+        ("краткий состояние сводка", "краткая сводка состояния"),
+        ("Состояние отчёт должен быть основное окно", "Отчёт о состоянии должен быть основным окном"),
+        ("Проверка проекта должна иметь", "Проверка проекта должна иметь"),
+    )
+    for old, new in polish_replacements:
+        text = text.replace(old, new)
+    return " ".join(text.split())
 
 
 @lru_cache(maxsize=1)
@@ -843,6 +970,176 @@ def v19_search_hints_by_workspace_code() -> dict[str, tuple[str, ...]]:
             ordered.append(text)
         hints[workspace] = tuple(ordered)
     return hints
+
+
+@lru_cache(maxsize=1)
+def load_v16_must_see_state_matrix() -> tuple[V16MustSeeStateEntry, ...]:
+    entries: list[V16MustSeeStateEntry] = []
+    for row in _load_csv_rows(V16_MUST_SEE_STATE_PATH):
+        entries.append(
+            V16MustSeeStateEntry(
+                workspace=_safe_text(_row_value(row, "workspace")),
+                state_id=_safe_text(_row_value(row, "state_id")),
+                state_name=_operator_v16_text(_row_value(row, "state_name")),
+                user_question=_operator_v16_text(_row_value(row, "user_question")),
+                severity=_safe_text(_row_value(row, "severity")),
+                visibility_policy=_safe_text(_row_value(row, "visibility_policy")),
+                primary_region=_v16_region_text(_row_value(row, "primary_region")),
+                trigger=_operator_v16_text(_row_value(row, "trigger")),
+                why_must_be_visible=_operator_v16_text(
+                    _row_value(row, "why_must_be_visible")
+                ),
+                risk_if_hidden=_operator_v16_text(_row_value(row, "risk_if_hidden")),
+                recommended_ui_pattern=_operator_v16_text(
+                    _row_value(row, "recommended_ui_pattern")
+                ),
+            )
+        )
+    return tuple(entries)
+
+
+@lru_cache(maxsize=1)
+def load_v16_placement_policy_matrix() -> tuple[V16PlacementPolicyEntry, ...]:
+    entries: list[V16PlacementPolicyEntry] = []
+    for row in _load_csv_rows(V16_PLACEMENT_POLICY_PATH):
+        entries.append(
+            V16PlacementPolicyEntry(
+                workspace=_safe_text(_row_value(row, "workspace")),
+                state_id=_safe_text(_row_value(row, "state_id")),
+                state_name=_operator_v16_text(_row_value(row, "state_name")),
+                visibility_policy=_safe_text(_row_value(row, "visibility_policy")),
+                required_treatment=_operator_v16_text(
+                    _row_value(row, "required_treatment")
+                ),
+                default_region=_v16_region_text(_row_value(row, "default_region")),
+                can_live_only_in_inspector=_operator_v16_text(
+                    _row_value(row, "can_live_only_in_inspector")
+                ),
+            )
+        )
+    return tuple(entries)
+
+
+@lru_cache(maxsize=1)
+def v16_first_seconds_by_workspace_code() -> dict[str, str]:
+    return {
+        _safe_text(_row_value(row, "workspace")): _operator_v16_text(
+            _row_value(row, "must_be_understood_in_first_5_seconds")
+        )
+        for row in _load_csv_rows(V16_WORKSPACE_FIRST_SECONDS_PATH)
+        if _safe_text(_row_value(row, "workspace"))
+    }
+
+
+def _dedupe_text(values: tuple[str, ...] | list[str]) -> tuple[str, ...]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for raw in values:
+        text = _operator_v16_text(raw)
+        if not text:
+            continue
+        key = text.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        ordered.append(text)
+    return tuple(ordered)
+
+
+@lru_cache(maxsize=1)
+def v16_guidance_by_workspace_code() -> dict[str, V16WorkspaceVisibilityGuidance]:
+    must_rows = load_v16_must_see_state_matrix()
+    placement_by_state = {
+        row.state_id: row for row in load_v16_placement_policy_matrix() if row.state_id
+    }
+    first_seconds = v16_first_seconds_by_workspace_code()
+    workspaces = sorted(
+        {
+            *(row.workspace for row in must_rows if row.workspace),
+            *first_seconds.keys(),
+        }
+    )
+
+    guidance: dict[str, V16WorkspaceVisibilityGuidance] = {}
+    for workspace in workspaces:
+        rows = tuple(row for row in must_rows if row.workspace == workspace)
+        always_lines: list[str] = []
+        conditional_lines: list[str] = []
+        boundary_lines: list[str] = []
+        search_values: list[str] = []
+        for row in rows:
+            placement = placement_by_state.get(row.state_id)
+            visibility_policy = (
+                placement.visibility_policy if placement is not None else row.visibility_policy
+            )
+            region = (
+                placement.default_region if placement is not None else row.primary_region
+            )
+            trigger = row.trigger if row.trigger else "при необходимости"
+            pattern = row.recommended_ui_pattern
+            line = ". ".join(
+                part
+                for part in (
+                    f"{row.state_name} — {region}",
+                    f"Показ: {pattern}" if pattern else "",
+                )
+                if part
+            )
+            if visibility_policy == "always":
+                always_lines.append(line)
+            else:
+                conditional_lines.append(
+                    ". ".join(
+                        part
+                        for part in (
+                            f"{row.state_name} — {region}",
+                            f"Когда: {trigger}",
+                            f"Риск: {row.risk_if_hidden}" if row.risk_if_hidden else "",
+                        )
+                        if part
+                    )
+                )
+            if placement is not None and "нет" in placement.can_live_only_in_inspector.casefold():
+                boundary_lines.append(
+                    f"{row.state_name}: не прятать только в правой панели; {placement.required_treatment}."
+                )
+            elif placement is not None and placement.can_live_only_in_inspector:
+                boundary_lines.append(
+                    f"{row.state_name}: {placement.can_live_only_in_inspector}."
+                )
+            search_values.extend(
+                (
+                    row.state_name,
+                    row.user_question,
+                    row.why_must_be_visible,
+                    row.risk_if_hidden,
+                    row.recommended_ui_pattern,
+                    row.primary_region,
+                )
+            )
+        guidance[workspace] = V16WorkspaceVisibilityGuidance(
+            workspace=workspace,
+            first_seconds=first_seconds.get(workspace, ""),
+            always_visible_lines=_dedupe_text(always_lines),
+            conditional_lines=_dedupe_text(conditional_lines),
+            inspector_boundary_lines=_dedupe_text(boundary_lines),
+            search_hints=_dedupe_text(search_values),
+        )
+    return guidance
+
+
+def get_v16_workspace_guidance(workspace_code: str | None) -> V16WorkspaceVisibilityGuidance | None:
+    if not workspace_code:
+        return None
+    return v16_guidance_by_workspace_code().get(str(workspace_code).strip())
+
+
+@lru_cache(maxsize=1)
+def v16_search_hints_by_workspace_code() -> dict[str, tuple[str, ...]]:
+    return {
+        workspace: guidance.search_hints
+        for workspace, guidance in v16_guidance_by_workspace_code().items()
+    }
 
 
 @lru_cache(maxsize=1)

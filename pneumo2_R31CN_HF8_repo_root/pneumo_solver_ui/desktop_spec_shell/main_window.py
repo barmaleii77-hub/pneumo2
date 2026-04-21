@@ -31,6 +31,7 @@ from .registry import (
     build_workspace_map,
 )
 from .search import build_search_entries, search_command_palette
+from .v16_guidance_widgets import build_v16_visibility_priority_box
 from .workspace_pages import (
     BaselineWorkspacePage,
     ControlHubWorkspacePage,
@@ -253,11 +254,13 @@ class OverviewPage(QtWidgets.QWidget):
     def __init__(
         self,
         repo_root: Path,
+        workspace: DesktopWorkspaceSpec,
         on_command: Callable[[str], None],
         parent: QtWidgets.QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.repo_root = repo_root
+        self.workspace = workspace
         self.on_command = on_command
 
         scroll = QtWidgets.QScrollArea()
@@ -284,6 +287,9 @@ class OverviewPage(QtWidgets.QWidget):
         self.cards_layout = QtWidgets.QVBoxLayout()
         self.cards_layout.setSpacing(14)
         layout.addLayout(self.cards_layout)
+        v16_box = build_v16_visibility_priority_box(workspace)
+        if v16_box is not None:
+            layout.addWidget(v16_box)
         layout.addStretch(1)
 
         outer = QtWidgets.QVBoxLayout(self)
@@ -779,7 +785,11 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
                 item.setForeground(QtGui.QColor("#576574"))
             self.workspace_list.addItem(item)
 
-        overview_page = OverviewPage(self.repo_root, self.run_command)
+        overview_page = OverviewPage(
+            self.repo_root,
+            self.workspace_by_id["overview"],
+            self.run_command,
+        )
         self.page_stack.addWidget(overview_page)
         self._page_index_by_workspace_id = {"overview": 0}
         self._page_widget_by_workspace_id = {"overview": overview_page}

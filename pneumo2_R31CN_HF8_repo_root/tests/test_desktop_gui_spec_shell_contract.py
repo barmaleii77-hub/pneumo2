@@ -4,7 +4,12 @@ import csv
 from pathlib import Path
 
 from pneumo_solver_ui.desktop_shell.launcher_catalog import build_desktop_launch_catalog
-from pneumo_solver_ui.desktop_spec_shell.catalogs import legacy_key_aliases
+from pneumo_solver_ui.desktop_spec_shell.catalogs import (
+    get_v16_workspace_guidance,
+    legacy_key_aliases,
+    load_v16_must_see_state_matrix,
+    v16_search_hints_by_workspace_code,
+)
 from pneumo_solver_ui.desktop_spec_shell.help_registry import (
     build_help_registry,
     _operator_text,
@@ -231,6 +236,8 @@ def test_gui_spec_shell_search_indexes_migration_aliases_and_visual_routes() -> 
     v19_seam_hits = search_command_palette(entries, "статус шва")
     v19_underfill_hits = search_command_palette(entries, "недобор")
     v19_diagnostics_hits = search_command_palette(entries, "свежесть путь состав архива")
+    v16_project_hits = search_command_palette(entries, "активный проект")
+    v16_diagnostics_hits = search_command_palette(entries, "свежесть архива")
 
     assert diagnostics_hits
     assert diagnostics_hits[0].command_id == "diagnostics.collect_bundle"
@@ -256,6 +263,39 @@ def test_gui_spec_shell_search_indexes_migration_aliases_and_visual_routes() -> 
         hit.command_id in {"workspace.diagnostics.open", "diagnostics.collect_bundle"}
         for hit in v19_diagnostics_hits
     )
+    assert v16_project_hits
+    assert v16_project_hits[0].command_id == "workspace.overview.open"
+    assert v16_diagnostics_hits
+    assert any(
+        hit.command_id in {"workspace.diagnostics.open", "diagnostics.collect_bundle"}
+        for hit in v16_diagnostics_hits
+    )
+
+
+def test_gui_spec_shell_loads_v16_visibility_priority_contract() -> None:
+    rows = load_v16_must_see_state_matrix()
+    hints = v16_search_hints_by_workspace_code()
+    input_guidance = get_v16_workspace_guidance("WS-INPUTS")
+    diagnostics_guidance = get_v16_workspace_guidance("WS-DIAGNOSTICS")
+
+    assert len(rows) == 45
+    assert any(
+        row.workspace == "SHELL"
+        and row.state_id == "STATE-SH-001"
+        and row.state_name == "Активный проект"
+        and row.visibility_policy == "always"
+        for row in rows
+    )
+    assert input_guidance is not None
+    assert "Активный вариант исходных данных" in "\n".join(
+        input_guidance.always_visible_lines
+    )
+    assert "Две пружины на угол" in "\n".join(input_guidance.always_visible_lines)
+    assert any("правой панели" in line for line in input_guidance.inspector_boundary_lines)
+    assert diagnostics_guidance is not None
+    assert "Сохранить архив проекта" in diagnostics_guidance.first_seconds
+    assert "Активный проект" in "\n".join(hints["SHELL"])
+    assert "Свежесть архива" in "\n".join(hints["WS-DIAGNOSTICS"])
 
 
 def test_gui_spec_shell_help_registry_covers_every_workspace_with_catalog_text() -> None:
@@ -403,6 +443,7 @@ def test_gui_spec_shell_main_window_uses_hosted_hubs_and_single_dispatcher() -> 
     assert "def _primary_command_title(" in src
     assert "self.pinned_list = QtWidgets.QListWidget()" in src
     assert "ControlHubWorkspacePage" in src
+    assert "build_v16_visibility_priority_box" in src
     assert "InputWorkspacePage" in src
     assert "BaselineWorkspacePage" in src
     assert "OptimizationWorkspacePage" in src
