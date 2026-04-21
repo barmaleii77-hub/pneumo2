@@ -33,6 +33,7 @@ from .registry import (
 from .search import build_search_entries, search_command_palette
 from .v16_guidance_widgets import build_v16_visibility_priority_box
 from .workspace_pages import (
+    AnimationWorkspacePage,
     BaselineWorkspacePage,
     ControlHubWorkspacePage,
     InputWorkspacePage,
@@ -853,6 +854,13 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
             )
         if workspace.workspace_id == "results_analysis":
             return ResultsWorkspacePage(
+                workspace,
+                actions,
+                self.run_command,
+                repo_root=self.repo_root,
+            )
+        if workspace.workspace_id == "animation":
+            return AnimationWorkspacePage(
                 workspace,
                 actions,
                 self.run_command,

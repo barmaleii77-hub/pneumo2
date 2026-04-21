@@ -104,6 +104,18 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert commands["results.legacy_center.open"].kind == "launch_module"
     assert commands["results.legacy_center.open"].module == "pneumo_solver_ui.tools.desktop_results_center"
     assert commands["results.legacy_center.open"].launch_surface == "legacy_bridge"
+    assert commands["animation.animator.open"].kind == "hosted_action"
+    assert commands["animation.animator.open"].module is None
+    assert commands["animation.animator.open"].launch_surface == "workspace"
+    assert commands["animation.mnemo.open"].kind == "hosted_action"
+    assert commands["animation.mnemo.open"].module is None
+    assert commands["animation.mnemo.open"].launch_surface == "workspace"
+    assert commands["animation.legacy_animator.open"].kind == "launch_module"
+    assert commands["animation.legacy_animator.open"].module == "pneumo_solver_ui.desktop_animator.app"
+    assert commands["animation.legacy_animator.open"].launch_surface == "external_window"
+    assert commands["animation.legacy_mnemo.open"].kind == "launch_module"
+    assert commands["animation.legacy_mnemo.open"].module == "pneumo_solver_ui.desktop_mnemo.main"
+    assert commands["animation.legacy_mnemo.open"].launch_surface == "external_window"
     assert commands["baseline.center.open"].kind == "open_workspace"
     assert commands["baseline.center.open"].target_workspace_id == "baseline_run"
     assert commands["baseline.center.open"].automation_id == "BL-BTN-RUN"
@@ -161,6 +173,10 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert "results.compare.prepare" in workspaces["results_analysis"].quick_action_ids
     assert "results.evidence.prepare" in workspaces["results_analysis"].quick_action_ids
     assert "results.legacy_center.open" not in workspaces["results_analysis"].quick_action_ids
+    assert "animation.animator.open" in workspaces["animation"].quick_action_ids
+    assert "animation.mnemo.open" in workspaces["animation"].quick_action_ids
+    assert "animation.legacy_animator.open" not in workspaces["animation"].quick_action_ids
+    assert "animation.legacy_mnemo.open" not in workspaces["animation"].quick_action_ids
     assert workspaces["overview"].quick_action_ids == (
         "workspace.input_data.open",
         "workspace.ring_editor.open",
@@ -253,11 +269,12 @@ def test_gui_spec_shell_covers_shared_desktop_launch_catalog_without_duplicate_g
     tools_workspace = build_workspace_map()["tools"]
 
     assert catalog_modules <= command_modules
-    assert commands["animation.mnemo.open"].module == "pneumo_solver_ui.desktop_mnemo.main"
+    assert commands["animation.legacy_mnemo.open"].module == "pneumo_solver_ui.desktop_mnemo.main"
+    assert commands["animation.legacy_animator.open"].module == "pneumo_solver_ui.desktop_animator.app"
     assert "tools.qt_main_shell.open" in tools_workspace.quick_action_ids
     assert "tools.spec_shell.open" in tools_workspace.quick_action_ids
-    assert "animation.mnemo.open" in tools_workspace.quick_action_ids
-    assert "animation.animator.open" in tools_workspace.quick_action_ids
+    assert "animation.legacy_mnemo.open" in tools_workspace.quick_action_ids
+    assert "animation.legacy_animator.open" in tools_workspace.quick_action_ids
     assert "results.legacy_center.open" in tools_workspace.quick_action_ids
     assert "results.compare.open" in tools_workspace.quick_action_ids
 
@@ -511,6 +528,7 @@ def test_gui_spec_shell_main_window_uses_hosted_hubs_and_single_dispatcher() -> 
     assert "self.pinned_list = QtWidgets.QListWidget()" in src
     assert "ControlHubWorkspacePage" in src
     assert "build_v16_visibility_priority_box" in src
+    assert "AnimationWorkspacePage" in src
     assert "InputWorkspacePage" in src
     assert "BaselineWorkspacePage" in src
     assert "OptimizationWorkspacePage" in src

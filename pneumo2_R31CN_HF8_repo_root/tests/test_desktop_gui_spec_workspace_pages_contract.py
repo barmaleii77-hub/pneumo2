@@ -12,6 +12,7 @@ from pneumo_solver_ui.desktop_spec_shell.diagnostics_panel import DiagnosticsWor
 from pneumo_solver_ui.desktop_spec_shell.main_window import DesktopGuiSpecMainWindow
 from pneumo_solver_ui.desktop_spec_shell.registry import build_workspace_map
 from pneumo_solver_ui.desktop_spec_shell.workspace_pages import (
+    AnimationWorkspacePage,
     BaselineWorkspacePage,
     ControlHubWorkspacePage,
     InputWorkspacePage,
@@ -178,7 +179,8 @@ def test_gui_spec_main_window_uses_hosted_pages_for_runtime_and_control_hubs_for
         assert isinstance(window._page_widget_by_workspace_id["input_data"], InputWorkspacePage)
         assert isinstance(window._page_widget_by_workspace_id["ring_editor"], RingWorkspacePage)
         assert isinstance(window._page_widget_by_workspace_id["test_matrix"], SuiteWorkspacePage)
-        assert isinstance(window._page_widget_by_workspace_id["animation"], ControlHubWorkspacePage)
+        assert isinstance(window._page_widget_by_workspace_id["animation"], AnimationWorkspacePage)
+        assert window._page_widget_by_workspace_id["animation"].objectName() == "WS-ANIMATOR-HOSTED-PAGE"
         assert isinstance(window._page_widget_by_workspace_id["baseline_run"], BaselineWorkspacePage)
         assert isinstance(window._page_widget_by_workspace_id["optimization"], OptimizationWorkspacePage)
         assert window._page_widget_by_workspace_id["optimization"].objectName() == "WS-OPTIMIZATION-HOSTED-PAGE"
@@ -454,15 +456,44 @@ def test_control_hub_pages_render_catalog_surface_summary_and_actions() -> None:
     app = _app()
     window = DesktopGuiSpecMainWindow()
     try:
-        page = window._page_widget_by_workspace_id["animation"]
+        page = window._page_widget_by_workspace_id["tools"]
         assert isinstance(page, ControlHubWorkspacePage)
         page.refresh_view()
         app.processEvents()
 
         assert page.surface_box.title() == "Ключевые элементы рабочего шага"
         assert page.actions_box.title() == "Основные действия"
-        assert page.workspace.workspace_id == "animation"
+        assert page.workspace.workspace_id == "tools"
         assert len(page.action_commands) >= 1
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_animation_workspace_page_hosts_route_aware_animation_hub() -> None:
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        page = window._page_widget_by_workspace_id["animation"]
+        assert isinstance(page, AnimationWorkspacePage)
+        window.run_command("animation.animator.open")
+        app.processEvents()
+
+        assert page.animation_hub_box.objectName() == "AM-VIEWPORT"
+        visible_buttons = {button.text() for button in page.findChildren(QtWidgets.QPushButton)}
+        assert "Обновить анимацию" in visible_buttons
+        assert "Проверить аниматор" in visible_buttons
+        assert "Проверить мнемосхему" in visible_buttons
+        assert "Расширенный просмотр анимации" in visible_buttons
+        assert "Расширенный просмотр мнемосхемы" in visible_buttons
+        assert page.animation_status_table.columnCount() == 3
+        assert "Анимация открыта" in page.animation_action_label.text()
+
+        window.run_command("animation.mnemo.open")
+        app.processEvents()
+        assert "Мнемосхема открыта" in page.animation_action_label.text()
+        assert "animation.mnemo.open" in window.recent_command_ids
     finally:
         window.close()
         window.deleteLater()

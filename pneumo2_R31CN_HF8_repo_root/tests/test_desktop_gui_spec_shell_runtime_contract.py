@@ -10,6 +10,7 @@ from pneumo_solver_ui.desktop_ring_editor_model import build_default_ring_spec
 from pneumo_solver_ui.desktop_spec_shell.main_window import DesktopGuiSpecMainWindow
 from pneumo_solver_ui.desktop_spec_shell.workspace_runtime import build_ring_workspace_summary
 from pneumo_solver_ui.desktop_spec_shell.workspace_pages import (
+    AnimationWorkspacePage,
     BaselineWorkspacePage,
     OptimizationWorkspacePage,
     ResultsWorkspacePage,
@@ -244,6 +245,33 @@ def test_main_window_routes_results_analysis_to_hosted_page(tmp_path, monkeypatc
         window.run_command("results.compare.prepare")
         app.processEvents()
         assert "Сравнение подготовлено" in page.results_action_label.text()
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_main_window_routes_animation_to_hosted_page(tmp_path, monkeypatch) -> None:
+    settings_path = tmp_path / "desktop_spec_shell_animation_state.ini"
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
+
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        window.run_command("animation.animator.open")
+        app.processEvents()
+
+        assert window._current_workspace_id == "animation"
+        page = window._page_widget_by_workspace_id["animation"]
+        assert isinstance(page, AnimationWorkspacePage)
+        assert page.objectName() == "WS-ANIMATOR-HOSTED-PAGE"
+        assert page.animation_hub_box.objectName() == "AM-VIEWPORT"
+        assert "Анимация открыта" in page.animation_action_label.text()
+        assert "animation.animator.open" in window.recent_command_ids
+
+        window.run_command("animation.mnemo.open")
+        app.processEvents()
+        assert "Мнемосхема открыта" in page.animation_action_label.text()
     finally:
         window.close()
         window.deleteLater()

@@ -2105,6 +2105,239 @@ class ResultsWorkspacePage(RuntimeWorkspacePage):
             self._prepare_evidence_manifest()
 
 
+class AnimationWorkspacePage(RuntimeWorkspacePage):
+    def __init__(
+        self,
+        workspace: DesktopWorkspaceSpec,
+        action_commands: Iterable[DesktopShellCommandSpec],
+        on_command: Callable[[str], None],
+        *,
+        repo_root: Path,
+        python_executable: str | None = None,
+        parent: QtWidgets.QWidget | None = None,
+    ) -> None:
+        self.repo_root = Path(repo_root)
+        self.python_executable = python_executable
+        super().__init__(
+            workspace,
+            action_commands,
+            on_command,
+            lambda: build_results_workspace_summary(
+                repo_root,
+                python_executable=python_executable,
+            ),
+            parent,
+        )
+        self.setObjectName("WS-ANIMATOR-HOSTED-PAGE")
+
+    def _build_extra_controls(self, layout: QtWidgets.QVBoxLayout) -> None:
+        self.animation_hub_box = QtWidgets.QGroupBox("Анимация и мнемосхема")
+        self.animation_hub_box.setObjectName("AM-VIEWPORT")
+        self.animation_hub_box.setFocusPolicy(QtCore.Qt.StrongFocus)
+        hub_layout = QtWidgets.QVBoxLayout(self.animation_hub_box)
+        hub_layout.setSpacing(8)
+
+        intro = QtWidgets.QLabel(
+            "Этот рабочий шаг показывает готовность данных сцены, достоверность отображения и журнал мнемосхемы. "
+            "Подробные графические окна остаются доступными как отдельные инструменты просмотра."
+        )
+        intro.setWordWrap(True)
+        hub_layout.addWidget(intro)
+
+        self.animation_scene_label = QtWidgets.QLabel("")
+        self.animation_truth_label = QtWidgets.QLabel("")
+        self.animation_mnemo_label = QtWidgets.QLabel("")
+        self.animation_next_label = QtWidgets.QLabel("")
+        for label in (
+            self.animation_scene_label,
+            self.animation_truth_label,
+            self.animation_mnemo_label,
+            self.animation_next_label,
+        ):
+            label.setWordWrap(True)
+            hub_layout.addWidget(label)
+
+        self.animation_status_table = QtWidgets.QTableWidget(0, 3)
+        self.animation_status_table.setObjectName("AM-STATUS-TABLE")
+        self.animation_status_table.setHorizontalHeaderLabels(
+            ("Область", "Состояние", "Следующий шаг")
+        )
+        self.animation_status_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.animation_status_table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.animation_status_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.animation_status_table.verticalHeader().setVisible(False)
+        self.animation_status_table.horizontalHeader().setStretchLastSection(True)
+        hub_layout.addWidget(self.animation_status_table)
+
+        button_row = QtWidgets.QHBoxLayout()
+        self.animation_refresh_button = QtWidgets.QPushButton("Обновить анимацию")
+        self.animation_refresh_button.setObjectName("AM-BTN-REFRESH")
+        self.animation_refresh_button.clicked.connect(self.refresh_view)
+        self.animation_open_button = QtWidgets.QPushButton("Проверить аниматор")
+        self.animation_open_button.setObjectName("AM-BTN-CHECK-ANIMATOR")
+        self.animation_open_button.setToolTip("Показать готовность данных сцены внутри рабочего шага.")
+        self.animation_open_button.clicked.connect(lambda: self.on_command("animation.animator.open"))
+        self.animation_mnemo_button = QtWidgets.QPushButton("Проверить мнемосхему")
+        self.animation_mnemo_button.setObjectName("AM-BTN-CHECK-MNEMO")
+        self.animation_mnemo_button.setToolTip("Показать журнал и события мнемосхемы внутри рабочего шага.")
+        self.animation_mnemo_button.clicked.connect(lambda: self.on_command("animation.mnemo.open"))
+        self.animation_detach_button = QtWidgets.QPushButton("Расширенный просмотр анимации")
+        self.animation_detach_button.setObjectName("AM-DETACH")
+        self.animation_detach_button.setToolTip("Открыть подробную графическую проверку.")
+        self.animation_detach_button.clicked.connect(lambda: self.on_command("animation.legacy_animator.open"))
+        self.animation_mnemo_detach_button = QtWidgets.QPushButton("Расширенный просмотр мнемосхемы")
+        self.animation_mnemo_detach_button.setObjectName("AM-BTN-DETACH-MNEMO")
+        self.animation_mnemo_detach_button.setToolTip("Открыть подробную мнемосхему.")
+        self.animation_mnemo_detach_button.clicked.connect(lambda: self.on_command("animation.legacy_mnemo.open"))
+        for button in (
+            self.animation_refresh_button,
+            self.animation_open_button,
+            self.animation_mnemo_button,
+            self.animation_detach_button,
+            self.animation_mnemo_detach_button,
+        ):
+            button_row.addWidget(button)
+        button_row.addStretch(1)
+        hub_layout.addLayout(button_row)
+
+        self.animation_action_label = QtWidgets.QLabel("")
+        self.animation_action_label.setObjectName("AM-ACTION-RESULT")
+        self.animation_action_label.setWordWrap(True)
+        self.animation_action_label.setStyleSheet("color: #576574;")
+        hub_layout.addWidget(self.animation_action_label)
+
+        layout.addWidget(self.animation_hub_box)
+
+    def _results_runtime(self) -> DesktopResultsRuntime:
+        return DesktopResultsRuntime(
+            repo_root=self.repo_root,
+            python_executable=str(self.python_executable or sys.executable),
+        )
+
+    @staticmethod
+    def _status_text(raw: object) -> str:
+        text = " ".join(str(raw or "").replace("_", " ").split()).strip()
+        labels = {
+            "READY": "готово",
+            "MISSING": "нет данных",
+            "BLOCKED": "заблокировано",
+            "WARN": "предупреждение",
+            "PASS": "норма",
+            "FAIL": "ошибка",
+            "CURRENT": "актуально",
+            "STALE": "устарело",
+            "UNKNOWN": "нет данных",
+        }
+        return labels.get(text.upper(), text.lower() if text else "нет данных")
+
+    @staticmethod
+    def _present(path: Path | None) -> str:
+        return "найдено" if path is not None else "нет данных"
+
+    @staticmethod
+    def _operator_text(raw: object, *, fallback: str = "нет данных", limit: int = 110) -> str:
+        text = _operator_result_text(raw)
+        text = " ".join(str(text or "").split()).strip()
+        if not text:
+            return fallback
+        if len(text) <= limit:
+            return text
+        return text[: limit - 1].rstrip() + "…"
+
+    def _refresh_animation_controls(self) -> None:
+        if not hasattr(self, "animation_hub_box"):
+            return
+        try:
+            runtime = self._results_runtime()
+            snapshot = runtime.snapshot()
+        except Exception as exc:
+            message = f"Сводка анимации временно недоступна: {exc}"
+            self.animation_scene_label.setText(message)
+            self.animation_truth_label.setText(message)
+            self.animation_mnemo_label.setText(message)
+            self.animation_next_label.setText(message)
+            self.animation_status_table.setRowCount(0)
+            return
+
+        scene_state = self._present(snapshot.latest_npz_path)
+        pointer_state = self._present(snapshot.latest_pointer_json_path)
+        mnemo_state = self._present(snapshot.latest_mnemo_event_log_path)
+        capture_state = self._status_text(snapshot.latest_capture_export_manifest_status)
+        mode_text = self._operator_text(snapshot.mnemo_current_mode, fallback="режим не выбран")
+        recent_title = self._operator_text(
+            snapshot.mnemo_recent_titles[0] if snapshot.mnemo_recent_titles else "",
+            fallback="события пока не найдены",
+        )
+        recommendation = self._operator_text(
+            snapshot.operator_recommendations[0] if snapshot.operator_recommendations else "",
+            fallback="после проверки сцены вернитесь к анализу результатов или проверке проекта",
+        )
+
+        self.animation_scene_label.setText(
+            f"Данные сцены - {scene_state}. Данные проигрывания - {pointer_state}."
+        )
+        self.animation_truth_label.setText(
+            f"Достоверность отображения - {capture_state}. Связь с выбранным результатом проверяется по записи сохранения."
+        )
+        self.animation_mnemo_label.setText(
+            f"Мнемосхема - {mnemo_state}. Текущий режим - {mode_text}. Последнее событие - {recent_title}."
+        )
+        self.animation_next_label.setText(f"Следующий шаг - {recommendation}.")
+
+        rows = (
+            (
+                "Сцена",
+                f"данные сцены - {scene_state}; данные проигрывания - {pointer_state}",
+                "проверьте движение в отдельном окне, если данные найдены",
+            ),
+            (
+                "Мнемосхема",
+                f"журнал - {mnemo_state}; режим - {mode_text}",
+                recent_title,
+            ),
+            (
+                "Достоверность",
+                capture_state,
+                "проверьте связь с выбранным результатом перед передачей проекта",
+            ),
+        )
+        self.animation_status_table.setRowCount(len(rows))
+        for row_index, values in enumerate(rows):
+            for column, value in enumerate(values):
+                item = QtWidgets.QTableWidgetItem(self._operator_text(value))
+                self.animation_status_table.setItem(row_index, column, item)
+        self.animation_status_table.resizeColumnsToContents()
+
+        has_scene = snapshot.latest_npz_path is not None or snapshot.latest_pointer_json_path is not None
+        self.animation_detach_button.setEnabled(has_scene)
+        self.animation_detach_button.setToolTip(
+            "Открыть подробную графическую проверку."
+            if has_scene
+            else "Сначала нужен результат для отображения."
+        )
+
+    def _activate_animation_panel(self, message: str = "") -> None:
+        self._refresh_animation_controls()
+        self.animation_hub_box.setFocus(QtCore.Qt.OtherFocusReason)
+        if message:
+            self.animation_action_label.setText(message)
+
+    def refresh_view(self) -> None:
+        super().refresh_view()
+        self._refresh_animation_controls()
+
+    def handle_command(self, command_id: str) -> None:
+        if command_id == "animation.animator.open":
+            self._activate_animation_panel(
+                "Анимация открыта в рабочем шаге. Проверьте готовность данных сцены перед отдельным просмотром."
+            )
+            return
+        if command_id == "animation.mnemo.open":
+            self._activate_animation_panel(
+                "Мнемосхема открыта в рабочем шаге. Проверьте журнал и последнее событие перед отдельным просмотром."
+            )
+
+
 class DiagnosticsWorkspacePage(RuntimeWorkspacePage):
     def __init__(
         self,

@@ -25,7 +25,7 @@ Status: actionable implementation audit after importing `pneumo_chat_consolidate
 - `ring_editor` and `test_matrix` are hosted workspace surfaces with legacy fallback commands for detailed tools.
 - `optimization` now has a hosted primary setup/readiness surface. The old `desktop_optimizer_center` remains available as an explicit advanced fallback command.
 - `results_analysis` now has a hosted analysis/compare preparation surface. The old `desktop_results_center` remains available as an explicit advanced fallback command.
-- `animation` is route-visible, but its main actions still launch external Animator and Mnemo windows.
+- `animation` now has a hosted route-aware animation/mnemo readiness hub. The separate Animator and Mnemo windows remain available as explicit advanced fallback commands.
 - `tools` is a support workspace and keeps legacy/tooling entrypoints available for fallback.
 
 ## V21 Findings Applied In This Step
@@ -91,6 +91,16 @@ The sixth implementation change moves the first analysis surface onto the active
 - `results.legacy_center.open` keeps the old results center available as an explicit advanced fallback.
 - The active route now reads as `WS-OPTIMIZATION -> WS-ANALYSIS -> WS-ANIMATOR/WS-DIAGNOSTICS` without forcing the user into the results center before seeing result readiness.
 
+## Follow-Up Applied: Hosted WS-ANIMATOR Hub
+
+The seventh implementation change makes animation a first-class route step instead of a direct external-window jump:
+
+- `animation.animator.open` and `animation.mnemo.open` are now hosted actions routed through `AnimationWorkspacePage`.
+- `AnimationWorkspacePage` exposes `WS-ANIMATOR-HOSTED-PAGE` plus `AM-VIEWPORT` for the primary animation/mnemo readiness surface.
+- The hosted surface shows scene data readiness, playback data readiness, capture/truth state, mnemo event log state and the next recommended visual-check step through `desktop_results_runtime`.
+- `animation.legacy_animator.open` and `animation.legacy_mnemo.open` keep the separate graphical windows available as explicit advanced fallback commands.
+- The active route now reads as `WS-ANALYSIS -> WS-ANIMATOR -> WS-DIAGNOSTICS` without forcing the user into a separate window before seeing whether animation data exists.
+
 ## Remaining Gaps Against Master V1
 
 | Gap | Master V1 source | Current state | Next action |
@@ -100,7 +110,7 @@ The sixth implementation change moves the first analysis surface onto the active
 | Baseline setup must not be a side launcher | V20 `WS-BASELINE`, route cost scenarios | setup/readiness hosted; actual heavy run execution still delegated to advanced center | wire native execution once subprocess contract is isolated from Tk editor state |
 | Optimization needs one primary route | V21 `CUR-SHELL-OPT-PAGE`, V17 path-cost data | setup/readiness hosted; heavy execution remains in advanced optimizer center | wire native execution once launch subprocess state is separated from the detailed optimizer center |
 | Analysis compare must be primary inside analysis | V21 `CUR-WIN-COMPARE` | analysis/compare preparation hosted; detailed plots still delegated to advanced windows | wire native compare chart/table once plotting state is separated from external viewers |
-| Animation is route-visible but still external | V20 `WS-ANIMATOR` | workspace exists, Animator/Mnemo external | host route-aware animation hub before native re-host |
+| Animation is route-visible but still external | V20 `WS-ANIMATOR` | route-aware readiness hub hosted; detailed graphics still delegated to advanced windows | re-host core scene controls once the graphics runtime exposes a safe embedded surface |
 
 ## Next Implementation Order
 
@@ -110,7 +120,7 @@ The sixth implementation change moves the first analysis surface onto the active
 4. Move baseline run setup into hosted `WS-BASELINE`. Done as hosted setup/readiness surface; native execution wiring remains next.
 5. Move StageRunner-first optimization controls into hosted `WS-OPTIMIZATION`. Done as hosted setup/readiness surface; native execution wiring remains next.
 6. Move latest results and primary compare summary into hosted `WS-ANALYSIS`. Done as hosted analysis/compare-preparation surface; native plots remain next.
-7. Convert `WS-ANIMATOR` from external-window hub to hosted control hub, then re-host Animator/Mnemo surfaces when runtime evidence is ready.
+7. Convert `WS-ANIMATOR` from external-window hub to hosted control hub. Done as hosted readiness hub; full scene/mnemo re-host remains next.
 
 ## Validation Added
 
@@ -127,3 +137,5 @@ The sixth implementation change moves the first analysis surface onto the active
 - `tests/test_desktop_gui_spec_shell_runtime_contract.py` and `tests/test_desktop_gui_spec_workspace_pages_contract.py` now verify the hosted optimization setup panel and command routing.
 - `tests/test_desktop_gui_spec_shell_contract.py` now asserts that analysis setup is hosted while `results.legacy_center.open` remains the advanced fallback.
 - `tests/test_desktop_gui_spec_shell_runtime_contract.py` and `tests/test_desktop_gui_spec_workspace_pages_contract.py` now verify the hosted analysis panel, compare context preparation and diagnostics evidence preparation.
+- `tests/test_desktop_gui_spec_shell_contract.py` now asserts that animation and mnemo primary commands are hosted while separate graphical windows remain fallback commands.
+- `tests/test_desktop_gui_spec_shell_runtime_contract.py` and `tests/test_desktop_gui_spec_workspace_pages_contract.py` now verify the hosted animation hub and command routing.
