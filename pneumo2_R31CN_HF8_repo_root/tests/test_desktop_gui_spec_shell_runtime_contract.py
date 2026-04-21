@@ -12,6 +12,7 @@ from pneumo_solver_ui.desktop_spec_shell.workspace_runtime import build_ring_wor
 from pneumo_solver_ui.desktop_spec_shell.workspace_pages import (
     AnimationWorkspacePage,
     BaselineWorkspacePage,
+    InputWorkspacePage,
     OptimizationWorkspacePage,
     ResultsWorkspacePage,
     RingWorkspacePage,
@@ -87,6 +88,30 @@ def test_main_window_defers_settings_sync_during_initial_open(tmp_path, monkeypa
 
     settings = QtCore.QSettings(str(settings_path), QtCore.QSettings.IniFormat)
     assert str(settings.value("window/last_workspace") or "") == "diagnostics"
+
+
+def test_main_window_routes_input_editor_to_hosted_page(tmp_path, monkeypatch) -> None:
+    settings_path = tmp_path / "desktop_spec_shell_input_state.ini"
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
+
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        window.run_command("input.editor.open")
+        app.processEvents()
+
+        assert window._current_workspace_id == "input_data"
+        page = window._page_widget_by_workspace_id["input_data"]
+        assert isinstance(page, InputWorkspacePage)
+        assert page.objectName() == "WS-INPUTS-HOSTED-PAGE"
+        assert page.input_editor_box.objectName() == "ID-PARAM-TABLE"
+        assert page.input_table.rowCount() > 0
+        assert "Редактирование исходных данных открыто" in page.input_action_label.text()
+        assert "input.editor.open" in window.recent_command_ids
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
 
 
 def test_main_window_hosts_ring_workspace_without_legacy_bridge_surface(tmp_path, monkeypatch) -> None:

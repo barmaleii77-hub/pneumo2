@@ -62,6 +62,7 @@ WORKSPACE_ELEMENT_BY_ID: dict[str, str] = {
 }
 
 COMMAND_ELEMENT_BY_ID: dict[str, str] = {
+    "input.editor.open": "ID-PARAM-TABLE",
     "diagnostics.collect_bundle": "DG-BTN-COLLECT",
     "baseline.center.open": "BL-BTN-RUN",
     "baseline.review": "BL-BTN-REVIEW",
@@ -499,7 +500,7 @@ def build_shell_workspaces() -> tuple[DesktopWorkspaceSpec, ...]:
             graphics_policy="Любой инструмент обязан честно маркировать, это справочный вид, производный результат или окно проверки.",
             search_aliases=("инструменты", "справочник", "reference"),
             quick_action_ids=(
-                "input.editor.open",
+                "input.legacy_editor.open",
                 "ring.editor.open",
                 "test.center.open",
                 "baseline.legacy_run_setup.open",
@@ -528,7 +529,8 @@ def build_shell_commands() -> tuple[DesktopShellCommandSpec, ...]:
     commands = (
         DesktopShellCommandSpec("workspace.overview.open", "Перейти к панели проекта", "Показать инженерную сводку, опорный прогон, проверку проекта, архив и быстрые действия.", "overview", "open_workspace", "Окна -> Панель проекта", target_workspace_id="overview", search_aliases=("обзор", "главная"), help_topic_id="overview"),
         DesktopShellCommandSpec("workspace.input_data.open", "Перейти к исходным данным", "Перейти к исходным данным и открыть основную редактируемую копию проекта в главной последовательности.", "input_data", "open_workspace", "Окна -> Исходные данные", target_workspace_id="input_data", capability_ids=("input.project_entry_and_setup",), help_topic_id="input_data"),
-        DesktopShellCommandSpec("input.editor.open", "Редактировать исходные данные", "Работать с инженерным редактором исходных данных.", "input_data", "launch_module", "Окна -> Исходные данные -> Редактор исходных данных", module="pneumo_solver_ui.tools.desktop_input_editor", capability_ids=("input.project_entry_and_setup",), launch_surface="legacy_bridge", status_label="Рабочее окно", help_topic_id="input_data"),
+        DesktopShellCommandSpec("input.editor.open", "Редактировать исходные данные", "Работать с редактируемой копией исходных данных прямо в рабочем шаге.", "input_data", "hosted_action", "Окна -> Исходные данные -> Редактор исходных данных", capability_ids=("input.project_entry_and_setup",), launch_surface="workspace", status_label="Рабочий раздел", help_topic_id="input_data", search_aliases=("редактировать исходные данные", "таблица параметров", "рабочая копия исходных данных", "снимок исходных данных")),
+        DesktopShellCommandSpec("input.legacy_editor.open", "Расширенный редактор исходных данных", "Открыть подробный редактор исходных данных для специальных сценариев.", "input_data", "launch_module", "Окна -> Исходные данные -> Расширенный редактор", module="pneumo_solver_ui.tools.desktop_input_editor", capability_ids=("input.project_entry_and_setup",), launch_surface="legacy_bridge", status_label="Рабочее окно", help_topic_id="input_data", search_aliases=("расширенный редактор исходных данных", "подробный редактор исходных данных", "профили исходных данных")),
         DesktopShellCommandSpec("workspace.ring_editor.open", "Перейти к редактору циклического сценария", "Перейти к сценарию, дороге, сегментам и производным файлам.", "ring_editor", "open_workspace", "Окна -> Редактор циклического сценария", target_workspace_id="ring_editor", help_topic_id="ring_editor"),
         DesktopShellCommandSpec("ring.editor.open", "Редактировать циклический сценарий", "Работать со сценарием, дорогой, сегментами и производными файлами.", "ring_editor", "launch_module", "Окна -> Редактор циклического сценария -> Редактор", module="pneumo_solver_ui.tools.desktop_ring_scenario_editor", launch_surface="legacy_bridge", status_label="Рабочее окно", help_topic_id="ring_editor", search_aliases=("редактор циклического сценария", "циклический сценарий", "редактор кольца", "сценарии", "генерация дороги")),
         DesktopShellCommandSpec("workspace.test_matrix.open", "Перейти к набору испытаний", "Перейти к матрице испытаний, стадиям, ручным изменениям и снимку набора.", "test_matrix", "open_workspace", "Окна -> Набор испытаний", target_workspace_id="test_matrix", capability_ids=("calculation.validation_and_prechecks",), help_topic_id="test_matrix", search_aliases=("матрица испытаний", "снимок набора", "контроль набора", "зафиксировать набор")),

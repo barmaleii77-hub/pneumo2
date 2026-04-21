@@ -177,6 +177,7 @@ def test_gui_spec_main_window_uses_hosted_pages_for_runtime_and_control_hubs_for
     window = DesktopGuiSpecMainWindow()
     try:
         assert isinstance(window._page_widget_by_workspace_id["input_data"], InputWorkspacePage)
+        assert window._page_widget_by_workspace_id["input_data"].objectName() == "WS-INPUTS-HOSTED-PAGE"
         assert isinstance(window._page_widget_by_workspace_id["ring_editor"], RingWorkspacePage)
         assert isinstance(window._page_widget_by_workspace_id["test_matrix"], SuiteWorkspacePage)
         assert isinstance(window._page_widget_by_workspace_id["animation"], AnimationWorkspacePage)
@@ -446,6 +447,13 @@ def test_hosted_input_workspace_page_keeps_runtime_summary_and_route_actions() -
         assert page.facts_box.title() == "Ключевые сигналы"
         assert len(page.action_commands) >= 3
         assert page.workspace.launch_surface == "workspace"
+        assert page.input_editor_box.objectName() == "ID-PARAM-TABLE"
+        assert page.input_table.columnCount() == 5
+        assert page.input_table.rowCount() > 0
+        visible_buttons = {button.text() for button in page.findChildren(QtWidgets.QPushButton)}
+        assert "Сохранить рабочую копию" in visible_buttons
+        assert "Зафиксировать снимок для маршрута" in visible_buttons
+        assert "Расширенный редактор" in visible_buttons
     finally:
         window.close()
         window.deleteLater()

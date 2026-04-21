@@ -6,6 +6,14 @@ from typing import Any, Callable, Iterable
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
+from pneumo_solver_ui.desktop_input_model import (
+    DESKTOP_INPUT_SECTIONS,
+    DesktopInputFieldSpec,
+    default_working_copy_path,
+    load_base_with_defaults,
+    save_base_payload,
+    save_desktop_inputs_snapshot,
+)
 from pneumo_solver_ui.desktop_results_runtime import DesktopResultsRuntime
 from pneumo_solver_ui.desktop_suite_runtime import (
     build_desktop_suite_snapshot_context,
@@ -1479,6 +1487,10 @@ class InputWorkspacePage(RuntimeWorkspacePage):
         python_executable: str | None = None,
         parent: QtWidgets.QWidget | None = None,
     ) -> None:
+        self.repo_root = Path(repo_root)
+        self.python_executable = python_executable
+        self._input_payload: dict[str, Any] = {}
+        self._refreshing_input_table = False
         super().__init__(
             workspace,
             action_commands,
@@ -1489,6 +1501,204 @@ class InputWorkspacePage(RuntimeWorkspacePage):
             ),
             parent,
         )
+        self.setObjectName("WS-INPUTS-HOSTED-PAGE")
+
+    def _build_extra_controls(self, layout: QtWidgets.QVBoxLayout) -> None:
+        self.input_editor_box = QtWidgets.QGroupBox("Редактируемая копия исходных данных")
+        self.input_editor_box.setObjectName("ID-PARAM-TABLE")
+        self.input_editor_box.setFocusPolicy(QtCore.Qt.StrongFocus)
+        editor_layout = QtWidgets.QVBoxLayout(self.input_editor_box)
+        editor_layout.setSpacing(8)
+
+        intro = QtWidgets.QLabel(
+            "Это основной встроенный слой WS-INPUTS: он читает текущую рабочую копию, показывает "
+            "секцию, параметр, значение и единицу измерения, а сохранение выполняет через desktop_input_model."
+        )
+        intro.setWordWrap(True)
+        editor_layout.addWidget(intro)
+
+        self.input_table = QtWidgets.QTableWidget(0, 5)
+        self.input_table.setObjectName("ID-PARAM-TABLE-VIEW")
+        self.input_table.setHorizontalHeaderLabels(
+            ("Раздел", "Параметр", "Значение", "Ед.", "Подсказка")
+        )
+        self.input_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.input_table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.input_table.setEditTriggers(
+            QtWidgets.QAbstractItemView.DoubleClicked
+            | QtWidgets.QAbstractItemView.EditKeyPressed
+            | QtWidgets.QAbstractItemView.SelectedClicked
+        )
+        self.input_table.verticalHeader().setVisible(False)
+        self.input_table.horizontalHeader().setStretchLastSection(True)
+        self.input_table.itemChanged.connect(self._on_input_item_changed)
+        editor_layout.addWidget(self.input_table)
+
+        actions = QtWidgets.QHBoxLayout()
+        self.input_refresh_button = QtWidgets.QPushButton("Обновить параметры")
+        self.input_refresh_button.setObjectName("ID-BTN-REFRESH")
+        self.input_refresh_button.clicked.connect(self._refresh_input_editor_controls)
+        actions.addWidget(self.input_refresh_button)
+
+        self.input_save_button = QtWidgets.QPushButton("Сохранить рабочую копию")
+        self.input_save_button.setObjectName("ID-BTN-SAVE-WORKING-COPY")
+        self.input_save_button.clicked.connect(self._save_input_working_copy)
+        actions.addWidget(self.input_save_button)
+
+        self.input_snapshot_button = QtWidgets.QPushButton("Зафиксировать снимок для маршрута")
+        self.input_snapshot_button.setObjectName("ID-BTN-SAVE-HANDOFF")
+        self.input_snapshot_button.clicked.connect(self._save_input_handoff_snapshot)
+        actions.addWidget(self.input_snapshot_button)
+
+        self.input_advanced_button = QtWidgets.QPushButton("Расширенный редактор")
+        self.input_advanced_button.setObjectName("ID-BTN-LEGACY-EDITOR")
+        self.input_advanced_button.clicked.connect(
+            lambda _checked=False: self.on_command("input.legacy_editor.open")
+        )
+        actions.addWidget(self.input_advanced_button)
+        editor_layout.addLayout(actions)
+
+        self.input_action_label = QtWidgets.QLabel("")
+        self.input_action_label.setObjectName("ID-ACTION-RESULT")
+        self.input_action_label.setWordWrap(True)
+        self.input_action_label.setStyleSheet("color: #576574;")
+        editor_layout.addWidget(self.input_action_label)
+
+        layout.addWidget(self.input_editor_box)
+
+    def refresh_view(self) -> None:
+        super().refresh_view()
+        self._refresh_input_editor_controls()
+
+    def _section_specs(self) -> tuple[tuple[str, DesktopInputFieldSpec], ...]:
+        rows: list[tuple[str, DesktopInputFieldSpec]] = []
+        for section in DESKTOP_INPUT_SECTIONS:
+            for spec in section.fields:
+                rows.append((section.title, spec))
+        return tuple(rows)
+
+    def _format_input_value(self, spec: DesktopInputFieldSpec, payload: dict[str, Any]) -> str:
+        value = spec.to_ui(payload.get(spec.key))
+        if spec.control == "bool":
+            return "да" if bool(value) else "нет"
+        if spec.control == "choice":
+            return str(value)
+        if spec.control in {"int", "slider"}:
+            try:
+                digits = 0 if spec.control == "int" else max(0, int(spec.digits))
+                return f"{float(value):.{digits}f}"
+            except Exception:
+                return str(value)
+        return str(value)
+
+    def _parse_input_value(self, spec: DesktopInputFieldSpec, raw: str) -> Any:
+        text = str(raw or "").strip()
+        if spec.control == "bool":
+            return spec.to_base(text.casefold() in {"1", "true", "yes", "on", "да", "истина"})
+        if spec.control == "choice":
+            return spec.to_base(text)
+        if spec.control == "int":
+            return spec.to_base(int(round(float(text.replace(",", ".")))))
+        if spec.control == "slider":
+            return spec.to_base(float(text.replace(",", ".")))
+        return spec.to_base(text)
+
+    def _add_input_table_item(
+        self,
+        row: int,
+        column: int,
+        text: str,
+        *,
+        spec: DesktopInputFieldSpec,
+        editable: bool = False,
+    ) -> None:
+        item = QtWidgets.QTableWidgetItem(text)
+        flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled
+        if editable:
+            flags |= QtCore.Qt.ItemIsEditable
+        item.setFlags(flags)
+        item.setData(QtCore.Qt.UserRole, spec.key)
+        self.input_table.setItem(row, column, item)
+
+    def _refresh_input_editor_controls(self) -> None:
+        if not hasattr(self, "input_table"):
+            return
+        self._refreshing_input_table = True
+        try:
+            self._input_payload = load_base_with_defaults()
+            rows = self._section_specs()
+            self.input_table.setRowCount(len(rows))
+            for row_index, (section_title, spec) in enumerate(rows):
+                self._add_input_table_item(row_index, 0, section_title, spec=spec)
+                self._add_input_table_item(row_index, 1, spec.label, spec=spec)
+                self._add_input_table_item(
+                    row_index,
+                    2,
+                    self._format_input_value(spec, self._input_payload),
+                    spec=spec,
+                    editable=True,
+                )
+                self._add_input_table_item(row_index, 3, spec.unit_label or "—", spec=spec)
+                self._add_input_table_item(row_index, 4, spec.description, spec=spec)
+            self.input_table.resizeColumnsToContents()
+        except Exception as exc:
+            self.input_table.setRowCount(0)
+            self.input_action_label.setText(f"Не удалось прочитать исходные данные: {exc}")
+        finally:
+            self._refreshing_input_table = False
+
+    def _gather_input_payload_from_table(self) -> dict[str, Any]:
+        payload = load_base_with_defaults()
+        spec_by_key = {
+            spec.key: spec
+            for _section_title, spec in self._section_specs()
+        }
+        for row_index in range(self.input_table.rowCount()):
+            value_item = self.input_table.item(row_index, 2)
+            if value_item is None:
+                continue
+            key = str(value_item.data(QtCore.Qt.UserRole) or "").strip()
+            spec = spec_by_key.get(key)
+            if spec is None:
+                continue
+            payload[key] = self._parse_input_value(spec, value_item.text())
+        return payload
+
+    def _on_input_item_changed(self, item: QtWidgets.QTableWidgetItem) -> None:
+        if self._refreshing_input_table or item.column() != 2:
+            return
+        self.input_action_label.setText(
+            "Есть несохранённые изменения в таблице исходных данных. Сохраните рабочую копию перед переходом дальше."
+        )
+
+    def _save_input_working_copy(self) -> None:
+        try:
+            payload = self._gather_input_payload_from_table()
+            target = save_base_payload(default_working_copy_path(), payload)
+            self._input_payload = dict(payload)
+            self.input_action_label.setText(f"Рабочая копия сохранена: {target}")
+            self.refresh_view()
+        except Exception as exc:
+            self.input_action_label.setText(f"Не удалось сохранить рабочую копию: {exc}")
+
+    def _save_input_handoff_snapshot(self) -> None:
+        try:
+            payload = self._gather_input_payload_from_table()
+            working_copy = save_base_payload(default_working_copy_path(), payload)
+            snapshot = save_desktop_inputs_snapshot(payload, source_path=working_copy)
+            self._input_payload = dict(payload)
+            self.input_action_label.setText(f"Снимок исходных данных зафиксирован для маршрута: {snapshot}")
+            self.refresh_view()
+        except Exception as exc:
+            self.input_action_label.setText(f"Не удалось зафиксировать снимок исходных данных: {exc}")
+
+    def handle_command(self, command_id: str) -> None:
+        if command_id == "input.editor.open":
+            self._refresh_input_editor_controls()
+            self.input_editor_box.setFocus(QtCore.Qt.OtherFocusReason)
+            self.input_action_label.setText(
+                "Редактирование исходных данных открыто в рабочем шаге. Проверьте таблицу, сохраните рабочую копию и зафиксируйте снимок перед переходом к сценарию."
+            )
 
 
 class RingWorkspacePage(RuntimeWorkspacePage):

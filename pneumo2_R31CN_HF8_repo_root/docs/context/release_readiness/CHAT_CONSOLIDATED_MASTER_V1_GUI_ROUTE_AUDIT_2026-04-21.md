@@ -21,6 +21,7 @@ Status: actionable implementation audit after importing `pneumo_chat_consolidate
 
 - `pneumo_solver_ui/desktop_spec_shell/registry.py` exposes 11 top-level workspaces in the canonical route order.
 - `diagnostics` is already a hosted workspace. `diagnostics.collect_bundle`, `diagnostics.verify_bundle` and `diagnostics.send_results` are hosted actions, while `diagnostics.legacy_center.open` remains a fallback.
+- `input_data` now has a hosted editable parameter table. `input.editor.open` is routed through `InputWorkspacePage`, while `input.legacy_editor.open` remains an explicit fallback for the old detailed editor.
 - `baseline_run` has hosted run setup, readiness check and review/adopt/restore surfaces. The old `desktop_run_setup_center` remains available as an explicit advanced fallback command.
 - `ring_editor` and `test_matrix` are hosted workspace surfaces with legacy fallback commands for detailed tools.
 - `optimization` now has a hosted primary setup/readiness surface. The old `desktop_optimizer_center` remains available as an explicit advanced fallback command.
@@ -38,6 +39,16 @@ V21 says the main conflict is at shell/route level: the home surface must stop a
 - The `Последний архив проекта` overview card now opens `workspace.diagnostics.open`.
 
 This keeps direct actions available through their owning workspaces and command search, but removes legacy/external actions from the first overview decision row.
+
+## Follow-Up Applied: Hosted WS-INPUTS Editor
+
+This implementation change removes the first route-critical legacy editor command from the active path:
+
+- `input.editor.open` is now a hosted action routed through `InputWorkspacePage`, not a direct module launch.
+- `InputWorkspacePage` exposes `WS-INPUTS-HOSTED-PAGE` plus `ID-PARAM-TABLE` for the primary editable input surface.
+- The hosted surface reads sections and fields through `desktop_input_model`, shows section, parameter, value, unit and help text, and can save the working copy and the frozen route snapshot through the existing model functions.
+- `input.legacy_editor.open` keeps the old detailed Tk editor available as an explicit advanced fallback command.
+- The active route now reads as `WS-INPUTS -> WS-RING -> WS-SUITE` without forcing the user into a separate source-data editor before seeing or changing route-critical values.
 
 ## Follow-Up Applied: Hosted WS-RING
 
@@ -111,6 +122,7 @@ The seventh implementation change makes animation a first-class route step inste
 | Optimization needs one primary route | V21 `CUR-SHELL-OPT-PAGE`, V17 path-cost data | setup/readiness hosted; heavy execution remains in advanced optimizer center | wire native execution once launch subprocess state is separated from the detailed optimizer center |
 | Analysis compare must be primary inside analysis | V21 `CUR-WIN-COMPARE` | analysis/compare preparation hosted; detailed plots still delegated to advanced windows | wire native compare chart/table once plotting state is separated from external viewers |
 | Animation is route-visible but still external | V20 `WS-ANIMATOR` | route-aware readiness hub hosted; detailed graphics still delegated to advanced windows | re-host core scene controls once the graphics runtime exposes a safe embedded surface |
+| Ring and suite mutation depth is still partial | V21 route dominance notes, V20 workspace graphs | input editing is now hosted; ring and suite still keep detailed mutation in fallback windows | apply the same hosted-first pattern to ring segment editing and suite row/detail mutation |
 
 ## Next Implementation Order
 
@@ -121,6 +133,7 @@ The seventh implementation change makes animation a first-class route step inste
 5. Move StageRunner-first optimization controls into hosted `WS-OPTIMIZATION`. Done as hosted setup/readiness surface; native execution wiring remains next.
 6. Move latest results and primary compare summary into hosted `WS-ANALYSIS`. Done as hosted analysis/compare-preparation surface; native plots remain next.
 7. Convert `WS-ANIMATOR` from external-window hub to hosted control hub. Done as hosted readiness hub; full scene/mnemo re-host remains next.
+8. Continue removing legacy primary actions from route-critical workspaces. Started with hosted `WS-INPUTS` editing; next candidates are native WS-RING mutation and native WS-SUITE detail editing.
 
 ## Validation Added
 
@@ -139,3 +152,5 @@ The seventh implementation change makes animation a first-class route step inste
 - `tests/test_desktop_gui_spec_shell_runtime_contract.py` and `tests/test_desktop_gui_spec_workspace_pages_contract.py` now verify the hosted analysis panel, compare context preparation and diagnostics evidence preparation.
 - `tests/test_desktop_gui_spec_shell_contract.py` now asserts that animation and mnemo primary commands are hosted while separate graphical windows remain fallback commands.
 - `tests/test_desktop_gui_spec_shell_runtime_contract.py` and `tests/test_desktop_gui_spec_workspace_pages_contract.py` now verify the hosted animation hub and command routing.
+- `tests/test_desktop_gui_spec_shell_contract.py` now asserts that `input.editor.open` is hosted while `input.legacy_editor.open` remains the fallback launch command.
+- `tests/test_desktop_gui_spec_shell_runtime_contract.py` and `tests/test_desktop_gui_spec_workspace_pages_contract.py` now verify the hosted input editor table, object names and command routing.
