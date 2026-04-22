@@ -178,13 +178,17 @@ def test_main_window_hosts_suite_workspace_as_ring_consumer(tmp_path, monkeypatc
     app = _app()
     window = DesktopGuiSpecMainWindow()
     try:
-        window.open_workspace("test_matrix")
+        window.run_command("test.center.open")
         app.processEvents()
 
+        assert window._current_workspace_id == "test_matrix"
         page = window._page_widget_by_workspace_id["test_matrix"]
         assert isinstance(page, SuiteWorkspacePage)
         assert page.objectName() == "WS-SUITE-HOSTED-PAGE"
+        assert page.suite_table.objectName() == "TS-TABLE"
         assert page.suite_table.rowCount() > 0
+        assert "Проверка набора открыта" in page.validation_label.text()
+        assert "test.center.open" in window.recent_command_ids
         action_ids = tuple(command.command_id for command in page.action_commands)
         assert action_ids == (
             "test.center.open",

@@ -203,6 +203,9 @@ def test_suite_workspace_page_shows_test_rows_without_launcher_shell() -> None:
         page = window._page_widget_by_workspace_id["test_matrix"]
         assert isinstance(page, SuiteWorkspacePage)
         assert page.objectName() == "WS-SUITE-HOSTED-PAGE"
+        assert page.suite_table.objectName() == "TS-TABLE"
+        assert page.validation_label.objectName() == "TS-VALIDATION-SUMMARY"
+        assert page.check_button.objectName() == "TS-BTN-VALIDATE"
         page.refresh_view()
         app.processEvents()
 
@@ -236,6 +239,10 @@ def test_suite_workspace_page_shows_test_rows_without_launcher_shell() -> None:
         assert "stage" not in visible_text
         assert "suite" not in visible_text
         assert "sidecar" not in visible_text
+
+        window.run_command("test.center.open")
+        app.processEvents()
+        assert "Проверка набора открыта" in page.validation_label.text()
     finally:
         window.close()
         window.deleteLater()

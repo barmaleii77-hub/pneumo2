@@ -694,6 +694,7 @@ class SuiteWorkspacePage(QtWidgets.QWidget):
         self.ring_link_label = QtWidgets.QLabel("")
         self.ring_link_label.setWordWrap(True)
         self.validation_label = QtWidgets.QLabel("")
+        self.validation_label.setObjectName("TS-VALIDATION-SUMMARY")
         self.validation_label.setWordWrap(True)
         self.snapshot_label = QtWidgets.QLabel("Снимок набора ещё не сохранён для базового прогона.")
         self.snapshot_label.setWordWrap(True)
@@ -706,6 +707,7 @@ class SuiteWorkspacePage(QtWidgets.QWidget):
         table_box = QtWidgets.QGroupBox("Испытания в наборе")
         table_layout = QtWidgets.QVBoxLayout(table_box)
         self.suite_table = QtWidgets.QTableWidget(0, 7)
+        self.suite_table.setObjectName("TS-TABLE")
         self.suite_table.setHorizontalHeaderLabels(
             (
                 "Включено",
@@ -729,6 +731,7 @@ class SuiteWorkspacePage(QtWidgets.QWidget):
         actions_box = QtWidgets.QGroupBox("Действия")
         actions_layout = QtWidgets.QHBoxLayout(actions_box)
         self.check_button = QtWidgets.QPushButton("Проверить набор")
+        self.check_button.setObjectName("TS-BTN-VALIDATE")
         self.check_button.clicked.connect(self.check_suite)
         actions_layout.addWidget(self.check_button)
         self.save_button = QtWidgets.QPushButton("Сохранить снимок для базового прогона")
@@ -745,21 +748,18 @@ class SuiteWorkspacePage(QtWidgets.QWidget):
         )
         if baseline_command is not None:
             baseline_button = QtWidgets.QPushButton(baseline_command.title)
+            baseline_button.setObjectName("TS-BTN-RUN-BASELINE")
             baseline_button.setToolTip(baseline_command.summary)
             baseline_button.clicked.connect(
                 lambda _checked=False, cid=baseline_command.command_id: self.on_command(cid)
             )
             actions_layout.addWidget(baseline_button)
-        for command in self.action_commands:
-            if command.command_id != "test.center.open":
-                continue
-            advanced_button = QtWidgets.QPushButton("Расширенная настройка набора")
-            advanced_button.setToolTip(command.summary)
-            advanced_button.clicked.connect(
-                lambda _checked=False, cid=command.command_id: self.on_command(cid)
-            )
-            actions_layout.addWidget(advanced_button)
-            break
+        advanced_button = QtWidgets.QPushButton("Расширенная настройка набора")
+        advanced_button.setToolTip("Открыть прежний центр набора испытаний для детальной настройки.")
+        advanced_button.clicked.connect(
+            lambda _checked=False: self.on_command("test.legacy_center.open")
+        )
+        actions_layout.addWidget(advanced_button)
         layout.addWidget(actions_box)
 
         v16_box = build_v16_visibility_priority_box(workspace)
@@ -890,6 +890,14 @@ class SuiteWorkspacePage(QtWidgets.QWidget):
             return
         self.snapshot_label.setText("Снимок набора сохранён для базового прогона.")
         self.validation_label.setText("Набор проверен и готов для базового прогона.")
+
+    def handle_command(self, command_id: str) -> None:
+        if command_id == "test.center.open":
+            self.refresh_view()
+            self.suite_table.setFocus(QtCore.Qt.OtherFocusReason)
+            self.validation_label.setText(
+                "Проверка набора открыта в рабочем шаге. Проверьте строки, сохраните снимок и переходите к базовому прогону."
+            )
 
 
 class BaselineWorkspacePage(RuntimeWorkspacePage):

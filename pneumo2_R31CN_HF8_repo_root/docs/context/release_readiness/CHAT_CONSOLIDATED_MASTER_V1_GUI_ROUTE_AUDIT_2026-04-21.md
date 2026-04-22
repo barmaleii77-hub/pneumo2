@@ -24,7 +24,7 @@ Status: actionable implementation audit after importing `pneumo_chat_consolidate
 - `input_data` now has a hosted editable parameter table. `input.editor.open` is routed through `InputWorkspacePage`, while `input.legacy_editor.open` remains an explicit fallback for the old detailed editor.
 - `baseline_run` has hosted run setup, readiness check and review/adopt/restore surfaces. The old `desktop_run_setup_center` remains available as an explicit advanced fallback command.
 - `ring_editor` now has a hosted segment-editing surface. `ring.editor.open` is routed through `RingWorkspacePage`, while `ring.legacy_editor.open` remains an explicit fallback for the old detailed ring editor.
-- `test_matrix` is a hosted workspace surface with the legacy test center kept as a fallback command.
+- `test_matrix` is a hosted workspace surface. `test.center.open` now routes through `SuiteWorkspacePage`, while `test.legacy_center.open` keeps the old test center available as a fallback command.
 - `optimization` now has a hosted primary setup/readiness surface. The old `desktop_optimizer_center` remains available as an explicit advanced fallback command.
 - `results_analysis` now has a hosted analysis/compare preparation surface. The old `desktop_results_center` remains available as an explicit advanced fallback command.
 - `animation` now has a hosted route-aware animation/mnemo readiness hub. The separate Animator and Mnemo windows remain available as explicit advanced fallback commands.
@@ -70,7 +70,7 @@ The third implementation change promotes the suite lane into the active route af
 - `SuiteWorkspacePage` exposes a stable `WS-SUITE-HOSTED-PAGE` object name for smoke/contract tests.
 - The page remains the active HO-005 surface: it shows test rows, checks upstream WS-INPUTS/WS-RING links and can save the validated suite snapshot for baseline run setup.
 - `workspace.baseline_run.open` is visible as the route-forward handoff after suite validation.
-- `test.center.open` remains a legacy fallback/advanced command instead of the only implementation of the workspace.
+- `test.center.open` is now the hosted active action for the suite lane; `test.legacy_center.open` keeps the old test center available as an explicit advanced fallback command.
 
 ## Follow-Up Applied: Hosted WS-BASELINE Setup
 
@@ -119,7 +119,7 @@ The seventh implementation change makes animation a first-class route step inste
 | Gap | Master V1 source | Current state | Next action |
 | --- | --- | --- | --- |
 | Ring editor must dominate as step 2 | V21 `CUR-RING-NOT-DOMINANT`, V20/V19 ring graphs, V13 ring migration | hosted segment-editing surface; legacy editor fallback remains | extend native WS-RING with advanced road/event editors when those panels are safe to re-host |
-| Suite must read as consumer after ring | V21 `CUR-WIN-SUITE`, V20 `WS-SUITE` graph | hosted table/check/snapshot surface; legacy test center fallback remains | expand native suite editing beyond enable/check/save once mutation rules are ready |
+| Suite must read as consumer after ring | V21 `CUR-WIN-SUITE`, V20 `WS-SUITE` graph | hosted table/check/snapshot surface is the active command route; legacy test center fallback remains | expand native suite editing beyond enable/check/save once mutation rules are ready |
 | Baseline setup must not be a side launcher | V20 `WS-BASELINE`, route cost scenarios | setup/readiness hosted; actual heavy run execution still delegated to advanced center | wire native execution once subprocess contract is isolated from Tk editor state |
 | Optimization needs one primary route | V21 `CUR-SHELL-OPT-PAGE`, V17 path-cost data | setup/readiness hosted; heavy execution remains in advanced optimizer center | wire native execution once launch subprocess state is separated from the detailed optimizer center |
 | Analysis compare must be primary inside analysis | V21 `CUR-WIN-COMPARE` | analysis/compare preparation hosted; detailed plots still delegated to advanced windows | wire native compare chart/table once plotting state is separated from external viewers |
@@ -135,7 +135,7 @@ The seventh implementation change makes animation a first-class route step inste
 5. Move StageRunner-first optimization controls into hosted `WS-OPTIMIZATION`. Done as hosted setup/readiness surface; native execution wiring remains next.
 6. Move latest results and primary compare summary into hosted `WS-ANALYSIS`. Done as hosted analysis/compare-preparation surface; native plots remain next.
 7. Convert `WS-ANIMATOR` from external-window hub to hosted control hub. Done as hosted readiness hub; full scene/mnemo re-host remains next.
-8. Continue removing legacy primary actions from route-critical workspaces. `WS-INPUTS` editing and `WS-RING` segment editing are hosted; next candidate is native WS-SUITE detail editing.
+8. Continue removing legacy primary actions from route-critical workspaces. `WS-INPUTS`, `WS-RING` and the primary `WS-SUITE` action are hosted; next candidate is native baseline execution wiring.
 
 ## Validation Added
 
@@ -146,8 +146,8 @@ The seventh implementation change makes animation a first-class route step inste
 - `tests/test_desktop_gui_spec_shell_runtime_contract.py` now opens `ring_editor` offscreen and verifies that the shell hosts `RingWorkspacePage`.
 - `tests/test_desktop_gui_spec_shell_contract.py` now asserts that `ring.editor.open` is hosted while `ring.legacy_editor.open` remains the fallback launch command.
 - `tests/test_desktop_gui_spec_shell_runtime_contract.py` and `tests/test_desktop_gui_spec_workspace_pages_contract.py` now verify the hosted ring segment table, object names and command routing.
-- `tests/test_desktop_gui_spec_shell_contract.py` now asserts that WS-SUITE is a hosted workspace while `test.center.open` remains a legacy fallback.
-- `tests/test_desktop_gui_spec_shell_runtime_contract.py` and `tests/test_desktop_gui_spec_workspace_pages_contract.py` now verify the hosted suite page, route-forward baseline action and advanced fallback action.
+- `tests/test_desktop_gui_spec_shell_contract.py` now asserts that WS-SUITE and `test.center.open` are hosted while `test.legacy_center.open` remains the fallback launch command.
+- `tests/test_desktop_gui_spec_shell_runtime_contract.py` and `tests/test_desktop_gui_spec_workspace_pages_contract.py` now verify the hosted suite page, command routing, stable object names, route-forward baseline action and advanced fallback action.
 - `tests/test_desktop_gui_spec_shell_contract.py` now asserts that baseline setup is hosted while `baseline.legacy_run_setup.open` remains the advanced fallback.
 - `tests/test_desktop_gui_spec_shell_runtime_contract.py` and `tests/test_desktop_gui_spec_workspace_pages_contract.py` now verify the hosted baseline setup panel and command routing.
 - `tests/test_desktop_gui_spec_shell_contract.py` now asserts that optimization setup is hosted while `optimization.legacy_center.open` remains the advanced fallback.
