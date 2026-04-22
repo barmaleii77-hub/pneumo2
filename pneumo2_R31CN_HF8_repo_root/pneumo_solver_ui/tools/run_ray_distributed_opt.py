@@ -96,9 +96,106 @@ def _parse_devices(s: str) -> List[str]:
     return parts if parts else ["auto"]
 
 
+def _request_idx_from_trial_id(trial_id: Any, *, fallback: int = 0) -> int:
+    """Build a stable integer request id from string/integer trial ids."""
+    text = str(trial_id or "").strip()
+    if text:
+        try:
+            return int(text)
+        except Exception:
+            pass
+        try:
+            return int(text[:8], 16)
+        except Exception:
+            pass
+    try:
+        return int(fallback)
+    except Exception:
+        return 0
+
+
+def _safe_float(value: Any, default: float = float("nan")) -> float:
+    """Best-effort float cast used by legacy cache/result payloads."""
+    try:
+        if value is None:
+            return float(default)
+        return float(value)
+    except Exception:
+        return float(default)
+
+
+def _ray_error(stage: str, err: Any) -> str:
+    return f"Ray {str(stage)} failed: {err}"
+
+
+def _make_propose_options(args: argparse.Namespace) -> ProposeOptions:
+    from pneumo_solver_ui.pneumo_dist.mobo_propose import ProposeOptions
+
+    return ProposeOptions(
+        method="botorch" if bool(getattr(args, "botorch", False)) else "auto",
+        seed=int(getattr(args, "seed", 0) or 0),
+        n_init=int(getattr(args, "n_init", 0) or 0),
+        allow_botorch=bool(getattr(args, "botorch", False)),
+        feasible_tol=float(getattr(args, "feasible_tol", 1e-9)),
+        min_feasible=int(getattr(args, "min_feasible", 8) or 8),
+        use_constraint_model=(not bool(getattr(args, "no_constraints", False))),
+        heuristic_pool_size=int(getattr(args, "heuristic_pool_size", 256) or 256),
+        heuristic_explore=float(getattr(args, "heuristic_explore", 0.70)),
+    )
+
+
+def _row_from_evaluator(
+    evaluator: Any,
+    *,
+    trial_id: Any,
+    param_hash: str,
+    x_u: List[float],
+    idx: int = 0,
+    worker_id: str = "",
+) -> Dict[str, Any]:
+    trial_text = str(trial_id)
+    x_arr = np.asarray(x_u, dtype=float)
+
+    try:
+        res = evaluator.evaluate(trial_id=trial_text, x_u=x_arr, idx=int(idx))
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "trial_id": trial_text,
+            "param_hash": str(param_hash),
+            "idx": int(idx),
+            "worker_id": str(worker_id),
+            "x_u": [float(v) for v in x_arr.reshape(-1)],
+            "params": {},
+        }
+
+    row: Dict[str, Any] = {}
+    if isinstance(res, dict):
+        row.update(res)
+    else:
+        row.update({"status": "error", "message": str(res)})
+
+    row.setdefault("trial_id", trial_text)
+    row.setdefault("param_hash", str(param_hash))
+    row.setdefault("idx", int(idx))
+    row.setdefault("worker_id", str(worker_id))
+    try:
+        row.setdefault("x_u", [float(v) for v in x_arr.reshape(-1)])
+    except Exception:
+        row.setdefault("x_u", [])
+    try:
+        row.setdefault("params", evaluator.denormalize(x_arr))
+    except Exception:
+        row.setdefault("params", {})
+    return row
+
+
 def main() -> int:
     db = None  # ExperimentDB (init later)
     token = None  # RunToken (init later)
+    ray_runtime = None
     ap = argparse.ArgumentParser()
 
     ap.add_argument("--model", required=True, help="Path to model .py")
@@ -138,9 +235,13 @@ def main() -> int:
     ap.add_argument("--proposer-devices", default="auto", help="Comma-separated devices for proposer, e.g. cuda:0,cuda:1")
     ap.add_argument("--feasible-tol", type=float, default=1e-9)
     ap.add_argument("--min-feasible", type=int, default=8)
+    ap.add_argument("--heuristic-pool-size", type=int, default=256, help="Candidate pool size for heuristic proposer fallback")
+    ap.add_argument("--heuristic-explore", type=float, default=0.70, help="Exploration weight (0..1) for heuristic proposer fallback")
     ap.add_argument("--no-constraints", action="store_true", help="Disable constraint modeling")
 
     args = ap.parse_args()
+    num_workers = max(1, int(args.num_workers))
+    queue_target = max(1, int(args.queue_target))
 
     from pneumo_solver_ui.run_registry import end_run, env_context, start_run
     from pneumo_solver_ui.pneumo_dist.eval_core import Evaluator
@@ -162,119 +263,176 @@ def main() -> int:
         "settle_band_ratio": float(args.settle_band_ratio),
     }
 
-    # Evaluator (local) for dimension and param order
-    evaluator_local = Evaluator(
-        model_py=model_py,
-        worker_py=worker_py,
-        base_json=args.base_json,
-        ranges_json=args.ranges_json,
-        suite_json=args.suite_json,
-        cfg_extra=cfg_extra,
-    )
-
-    # Hash the full problem definition
-    problem_hash = stable_hash_problem(
-        model_py=model_py,
-        worker_py=worker_py,
-        base=evaluator_local.base,
-        ranges={k: list(v) for k, v in evaluator_local.ranges.items()},
-        suite=evaluator_local.suite,
-        extra={
-            "cfg": cfg_extra,
-            "objectives": ["obj1", "obj2"],
-            "constraint": "penalty<=tol",
-            "release": "R57",
-        },
-    )
-
-    # Resolve run_dir
-    if args.out_dir:
-        run_dir = Path(args.out_dir)
-    else:
-        run_dir = REPO_ROOT / "runs" / "dist_runs" / _make_run_id("DIST_RAY", problem_hash)
-
-    run_dir.mkdir(parents=True, exist_ok=True)
-
-    # DB path
-    db_path = run_dir / ("experiments.duckdb" if _duckdb_available() else "experiments.sqlite")
-
-    # Resume logic
-    run_id = None
-    if args.resume:
-        cfg_path = run_dir / "run_config.json"
-        if cfg_path.exists():
-            try:
-                prev = _read_json(cfg_path)
-                run_id = str(prev.get("run_id") or "")
-                prev_ph = str(prev.get("problem_hash") or "")
-                if prev_ph and prev_ph != problem_hash:
-                    print("WARNING: problem_hash differs from run_config.json; using current hash")
-            except Exception:
-                run_id = None
-        if not run_id:
-            run_id = _make_run_id("DIST_RAY", problem_hash)
-    else:
-        run_id = _make_run_id("DIST_RAY", problem_hash)
-
-    # Save run_config.json
-    _write_json_atomic(
-        run_dir / "run_config.json",
-        {
-            "release": "R57",
-            "run_id": run_id,
-            "problem_hash": problem_hash,
-            "model_py": model_py,
-            "worker_py": worker_py,
-            "base_json": args.base_json,
-            "ranges_json": args.ranges_json,
-            "suite_json": args.suite_json,
-            "cfg_extra": cfg_extra,
-            "budget": int(args.budget),
-            "num_workers": int(args.num_workers),
-            "queue_target": int(args.queue_target),
-            "seed": int(args.seed),
-            "n_init": int(args.n_init),
-            "botorch": bool(args.botorch),
-            "proposer_devices": str(args.proposer_devices),
-            "feasible_tol": float(args.feasible_tol),
-            "min_feasible": int(args.min_feasible),
-            "use_constraints": (not bool(args.no_constraints)),
-            "ray_address": args.ray_address,
-            "ship_code": bool(args.ship_code),
-        },
-    )
-
-    # Start run registry
-    token = start_run(
-        run_type="dist_ray_opt",
-        run_dir=str(run_dir),
-        meta={
-            "run_id": run_id,
-            "problem_hash": problem_hash,
-            "db_path": str(db_path),
-            "ray_address": args.ray_address,
-            "num_workers": int(args.num_workers),
-            "queue_target": int(args.queue_target),
-        },
-        env=env_context(),
-    )
-
-    # Experiment DB
-    db = ExperimentDB(str(db_path))
-    db.connect()
-    db.init_schema()
-
-    # Create run row if not exists
     try:
-        db.add_run(run_id=run_id, problem_hash=problem_hash, meta={"run_dir": str(run_dir)}, status="running")
-    except Exception:
-        # already exists
-        pass
+        # Evaluator (local) for dimension and param order
+        evaluator_local = Evaluator(
+            model_py=model_py,
+            worker_py=worker_py,
+            base_json=args.base_json,
+            ranges_json=args.ranges_json,
+            suite_json=args.suite_json,
+            cfg_extra=cfg_extra,
+        )
+
+        # Hash the full problem definition
+        problem_hash = stable_hash_problem(
+            model_py=model_py,
+            worker_py=worker_py,
+            base=evaluator_local.base,
+            ranges={k: list(v) for k, v in evaluator_local.ranges.items()},
+            suite=evaluator_local.suite,
+            extra={
+                "cfg": cfg_extra,
+                "objectives": ["obj1", "obj2"],
+                "constraint": "penalty<=tol",
+                "release": "R57",
+            },
+        )
+
+        # Resolve run_dir
+        if args.out_dir:
+            run_dir = Path(args.out_dir)
+        else:
+            run_dir = REPO_ROOT / "runs" / "dist_runs" / _make_run_id("DIST_RAY", problem_hash)
+
+        run_dir.mkdir(parents=True, exist_ok=True)
+
+        # DB path
+        db_path = run_dir / ("experiments.duckdb" if _duckdb_available() else "experiments.sqlite")
+
+        # Resume logic
+        run_id = None
+        if args.resume:
+            cfg_path = run_dir / "run_config.json"
+            if cfg_path.exists():
+                try:
+                    prev = _read_json(cfg_path)
+                    run_id = str(prev.get("run_id") or "")
+                    prev_ph = str(prev.get("problem_hash") or "")
+                    if prev_ph and prev_ph != problem_hash:
+                        print("WARNING: problem_hash differs from run_config.json; using current hash")
+                except Exception:
+                    run_id = None
+            if not run_id:
+                run_id = _make_run_id("DIST_RAY", problem_hash)
+        else:
+            run_id = _make_run_id("DIST_RAY", problem_hash)
+
+        # Save run_config.json
+        _write_json_atomic(
+            run_dir / "run_config.json",
+            {
+                "release": "R57",
+                "run_id": run_id,
+                "problem_hash": problem_hash,
+                "model_py": model_py,
+                "worker_py": worker_py,
+                "base_json": args.base_json,
+                "ranges_json": args.ranges_json,
+                "suite_json": args.suite_json,
+                "cfg_extra": cfg_extra,
+                "budget": int(args.budget),
+                "num_workers": int(num_workers),
+                "queue_target": int(queue_target),
+                "seed": int(args.seed),
+                "n_init": int(args.n_init),
+                "botorch": bool(args.botorch),
+                "proposer_devices": str(args.proposer_devices),
+                "feasible_tol": float(args.feasible_tol),
+                "min_feasible": int(args.min_feasible),
+                "use_constraints": (not bool(args.no_constraints)),
+                "ray_address": args.ray_address,
+                "ship_code": bool(args.ship_code),
+            },
+        )
+
+        # Start run registry
+        token = start_run(
+            run_type="dist_ray_opt",
+            run_id=run_id,
+            run_dir=str(run_dir),
+            meta={
+                "run_id": run_id,
+                "problem_hash": problem_hash,
+                "db_path": str(db_path),
+                "ray_address": args.ray_address,
+                "num_workers": int(num_workers),
+                "queue_target": int(queue_target),
+            },
+            env=env_context(),
+        )
+
+        # Experiment DB
+        db = ExperimentDB(str(db_path))
+        db.connect()
+        db.init_schema()
+
+        # Create run row if not exists
+        try:
+            db.add_run(run_id=run_id, problem_hash=problem_hash, meta={"run_dir": str(run_dir)}, status="running")
+        except Exception:
+            # already exists
+            pass
+    except Exception as e:
+        err_msg = _ray_error("pre-start setup", e)
+        try:
+            if db is not None and "run_id" in locals():
+                db.update_run_status(run_id, "error", error=str(err_msg))
+        except Exception:
+            pass
+        try:
+            if token is not None:
+                end_run(token, status="error", error=str(err_msg))
+        except Exception:
+            pass
+        try:
+            if db is not None:
+                close_fn = getattr(db, "close", None)
+                if callable(close_fn):
+                    close_fn()
+        except Exception:
+            pass
+        print("FATAL:", err_msg)
+        print(traceback.format_exc())
+        return 1
+
+    def _cleanup_runtime() -> None:
+        if ray_runtime is None:
+            return
+        try:
+            is_init = getattr(ray_runtime, "is_initialized", None)
+            if callable(is_init):
+                try:
+                    if not bool(is_init()):
+                        return
+                except Exception:
+                    pass
+            shutdown_fn = getattr(ray_runtime, "shutdown", None)
+            if callable(shutdown_fn):
+                shutdown_fn()
+        except Exception:
+            pass
+
+    def _cleanup_db() -> None:
+        if db is None:
+            return
+        try:
+            close_fn = getattr(db, "close", None)
+            if callable(close_fn):
+                close_fn()
+        except Exception:
+            pass
+
+    def _return_with_cleanup(rc: int) -> int:
+        _cleanup_runtime()
+        _cleanup_db()
+        return int(rc)
 
     # Ray init
     try:
         import ray  # type: ignore
 
+        ray_runtime = ray
         runtime_env = None
         if bool(args.ship_code):
             runtime_env = {"working_dir": str(REPO_ROOT)}
@@ -283,10 +441,19 @@ def main() -> int:
         else:
             ray.init(ignore_reinit_error=True, runtime_env=runtime_env)
     except Exception as e:
-        end_run(token, status="error", error=f"Ray init failed: {e}")
-        raise
-
-    from pneumo_solver_ui.pneumo_dist.eval_core import evaluate_xu_to_row
+        err_msg = _ray_error("init", e)
+        try:
+            if db is not None and "run_id" in locals():
+                db.update_run_status(run_id, "error", error=err_msg)
+        except Exception:
+            pass
+        try:
+            end_run(token, status="error", error=err_msg)
+        except Exception:
+            pass
+        print("FATAL:", err_msg)
+        print(traceback.format_exc())
+        return _return_with_cleanup(1)
 
     # Remote evaluator actor
     import ray  # type: ignore
@@ -304,31 +471,51 @@ def main() -> int:
                 cfg_extra=cfg_extra,
             )
 
-        def evaluate(self, trial_id: int, param_hash: str, x_u: List[float], idx: int) -> Dict[str, Any]:
-            return evaluate_xu_to_row(self.evaluator, trial_id=int(trial_id), param_hash=str(param_hash), x_u=list(x_u), worker_id=str(self.actor_id), idx=int(idx))
+        def evaluate(self, trial_id: Any, param_hash: str, x_u: List[float], idx: int) -> Dict[str, Any]:
+            return _row_from_evaluator(
+                self.evaluator,
+                trial_id=trial_id,
+                param_hash=str(param_hash),
+                x_u=list(x_u),
+                idx=int(idx),
+                worker_id=str(self.actor_id),
+            )
 
         def ping(self) -> str:
             return "ok"
 
-    # create actors
-    actors = [EvalActor.remote(f"ray_worker_{i}", model_py, worker_py, args.base_json, args.ranges_json, args.suite_json, cfg_extra) for i in range(int(args.num_workers))]
-
-    # ping actors
+    # create actors + startup ping (fail-fast)
     try:
+        actors = [
+            EvalActor.remote(
+                f"ray_worker_{i}",
+                model_py,
+                worker_py,
+                args.base_json,
+                args.ranges_json,
+                args.suite_json,
+                cfg_extra,
+            )
+            for i in range(int(num_workers))
+        ]
         ray.get([a.ping.remote() for a in actors])
     except Exception as e:
-        print("WARNING: some actors failed to start:", e)
+        err_msg = _ray_error("evaluator actor startup", e)
+        try:
+            if db is not None and "run_id" in locals():
+                db.update_run_status(run_id, "error", error=err_msg)
+        except Exception:
+            pass
+        try:
+            end_run(token, status="error", error=err_msg)
+        except Exception:
+            pass
+        print("FATAL:", err_msg)
+        print(traceback.format_exc())
+        return _return_with_cleanup(1)
 
     # Proposer options
-    popt = ProposeOptions(
-        method="botorch" if args.botorch else "auto",
-        seed=int(args.seed),
-        n_init=int(args.n_init),
-        allow_botorch=bool(args.botorch),
-        feasible_tol=float(args.feasible_tol),
-        min_feasible_for_mobo=int(args.min_feasible),
-        use_constraints=(not bool(args.no_constraints)),
-    )
+    popt = _make_propose_options(args)
 
     proposer_devices = _parse_devices(args.proposer_devices)
 
@@ -343,9 +530,8 @@ def main() -> int:
 
     # State
     budget = int(args.budget)
-    queue_target = max(1, int(args.queue_target))
 
-    inflight: Dict[Any, Tuple[int, str, List[float]]] = {}
+    inflight: Dict[Any, Tuple[str, str, List[float]]] = {}
     submitted = 0
 
     # Completed counts include cached + done (not error)
@@ -467,9 +653,9 @@ def main() -> int:
                     db.mark_done(
                         trial_id,
                         metrics=cached.get("metrics", {}),
-                        obj1=float(cached.get("obj1", float("nan"))),
-                        obj2=float(cached.get("obj2", float("nan"))),
-                        penalty=float(cached.get("penalty", float("nan"))),
+                        obj1=_safe_float(cached.get("obj1")),
+                        obj2=_safe_float(cached.get("obj2")),
+                        penalty=_safe_float(cached.get("penalty")),
                         status="cached",
                     )
                     completed = _count_completed()
@@ -480,7 +666,11 @@ def main() -> int:
                 worker_id = f"ray_actor_{(submitted + len(inflight)) % len(actors)}"
                 db.mark_started(trial_id, worker_id)
 
-                fut = actor.evaluate.remote(trial_id, param_hash, xq, int(trial_id))
+                req_idx = _request_idx_from_trial_id(
+                    trial_id,
+                    fallback=int(submitted + len(inflight)),
+                )
+                fut = actor.evaluate.remote(trial_id, param_hash, xq, int(req_idx))
                 inflight[fut] = (trial_id, param_hash, xq)
                 submitted += 1
 
@@ -503,9 +693,9 @@ def main() -> int:
                     continue
 
                 if isinstance(res, dict) and res.get("status") == "done":
-                    obj1 = float(res.get("obj1", float("nan")))
-                    obj2 = float(res.get("obj2", float("nan")))
-                    pen = float(res.get("penalty", float("nan")))
+                    obj1 = _safe_float(res.get("obj1"))
+                    obj2 = _safe_float(res.get("obj2"))
+                    pen = _safe_float(res.get("penalty"))
                     metrics = res.get("metrics", {}) if isinstance(res.get("metrics", {}), dict) else {"metrics": res.get("metrics")}
 
                     db.mark_done(trial_id, metrics=metrics, obj1=obj1, obj2=obj2, penalty=pen, status="done")
@@ -547,7 +737,7 @@ def main() -> int:
         db.update_run_status(run_id, "done")
         _update_progress("done", "completed")
         end_run(token, status="done")
-        return 0
+        return _return_with_cleanup(0)
 
     except KeyboardInterrupt:
         try:
@@ -561,23 +751,24 @@ def main() -> int:
                 end_run(token, status="stopped", error="KeyboardInterrupt")
         except Exception:
             pass
-        return 130
+        return _return_with_cleanup(130)
 
     except Exception as e:
+        err_msg = _ray_error("runtime", e)
         try:
             if db is not None and "run_id" in locals():
-                db.update_run_status(run_id, "error", error=str(e))
+                db.update_run_status(run_id, "error", error=str(err_msg))
         except Exception:
             pass
-        _update_progress("error", str(e))
+        _update_progress("error", str(err_msg))
         try:
             if token is not None:
-                end_run(token, status="error", error=str(e))
+                end_run(token, status="error", error=str(err_msg))
         except Exception:
             pass
-        print("FATAL:", e)
+        print("FATAL:", err_msg)
         print(traceback.format_exc())
-        return 2
+        return _return_with_cleanup(1)
 
 
 if __name__ == "__main__":

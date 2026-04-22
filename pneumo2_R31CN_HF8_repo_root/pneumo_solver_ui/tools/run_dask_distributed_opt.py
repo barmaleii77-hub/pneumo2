@@ -56,9 +56,110 @@ def _duckdb_available() -> bool:
         return False
 
 
+def _request_idx_from_trial_id(trial_id: Any, *, fallback: int = 0) -> int:
+    """Build a stable integer request id from string/integer trial ids."""
+    text = str(trial_id or "").strip()
+    if text:
+        try:
+            return int(text)
+        except Exception:
+            pass
+        try:
+            return int(text[:8], 16)
+        except Exception:
+            pass
+    try:
+        return int(fallback)
+    except Exception:
+        return 0
+
+
+def _safe_float(value: Any, default: float = float("nan")) -> float:
+    """Best-effort float cast used by legacy cache/result payloads."""
+    try:
+        if value is None:
+            return float(default)
+        return float(value)
+    except Exception:
+        return float(default)
+
+
+def _dask_error(stage: str, err: Any) -> str:
+    return f"Dask {str(stage)} failed: {err}"
+
+
+def _make_propose_options(args: argparse.Namespace) -> ProposeOptions:
+    from pneumo_solver_ui.pneumo_dist.mobo_propose import ProposeOptions
+
+    return ProposeOptions(
+        method="auto",
+        allow_botorch=bool(getattr(args, "botorch", False)),
+        device="auto",
+        q=1,
+        num_restarts=8,
+        raw_samples=64,
+        seed=int(getattr(args, "seed", 0) or 0),
+        feasible_tol=float(getattr(args, "feasible_tol", 1e-9)),
+        min_feasible=int(getattr(args, "min_feasible", 8) or 8),
+        use_constraint_model=(not bool(getattr(args, "no_constraints", False))),
+        n_init=int(getattr(args, "n_init", 24) or 24),
+        heuristic_pool_size=int(getattr(args, "heuristic_pool_size", 256) or 256),
+        heuristic_explore=float(getattr(args, "heuristic_explore", 0.70)),
+    )
+
+
+def _row_from_evaluator(
+    evaluator: Any,
+    *,
+    trial_id: Any,
+    param_hash: str,
+    x_u: List[float],
+    idx: int = 0,
+    worker_id: str = "",
+) -> Dict[str, Any]:
+    trial_text = str(trial_id)
+    x_arr = np.asarray(x_u, dtype=float)
+
+    try:
+        res = evaluator.evaluate(trial_id=trial_text, x_u=x_arr, idx=int(idx))
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "trial_id": trial_text,
+            "param_hash": str(param_hash),
+            "idx": int(idx),
+            "worker_id": str(worker_id),
+            "x_u": [float(v) for v in x_arr.reshape(-1)],
+            "params": {},
+        }
+
+    row: Dict[str, Any] = {}
+    if isinstance(res, dict):
+        row.update(res)
+    else:
+        row.update({"status": "error", "message": str(res)})
+
+    row.setdefault("trial_id", trial_text)
+    row.setdefault("param_hash", str(param_hash))
+    row.setdefault("idx", int(idx))
+    row.setdefault("worker_id", str(worker_id))
+    try:
+        row.setdefault("x_u", [float(v) for v in x_arr.reshape(-1)])
+    except Exception:
+        row.setdefault("x_u", [])
+    try:
+        row.setdefault("params", evaluator.denormalize(x_arr))
+    except Exception:
+        row.setdefault("params", {})
+    return row
+
+
 def main() -> int:
     db = None
     token = None
+    client = None
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", required=True)
@@ -93,9 +194,13 @@ def main() -> int:
     ap.add_argument("--proposer-devices", default="auto")
     ap.add_argument("--feasible-tol", type=float, default=1e-9)
     ap.add_argument("--min-feasible", type=int, default=8)
+    ap.add_argument("--heuristic-pool-size", type=int, default=256, help="Candidate pool size for heuristic proposer fallback")
+    ap.add_argument("--heuristic-explore", type=float, default=0.70, help="Exploration weight (0..1) for heuristic proposer fallback")
     ap.add_argument("--no-constraints", action="store_true")
 
     args = ap.parse_args()
+    num_workers = max(1, int(args.num_workers))
+    queue_target = max(1, int(args.queue_target))
 
     from pneumo_solver_ui.run_registry import end_run, env_context, start_run
     from pneumo_solver_ui.pneumo_dist.eval_core import Evaluator, evaluate_xu_to_row
@@ -117,123 +222,176 @@ def main() -> int:
     model_py = str(Path(args.model))
     worker_py = str(Path(args.worker))
 
-    evaluator_local = Evaluator(
-        model_py=model_py,
-        worker_py=worker_py,
-        base_json=args.base_json,
-        ranges_json=args.ranges_json,
-        suite_json=args.suite_json,
-        cfg_extra=cfg_extra,
-    )
+    try:
+        evaluator_local = Evaluator(
+            model_py=model_py,
+            worker_py=worker_py,
+            base_json=args.base_json,
+            ranges_json=args.ranges_json,
+            suite_json=args.suite_json,
+            cfg_extra=cfg_extra,
+        )
 
-    problem_hash = stable_hash_problem(
-        model_py=model_py,
-        worker_py=worker_py,
-        base=evaluator_local.base,
-        ranges=evaluator_local.ranges,
-        suite=evaluator_local.suite,
-        extra={"cfg_extra": cfg_extra, "runner": "dask", "release": "R57"},
-    )
+        problem_hash = stable_hash_problem(
+            model_py=model_py,
+            worker_py=worker_py,
+            base=evaluator_local.base,
+            ranges=evaluator_local.ranges,
+            suite=evaluator_local.suite,
+            extra={"cfg_extra": cfg_extra, "runner": "dask", "release": "R57"},
+        )
 
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    if args.out_dir:
-        run_dir = Path(args.out_dir)
-    else:
-        run_dir = REPO_ROOT / "runs" / "dist_runs" / f"DIST_DASK_{ts}_{problem_hash[:8]}"
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        if args.out_dir:
+            run_dir = Path(args.out_dir)
+        else:
+            run_dir = REPO_ROOT / "runs" / "dist_runs" / f"DIST_DASK_{ts}_{problem_hash[:8]}"
 
-    run_dir.mkdir(parents=True, exist_ok=True)
-    stop_file = run_dir / "STOP_DISTRIBUTED.txt"
-    progress_path = run_dir / "progress.json"
-    cfg_path = run_dir / "run_config.json"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        stop_file = run_dir / "STOP_DISTRIBUTED.txt"
+        progress_path = run_dir / "progress.json"
+        cfg_path = run_dir / "run_config.json"
 
-    if args.resume:
-        if cfg_path.exists():
-            cfg_prev = json.loads(cfg_path.read_text(encoding="utf-8"))
-            run_id = str(cfg_prev.get("run_id", f"DIST_DASK_{ts}_{problem_hash[:8]}"))
+        if args.resume:
+            if cfg_path.exists():
+                cfg_prev = json.loads(cfg_path.read_text(encoding="utf-8"))
+                run_id = str(cfg_prev.get("run_id", f"DIST_DASK_{ts}_{problem_hash[:8]}"))
+            else:
+                run_id = f"DIST_DASK_{ts}_{problem_hash[:8]}"
         else:
             run_id = f"DIST_DASK_{ts}_{problem_hash[:8]}"
-    else:
-        run_id = f"DIST_DASK_{ts}_{problem_hash[:8]}"
 
-    db_path = run_dir / ("experiments.duckdb" if _duckdb_available() else "experiments.sqlite")
+        db_path = run_dir / ("experiments.duckdb" if _duckdb_available() else "experiments.sqlite")
 
-    _write_json_atomic(
-        cfg_path,
-        {
-            "release": "R57",
-            "run_id": run_id,
-            "problem_hash": problem_hash,
-            "runner": "dask",
-            "db_path": str(db_path),
-            "model": model_py,
-            "worker": worker_py,
-            "base_json": args.base_json,
-            "ranges_json": args.ranges_json,
-            "suite_json": args.suite_json,
-            "cfg_extra": cfg_extra,
-            "budget": int(args.budget),
-            "num_workers": int(args.num_workers),
-            "queue_target": int(args.queue_target),
-            "seed": int(args.seed),
-            "n_init": int(args.n_init),
-            "botorch": bool(args.botorch),
-            "proposer_devices": str(args.proposer_devices),
-            "feasible_tol": float(args.feasible_tol),
-            "min_feasible": int(args.min_feasible),
-            "use_constraints": (not bool(args.no_constraints)),
-            "scheduler": args.scheduler,
-        },
-    )
+        _write_json_atomic(
+            cfg_path,
+            {
+                "release": "R57",
+                "run_id": run_id,
+                "problem_hash": problem_hash,
+                "runner": "dask",
+                "db_path": str(db_path),
+                "model": model_py,
+                "worker": worker_py,
+                "base_json": args.base_json,
+                "ranges_json": args.ranges_json,
+                "suite_json": args.suite_json,
+                "cfg_extra": cfg_extra,
+                "budget": int(args.budget),
+                "num_workers": int(num_workers),
+                "queue_target": int(queue_target),
+                "seed": int(args.seed),
+                "n_init": int(args.n_init),
+                "botorch": bool(args.botorch),
+                "proposer_devices": str(args.proposer_devices),
+                "feasible_tol": float(args.feasible_tol),
+                "min_feasible": int(args.min_feasible),
+                "use_constraints": (not bool(args.no_constraints)),
+                "scheduler": args.scheduler,
+            },
+        )
 
-    token = start_run(
-        run_type="dist_dask_opt",
-        run_dir=str(run_dir),
-        meta={
-            "run_id": run_id,
-            "problem_hash": problem_hash,
-            "db_path": str(db_path),
-            "scheduler": args.scheduler,
-            "num_workers": int(args.num_workers),
-            "queue_target": int(args.queue_target),
-        },
-        env=env_context(),
-    )
+        token = start_run(
+            run_type="dist_dask_opt",
+            run_id=run_id,
+            run_dir=str(run_dir),
+            meta={
+                "run_id": run_id,
+                "problem_hash": problem_hash,
+                "db_path": str(db_path),
+                "scheduler": args.scheduler,
+                "num_workers": int(num_workers),
+                "queue_target": int(queue_target),
+            },
+            env=env_context(),
+        )
 
-    db = ExperimentDB(str(db_path))
-    db.connect()
-    db.init_schema()
-    try:
-        db.add_run(run_id=run_id, problem_hash=problem_hash, meta={"run_dir": str(run_dir)}, status="running")
-    except Exception:
-        pass
+        db = ExperimentDB(str(db_path))
+        db.connect()
+        db.init_schema()
+        try:
+            db.add_run(run_id=run_id, problem_hash=problem_hash, meta={"run_dir": str(run_dir)}, status="running")
+        except Exception:
+            pass
+    except Exception as e:
+        err_msg = _dask_error("pre-start setup", e)
+        try:
+            if db is not None and "run_id" in locals():
+                db.update_run_status(run_id, "error", error=str(err_msg))
+        except Exception:
+            pass
+        try:
+            if token is not None:
+                end_run(token, status="error", error=str(err_msg))
+        except Exception:
+            pass
+        try:
+            if db is not None:
+                close_fn = getattr(db, "close", None)
+                if callable(close_fn):
+                    close_fn()
+        except Exception:
+            pass
+        print("FATAL:", err_msg)
+        print(traceback.format_exc())
+        return 1
+
+    def _cleanup_runtime() -> None:
+        if client is None:
+            return
+        try:
+            close_fn = getattr(client, "close", None)
+            if callable(close_fn):
+                close_fn()
+        except Exception:
+            pass
+
+    def _cleanup_db() -> None:
+        if db is None:
+            return
+        try:
+            close_fn = getattr(db, "close", None)
+            if callable(close_fn):
+                close_fn()
+        except Exception:
+            pass
+
+    def _return_with_cleanup(rc: int) -> int:
+        _cleanup_runtime()
+        _cleanup_db()
+        return int(rc)
 
     # Dask client
     try:
         from dask.distributed import Client, as_completed  # type: ignore
 
         client = Client(address=args.scheduler) if args.scheduler else Client()
-    except Exception as e:
+        info = {}
         try:
-            end_run(token, status="error", error=f"Dask init failed: {e}")
+            info = client.scheduler_info()
+        except Exception:
+            info = {}
+        connected_workers = int((info or {}).get("nworkers", 0) or 0)
+        if connected_workers <= 0:
+            raise RuntimeError("no Dask workers connected")
+    except Exception as e:
+        err_msg = _dask_error("init", e)
+        try:
+            if db is not None and "run_id" in locals():
+                db.update_run_status(run_id, "error", error=err_msg)
         except Exception:
             pass
-        raise
+        try:
+            end_run(token, status="error", error=err_msg)
+        except Exception:
+            pass
+        print("FATAL:", err_msg)
+        print(traceback.format_exc())
+        return _return_with_cleanup(1)
 
     proposer_devices = [p.strip() for p in str(args.proposer_devices).split(",") if p.strip()] or ["auto"]
 
-    popt = ProposeOptions(
-        method="auto",
-        allow_botorch=bool(args.botorch),
-        device="auto",
-        q=1,
-        num_restarts=8,
-        raw_samples=64,
-        seed=int(args.seed),
-        feasible_tol=float(args.feasible_tol),
-        min_feasible=int(args.min_feasible),
-        use_constraint_model=(not bool(args.no_constraints)),
-        n_init=int(args.n_init),
-    )
+    popt = _make_propose_options(args)
 
     inflight = {}
     submitted = 0
@@ -294,7 +452,7 @@ def main() -> int:
 
             # fill queue
             fill_guard = 0
-            while len(inflight) < int(args.queue_target) and completed + len(inflight) < int(args.budget) and fill_guard < 200:
+            while len(inflight) < int(queue_target) and completed + len(inflight) < int(args.budget) and fill_guard < 200:
                 fill_guard += 1
                 X_hist, Y_hist, pen_hist = db.fetch_dataset_arrays(run_id)
 
@@ -332,18 +490,35 @@ def main() -> int:
                     db.mark_done(
                         trial_id,
                         metrics=cached.get("metrics", {}),
-                        obj1=float(cached.get("obj1", float("nan"))),
-                        obj2=float(cached.get("obj2", float("nan"))),
-                        penalty=float(cached.get("penalty", float("nan"))),
+                        obj1=_safe_float(cached.get("obj1")),
+                        obj2=_safe_float(cached.get("obj2")),
+                        penalty=_safe_float(cached.get("penalty")),
                         status="cached",
                     )
                     completed = _count_completed()
                     continue
 
-                worker_id = f"dask_worker_{(submitted + len(inflight)) % int(args.num_workers)}"
+                worker_id = f"dask_worker_{(submitted + len(inflight)) % int(num_workers)}"
                 db.mark_started(trial_id, worker_id)
 
-                fut = client.submit(_dask_eval_wrapper, model_py, worker_py, args.base_json, args.ranges_json, args.suite_json, cfg_extra, trial_id, param_hash, xq, int(trial_id), pure=False)
+                req_idx = _request_idx_from_trial_id(
+                    trial_id,
+                    fallback=int(submitted + len(inflight)),
+                )
+                fut = client.submit(
+                    _dask_eval_wrapper,
+                    model_py,
+                    worker_py,
+                    args.base_json,
+                    args.ranges_json,
+                    args.suite_json,
+                    cfg_extra,
+                    trial_id,
+                    param_hash,
+                    xq,
+                    int(req_idx),
+                    pure=False,
+                )
                 inflight[fut] = (trial_id, param_hash, xq)
                 submitted += 1
                 ac.add(fut)
@@ -368,9 +543,9 @@ def main() -> int:
                     continue
 
                 if isinstance(res, dict) and res.get("status") == "done":
-                    obj1 = float(res.get("obj1", float("nan")))
-                    obj2 = float(res.get("obj2", float("nan")))
-                    pen = float(res.get("penalty", float("nan")))
+                    obj1 = _safe_float(res.get("obj1"))
+                    obj2 = _safe_float(res.get("obj2"))
+                    pen = _safe_float(res.get("penalty"))
                     metrics = res.get("metrics", {}) if isinstance(res.get("metrics", {}), dict) else {"metrics": res.get("metrics")}
 
                     db.mark_done(trial_id, metrics=metrics, obj1=obj1, obj2=obj2, penalty=pen, status="done")
@@ -414,7 +589,7 @@ def main() -> int:
                 end_run(token, status="done")
         except Exception:
             pass
-        return 0
+        return _return_with_cleanup(0)
 
     except KeyboardInterrupt:
         try:
@@ -428,33 +603,45 @@ def main() -> int:
                 end_run(token, status="stopped", error="KeyboardInterrupt")
         except Exception:
             pass
-        return 130
+        return _return_with_cleanup(130)
 
     except Exception as e:
+        err_msg = _dask_error("runtime", e)
         try:
             if db is not None and "run_id" in locals():
-                db.update_run_status(run_id, "error", error=str(e))
+                db.update_run_status(run_id, "error", error=str(err_msg))
         except Exception:
             pass
-        _update_progress("error", str(e))
+        _update_progress("error", str(err_msg))
         try:
             if token is not None:
-                end_run(token, status="error", error=str(e))
+                end_run(token, status="error", error=str(err_msg))
         except Exception:
             pass
-        print("FATAL:", e)
+        print("FATAL:", err_msg)
         print(traceback.format_exc())
-        return 2
+        return _return_with_cleanup(1)
 
 
-def _dask_eval_wrapper(model_py: str, worker_py: str, base_json: Optional[str], ranges_json: Optional[str], suite_json: Optional[str], cfg_extra: Dict[str, Any], trial_id: int, param_hash: str, x_u: List[float], idx: int) -> Dict[str, Any]:
+def _dask_eval_wrapper(
+    model_py: str,
+    worker_py: str,
+    base_json: Optional[str],
+    ranges_json: Optional[str],
+    suite_json: Optional[str],
+    cfg_extra: Dict[str, Any],
+    trial_id: Any,
+    param_hash: str,
+    x_u: List[float],
+    idx: int,
+) -> Dict[str, Any]:
     """Worker-side wrapper.
 
     Dask will serialize this function + args to a worker process.
     The worker must have project code installed/available.
     """
 
-    from pneumo_solver_ui.pneumo_dist.eval_core import Evaluator, evaluate_xu_to_row
+    from pneumo_solver_ui.pneumo_dist.eval_core import Evaluator
 
     ev = Evaluator(
         model_py=model_py,
@@ -464,7 +651,14 @@ def _dask_eval_wrapper(model_py: str, worker_py: str, base_json: Optional[str], 
         suite_json=suite_json,
         cfg_extra=cfg_extra,
     )
-    return evaluate_xu_to_row(ev, x_u=x_u, trial_id=trial_id, param_hash=param_hash, idx=idx)
+    return _row_from_evaluator(
+        ev,
+        trial_id=trial_id,
+        param_hash=param_hash,
+        x_u=list(x_u),
+        idx=int(idx),
+        worker_id="dask",
+    )
 
 
 if __name__ == "__main__":

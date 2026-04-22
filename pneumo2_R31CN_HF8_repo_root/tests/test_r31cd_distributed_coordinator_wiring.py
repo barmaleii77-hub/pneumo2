@@ -77,6 +77,10 @@ def test_r31cd_parser_accepts_restored_runtime_and_botorch_flags() -> None:
             "--botorch-ref-margin",
             "0.25",
             "--botorch-no-normalize-objectives",
+            "--heuristic-pool-size",
+            "640",
+            "--heuristic-explore",
+            "0.45",
             "--dask-threads-per-worker",
             "3",
             "--dask-memory-limit",
@@ -108,6 +112,8 @@ def test_r31cd_parser_accepts_restored_runtime_and_botorch_flags() -> None:
     assert ns.botorch_maxiter == 333
     assert ns.botorch_ref_margin == 0.25
     assert ns.botorch_no_normalize_objectives is True
+    assert ns.heuristic_pool_size == 640
+    assert ns.heuristic_explore == 0.45
     assert ns.dask_threads_per_worker == 3
     assert ns.dask_memory_limit == "4GB"
     assert ns.dask_dashboard_address == ":0"
@@ -138,6 +144,12 @@ def test_r31cd_resolve_proposer_mode_honors_warmup_and_feasible_gates() -> None:
     hot_portfolio = resolve_proposer_mode(portfolio_args, done_n=4, feasible_n=2, dim=2)
     assert hot_portfolio["mode"] == "portfolio"
     assert hot_portfolio["portfolio_enabled"] is True
+
+    heuristic_args = SimpleNamespace(proposer="heuristic", n_init=50, min_feasible=50)
+    heuristic_mode = resolve_proposer_mode(heuristic_args, done_n=1, feasible_n=0, dim=5)
+    assert heuristic_mode["mode"] == "heuristic"
+    assert heuristic_mode["ready_by_done"] is False
+    assert heuristic_mode["ready_by_feasible"] is False
 
 
 def test_r31cd_run_record_meta_persists_hash_mode_and_objective_contract() -> None:
@@ -182,6 +194,8 @@ def test_r31cd_runtime_arg_builder_restores_real_wiring_for_dask_and_ray() -> No
         "opt_botorch_maxiter": 50,
         "opt_botorch_ref_margin": 0.33,
         "opt_botorch_normalize_objectives": False,
+        "opt_heuristic_pool_size": 512,
+        "opt_heuristic_explore": 0.61,
     }
     dask_cmd = append_coordinator_runtime_args(["python", "coord.py"], dask_state, backend_cli="dask")
     assert _flag_values(dask_cmd, "--dask-workers") == ["4"]
@@ -201,6 +215,8 @@ def test_r31cd_runtime_arg_builder_restores_real_wiring_for_dask_and_ray() -> No
     assert _flag_values(dask_cmd, "--botorch-raw-samples") == ["256"]
     assert _flag_values(dask_cmd, "--botorch-maxiter") == ["50"]
     assert _flag_values(dask_cmd, "--botorch-ref-margin") == ["0.33"]
+    assert _flag_values(dask_cmd, "--heuristic-pool-size") == ["512"]
+    assert _flag_values(dask_cmd, "--heuristic-explore") == ["0.61"]
     assert "--botorch-no-normalize-objectives" in dask_cmd
 
     ray_state = {
@@ -224,6 +240,8 @@ def test_r31cd_runtime_arg_builder_restores_real_wiring_for_dask_and_ray() -> No
         "opt_botorch_maxiter": 300,
         "opt_botorch_ref_margin": 0.2,
         "opt_botorch_normalize_objectives": True,
+        "opt_heuristic_pool_size": 768,
+        "opt_heuristic_explore": 0.22,
     }
     assert migrated_ray_runtime_env_mode(ray_state) == "on"
     assert migrated_ray_runtime_env_json(ray_state) == '{"env_vars": {"OMP_NUM_THREADS": "1"}}'
@@ -242,6 +260,8 @@ def test_r31cd_runtime_arg_builder_restores_real_wiring_for_dask_and_ray() -> No
     assert _flag_values(ray_cmd, "--export-every") == ["15"]
     assert _flag_values(ray_cmd, "--n-init") == ["30"]
     assert _flag_values(ray_cmd, "--min-feasible") == ["4"]
+    assert _flag_values(ray_cmd, "--heuristic-pool-size") == ["768"]
+    assert _flag_values(ray_cmd, "--heuristic-explore") == ["0.22"]
     assert "--botorch-no-normalize-objectives" not in ray_cmd
 
 

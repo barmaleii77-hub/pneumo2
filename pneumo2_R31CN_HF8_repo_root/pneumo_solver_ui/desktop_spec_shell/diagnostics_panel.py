@@ -510,6 +510,15 @@ class DiagnosticsShellController(QtCore.QObject):
                 f"- Состояние проекта: {_safe_path_text(snapshot.bundle.latest_health_md_path)}",
                 f"- Проверка результата: {_safe_path_text(snapshot.bundle.latest_validation_md_path)}",
                 f"- Разбор предупреждений: {_safe_path_text(snapshot.bundle.latest_triage_md_path)}",
+                (
+                    "- Материал анимации для проверки: "
+                    f"{_safe_path_text(snapshot.bundle.latest_animation_diagnostics_handoff_path)}"
+                ),
+                f"- Сцена анимации: {_safe_path_text(snapshot.bundle.animation_diagnostics_scene_npz_path)}",
+                (
+                    "- Данные проигрывания: "
+                    f"{_safe_path_text(snapshot.bundle.animation_diagnostics_pointer_json_path)}"
+                ),
             ]
         )
         summary_md_path = write_desktop_diagnostics_summary_md(snapshot.bundle.out_dir, summary_text)
@@ -682,6 +691,26 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         check_layout.addRow("Рекомендуемый шаг", self.next_step_value)
         layout.addWidget(self.check_box)
 
+        self.animation_handoff_box = QtWidgets.QGroupBox("Материал анимации для проверки")
+        self.animation_handoff_box.setObjectName("DG-ANIMATION-HANDOFF")
+        animation_layout = QtWidgets.QFormLayout(self.animation_handoff_box)
+        self.animation_handoff_source_value = QtWidgets.QLabel("")
+        self.animation_handoff_scene_value = QtWidgets.QLabel("")
+        self.animation_handoff_pointer_value = QtWidgets.QLabel("")
+        self.animation_handoff_next_value = QtWidgets.QLabel("")
+        for label in (
+            self.animation_handoff_source_value,
+            self.animation_handoff_scene_value,
+            self.animation_handoff_pointer_value,
+            self.animation_handoff_next_value,
+        ):
+            label.setWordWrap(True)
+        animation_layout.addRow("Источник", self.animation_handoff_source_value)
+        animation_layout.addRow("Сцена", self.animation_handoff_scene_value)
+        animation_layout.addRow("Данные проигрывания", self.animation_handoff_pointer_value)
+        animation_layout.addRow("Следующий шаг", self.animation_handoff_next_value)
+        layout.addWidget(self.animation_handoff_box)
+
         self.baseline_box = QtWidgets.QGroupBox("Опорный прогон")
         baseline_layout = QtWidgets.QVBoxLayout(self.baseline_box)
         self.baseline_status_value = QtWidgets.QLabel("")
@@ -814,6 +843,34 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         self.validation_value.setText(_safe_path_text(snapshot.bundle.latest_validation_md_path))
         self.triage_value.setText(_safe_path_text(snapshot.bundle.latest_triage_md_path))
         self.next_step_value.setText(snapshot.recommended_next_step)
+        animation_status = str(snapshot.bundle.animation_diagnostics_handoff_status or "").upper()
+        if snapshot.bundle.latest_animation_diagnostics_handoff_path:
+            self.animation_handoff_source_value.setText(
+                snapshot.bundle.animation_diagnostics_selected_title
+                or snapshot.bundle.animation_diagnostics_selected_path
+                or "Материал передан из анимации."
+            )
+            self.animation_handoff_scene_value.setText(
+                _safe_path_text(snapshot.bundle.animation_diagnostics_scene_npz_path)
+            )
+            self.animation_handoff_pointer_value.setText(
+                _safe_path_text(snapshot.bundle.animation_diagnostics_pointer_json_path)
+            )
+            self.animation_handoff_next_value.setText(
+                snapshot.bundle.animation_diagnostics_next_step
+                or (
+                    "Проверьте материал анимации перед сохранением архива проекта."
+                    if animation_status == "WARN"
+                    else "Сохраните архив проекта с текущим материалом."
+                )
+            )
+        else:
+            self.animation_handoff_source_value.setText("Материал анимации ещё не передан.")
+            self.animation_handoff_scene_value.setText("нет данных")
+            self.animation_handoff_pointer_value.setText("нет данных")
+            self.animation_handoff_next_value.setText(
+                "Если нужно проверить визуальный результат, передайте материал из рабочего шага анимации."
+            )
         self.baseline_status_value.setText(snapshot.baseline_status_text)
         if snapshot.baseline_attention_required:
             self.baseline_status_value.setStyleSheet(

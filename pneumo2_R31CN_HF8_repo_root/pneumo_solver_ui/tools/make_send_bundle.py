@@ -59,6 +59,8 @@ from .send_bundle_contract import (
     extract_anim_snapshot,
 )
 from .send_bundle_evidence import (
+    ANIMATION_DIAGNOSTICS_HANDOFF_ARCNAME,
+    ANIMATION_DIAGNOSTICS_HANDOFF_SIDECAR_NAME,
     ENGINEERING_ANALYSIS_EVIDENCE_ARCNAME,
     ENGINEERING_ANALYSIS_EVIDENCE_SIDECAR_NAME,
     ENGINEERING_ANALYSIS_EVIDENCE_WORKSPACE_ARCNAME,
@@ -1592,8 +1594,49 @@ def _make_send_bundle_inner(
             res_total.added_bytes += rr.added_bytes
             geometry_reference_evidence_added = rr.added_files > 0
 
+        def _add_animation_diagnostics_handoff_sidecar() -> None:
+            nonlocal res_total
+            sidecar_path = out_dir / ANIMATION_DIAGNOSTICS_HANDOFF_SIDECAR_NAME
+            candidates = (
+                sidecar_path,
+                repo_root / "send_bundles" / ANIMATION_DIAGNOSTICS_HANDOFF_SIDECAR_NAME,
+                effective_ws / "exports" / ANIMATION_DIAGNOSTICS_HANDOFF_SIDECAR_NAME,
+                default_ws / "exports" / ANIMATION_DIAGNOSTICS_HANDOFF_SIDECAR_NAME,
+            )
+            seen: set[str] = set()
+            for src in candidates:
+                try:
+                    src_path = Path(src).expanduser().resolve()
+                except Exception:
+                    src_path = Path(src)
+                key = str(src_path)
+                if key in seen:
+                    continue
+                seen.add(key)
+                if not src_path.exists() or not src_path.is_file():
+                    continue
+                rr = _add_file(
+                    z,
+                    src_path,
+                    ANIMATION_DIAGNOSTICS_HANDOFF_ARCNAME,
+                    manifest=manifest,
+                    skips=skips,
+                    max_file_bytes=max_file_bytes,
+                )
+                res_total.added_files += rr.added_files
+                res_total.added_bytes += rr.added_bytes
+                res_total.skipped_files += rr.skipped_files
+                res_total.skipped_bytes += rr.skipped_bytes
+                if rr.added_files > 0 and src_path != sidecar_path:
+                    try:
+                        _safe_write_text(sidecar_path, src_path.read_text(encoding="utf-8", errors="replace"))
+                    except Exception:
+                        pass
+                return
+
         _add_engineering_analysis_evidence_sidecar()
         _add_geometry_reference_evidence_sidecar()
+        _add_animation_diagnostics_handoff_sidecar()
 
         # Preserve visibility of a distinct env override tree only when it is NOT the
         # effective workspace mirrored into `workspace/`.

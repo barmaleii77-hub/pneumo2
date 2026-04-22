@@ -4,9 +4,24 @@ import json
 import os
 from pathlib import Path
 import re
+import sys
+from types import SimpleNamespace
 
+import pytest
 from PySide6 import QtWidgets
 
+from pneumo_solver_ui.desktop_baseline_run_runtime import (
+    DESKTOP_SINGLE_RUN_MODULE,
+    baseline_run_launch_request_path,
+    prepare_baseline_run_launch_request,
+)
+from pneumo_solver_ui.desktop_results_model import DesktopResultsArtifact
+from pneumo_solver_ui.desktop_results_runtime import DesktopResultsRuntime
+from pneumo_solver_ui.desktop_input_model import (
+    load_base_with_defaults,
+    save_desktop_inputs_snapshot,
+)
+from pneumo_solver_ui.desktop_spec_shell import workspace_pages as workspace_pages_module
 from pneumo_solver_ui.desktop_suite_snapshot import build_validated_suite_snapshot
 from pneumo_solver_ui.desktop_spec_shell.diagnostics_panel import DiagnosticsWorkspacePage
 from pneumo_solver_ui.desktop_spec_shell.main_window import DesktopGuiSpecMainWindow
@@ -70,6 +85,93 @@ def _suite_snapshot() -> dict[str, object]:
         created_at_utc="2026-04-17T00:00:00Z",
         context_label="baseline-ui",
     )
+
+
+def _write_launch_ready_baseline_handoffs(workspace_dir: Path) -> dict[str, object]:
+    inputs_path = workspace_dir / "handoffs" / "WS-INPUTS" / "inputs_snapshot.json"
+    save_desktop_inputs_snapshot(load_base_with_defaults(), target_path=inputs_path)
+    inputs_snapshot = json.loads(inputs_path.read_text(encoding="utf-8"))
+    suite_snapshot = build_validated_suite_snapshot(
+        [
+            {
+                "id": "baseline-ui-launch-row-1",
+                "имя": "baseline_ui_launch",
+                "тип": "инерция_крен",
+                "включен": True,
+                "стадия": 0,
+                "dt": 0.01,
+                "t_end": 1.0,
+            }
+        ],
+        inputs_snapshot_ref=inputs_path,
+        inputs_snapshot_hash=str(inputs_snapshot["payload_hash"]),
+        ring_source_hash="ring-hash-ui",
+        created_at_utc="2026-04-17T00:20:00Z",
+        context_label="baseline-ui-launch",
+    )
+    suite_path = baseline_suite_handoff_snapshot_path(workspace_dir=workspace_dir)
+    suite_path.parent.mkdir(parents=True, exist_ok=True)
+    suite_path.write_text(json.dumps(suite_snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {
+        "inputs_path": inputs_path,
+        "suite_path": suite_path,
+        "suite_snapshot": suite_snapshot,
+    }
+
+
+def test_baseline_run_launch_runtime_blocks_without_suite_snapshot(tmp_path: Path, monkeypatch) -> None:
+    workspace_dir = tmp_path / "workspace"
+    monkeypatch.setenv("PNEUMO_WORKSPACE_DIR", str(workspace_dir))
+
+    request = prepare_baseline_run_launch_request(
+        {"launch_profile": "detail", "cache_policy": "reuse", "runtime_policy": "balanced"},
+        repo_root=ROOT,
+        python_executable="python-test",
+    )
+    request_path = baseline_run_launch_request_path(repo_root=ROOT, workspace_dir=workspace_dir)
+
+    assert request["execution_ready"] is False
+    assert request["command"] == []
+    assert "нет зафиксированного набора испытаний" in request["operator_blockers"]
+    assert request_path.exists()
+    assert json.loads(request_path.read_text(encoding="utf-8"))["execution_ready"] is False
+
+
+def test_baseline_run_launch_runtime_prepares_desktop_single_run_request(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspace_dir = tmp_path / "workspace"
+    monkeypatch.setenv("PNEUMO_WORKSPACE_DIR", str(workspace_dir))
+    _write_launch_ready_baseline_handoffs(workspace_dir)
+
+    request = prepare_baseline_run_launch_request(
+        {
+            "launch_profile": "detail",
+            "cache_policy": "reuse",
+            "runtime_policy": "balanced",
+            "run_dt": 0.003,
+            "run_t_end": 1.6,
+            "export_csv": True,
+            "export_npz": False,
+            "record_full": False,
+        },
+        repo_root=ROOT,
+        python_executable="python-test",
+    )
+    paths = dict(request["paths"])
+    command = list(request["command"])
+
+    assert request["execution_ready"] is True
+    assert request["command_module"] == DESKTOP_SINGLE_RUN_MODULE
+    assert command[:3] == ["python-test", "-m", DESKTOP_SINGLE_RUN_MODULE]
+    assert "--params" in command
+    assert "--test" in command
+    assert "--outdir" in command
+    assert Path(str(paths["prepared_inputs"])).exists()
+    assert Path(str(paths["prepared_suite"])).exists()
+    assert str(workspace_dir.resolve()) in str(paths["run_dir"])
+    assert json.loads(Path(str(paths["request"])).read_text(encoding="utf-8"))["execution_ready"] is True
 
 
 def test_gui_spec_imported_catalog_text_is_sanitized_before_display() -> None:
@@ -249,6 +351,31 @@ def test_suite_workspace_page_shows_test_rows_without_launcher_shell() -> None:
         app.processEvents()
 
 
+def test_suite_workspace_page_keeps_read_error_message_when_open_command_fails(
+    monkeypatch,
+) -> None:
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        page = window._page_widget_by_workspace_id["test_matrix"]
+        assert isinstance(page, SuiteWorkspacePage)
+
+        def _raise_suite_read_error(_path: Path) -> list[dict[str, object]]:
+            raise RuntimeError("suite read failed")
+
+        monkeypatch.setattr(workspace_pages_module, "load_suite_rows", _raise_suite_read_error)
+
+        window.run_command("test.center.open")
+        app.processEvents()
+
+        assert page.suite_table.rowCount() == 0
+        assert "Не удалось прочитать основной набор испытаний." in page.validation_label.text()
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
 def test_optimization_workspace_page_hosts_primary_launch_controls() -> None:
     app = _app()
     window = DesktopGuiSpecMainWindow()
@@ -262,6 +389,11 @@ def test_optimization_workspace_page_hosts_primary_launch_controls() -> None:
         visible_buttons = {button.text() for button in page.findChildren(QtWidgets.QPushButton)}
         assert "Проверить готовность" in visible_buttons
         assert "Подготовить основной запуск" in visible_buttons
+        assert "Запустить оптимизацию" in visible_buttons
+        assert "Мягкая остановка" in visible_buttons
+        assert "Остановить сейчас" in visible_buttons
+        assert "Открыть журнал" in visible_buttons
+        assert "Открыть папку запуска" in visible_buttons
         assert "Расширенная настройка" in visible_buttons
         assert "Настройка основного запуска открыта" in page.optimization_result_label.text()
 
@@ -269,6 +401,117 @@ def test_optimization_workspace_page_hosts_primary_launch_controls() -> None:
         app.processEvents()
         assert page.optimization_result_label.text()
         assert "optimization.primary_launch.prepare" in window.recent_command_ids
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_optimization_workspace_page_runs_stage_runner_through_hosted_surface(tmp_path, monkeypatch) -> None:
+    class _FakeProc:
+        def __init__(self) -> None:
+            self.returncode: int | None = None
+
+        def poll(self) -> int | None:
+            return self.returncode
+
+    class _FakeOptimizerRuntime:
+        instances: list["_FakeOptimizerRuntime"] = []
+
+        def __init__(self, *, ui_root: Path, python_executable: str | None = None) -> None:
+            self.ui_root = Path(ui_root)
+            self.python_executable = python_executable
+            self.job: SimpleNamespace | None = None
+            self.soft_stop_requested = False
+            self.hard_stop_requested = False
+            self.run_dir = tmp_path / "opt_runs" / "staged" / "fake-stage-runner"
+            self.log_path = self.run_dir / "stage_runner.log"
+            self.run_dir.mkdir(parents=True, exist_ok=True)
+            self.log_path.write_text("done=1/3\n", encoding="utf-8")
+            self.instances.append(self)
+
+        def contract_snapshot(self) -> SimpleNamespace:
+            return SimpleNamespace(
+                objective_keys=("objective_clearance",),
+                penalty_key="penalty_total",
+                penalty_tol=0.0,
+                optimizer_baseline_can_consume=True,
+                enabled_suite_total=1,
+                suite_row_count=1,
+                search_param_count=2,
+                base_param_count=5,
+                active_baseline_hash="baseline-hash",
+                active_baseline_state="active",
+            )
+
+        def latest_pointer_summary(self) -> dict[str, object]:
+            return {"exists": False}
+
+        def current_job(self) -> SimpleNamespace | None:
+            return self.job
+
+        def start_job(self) -> SimpleNamespace:
+            self.job = SimpleNamespace(
+                proc=_FakeProc(),
+                run_dir=self.run_dir,
+                log_path=self.log_path,
+                backend="StageRunner",
+                pipeline_mode="staged",
+            )
+            return self.job
+
+        def active_job_surface(self) -> dict[str, object]:
+            return {"returncode": None, "captions": ("done=1/3",)}
+
+        def request_soft_stop(self) -> bool:
+            self.soft_stop_requested = True
+            return True
+
+        def request_hard_stop(self) -> bool:
+            self.hard_stop_requested = True
+            if self.job is not None:
+                self.job.proc.returncode = -15
+            return True
+
+    opened_paths: list[str] = []
+    settings_path = tmp_path / "desktop_spec_shell_optimization_execution_state.ini"
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
+    monkeypatch.setattr(workspace_pages_module, "DesktopOptimizerRuntime", _FakeOptimizerRuntime)
+    monkeypatch.setattr(
+        workspace_pages_module.QtGui.QDesktopServices,
+        "openUrl",
+        lambda url: opened_paths.append(url.toLocalFile()) or True,
+    )
+
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        page = window._page_widget_by_workspace_id["optimization"]
+        assert isinstance(page, OptimizationWorkspacePage)
+
+        window.run_command("optimization.primary_launch.execute")
+        app.processEvents()
+
+        runtime = _FakeOptimizerRuntime.instances[-1]
+        assert runtime.job is not None
+        assert "Оптимизация запущена" in page.optimization_result_label.text()
+        assert page.optimization_execute_button.isEnabled() is False
+        assert page.optimization_soft_stop_button.isEnabled() is True
+        assert "optimization.primary_launch.execute" in window.recent_command_ids
+
+        window.run_command("optimization.primary_launch.open_log")
+        window.run_command("optimization.primary_launch.open_run_dir")
+        assert [Path(path) for path in opened_paths[-2:]] == [runtime.log_path, runtime.run_dir]
+
+        window.run_command("optimization.primary_launch.soft_stop")
+        assert runtime.soft_stop_requested is True
+        assert "Мягкая остановка" in page.optimization_result_label.text()
+
+        window.run_command("optimization.primary_launch.hard_stop")
+        app.processEvents()
+        assert runtime.hard_stop_requested is True
+        assert page.optimization_soft_stop_button.isEnabled() is False
+        assert "Остановка активного запуска" in page.optimization_result_label.text()
     finally:
         window.close()
         window.deleteLater()
@@ -288,16 +531,558 @@ def test_results_workspace_page_hosts_analysis_and_compare_controls() -> None:
         visible_buttons = {button.text() for button in page.findChildren(QtWidgets.QPushButton)}
         assert "Обновить анализ" in visible_buttons
         assert "Подготовить сравнение" in visible_buttons
+        assert "Открыть сравнение" in visible_buttons
+        assert "Передать в анимацию" in visible_buttons
         assert "Подготовить материалы проверки" in visible_buttons
         assert "Расширенный анализ" in visible_buttons
         assert "Анализ результатов открыт" in page.results_action_label.text()
         assert page.results_overview_table.columnCount() == 4
         assert page.results_artifacts_table.columnCount() == 3
+        assert page.results_compare_preview_box.objectName() == "RS-COMPARE-PREVIEW"
+        assert page.results_compare_preview_table.columnCount() == 2
+        assert page.results_compare_preview_table.rowCount() >= 4
+        assert page.results_chart_preview_box.objectName() == "RS-CHART-PREVIEW"
+        assert page.results_chart_preview_table.columnCount() == 4
+        assert page.results_chart_preview_table.rowCount() >= 1
 
         window.run_command("results.evidence.prepare")
         app.processEvents()
         assert "Материалы проверки подготовлены" in page.results_action_label.text()
         assert "results.evidence.prepare" in window.recent_command_ids
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_results_workspace_page_renders_native_chart_preview(tmp_path, monkeypatch) -> None:
+    npz_path = tmp_path / "chart_result.npz"
+    npz_path.write_bytes(b"NPZ")
+
+    class _FakeResultsRuntime:
+        def __init__(self, *, repo_root: Path, python_executable: str) -> None:
+            self.repo_root = Path(repo_root)
+            self.python_executable = python_executable
+
+        def snapshot(self) -> SimpleNamespace:
+            artifact = SimpleNamespace(
+                key="latest_npz",
+                title="Последний файл результата",
+                category="results",
+                path=npz_path,
+                detail="",
+            )
+            return SimpleNamespace(
+                result_context_state="CURRENT",
+                result_context_banner="Свежий результат готов к графикам.",
+                validation_overview_rows=(
+                    SimpleNamespace(
+                        title="Графики",
+                        status="READY",
+                        detail="Числовые серии найдены.",
+                        next_action="Проверьте графики.",
+                    ),
+                ),
+                recent_artifacts=(artifact,),
+                latest_npz_path=npz_path,
+                latest_pointer_json_path=None,
+                latest_mnemo_event_log_path=None,
+                latest_capture_export_manifest_status="READY",
+                mnemo_current_mode="нет данных",
+                mnemo_recent_titles=(),
+                operator_recommendations=("Проверьте графики.",),
+                selected_run_contract_status="CURRENT",
+                selected_run_contract_banner="Выбранный прогон актуален.",
+            )
+
+        def artifact_by_key(self, snapshot: SimpleNamespace, artifact_key: str) -> SimpleNamespace | None:
+            for artifact in snapshot.recent_artifacts:
+                if artifact.key == artifact_key:
+                    return artifact
+            return None
+
+        def compare_viewer_path(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+        ) -> Path | None:
+            return artifact.path if artifact is not None else snapshot.latest_npz_path
+
+        def artifact_preview_lines(self, artifact: SimpleNamespace) -> tuple[str, ...]:
+            return (f"Файл результата: {artifact.path.name}", "Размер: 3 байт")
+
+        def chart_preview_rows(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+        ) -> tuple[dict[str, str], ...]:
+            return (
+                {
+                    "series": "z_body_mm",
+                    "points": "1200; форма 1200",
+                    "range": "-10 .. 35",
+                    "role": "готово к графику",
+                },
+                {
+                    "series": "roll_deg",
+                    "points": "1200; форма 1200",
+                    "range": "-3 .. 4",
+                    "role": "готово к графику",
+                },
+            )
+
+        def chart_preview_series_samples(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+        ) -> dict[str, object]:
+            return {
+                "status": "READY",
+                "series": "z_body_mm",
+                "samples": (-10.0, -5.0, 0.0, 20.0, 35.0),
+                "point_count": 1200,
+                "range": "-10 .. 35",
+            }
+
+    settings_path = tmp_path / "desktop_spec_shell_results_chart_preview_state.ini"
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    monkeypatch.setattr(workspace_pages_module, "DesktopResultsRuntime", _FakeResultsRuntime)
+    try:
+        page = window._page_widget_by_workspace_id["results_analysis"]
+        assert isinstance(page, ResultsWorkspacePage)
+
+        window.run_command("results.center.open")
+        app.processEvents()
+
+        chart_values = {
+            page.results_chart_preview_table.item(row, column).text()
+            for row in range(page.results_chart_preview_table.rowCount())
+            for column in range(page.results_chart_preview_table.columnCount())
+            if page.results_chart_preview_table.item(row, column) is not None
+        }
+        assert "z_body_mm" in chart_values
+        assert "roll_deg" in chart_values
+        assert "1200; форма 1200" in chart_values
+        assert "-10 .. 35" in chart_values
+        assert "готово к графику" in chart_values
+        assert page.results_chart_preview_view.objectName() == "RS-CHART-NATIVE-PREVIEW"
+        assert page.results_chart_preview_view.scene().items()
+        assert "z_body_mm" in page.results_chart_preview_view.toolTip()
+        assert "-10" in page.results_chart_preview_view.toolTip()
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_results_workspace_page_updates_previews_for_selected_artifact(tmp_path, monkeypatch) -> None:
+    latest_path = tmp_path / "latest_result.npz"
+    selected_path = tmp_path / "selected_result.npz"
+    latest_path.write_bytes(b"NPZ")
+    selected_path.write_bytes(b"NPZ")
+
+    class _FakeResultsRuntime:
+        handoff_paths: list[Path | None] = []
+
+        def __init__(self, *, repo_root: Path, python_executable: str) -> None:
+            self.repo_root = Path(repo_root)
+            self.python_executable = python_executable
+
+        def snapshot(self) -> SimpleNamespace:
+            artifacts = (
+                SimpleNamespace(
+                    key="latest_npz",
+                    title="Последний файл результата",
+                    category="results",
+                    path=latest_path,
+                    detail="",
+                ),
+                SimpleNamespace(
+                    key="selected_npz",
+                    title="Выбранный файл результата",
+                    category="results",
+                    path=selected_path,
+                    detail="",
+                ),
+            )
+            return SimpleNamespace(
+                result_context_state="CURRENT",
+                result_context_banner="Свежий результат готов к выбору.",
+                validation_overview_rows=(
+                    SimpleNamespace(
+                        title="Результат",
+                        status="READY",
+                        detail="Есть несколько материалов.",
+                        next_action="Выберите материал.",
+                    ),
+                ),
+                recent_artifacts=artifacts,
+                latest_npz_path=latest_path,
+                latest_pointer_json_path=None,
+                latest_mnemo_event_log_path=None,
+                latest_capture_export_manifest_status="READY",
+                mnemo_current_mode="нет данных",
+                mnemo_recent_titles=(),
+                operator_recommendations=("Выберите материал.",),
+                selected_run_contract_status="CURRENT",
+                selected_run_contract_banner="Выбранный прогон актуален.",
+            )
+
+        def artifact_by_key(self, snapshot: SimpleNamespace, artifact_key: str) -> SimpleNamespace | None:
+            for artifact in snapshot.recent_artifacts:
+                if artifact.key == artifact_key:
+                    return artifact
+            return None
+
+        def compare_viewer_path(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+        ) -> Path | None:
+            return artifact.path if artifact is not None else snapshot.latest_npz_path
+
+        def artifact_preview_lines(self, artifact: SimpleNamespace) -> tuple[str, ...]:
+            return (f"Файл результата: {artifact.path.name}",)
+
+        def chart_preview_rows(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+        ) -> tuple[dict[str, str], ...]:
+            name = artifact.path.stem if artifact is not None else "latest_result"
+            return (
+                {
+                    "series": f"{name}_series",
+                    "points": "42; форма 42",
+                    "range": "1 .. 2",
+                    "role": "готово к графику",
+                },
+            )
+
+        def chart_preview_series_samples(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+        ) -> dict[str, object]:
+            name = artifact.path.stem if artifact is not None else "latest_result"
+            return {
+                "status": "READY",
+                "series": f"{name}_series",
+                "samples": (1.0, 1.5, 2.0),
+                "point_count": 42,
+                "range": "1 .. 2",
+            }
+
+        def write_analysis_animation_handoff(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+        ) -> Path:
+            self.__class__.handoff_paths.append(artifact.path if artifact is not None else None)
+            path = tmp_path / "latest_analysis_animation_handoff.json"
+            path.write_text("{}", encoding="utf-8")
+            return path
+
+    settings_path = tmp_path / "desktop_spec_shell_results_selected_preview_state.ini"
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    monkeypatch.setattr(workspace_pages_module, "DesktopResultsRuntime", _FakeResultsRuntime)
+    try:
+        page = window._page_widget_by_workspace_id["results_analysis"]
+        assert isinstance(page, ResultsWorkspacePage)
+
+        window.run_command("results.center.open")
+        app.processEvents()
+        page.results_artifacts_table.selectRow(1)
+        app.processEvents()
+
+        compare_values = {
+            page.results_compare_preview_table.item(row, 1).text()
+            for row in range(page.results_compare_preview_table.rowCount())
+            if page.results_compare_preview_table.item(row, 1) is not None
+        }
+        chart_values = {
+            page.results_chart_preview_table.item(row, column).text()
+            for row in range(page.results_chart_preview_table.rowCount())
+            for column in range(page.results_chart_preview_table.columnCount())
+            if page.results_chart_preview_table.item(row, column) is not None
+        }
+        assert "selected_result.npz" in compare_values
+        assert "selected_result_series" in chart_values
+        assert "latest_result_series" not in chart_values
+        assert "selected_result_series" in page.results_chart_preview_view.toolTip()
+        assert page.results_compare_window_button.isEnabled()
+
+        window.run_command("results.animation.prepare")
+        app.processEvents()
+        assert _FakeResultsRuntime.handoff_paths == [selected_path]
+        assert "Материал передан в анимацию" in page.results_action_label.text()
+        assert "results.animation.prepare" in window.recent_command_ids
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_results_runtime_extracts_npz_chart_preview_rows(tmp_path) -> None:
+    np = pytest.importorskip("numpy")
+    npz_path = tmp_path / "runtime_chart_result.npz"
+    np.savez(
+        npz_path,
+        z_body_mm=np.array([0.0, 2.0, 4.0]),
+        roll_deg=np.array([-3.0, 0.5, 4.0]),
+        labels=np.array(["start", "middle", "end"]),
+    )
+    runtime = DesktopResultsRuntime(repo_root=tmp_path, python_executable=sys.executable)
+    snapshot = SimpleNamespace(latest_npz_path=npz_path, recent_artifacts=())
+    artifact = SimpleNamespace(path=npz_path)
+
+    rows = runtime.chart_preview_rows(snapshot, artifact=artifact)
+    rows_by_series = {row["series"]: row for row in rows}
+    samples = runtime.chart_preview_series_samples(snapshot, artifact=artifact, max_points=2)
+
+    assert rows_by_series["z_body_mm"]["points"] == "3; форма 3"
+    assert rows_by_series["z_body_mm"]["range"] == "0 .. 4"
+    assert rows_by_series["roll_deg"]["range"] == "-3 .. 4"
+    assert "labels" not in rows_by_series
+    assert samples["status"] == "READY"
+    assert samples["series"] == "z_body_mm"
+    assert samples["samples"] == (0.0, 4.0)
+    assert samples["point_count"] == 3
+    assert samples["range"] == "0 .. 4"
+
+
+def test_results_runtime_extracts_animation_scene_preview_points(tmp_path) -> None:
+    np = pytest.importorskip("numpy")
+    npz_path = tmp_path / "runtime_scene_result.npz"
+    pointer_path = tmp_path / "runtime_scene_result.json"
+    pointer_path.write_text("{}", encoding="utf-8")
+    np.savez(
+        npz_path,
+        z_body_mm=np.array([1.0, 2.0, 3.0]),
+        time_s=np.array([0.0, 1.0, 2.0]),
+        labels=np.array(["start", "middle", "end"]),
+    )
+    runtime = DesktopResultsRuntime(repo_root=tmp_path, python_executable=sys.executable)
+    snapshot = SimpleNamespace(latest_npz_path=npz_path, latest_pointer_json_path=pointer_path)
+
+    preview = runtime.animation_scene_preview_points(snapshot, max_points=2)
+
+    assert preview["status"] == "READY"
+    assert preview["series_y"] == "z_body_mm"
+    assert preview["series_x"] == "time_s"
+    assert preview["points"] == ((0.0, 1.0), (2.0, 3.0))
+    assert preview["point_count"] == 3
+    assert preview["source_path"] == str(npz_path)
+    assert preview["pointer_path"] == str(pointer_path)
+
+
+def test_results_runtime_writes_animation_handoff_for_selected_artifact(tmp_path) -> None:
+    latest_path = tmp_path / "latest_result.npz"
+    selected_path = tmp_path / "selected_result.npz"
+    pointer_path = tmp_path / "selected_result.json"
+    latest_path.write_bytes(b"NPZ")
+    selected_path.write_bytes(b"NPZ")
+    pointer_path.write_text("{}", encoding="utf-8")
+
+    runtime = DesktopResultsRuntime(repo_root=tmp_path, python_executable=sys.executable)
+    snapshot = SimpleNamespace(
+        latest_npz_path=latest_path,
+        latest_pointer_json_path=None,
+        latest_mnemo_event_log_path=None,
+        latest_capture_export_manifest_path=None,
+        selected_run_contract_path=None,
+        result_context_state="CURRENT",
+        result_context_banner="Выбранный результат готов.",
+        recent_artifacts=(),
+    )
+    artifact = DesktopResultsArtifact(
+        key="selected_npz",
+        title="Выбранный файл результата",
+        category="results",
+        path=selected_path,
+    )
+
+    handoff_path = runtime.write_analysis_animation_handoff(snapshot, artifact=artifact)
+    payload = json.loads(handoff_path.read_text(encoding="utf-8"))
+    handoff_artifact = runtime.animation_handoff_artifact(snapshot)
+
+    assert payload["produced_by"] == "WS-ANALYSIS"
+    assert payload["consumed_by"] == "WS-ANIMATOR"
+    assert payload["selected_artifact"]["path"] == str(selected_path)
+    assert payload["artifacts"]["latest_npz_path"] == str(selected_path)
+    assert payload["artifacts"]["latest_pointer_json_path"] == str(pointer_path)
+    assert handoff_artifact is not None
+    assert handoff_artifact.path == selected_path
+
+
+def test_results_runtime_writes_animation_diagnostics_handoff(tmp_path) -> None:
+    selected_path = tmp_path / "selected_result.npz"
+    pointer_path = tmp_path / "selected_result.json"
+    mnemo_path = tmp_path / "selected_result.desktop_mnemo_events.json"
+    selected_path.write_bytes(b"NPZ")
+    pointer_path.write_text("{}", encoding="utf-8")
+    mnemo_path.write_text("{}", encoding="utf-8")
+
+    runtime = DesktopResultsRuntime(repo_root=tmp_path, python_executable=sys.executable)
+    snapshot = SimpleNamespace(
+        latest_npz_path=None,
+        latest_pointer_json_path=None,
+        latest_mnemo_event_log_path=mnemo_path,
+        latest_capture_export_manifest_path=None,
+        latest_capture_export_manifest_status="READY",
+        recent_artifacts=(),
+    )
+    artifact = DesktopResultsArtifact(
+        key="selected_npz",
+        title="Выбранный файл результата",
+        category="results",
+        path=selected_path,
+    )
+
+    handoff_path = runtime.write_animation_diagnostics_handoff(snapshot, artifact=artifact)
+    payload = json.loads(handoff_path.read_text(encoding="utf-8"))
+
+    assert payload["produced_by"] == "WS-ANIMATOR"
+    assert payload["consumed_by"] == "WS-DIAGNOSTICS"
+    assert payload["selected_artifact"]["path"] == str(selected_path)
+    assert payload["artifacts"]["scene_npz_path"] == str(selected_path)
+    assert payload["artifacts"]["pointer_json_path"] == str(pointer_path)
+    assert payload["artifacts"]["mnemo_event_log_path"] == str(mnemo_path)
+    assert payload["animation_context"]["scene_ready"] is True
+
+    evidence_snapshot = SimpleNamespace(
+        latest_npz_path=selected_path,
+        latest_pointer_json_path=pointer_path,
+        latest_mnemo_event_log_path=mnemo_path,
+        latest_capture_export_manifest_path=None,
+        latest_capture_export_manifest_status="READY",
+        latest_autotest_run_dir=None,
+        latest_diagnostics_run_dir=None,
+        latest_optimizer_pointer_json_path=None,
+        latest_optimizer_run_dir=None,
+        latest_validation_json_path=None,
+        latest_validation_md_path=None,
+        validation_ok=None,
+        validation_errors=(),
+        validation_warnings=(),
+        selected_run_contract_path=None,
+        selected_run_contract_hash="",
+        selected_run_contract_status="MISSING",
+        selected_run_contract_banner="",
+        result_context_state="CURRENT",
+        result_context_banner="Свежий результат готов.",
+        result_context_detail="",
+        result_context_action="",
+        result_context_fields=(),
+        recent_artifacts=(artifact,),
+    )
+    manifest = runtime.build_diagnostics_evidence_manifest(evidence_snapshot)
+
+    assert manifest["animation_diagnostics_handoff"]["status"] == "READY"
+    assert manifest["animation_diagnostics_handoff"]["sidecar_path"] == str(handoff_path)
+    assert manifest["animation_diagnostics_handoff"]["selected_artifact"]["path"] == str(selected_path)
+    assert manifest["animation_diagnostics_handoff"]["artifacts"]["scene_npz_path"] == str(selected_path)
+
+
+def test_results_workspace_page_opens_compare_through_hosted_surface(tmp_path, monkeypatch) -> None:
+    npz_path = tmp_path / "latest_result.npz"
+    npz_path.write_bytes(b"NPZ")
+
+    class _FakeResultsRuntime:
+        instances: list["_FakeResultsRuntime"] = []
+        launched_paths: list[Path | None] = []
+
+        def __init__(self, *, repo_root: Path, python_executable: str) -> None:
+            self.repo_root = Path(repo_root)
+            self.python_executable = python_executable
+            self.launched_artifact: SimpleNamespace | None = None
+            self.instances.append(self)
+
+        def snapshot(self) -> SimpleNamespace:
+            artifact = SimpleNamespace(
+                key="latest_npz",
+                title="Последний файл результата",
+                category="results",
+                path=npz_path,
+                detail="",
+            )
+            return SimpleNamespace(
+                result_context_state="CURRENT",
+                result_context_banner="Свежий результат готов к сравнению.",
+                validation_overview_rows=(
+                    SimpleNamespace(
+                        title="Результат",
+                        status="READY",
+                        detail="Файл результата найден.",
+                        next_action="Открыть сравнение.",
+                    ),
+                ),
+                recent_artifacts=(artifact,),
+                latest_npz_path=npz_path,
+                latest_pointer_json_path=None,
+                latest_mnemo_event_log_path=None,
+                latest_capture_export_manifest_status="READY",
+                mnemo_current_mode="нет данных",
+                mnemo_recent_titles=(),
+                operator_recommendations=("Откройте сравнение.",),
+                selected_run_contract_status="CURRENT",
+                selected_run_contract_banner="Выбранный прогон актуален.",
+            )
+
+        def artifact_by_key(self, snapshot: SimpleNamespace, artifact_key: str) -> SimpleNamespace | None:
+            for artifact in snapshot.recent_artifacts:
+                if artifact.key == artifact_key:
+                    return artifact
+            return None
+
+        def compare_viewer_path(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+        ) -> Path | None:
+            return (artifact.path if artifact is not None else snapshot.latest_npz_path)
+
+        def artifact_preview_lines(self, artifact: SimpleNamespace) -> tuple[str, ...]:
+            return (f"Файл результата: {artifact.path.name}", "Размер: 3 байт")
+
+        def launch_compare_viewer(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+        ) -> SimpleNamespace:
+            self.launched_artifact = artifact
+            self.__class__.launched_paths.append(
+                self.compare_viewer_path(snapshot, artifact=artifact)
+            )
+            return SimpleNamespace(pid=321)
+
+    settings_path = tmp_path / "desktop_spec_shell_results_compare_state.ini"
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
+    monkeypatch.setattr(workspace_pages_module, "DesktopResultsRuntime", _FakeResultsRuntime)
+
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        page = window._page_widget_by_workspace_id["results_analysis"]
+        assert isinstance(page, ResultsWorkspacePage)
+        page.results_artifacts_table.selectRow(0)
+
+        window.run_command("results.compare.open")
+        app.processEvents()
+
+        assert _FakeResultsRuntime.launched_paths == [npz_path]
+        preview_values = {
+            page.results_compare_preview_table.item(row, 1).text()
+            for row in range(page.results_compare_preview_table.rowCount())
+            if page.results_compare_preview_table.item(row, 1) is not None
+        }
+        assert "latest_result.npz" in preview_values
+        assert "Сравнение открывается" in page.results_action_label.text()
+        assert "results.compare.open" in window.recent_command_ids
     finally:
         window.close()
         window.deleteLater()
@@ -525,9 +1310,13 @@ def test_animation_workspace_page_hosts_route_aware_animation_hub() -> None:
         assert "Обновить анимацию" in visible_buttons
         assert "Проверить аниматор" in visible_buttons
         assert "Проверить мнемосхему" in visible_buttons
-        assert "Расширенный просмотр анимации" in visible_buttons
-        assert "Расширенный просмотр мнемосхемы" in visible_buttons
+        assert "Проверить движение" in visible_buttons
+        assert "Проверить схему" in visible_buttons
+        assert "Передать в проверку проекта" in visible_buttons
         assert page.animation_status_table.columnCount() == 3
+        assert page.animation_scene_preview_box.objectName() == "AM-SCENE-PREVIEW"
+        assert page.animation_scene_preview_table.columnCount() == 2
+        assert page.animation_scene_preview_table.rowCount() >= 5
         assert "Анимация открыта" in page.animation_action_label.text()
 
         window.run_command("animation.mnemo.open")
@@ -537,6 +1326,529 @@ def test_animation_workspace_page_hosts_route_aware_animation_hub() -> None:
     finally:
         window.close()
         window.deleteLater()
+        app.processEvents()
+
+
+def test_animation_workspace_page_renders_native_scene_preview(tmp_path, monkeypatch) -> None:
+    npz_path = tmp_path / "scene_result.npz"
+    pointer_path = tmp_path / "scene_result.json"
+    event_log_path = tmp_path / "scene_result.desktop_mnemo_events.json"
+    capture_path = tmp_path / "scene_result.capture_manifest.json"
+    npz_path.write_bytes(b"NPZ")
+    pointer_path.write_text("{}", encoding="utf-8")
+    event_log_path.write_text("{}", encoding="utf-8")
+    capture_path.write_text("{}", encoding="utf-8")
+
+    class _FakeResultsRuntime:
+        def __init__(self, *, repo_root: Path, python_executable: str) -> None:
+            self.repo_root = Path(repo_root)
+            self.python_executable = python_executable
+
+        def snapshot(self) -> SimpleNamespace:
+            artifacts = (
+                SimpleNamespace(key="latest_npz", path=npz_path),
+                SimpleNamespace(key="latest_pointer", path=pointer_path),
+                SimpleNamespace(key="mnemo_event_log", path=event_log_path),
+                SimpleNamespace(key="capture_export_manifest", path=capture_path),
+            )
+            return SimpleNamespace(
+                latest_npz_path=npz_path,
+                latest_pointer_json_path=pointer_path,
+                latest_mnemo_event_log_path=event_log_path,
+                latest_capture_export_manifest_status="READY",
+                mnemo_current_mode="overview",
+                mnemo_recent_titles=("Давление проверено",),
+                operator_recommendations=("Проверьте движение.",),
+                recent_artifacts=artifacts,
+            )
+
+        def artifact_by_key(
+            self,
+            snapshot: SimpleNamespace,
+            artifact_key: str,
+        ) -> SimpleNamespace | None:
+            for artifact in snapshot.recent_artifacts:
+                if artifact.key == artifact_key:
+                    return artifact
+            return None
+
+        def artifact_preview_lines(self, artifact: SimpleNamespace) -> tuple[str, ...]:
+            return (f"Файл: {artifact.path.name}", "Размер: 3 байт")
+
+        def animation_scene_preview_points(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+        ) -> dict[str, object]:
+            return {
+                "status": "READY",
+                "source_path": str(npz_path),
+                "pointer_path": str(pointer_path),
+                "series_x": "time_s",
+                "series_y": "z_body_mm",
+                "points": ((0.0, 0.0), (1.0, 4.0), (2.0, 2.0)),
+                "point_count": 3,
+                "range": "x 0 .. 2; y 0 .. 4",
+            }
+
+    settings_path = tmp_path / "desktop_spec_shell_animation_preview_state.ini"
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
+
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    monkeypatch.setattr(workspace_pages_module, "DesktopResultsRuntime", _FakeResultsRuntime)
+    try:
+        page = window._page_widget_by_workspace_id["animation"]
+        assert isinstance(page, AnimationWorkspacePage)
+
+        window.run_command("animation.animator.open")
+        app.processEvents()
+
+        preview_values = {
+            page.animation_scene_preview_table.item(row, 1).text()
+            for row in range(page.animation_scene_preview_table.rowCount())
+            if page.animation_scene_preview_table.item(row, 1) is not None
+        }
+        assert "scene_result.npz" in preview_values
+        assert "scene_result.json" in preview_values
+        assert "scene_result.desktop_mnemo_events.json" in preview_values
+        assert "готово" in preview_values
+        assert "scene_result.capture_manifest.json" in preview_values
+        assert "Файл: scene_result.npz" in preview_values
+        assert "Размер: 3 байт" in preview_values
+        assert page.animation_scene_preview_view.objectName() == "AM-SCENE-NATIVE-PREVIEW"
+        assert page.animation_scene_preview_view.scene().items()
+        assert "scene_result.npz" in page.animation_scene_preview_view.toolTip()
+        assert "x 0 .. 2" in page.animation_scene_preview_view.toolTip()
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_animation_workspace_page_uses_analysis_handoff_artifact(tmp_path, monkeypatch) -> None:
+    latest_path = tmp_path / "latest_result.npz"
+    selected_path = tmp_path / "selected_result.npz"
+    pointer_path = tmp_path / "selected_result.json"
+    latest_path.write_bytes(b"NPZ")
+    selected_path.write_bytes(b"NPZ")
+    pointer_path.write_text("{}", encoding="utf-8")
+
+    class _FakeResultsRuntime:
+        launched_args: list[list[str]] = []
+        diagnostics_handoff_paths: list[Path | None] = []
+
+        def __init__(self, *, repo_root: Path, python_executable: str) -> None:
+            self.repo_root = Path(repo_root)
+            self.python_executable = python_executable
+
+        def snapshot(self) -> SimpleNamespace:
+            artifacts = (
+                SimpleNamespace(key="latest_npz", path=latest_path),
+                SimpleNamespace(key="latest_pointer", path=pointer_path),
+            )
+            return SimpleNamespace(
+                latest_npz_path=latest_path,
+                latest_pointer_json_path=None,
+                latest_mnemo_event_log_path=None,
+                latest_capture_export_manifest_status="READY",
+                mnemo_current_mode="нет данных",
+                mnemo_recent_titles=(),
+                operator_recommendations=("Проверьте движение.",),
+                recent_artifacts=artifacts,
+            )
+
+        def animation_handoff_artifact(self, snapshot: SimpleNamespace) -> SimpleNamespace:
+            return SimpleNamespace(
+                key="selected_npz",
+                title="Выбранный файл результата",
+                category="results",
+                path=selected_path,
+                detail="",
+            )
+
+        def animator_target_paths(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+        ) -> tuple[Path | None, Path | None]:
+            if artifact is not None:
+                return artifact.path, pointer_path
+            return snapshot.latest_npz_path, snapshot.latest_pointer_json_path
+
+        def artifact_by_key(self, snapshot: SimpleNamespace, artifact_key: str) -> SimpleNamespace | None:
+            for artifact in snapshot.recent_artifacts:
+                if artifact.key == artifact_key:
+                    return artifact
+            return None
+
+        def artifact_preview_lines(self, artifact: SimpleNamespace) -> tuple[str, ...]:
+            return (f"Файл результата: {artifact.path.name}",)
+
+        def animation_scene_preview_points(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+        ) -> dict[str, object]:
+            target = artifact.path if artifact is not None else latest_path
+            return {
+                "status": "READY",
+                "source_path": str(target),
+                "pointer_path": str(pointer_path),
+                "series_x": "time_s",
+                "series_y": target.stem,
+                "points": ((0.0, 1.0), (1.0, 2.0), (2.0, 1.5)),
+                "point_count": 3,
+                "range": f"{target.name}: 1 .. 2",
+            }
+
+        def animator_args(self, snapshot: SimpleNamespace, *, follow: bool, artifact=None) -> list[str]:
+            npz_path, pointer = self.animator_target_paths(snapshot, artifact=artifact)
+            assert npz_path == selected_path
+            return ["--pointer", str(pointer)]
+
+        def launch_animator(self, snapshot: SimpleNamespace, *, follow: bool, artifact=None) -> SimpleNamespace:
+            self.__class__.launched_args.append(
+                self.animator_args(snapshot, follow=follow, artifact=artifact)
+            )
+            return SimpleNamespace(pid=777)
+
+        def write_animation_diagnostics_handoff(
+            self,
+            snapshot: SimpleNamespace,
+            artifact=None,
+        ) -> Path:
+            self.__class__.diagnostics_handoff_paths.append(
+                artifact.path if artifact is not None else None
+            )
+            path = tmp_path / "latest_animation_diagnostics_handoff.json"
+            path.write_text("{}", encoding="utf-8")
+            return path
+
+    settings_path = tmp_path / "desktop_spec_shell_animation_handoff_state.ini"
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    monkeypatch.setattr(workspace_pages_module, "DesktopResultsRuntime", _FakeResultsRuntime)
+    try:
+        page = window._page_widget_by_workspace_id["animation"]
+        assert isinstance(page, AnimationWorkspacePage)
+
+        window.run_command("animation.animator.open")
+        app.processEvents()
+
+        preview_values = {
+            page.animation_scene_preview_table.item(row, 1).text()
+            for row in range(page.animation_scene_preview_table.rowCount())
+            if page.animation_scene_preview_table.item(row, 1) is not None
+        }
+        assert "передано из анализа" in preview_values
+        assert "selected_result.npz" in preview_values
+        assert "latest_result.npz" not in preview_values
+        assert "selected_result.npz" in page.animation_scene_preview_view.toolTip()
+        assert "latest_result.npz" not in page.animation_scene_preview_view.toolTip()
+
+        window.run_command("animation.animator.launch")
+        app.processEvents()
+        assert _FakeResultsRuntime.launched_args == [["--pointer", str(pointer_path)]]
+
+        window.run_command("animation.diagnostics.prepare")
+        app.processEvents()
+        assert _FakeResultsRuntime.diagnostics_handoff_paths == [selected_path]
+        assert "Материал передан в проверку проекта" in page.animation_action_label.text()
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_animation_workspace_page_launches_animator_through_hosted_surface(tmp_path, monkeypatch) -> None:
+    npz_path = tmp_path / "anim_result.npz"
+    pointer_path = tmp_path / "anim_result.json"
+    npz_path.write_bytes(b"NPZ")
+    pointer_path.write_text("{}", encoding="utf-8")
+
+    class _FakeResultsRuntime:
+        launched_args: list[list[str]] = []
+
+        def __init__(self, *, repo_root: Path, python_executable: str) -> None:
+            self.repo_root = Path(repo_root)
+            self.python_executable = python_executable
+
+        def snapshot(self) -> SimpleNamespace:
+            return SimpleNamespace(
+                latest_npz_path=npz_path,
+                latest_pointer_json_path=pointer_path,
+                latest_mnemo_event_log_path=None,
+                latest_capture_export_manifest_status="READY",
+                mnemo_current_mode="нет данных",
+                mnemo_recent_titles=(),
+                operator_recommendations=("Проверьте движение.",),
+            )
+
+        def animator_args(self, snapshot: SimpleNamespace, *, follow: bool, artifact=None) -> list[str]:
+            assert follow is True
+            return ["--pointer", str(snapshot.latest_pointer_json_path)]
+
+        def launch_animator(self, snapshot: SimpleNamespace, *, follow: bool, artifact=None) -> SimpleNamespace:
+            self.__class__.launched_args.append(
+                self.animator_args(snapshot, follow=follow, artifact=artifact)
+            )
+            return SimpleNamespace(pid=654)
+
+    settings_path = tmp_path / "desktop_spec_shell_animation_launch_state.ini"
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    monkeypatch.setattr(workspace_pages_module, "DesktopResultsRuntime", _FakeResultsRuntime)
+    try:
+        page = window._page_widget_by_workspace_id["animation"]
+        assert isinstance(page, AnimationWorkspacePage)
+
+        window.run_command("animation.animator.launch")
+        app.processEvents()
+
+        assert _FakeResultsRuntime.launched_args == [["--pointer", str(pointer_path)]]
+        assert "Аниматор открывается" in page.animation_action_label.text()
+        assert "animation.animator.launch" in window.recent_command_ids
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_animation_workspace_page_launches_mnemo_through_hosted_surface(tmp_path, monkeypatch) -> None:
+    npz_path = tmp_path / "mnemo_result.npz"
+    pointer_path = tmp_path / "mnemo_result.json"
+    event_log_path = tmp_path / "mnemo_result.desktop_mnemo_events.json"
+    npz_path.write_bytes(b"NPZ")
+    pointer_path.write_text("{}", encoding="utf-8")
+    event_log_path.write_text("{}", encoding="utf-8")
+
+    class _FakeResultsRuntime:
+        launched_args: list[list[str]] = []
+
+        def __init__(self, *, repo_root: Path, python_executable: str) -> None:
+            self.repo_root = Path(repo_root)
+            self.python_executable = python_executable
+
+        def snapshot(self) -> SimpleNamespace:
+            return SimpleNamespace(
+                latest_npz_path=npz_path,
+                latest_pointer_json_path=pointer_path,
+                latest_mnemo_event_log_path=event_log_path,
+                latest_capture_export_manifest_status="READY",
+                mnemo_current_mode="overview",
+                mnemo_recent_titles=("Давление проверено",),
+                operator_recommendations=("Проверьте схему.",),
+            )
+
+        def mnemo_args(self, snapshot: SimpleNamespace, *, follow: bool, artifact=None) -> list[str]:
+            assert follow is True
+            return ["--follow", "--pointer", str(snapshot.latest_pointer_json_path)]
+
+        def launch_mnemo(self, snapshot: SimpleNamespace, *, follow: bool, artifact=None) -> SimpleNamespace:
+            self.__class__.launched_args.append(
+                self.mnemo_args(snapshot, follow=follow, artifact=artifact)
+            )
+            return SimpleNamespace(pid=655)
+
+    settings_path = tmp_path / "desktop_spec_shell_mnemo_launch_state.ini"
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    monkeypatch.setattr(workspace_pages_module, "DesktopResultsRuntime", _FakeResultsRuntime)
+    try:
+        page = window._page_widget_by_workspace_id["animation"]
+        assert isinstance(page, AnimationWorkspacePage)
+
+        window.run_command("animation.mnemo.launch")
+        app.processEvents()
+
+        assert _FakeResultsRuntime.launched_args == [["--follow", "--pointer", str(pointer_path)]]
+        assert "Мнемосхема запускается" in page.animation_action_label.text()
+        assert "animation.mnemo.launch" in window.recent_command_ids
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_hosted_baseline_workspace_page_prepares_native_launch_request(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    app = _app()
+    workspace_dir = tmp_path / "workspace"
+    monkeypatch.setenv("PNEUMO_WORKSPACE_DIR", str(workspace_dir))
+    _write_launch_ready_baseline_handoffs(workspace_dir)
+
+    page = BaselineWorkspacePage(
+        build_workspace_map()["baseline_run"],
+        (),
+        lambda _command_id: None,
+        repo_root=ROOT,
+        python_executable="python-test",
+    )
+    try:
+        app.processEvents()
+        page.handle_command("baseline.run_setup.prepare")
+        app.processEvents()
+
+        request_path = baseline_run_launch_request_path(repo_root=ROOT, workspace_dir=workspace_dir)
+        request = json.loads(request_path.read_text(encoding="utf-8"))
+
+        assert request["execution_ready"] is True
+        assert request["command"][:3] == ["python-test", "-m", DESKTOP_SINGLE_RUN_MODULE]
+        assert Path(request["paths"]["prepared_inputs"]).exists()
+        assert Path(request["paths"]["prepared_suite"]).exists()
+        assert "Команда запуска подготовлена" in page.run_setup_result_label.text()
+    finally:
+        page.close()
+        page.deleteLater()
+        app.processEvents()
+
+
+def test_hosted_baseline_workspace_page_runs_native_request_in_background(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    app = _app()
+    workspace_dir = tmp_path / "workspace"
+    monkeypatch.setenv("PNEUMO_WORKSPACE_DIR", str(workspace_dir))
+    _write_launch_ready_baseline_handoffs(workspace_dir)
+    shell_statuses: list[tuple[str, bool]] = []
+    opened_paths: list[str] = []
+
+    def fake_open_url(url) -> bool:
+        opened_paths.append(url.toLocalFile())
+        return True
+
+    def fake_prepare(run_setup, *, repo_root=None, workspace_dir=None, python_executable=None, checked=False):
+        request = prepare_baseline_run_launch_request(
+            run_setup,
+            repo_root=repo_root,
+            workspace_dir=workspace_dir,
+            python_executable=python_executable,
+            checked=checked,
+        )
+        run_dir = Path(str(request["paths"]["run_dir"]))
+        script = (
+            "import json, pathlib\n"
+            f"run_dir = pathlib.Path({str(run_dir)!r})\n"
+            "run_dir.mkdir(parents=True, exist_ok=True)\n"
+            "summary = {'ok': True, 'scenario_name': 'baseline_ui_launch', "
+            "'run_profile': 'detail', 'cache_key': 'fake-cache-key', 'dt_s': 0.003, 't_end_s': 1.6}\n"
+            "(run_dir / 'run_summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding='utf-8')\n"
+            "print('baseline fake done')\n"
+        )
+        request["command"] = [sys.executable, "-c", script]
+        Path(str(request["paths"]["request"])).write_text(json.dumps(request, ensure_ascii=False, indent=2), encoding="utf-8")
+        return request
+
+    monkeypatch.setattr(workspace_pages_module, "prepare_baseline_run_launch_request", fake_prepare)
+    monkeypatch.setattr(workspace_pages_module.QtGui.QDesktopServices, "openUrl", fake_open_url)
+
+    page = BaselineWorkspacePage(
+        build_workspace_map()["baseline_run"],
+        (),
+        lambda _command_id: None,
+        repo_root=ROOT,
+        python_executable=sys.executable,
+        on_shell_status=lambda text, busy: shell_statuses.append((text, bool(busy))),
+    )
+    try:
+        app.processEvents()
+        page.handle_command("baseline.run.execute")
+        app.processEvents()
+
+        process = page._baseline_process
+        assert process is not None
+        assert process.waitForFinished(10000)
+        app.processEvents()
+
+        request_path = baseline_run_launch_request_path(repo_root=ROOT, workspace_dir=workspace_dir)
+        request = json.loads(request_path.read_text(encoding="utf-8"))
+        history = read_baseline_history(workspace_dir=workspace_dir)
+
+        assert request["execution_status"] == "done"
+        assert request["returncode"] == 0
+        assert Path(request["run_summary_path"]).exists()
+        assert request["baseline_candidate"]["requires_explicit_adopt"] is True
+        assert history
+        assert history[-1]["action"] == "review"
+        assert "Базовый прогон завершён" in page.run_setup_result_label.text()
+        assert shell_statuses[-1] == ("Базовый прогон завершён.", False)
+        assert page.run_setup_open_log_button.isEnabled()
+        assert page.run_setup_open_result_button.isEnabled()
+
+        page.handle_command("baseline.run.open_log")
+        page.handle_command("baseline.run.open_result")
+
+        assert Path(opened_paths[0]) == Path(request["paths"]["log"])
+        assert Path(opened_paths[1]) == Path(request["paths"]["run_dir"])
+    finally:
+        page.close()
+        page.deleteLater()
+        app.processEvents()
+
+
+def test_hosted_baseline_workspace_page_cancels_background_run(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    app = _app()
+    workspace_dir = tmp_path / "workspace"
+    monkeypatch.setenv("PNEUMO_WORKSPACE_DIR", str(workspace_dir))
+    _write_launch_ready_baseline_handoffs(workspace_dir)
+    shell_statuses: list[tuple[str, bool]] = []
+
+    def fake_prepare(run_setup, *, repo_root=None, workspace_dir=None, python_executable=None, checked=False):
+        request = prepare_baseline_run_launch_request(
+            run_setup,
+            repo_root=repo_root,
+            workspace_dir=workspace_dir,
+            python_executable=python_executable,
+            checked=checked,
+        )
+        script = "import time\nprint('baseline fake long run', flush=True)\ntime.sleep(30)\n"
+        request["command"] = [sys.executable, "-c", script]
+        Path(str(request["paths"]["request"])).write_text(json.dumps(request, ensure_ascii=False, indent=2), encoding="utf-8")
+        return request
+
+    monkeypatch.setattr(workspace_pages_module, "prepare_baseline_run_launch_request", fake_prepare)
+
+    page = BaselineWorkspacePage(
+        build_workspace_map()["baseline_run"],
+        (),
+        lambda _command_id: None,
+        repo_root=ROOT,
+        python_executable=sys.executable,
+        on_shell_status=lambda text, busy: shell_statuses.append((text, bool(busy))),
+    )
+    try:
+        app.processEvents()
+        page.handle_command("baseline.run.execute")
+        app.processEvents()
+
+        process = page._baseline_process
+        assert process is not None
+        assert page.run_setup_cancel_button.isEnabled()
+
+        page.handle_command("baseline.run.cancel")
+        assert process.waitForFinished(10000)
+        app.processEvents()
+
+        request_path = baseline_run_launch_request_path(repo_root=ROOT, workspace_dir=workspace_dir)
+        request = json.loads(request_path.read_text(encoding="utf-8"))
+
+        assert request["execution_status"] == "failed"
+        assert "Запуск отменён оператором" in request["stderr_tail"]
+        assert "отменён" in page.run_setup_result_label.text()
+        assert shell_statuses[-1] == ("Базовый прогон отменён.", False)
+    finally:
+        page.close()
+        page.deleteLater()
         app.processEvents()
 
 
@@ -590,6 +1902,10 @@ def test_hosted_baseline_workspace_page_requires_explicit_action_before_restore(
         assert page.run_setup_check_button.text() == "Проверить готовность"
         assert page.run_setup_checked_launch_button.text() == "Проверить и подготовить запуск"
         assert page.run_setup_plain_launch_button.text() == "Подготовить запуск"
+        assert page.run_setup_execute_button.text() == "Запустить в фоне"
+        assert page.run_setup_cancel_button.text() == "Отменить запуск"
+        assert page.run_setup_open_log_button.text() == "Открыть журнал"
+        assert page.run_setup_open_result_button.text() == "Открыть папку результата"
         assert page.run_setup_advanced_button.text() == "Расширенный центр запуска"
         assert "Профиль запуска" in page.run_setup_summary_label.text()
         assert "Готовность набора испытаний" in page.run_setup_gate_label.text()
@@ -615,6 +1931,13 @@ def test_hosted_baseline_workspace_page_requires_explicit_action_before_restore(
         assert "Молчаливая подмена запрещена" in page.baseline_mismatch_label.text()
         assert page.baseline_mismatch_matrix.objectName() == "BL-MISMATCH-MATRIX"
         assert page.baseline_mismatch_matrix.rowCount() == 5
+        assert page.baseline_review_detail_box.objectName() == "BL-REVIEW-DETAILS"
+        assert page.baseline_review_detail_box.title() == "Карточка проверки выбранного результата"
+        assert page.baseline_review_detail_table.objectName() == "BL-REVIEW-DETAILS-TABLE"
+        assert page.baseline_review_detail_table.horizontalHeaderItem(0).text() == "Проверка"
+        assert page.baseline_review_detail_table.horizontalHeaderItem(1).text() == "Значение"
+        assert page.baseline_review_detail_table.horizontalHeaderItem(2).text() == "Следующий шаг"
+        assert page.baseline_review_detail_table.rowCount() >= 10
         matrix_status = {
             page.baseline_mismatch_matrix.item(row, 0).text(): page.baseline_mismatch_matrix.item(row, 3).text()
             for row in range(page.baseline_mismatch_matrix.rowCount())
@@ -624,6 +1947,17 @@ def test_hosted_baseline_workspace_page_requires_explicit_action_before_restore(
         assert matrix_status["Исходные данные"] == "совпадает"
         assert matrix_status["Циклический сценарий"] == "совпадает"
         assert matrix_status["Режим"] == "совпадает"
+        review_details = {
+            page.baseline_review_detail_table.item(row, 0).text(): (
+                page.baseline_review_detail_table.item(row, 1).text(),
+                page.baseline_review_detail_table.item(row, 2).text(),
+            )
+            for row in range(page.baseline_review_detail_table.rowCount())
+        }
+        assert review_details["Файл результата"][0].endswith("baseline_candidate.json")
+        assert review_details["Папка запуска"][0].endswith("candidate")
+        assert review_details["Доступность оптимизации"][0] == "готов"
+        assert "явное подтверждение" in review_details["Следующий безопасный шаг"][0]
 
         page.handle_command("baseline.review")
         assert "Действие: Просмотреть" in page.action_result_label.text()
@@ -730,6 +2064,17 @@ def test_hosted_baseline_workspace_page_warns_before_restore_with_context_mismat
         assert matrix_status["Исходные данные"] == "расходится"
         assert matrix_status["Циклический сценарий"] == "совпадает"
         assert matrix_status["Режим"] == "расходится"
+        review_details = {
+            page.baseline_review_detail_table.item(row, 0).text(): (
+                page.baseline_review_detail_table.item(row, 1).text(),
+                page.baseline_review_detail_table.item(row, 2).text(),
+            )
+            for row in range(page.baseline_review_detail_table.rowCount())
+        }
+        assert review_details["Файл результата"][0].endswith("baseline_historical.json")
+        assert review_details["Состояние сверки"][0] == "другой набор данных"
+        assert "расхождения" in review_details["Следующий безопасный шаг"][0]
+        assert "Снимок набора" in review_details["Состояние сверки"][1]
 
         blocked_restore = page.apply_baseline_action("restore")
         assert blocked_restore["status"] == "blocked"

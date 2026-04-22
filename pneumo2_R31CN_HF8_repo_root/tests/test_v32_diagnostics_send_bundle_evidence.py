@@ -25,6 +25,8 @@ from pneumo_solver_ui.tools.make_send_bundle import make_send_bundle
 from pneumo_solver_ui.tools.send_bundle_evidence import (
     ANALYSIS_EVIDENCE_SIDECAR_NAME,
     ANALYSIS_EVIDENCE_WORKSPACE_ARCNAME,
+    ANIMATION_DIAGNOSTICS_HANDOFF_ARCNAME,
+    ANIMATION_DIAGNOSTICS_HANDOFF_SIDECAR_NAME,
     ENGINEERING_ANALYSIS_EVIDENCE_ARCNAME,
     ENGINEERING_ANALYSIS_EVIDENCE_SIDECAR_NAME,
     EVIDENCE_MANIFEST_ARCNAME,
@@ -163,6 +165,38 @@ def test_make_send_bundle_embeds_v32_evidence_manifest_and_final_latest_pointer(
         ),
         encoding="utf-8",
     )
+    (out_dir / ANIMATION_DIAGNOSTICS_HANDOFF_SIDECAR_NAME).write_text(
+        json.dumps(
+            {
+                "schema": "desktop_animation_diagnostics_handoff",
+                "schema_version": "1.0.0",
+                "handoff_id": "HO-ANIMATION-DIAGNOSTICS-001",
+                "produced_by": "WS-ANIMATOR",
+                "consumed_by": "WS-DIAGNOSTICS",
+                "handoff_hash": "animation-handoff-hash",
+                "selected_artifact": {
+                    "key": "selected_npz",
+                    "title": "Выбранный файл результата",
+                    "category": "results",
+                    "path": "C:/workspace/exports/selected_result.npz",
+                },
+                "artifacts": {
+                    "scene_npz_path": "C:/workspace/exports/selected_result.npz",
+                    "pointer_json_path": "C:/workspace/exports/selected_result.json",
+                    "mnemo_event_log_path": "C:/workspace/exports/selected_result.desktop_mnemo_events.json",
+                },
+                "animation_context": {
+                    "scene_ready": True,
+                    "mnemo_ready": True,
+                    "capture_status": "READY",
+                },
+                "next_step": "Сохраните архив проекта с текущим материалом.",
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
 
     zip_path = make_send_bundle(
         repo_root=repo_root,
@@ -200,6 +234,9 @@ def test_make_send_bundle_embeds_v32_evidence_manifest_and_final_latest_pointer(
         geometry_reference = json.loads(
             zf.read(GEOMETRY_REFERENCE_EVIDENCE_ARCNAME).decode("utf-8", errors="replace")
         )
+        animation_handoff = json.loads(
+            zf.read(ANIMATION_DIAGNOSTICS_HANDOFF_ARCNAME).decode("utf-8", errors="replace")
+        )
     latest_evidence_payload = json.loads(latest_evidence.read_text(encoding="utf-8"))
     latest_inspection_payload = json.loads(latest_inspection_json.read_text(encoding="utf-8"))
     latest_geometry_payload = json.loads(latest_geometry_reference.read_text(encoding="utf-8"))
@@ -208,6 +245,7 @@ def test_make_send_bundle_embeds_v32_evidence_manifest_and_final_latest_pointer(
     assert "triage/triage_report.json" in names
     assert EVIDENCE_MANIFEST_ARCNAME in names
     assert GEOMETRY_REFERENCE_EVIDENCE_ARCNAME in names
+    assert ANIMATION_DIAGNOSTICS_HANDOFF_ARCNAME in names
     assert ANALYSIS_EVIDENCE_WORKSPACE_ARCNAME in names
     assert meta["trigger"] == "manual"
     assert meta["collection_mode"] == "manual"
@@ -232,6 +270,15 @@ def test_make_send_bundle_embeds_v32_evidence_manifest_and_final_latest_pointer(
     assert evidence["analysis_handoff"]["evidence_manifest_hash"] == "hash-bundle"
     assert evidence["geometry_reference_handoff"]["schema"] == "geometry_reference_evidence.v1"
     assert evidence["geometry_reference_handoff"]["source_path"].endswith(GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME)
+    assert evidence["animation_diagnostics_handoff"]["status"] == "READY"
+    assert evidence["animation_diagnostics_handoff"]["handoff_id"] == "HO-ANIMATION-DIAGNOSTICS-001"
+    assert evidence["animation_diagnostics_handoff"]["source_path"] == ANIMATION_DIAGNOSTICS_HANDOFF_ARCNAME
+    assert (
+        evidence["animation_diagnostics_handoff"]["artifacts"]["scene_npz_path"]
+        == "C:/workspace/exports/selected_result.npz"
+    )
+    assert animation_handoff["schema"] == "desktop_animation_diagnostics_handoff"
+    assert animation_handoff["produced_by"] == "WS-ANIMATOR"
     assert geometry_reference["schema"] == "geometry_reference_evidence.v1"
     assert geometry_reference["reference_center_role"] == "reader_and_evidence_surface"
     assert geometry_reference["does_not_render_animator_meshes"] is True
@@ -265,6 +312,8 @@ def test_make_send_bundle_embeds_v32_evidence_manifest_and_final_latest_pointer(
     assert evidence_ids["BND-001"]["status"] == "present"
     assert evidence_ids["BND-006"]["status"] == "present"
     assert evidence_ids["BND-002"]["status"] == "present"
+    assert evidence_ids["BND-023"]["status"] == "present"
+    assert ANIMATION_DIAGNOSTICS_HANDOFF_ARCNAME in evidence_ids["BND-023"]["present_paths"]
     assert latest_evidence_payload["finalization_stage"] == "latest_zip_sha_inspection_proof"
     assert latest_evidence_payload["final_latest_zip_sha256"] == hashlib.sha256(latest_zip.read_bytes()).hexdigest()
     assert latest_evidence_payload["zip_sha256"] == latest_evidence_payload["final_latest_zip_sha256"]

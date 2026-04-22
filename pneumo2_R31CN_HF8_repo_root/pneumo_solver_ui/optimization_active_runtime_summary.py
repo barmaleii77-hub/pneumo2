@@ -19,6 +19,29 @@ from pneumo_solver_ui.optimization_objective_contract import (
     normalize_penalty_tol,
 )
 
+_DONE_TRIAL_STATUSES = {
+    "DONE",
+    "CACHED",
+    "CACHE",
+    "SUCCESS",
+    "COMPLETED",
+}
+_RUNNING_TRIAL_STATUSES = {
+    "RUNNING",
+    "PENDING",
+    "QUEUED",
+    "RESERVED",
+    "STARTED",
+    "IN_PROGRESS",
+}
+_ERROR_TRIAL_STATUSES = {
+    "ERROR",
+    "FAILED",
+    "FAIL",
+    "EXCEPTION",
+    "CRASHED",
+}
+
 
 def _resolved_path_text(raw: Any) -> str:
     text = str(raw or "").strip()
@@ -133,6 +156,17 @@ def _load_runtime_contract(run_dir: str) -> dict[str, Any]:
     }
 
 
+def _trial_status_bucket(raw_status: Any) -> str:
+    status = str(raw_status or "").strip().upper()
+    if status in _DONE_TRIAL_STATUSES:
+        return "done"
+    if status in _RUNNING_TRIAL_STATUSES:
+        return "running"
+    if status in _ERROR_TRIAL_STATUSES:
+        return "error"
+    return ""
+
+
 def _objective_values_from_trial(
     objective_keys: tuple[str, ...],
     *,
@@ -208,8 +242,8 @@ def _read_trial_runtime_evidence(
         with trials_csv.open("r", encoding="utf-8", errors="ignore", newline="") as fh:
             reader = csv.DictReader(fh)
             for row in reader:
-                status = str((row or {}).get("status") or "").strip().upper()
-                if status == "DONE":
+                status_bucket = _trial_status_bucket((row or {}).get("status"))
+                if status_bucket == "done":
                     out["done"] += 1
                     metrics = _json_mapping((row or {}).get("metrics_json"))
                     g_values = _json_float_list((row or {}).get("g_json"))
@@ -247,9 +281,9 @@ def _read_trial_runtime_evidence(
                         for key, value in objective_values.items():
                             prev = feasible_best.get(key)
                             feasible_best[key] = value if prev is None else min(prev, value)
-                elif status == "RUNNING":
+                elif status_bucket == "running":
                     out["running"] += 1
-                elif status == "ERROR":
+                elif status_bucket == "error":
                     out["error"] += 1
                     err = _clean_error_text(
                         (row or {}).get("error_text"),

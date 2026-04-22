@@ -837,6 +837,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
                 actions,
                 self.run_command,
                 repo_root=self.repo_root,
+                on_shell_status=self.set_shell_status,
             )
         if workspace.workspace_id == "test_matrix":
             return SuiteWorkspacePage(
@@ -851,6 +852,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
                 actions,
                 self.run_command,
                 repo_root=self.repo_root,
+                on_shell_status=self.set_shell_status,
             )
         if workspace.workspace_id == "results_analysis":
             return ResultsWorkspacePage(

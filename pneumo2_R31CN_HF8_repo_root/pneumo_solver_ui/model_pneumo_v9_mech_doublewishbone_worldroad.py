@@ -2925,6 +2925,31 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     road_func = test.get('road_func', lambda t: np.zeros(4))
     # Производная дороги по времени в точке контакта (нужно для корректного pen_dot)
     road_dfunc = test.get('road_dfunc', lambda t: np.zeros(4))
+
+    def _finite_scalar_input(fn, name):
+        def _wrapped(t):
+            value = float(fn(t))
+            if not np.isfinite(value):
+                raise RuntimeError(f"Non-finite {name} input at t={float(t):.9g}: {value!r}")
+            return value
+        return _wrapped
+
+    def _finite_road_input(fn, name):
+        def _wrapped(t):
+            value = np.asarray(fn(t), dtype=float).reshape(-1)
+            if value.size == 1:
+                value = np.repeat(float(value[0]), 4)
+            if value.size != 4:
+                raise RuntimeError(
+                    f"{name} must return 4 values at t={float(t):.9g}, got size={int(value.size)}"
+                )
+            if not np.all(np.isfinite(value)):
+                raise RuntimeError(f"Non-finite {name} input at t={float(t):.9g}")
+            return value.reshape(4,)
+        return _wrapped
+
+    ay_func = _finite_scalar_input(ay_func, "ay_func")
+    ax_func = _finite_scalar_input(ax_func, "ax_func")
     # world-road: z = z(x(t),y(t)). Если задан road_surface и доступен road_surface.py,
     # переопределяем road_func/road_dfunc через предрасчёт траекторий колёс.
     world_cache = None
@@ -3050,6 +3075,8 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         road_offset0_m = 0.0
 
     road_dfunc_is_default_zero = isinstance(test, dict) and ('road_dfunc' not in test) and (world_cache is None)
+    road_func = _finite_road_input(road_func, "road_func")
+    road_dfunc = _finite_road_input(road_dfunc, "road_dfunc")
 
     label_func = test.get('label_func', lambda t: 0)
 
@@ -4611,6 +4638,7 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     }
 
     state = state0.copy()
+    mass_state_initial_total_kg = float(np.sum(np.asarray(state0[14:14 + N], dtype=float)))
 
 
     # ------------------------------------------------------------
@@ -4623,15 +4651,36 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     # - макс_число_внутренних_шагов_на_dt
     # - лимит_относит_изменения_объёма_за_шаг
 
-    max_h_default = float(params.get('макс_шаг_интегрирования_с', dt))
+    max_h_default_raw = params.get(
+        'integrator_dt_int_max_s',
+        params.get('макс_шаг_интегрирования_с', dt),
+    )
+    try:
+        max_h_default = float(max_h_default_raw)
+    except Exception:
+        max_h_default = float(dt)
     if (not np.isfinite(max_h_default)) or (max_h_default <= 0.0):
         max_h_default = float(dt)
 
-    max_sub = int(params.get('макс_число_внутренних_шагов_на_dt', 200000))
+    max_sub_raw = params.get(
+        'integrator_max_internal_steps_per_dt',
+        params.get('макс_число_внутренних_шагов_на_dt', 200000),
+    )
+    try:
+        max_sub = int(float(max_sub_raw))
+    except Exception:
+        max_sub = 200000
     if max_sub < 1:
         max_sub = 1
 
-    lim_rel_V = float(params.get('лимит_относит_изменения_объёма_за_шаг', 0.05))
+    lim_rel_V_raw = params.get(
+        'integrator_lim_rel_volume_per_step',
+        params.get('лимит_относит_изменения_объёма_за_шаг', 0.05),
+    )
+    try:
+        lim_rel_V = float(lim_rel_V_raw)
+    except Exception:
+        lim_rel_V = 0.05
     if (not np.isfinite(lim_rel_V)) or (lim_rel_V <= 0.0):
         lim_rel_V = 0.05
     lim_rel_V = float(np.clip(lim_rel_V, 1e-4, 0.5))
@@ -4643,36 +4692,92 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     # --- Опциональный контроль локальной ошибки (step-doubling для RK2/Heun) ---
     # По умолчанию ВЫКЛЮЧЕН, чтобы сохранить прежнее поведение модели.
     # Включение: params['интегратор_контроль_локальной_ошибки']=True
-    integ_err_control = bool(params.get('интегратор_контроль_локальной_ошибки', False))
+    integ_err_control_raw = params.get(
+        'integrator_error_control',
+        params.get('интегратор_контроль_локальной_ошибки', False),
+    )
+    if isinstance(integ_err_control_raw, str):
+        integ_err_token = integ_err_control_raw.strip().lower()
+        if integ_err_token in ("1", "true", "yes", "on"):
+            integ_err_control = True
+        elif integ_err_token in ("0", "false", "no", "off"):
+            integ_err_control = False
+        else:
+            integ_err_control = False
+    else:
+        try:
+            integ_err_num = float(integ_err_control_raw)
+            integ_err_control = bool(integ_err_num) if np.isfinite(integ_err_num) else False
+        except Exception:
+            integ_err_control = False
 
-    integ_rtol = float(params.get('интегратор_rtol', 1e-3))
+    integ_rtol_raw = params.get('integrator_rtol', params.get('интегратор_rtol', 1e-3))
+    try:
+        integ_rtol = float(integ_rtol_raw)
+    except Exception:
+        integ_rtol = 1e-4
     if (not np.isfinite(integ_rtol)) or integ_rtol <= 0.0:
         integ_rtol = 1e-4
 
-    integ_atol = float(params.get('интегратор_atol', 1e-7))
+    integ_atol_raw = params.get('integrator_atol', params.get('интегратор_atol', 1e-7))
+    try:
+        integ_atol = float(integ_atol_raw)
+    except Exception:
+        integ_atol = 1e-8
     if (not np.isfinite(integ_atol)) or integ_atol <= 0.0:
         integ_atol = 1e-8
 
-    integ_safety = float(params.get('интегратор_safety', 0.9))
+    integ_safety_raw = params.get('integrator_safety', params.get('интегратор_safety', 0.9))
+    try:
+        integ_safety = float(integ_safety_raw)
+    except Exception:
+        integ_safety = 0.9
     if (not np.isfinite(integ_safety)) or (integ_safety <= 0.0) or (integ_safety > 1.0):
         integ_safety = 0.9
 
-    integ_fac_min = float(params.get('интегратор_fac_min', 0.2))
+    integ_fac_min_raw = params.get('integrator_fac_min', params.get('интегратор_fac_min', 0.2))
+    try:
+        integ_fac_min = float(integ_fac_min_raw)
+    except Exception:
+        integ_fac_min = 0.2
     if (not np.isfinite(integ_fac_min)) or (integ_fac_min <= 0.0) or (integ_fac_min >= 1.0):
         integ_fac_min = 0.2
 
-    integ_fac_max = float(params.get('интегратор_fac_max', 5.0))
+    integ_fac_max_raw = params.get('integrator_fac_max', params.get('интегратор_fac_max', 5.0))
+    try:
+        integ_fac_max = float(integ_fac_max_raw)
+    except Exception:
+        integ_fac_max = 5.0
     if (not np.isfinite(integ_fac_max)) or (integ_fac_max <= 1.0):
         integ_fac_max = 5.0
 
-    integ_h_min = float(params.get('интегратор_h_min_с', 1e-7))
+    integ_h_min_raw = params.get('integrator_h_min_s', params.get('интегратор_h_min_с', 1e-7))
+    try:
+        integ_h_min = float(integ_h_min_raw)
+    except Exception:
+        integ_h_min = 1e-7
     if (not np.isfinite(integ_h_min)) or (integ_h_min <= 0.0):
         integ_h_min = 1e-7
 
-    integ_mass_rtol_scale_factor = float(params.get('интегратор_mass_rtol_scale_factor', 2.0))
+    integ_mass_rtol_scale_factor_raw = params.get(
+        'integrator_mass_rtol_scale_factor',
+        params.get('интегратор_mass_rtol_scale_factor', 2.0),
+    )
+    try:
+        integ_mass_rtol_scale_factor = float(integ_mass_rtol_scale_factor_raw)
+    except Exception:
+        integ_mass_rtol_scale_factor = 2.0
     if (not np.isfinite(integ_mass_rtol_scale_factor)) or (integ_mass_rtol_scale_factor < 1.0):
         integ_mass_rtol_scale_factor = 2.0
-    integ_err_group_weight_mass = float(params.get('интегратор_err_group_weight_mass', 0.92))
+
+    integ_err_group_weight_mass_raw = params.get(
+        'integrator_err_group_weight_mass',
+        params.get('интегратор_err_group_weight_mass', 0.92),
+    )
+    try:
+        integ_err_group_weight_mass = float(integ_err_group_weight_mass_raw)
+    except Exception:
+        integ_err_group_weight_mass = 0.92
     if (not np.isfinite(integ_err_group_weight_mass)) or (integ_err_group_weight_mass <= 0.0):
         integ_err_group_weight_mass = 0.92
     integ_mass_scale_floor_vec = p_mass_floor_scale * V0_vec
@@ -4719,6 +4824,9 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         m_floor = p_mass_floor_scale * V_safe
 
         m_state = _state[14:]
+        if not np.all(np.isfinite(m_state)):
+            m_state = np.where(np.isfinite(m_state), m_state, m_floor)
+            _state[14:] = m_state
         if smooth_pressure_floor:
             m_state = m_floor + smooth_pos(m_state - m_floor, smooth_eps_mass_kg)
             m_state[atm_index] = atm_mass
@@ -4786,6 +4894,9 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         m_floor = p_mass_floor_scale * V_safe
 
         m_state = _state[14:]
+        if not np.all(np.isfinite(m_state)):
+            m_state = np.where(np.isfinite(m_state), m_state, m_floor)
+            _state[14:] = m_state
         if smooth_pressure_floor:
             m_state = m_floor + smooth_pos(m_state - m_floor, smooth_eps_mass_kg)
             m_state[atm_index] = atm_mass
@@ -5017,26 +5128,53 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                 dm_dt=dm_dt_,
             )
 
-            # CFL по массе: не даём «высосать» массу за один подшаг
-            m_state = _state[14:14+N]
-            mask = (dm_dt_ < 0.0)
+            # CFL по массе: ограничиваем шаг по доступному запасу до mass floor.
+            # Это устойчивее около p_abs_min, чем ограничение по полной массе.
+            if smooth_pressure_floor:
+                V_mass_safe = smooth_max(V_, 1e-9, smooth_eps_vol_m3)
+            else:
+                V_mass_safe = V_ if np.all(V_ >= 1e-9) else np.maximum(1e-9, V_)
+            m_floor_cfl = p_mass_floor_scale * V_mass_safe
+            m_state = _state[14:14 + N]
+            m_margin = m_state - m_floor_cfl
+            mask = (dm_dt_ < -1e-15) & np.isfinite(dm_dt_) & np.isfinite(m_margin)
             mask[idx_atm] = False
             if np.any(mask):
-                dt_mass = 0.5 * float(np.min(m_state[mask] / (-dm_dt_[mask] + 1e-12)))
-                h = min(h, dt_mass)
+                dt_mass_candidates = 0.5 * (
+                    np.maximum(m_margin[mask], 0.0) / (-dm_dt_[mask] + 1e-12)
+                )
+                dt_mass_candidates = dt_mass_candidates[
+                    np.isfinite(dt_mass_candidates) & (dt_mass_candidates > 0.0)
+                ]
+                if dt_mass_candidates.size:
+                    h = min(h, float(np.min(dt_mass_candidates)))
 
             # Ограничение по относительному изменению объёма за шаг
-            maskV = (np.abs(dV_) > 0.0) & (V_ > 0.0)
+            maskV = np.isfinite(dV_) & np.isfinite(V_) & (np.abs(dV_) > 0.0) & (V_ > 0.0)
             if np.any(maskV) and (lim_rel_V > 0.0):
-                dt_vol = lim_rel_V * float(np.min(V_[maskV] / (np.abs(dV_[maskV]) + 1e-12)))
-                h = min(h, dt_vol)
+                dt_vol_candidates = lim_rel_V * (
+                    V_[maskV] / (np.abs(dV_[maskV]) + 1e-12)
+                )
+                dt_vol_candidates = dt_vol_candidates[
+                    np.isfinite(dt_vol_candidates) & (dt_vol_candidates > 0.0)
+                ]
+                if dt_vol_candidates.size:
+                    h = min(h, float(np.min(dt_vol_candidates)))
 
             # гарантируем прогресс времени
-            h = max(float(h), float(h_floor))
+            if (not np.isfinite(h)) or (h <= 0.0):
+                h = float(h_floor)
+            else:
+                h = max(float(h), float(h_floor))
 
             if not integ_err_control:
                 # --- обычный шаг RK2/Heun ---
                 _state, prepared_cfl = _heun_step(_state, t_loc, h, k1=k1_state, return_prepared=True)
+                m_state_new = _state[14:14 + N]
+                if np.any(~np.isfinite(m_state_new)):
+                    raise RuntimeError("Non-finite gas mass state (NaN/inf) after substep.")
+                if not np.all(np.isfinite(_state)):
+                    raise RuntimeError("Non-finite integrator state (NaN/inf) after substep.")
                 # статистика
                 h_min = min(h_min, h)
                 h_max = max(h_max, h)
@@ -5063,6 +5201,9 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                 hh = 0.5 * h
                 y_half = _heun_step(_state, t_loc, hh, k1=k1_state)
                 y2, prepared_y2 = _heun_step(y_half, t_loc + hh, hh, return_prepared=True)
+
+                y1_is_finite = bool(np.all(np.isfinite(y1)))
+                y2_is_finite = bool(np.all(np.isfinite(y2)))
 
                 err_est = (y2 - y1) / 3.0
                 scale = integ_atol + integ_rtol * np.maximum(np.abs(y1), np.abs(y2))
@@ -5093,7 +5234,8 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                 err_norm_last = err_norm
                 err_max = max(err_max, err_norm)
 
-                if (err_norm <= 1.0) or (h <= max(float(integ_h_min), float(h_floor))):
+                h_min_eff = max(float(integ_h_min), float(h_floor))
+                if y2_is_finite and ((err_norm <= 1.0) or (h <= h_min_eff)):
                     # принимаем более точный y2
                     _state = y2
                     prepared_cfl = prepared_y2
@@ -5105,10 +5247,19 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                 tries += 1
                 n_reject += 1
                 if tries >= 25:
-                    # fail‑safe: чтобы не «виснуть» на неустойчивом режиме, принимаем y2
-                    _state = y2
-                    prepared_cfl = prepared_y2
-                    break
+                    # fail-safe: не принимаем нечисловое состояние.
+                    if y2_is_finite:
+                        _state = y2
+                        prepared_cfl = prepared_y2
+                        break
+                    if y1_is_finite:
+                        prepared_y1 = _project_masses(y1, return_prepared=True, include_dv=True)
+                        _state = y1
+                        prepared_cfl = prepared_y1
+                        break
+                    raise RuntimeError(
+                        f"Integrator failed: non-finite state in error-control loop at t={t_loc:.6g}, h={h:.3e}"
+                    )
 
                 fac = float(integ_safety) * float((1.0 / err_norm) ** (1.0 / 3.0))
                 # при reject ограничиваем рост сверху <1, чтобы реально уменьшить шаг
@@ -6029,9 +6180,202 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
         df_atm.loc[0, 'интегратор_fac_max'] = float(integ_fac_max)
         df_atm.loc[0, 'интегратор_h_min_param_с'] = float(integ_h_min)
         df_atm.loc[0, 'интегратор_dt_int_max_с'] = float(max_h_default)
+        df_atm.loc[0, 'интегратор_max_internal_steps'] = int(max_sub)
         df_atm.loc[0, 'интегратор_lim_rel_V'] = float(lim_rel_V)
         df_atm.loc[0, 'интегратор_mass_rtol_scale_factor'] = float(integ_mass_rtol_scale_factor)
         df_atm.loc[0, 'интегратор_err_group_weight_mass'] = float(integ_err_group_weight_mass)
+
+        # Runtime diagnostics for numerical/physical QC.
+        def _qc_float(key: str, default: float) -> float:
+            raw = params.get(key, default)
+            try:
+                return float(raw)
+            except Exception:
+                return float(default)
+
+        def _qc_bool(key: str, default: bool) -> bool:
+            raw = params.get(key, default)
+            if isinstance(raw, str):
+                token = raw.strip().lower()
+                if token in ("1", "true", "yes", "on"):
+                    return True
+                if token in ("0", "false", "no", "off"):
+                    return False
+                return bool(default)
+            try:
+                val = float(raw)
+            except Exception:
+                return bool(default)
+            if not np.isfinite(val):
+                return bool(default)
+            return bool(val)
+
+        qc_min_pressure_req_pa = _qc_float('integrator_runtime_qc_min_pressure_pa', 0.0)
+        qc_max_pressure_pa = _qc_float('integrator_runtime_qc_max_pressure_pa', np.inf)
+        qc_max_reject_rate = _qc_float('integrator_runtime_qc_max_reject_rate', np.inf)
+        qc_max_mass_balance_residual_kg = _qc_float(
+            'integrator_runtime_qc_max_mass_balance_residual_kg',
+            np.inf,
+        )
+        qc_max_mass_balance_residual_rel = _qc_float(
+            'integrator_runtime_qc_max_mass_balance_residual_rel',
+            np.inf,
+        )
+        qc_require_active_rows = _qc_bool('integrator_runtime_qc_require_active_rows', True)
+        if (not np.isfinite(qc_min_pressure_req_pa)) or (qc_min_pressure_req_pa < 0.0):
+            qc_min_pressure_req_pa = 0.0
+        if (not np.isfinite(qc_max_pressure_pa)) or (qc_max_pressure_pa <= 0.0):
+            qc_max_pressure_pa = float(np.inf)
+        if (not np.isfinite(qc_max_reject_rate)) or (qc_max_reject_rate < 0.0):
+            qc_max_reject_rate = float(np.inf)
+        if (not np.isfinite(qc_max_mass_balance_residual_kg)) or (qc_max_mass_balance_residual_kg < 0.0):
+            qc_max_mass_balance_residual_kg = float(np.inf)
+        if (not np.isfinite(qc_max_mass_balance_residual_rel)) or (qc_max_mass_balance_residual_rel < 0.0):
+            qc_max_mass_balance_residual_rel = float(np.inf)
+        active_rows = int(np.sum(mask))
+        hmax_limit = float(max_h_default) * (1.0 + 1e-9) + 1e-15
+        hmax_violation_count = 0
+        hmax_violation_max_over = 0.0
+        if active_rows > 0:
+            hmax_active = hmax_arr[mask]
+            hmax_viol_mask = np.isfinite(hmax_active) & (hmax_active > hmax_limit)
+            hmax_violation_count = int(np.sum(hmax_viol_mask))
+            if hmax_violation_count > 0:
+                hmax_violation_max_over = float(np.max(hmax_active[hmax_viol_mask] - hmax_limit))
+            rej_total = float(np.sum(rej_arr[mask]))
+            nsub_total = float(np.sum(nsub_arr[mask]))
+            rej_rate = float(rej_total / max(1.0, nsub_total))
+        else:
+            rej_rate = 0.0
+        df_atm.loc[0, 'integrator_active_rows_N'] = active_rows
+        df_atm.loc[0, 'integrator_hmax_limit_s'] = float(hmax_limit)
+        df_atm.loc[0, 'integrator_hmax_violation_count'] = int(hmax_violation_count)
+        df_atm.loc[0, 'integrator_hmax_violation_max_over_s'] = float(hmax_violation_max_over)
+        df_atm.loc[0, 'integrator_hmax_le_dt_int_max_ok'] = int(hmax_violation_count == 0)
+        df_atm.loc[0, 'integrator_reject_rate'] = float(rej_rate)
+
+        core_start = min(7, int(df_main.shape[1]))
+        core_end = min(163, int(df_main.shape[1]))
+        if core_end > core_start:
+            core_arr = np.asarray(df_main.iloc[:, core_start:core_end], dtype=float)
+            core_finite_mask = np.isfinite(core_arr)
+            core_col_has_finite = np.any(core_finite_mask, axis=0)
+            if np.any(core_col_has_finite):
+                core_arr_eval = core_arr[:, core_col_has_finite]
+                core_nonfinite_count = int(
+                    core_arr_eval.size - int(np.count_nonzero(np.isfinite(core_arr_eval)))
+                )
+            else:
+                core_nonfinite_count = 0
+        else:
+            core_nonfinite_count = 0
+        df_atm.loc[0, 'solver_core_nonfinite_count'] = int(core_nonfinite_count)
+        df_atm.loc[0, 'solver_core_finite_ok'] = int(core_nonfinite_count == 0)
+
+        pa_suffix = "_\u041f\u0430"
+        pressure_cols = [c for c in df_main.columns if isinstance(c, str) and c.endswith(pa_suffix)]
+        if pressure_cols:
+            pressure_arr = np.asarray(df_main.loc[:, pressure_cols], dtype=float)
+            pressure_finite_mask = np.isfinite(pressure_arr)
+            pressure_nonfinite_count = int(pressure_arr.size - int(np.count_nonzero(pressure_finite_mask)))
+            if np.any(pressure_finite_mask):
+                pressure_min = float(np.min(pressure_arr[pressure_finite_mask]))
+                pressure_max = float(np.max(pressure_arr[pressure_finite_mask]))
+            else:
+                pressure_min = float('nan')
+                pressure_max = float('nan')
+        else:
+            pressure_nonfinite_count = 0
+            pressure_min = float('nan')
+            pressure_max = float('nan')
+        df_atm.loc[0, 'solver_pressure_nonfinite_count'] = int(pressure_nonfinite_count)
+        df_atm.loc[0, 'solver_pressure_finite_ok'] = int(pressure_nonfinite_count == 0)
+        df_atm.loc[0, 'solver_pressure_min_pa'] = float(pressure_min)
+        df_atm.loc[0, 'solver_pressure_max_pa'] = float(pressure_max)
+        df_atm.loc[0, 'solver_pressure_positive_ok'] = int(
+            bool(np.isfinite(pressure_min)) and (pressure_min > 0.0)
+        )
+        mass_state_final_total_kg = float(np.sum(np.asarray(state[14:14 + N], dtype=float)))
+        mass_state_delta_kg = float(mass_state_final_total_kg - mass_state_initial_total_kg)
+        mass_atm_net_kg = float(M_from_atm - M_to_atm)
+        mass_balance_residual_kg = float(mass_state_delta_kg - mass_atm_net_kg)
+        mass_balance_residual_abs_kg = float(abs(mass_balance_residual_kg))
+        mass_balance_scale_kg = float(
+            max(
+                1e-12,
+                abs(mass_state_initial_total_kg),
+                abs(mass_state_final_total_kg),
+                abs(mass_atm_net_kg),
+            )
+        )
+        mass_balance_residual_rel = float(mass_balance_residual_abs_kg / mass_balance_scale_kg)
+        df_atm.loc[0, 'solver_mass_state_initial_kg'] = float(mass_state_initial_total_kg)
+        df_atm.loc[0, 'solver_mass_state_final_kg'] = float(mass_state_final_total_kg)
+        df_atm.loc[0, 'solver_mass_state_delta_kg'] = float(mass_state_delta_kg)
+        df_atm.loc[0, 'solver_mass_atm_net_kg'] = float(mass_atm_net_kg)
+        df_atm.loc[0, 'solver_mass_balance_residual_kg'] = float(mass_balance_residual_kg)
+        df_atm.loc[0, 'solver_mass_balance_residual_abs_kg'] = float(mass_balance_residual_abs_kg)
+        df_atm.loc[0, 'solver_mass_balance_residual_rel'] = float(mass_balance_residual_rel)
+        active_rows_ok = (active_rows > 0) if qc_require_active_rows else True
+        hmax_ok = (hmax_violation_count == 0)
+        core_ok = (core_nonfinite_count == 0)
+        pressure_finite_ok = (pressure_nonfinite_count == 0) and bool(np.isfinite(pressure_min))
+        pressure_min_ok = bool(np.isfinite(pressure_min)) and (pressure_min > qc_min_pressure_req_pa)
+        pressure_max_ok = bool(np.isfinite(pressure_max)) and (pressure_max <= qc_max_pressure_pa)
+        reject_rate_ok = bool(np.isfinite(rej_rate)) and (rej_rate <= qc_max_reject_rate)
+        mass_balance_ok = bool(np.isfinite(mass_balance_residual_abs_kg)) and bool(np.isfinite(mass_balance_residual_rel))
+        mass_balance_ok = mass_balance_ok and (mass_balance_residual_abs_kg <= qc_max_mass_balance_residual_kg)
+        mass_balance_ok = mass_balance_ok and (mass_balance_residual_rel <= qc_max_mass_balance_residual_rel)
+        df_atm.loc[0, 'solver_mass_balance_ok'] = int(mass_balance_ok)
+        runtime_qc_ok = bool(
+            active_rows_ok
+            and hmax_ok
+            and core_ok
+            and pressure_finite_ok
+            and pressure_min_ok
+            and pressure_max_ok
+            and reject_rate_ok
+            and mass_balance_ok
+        )
+        runtime_qc_msgs = []
+        if not active_rows_ok:
+            runtime_qc_msgs.append('no_active_integrator_rows')
+        if not hmax_ok:
+            runtime_qc_msgs.append(f'hmax_violation_count={hmax_violation_count}')
+        if not core_ok:
+            runtime_qc_msgs.append(f'core_nonfinite_count={core_nonfinite_count}')
+        if not pressure_finite_ok:
+            runtime_qc_msgs.append(f'pressure_nonfinite_count={pressure_nonfinite_count}')
+        if not pressure_min_ok:
+            runtime_qc_msgs.append(
+                f'pressure_min_pa={pressure_min:.6g} <= required_min_pa={qc_min_pressure_req_pa:.6g}'
+            )
+        if not pressure_max_ok:
+            runtime_qc_msgs.append(
+                f'pressure_max_pa={pressure_max:.6g} > max_pa={qc_max_pressure_pa:.6g}'
+            )
+        if not reject_rate_ok:
+            runtime_qc_msgs.append(
+                f'reject_rate={rej_rate:.6g} > max_reject_rate={qc_max_reject_rate:.6g}'
+            )
+        if not mass_balance_ok:
+            runtime_qc_msgs.append(
+                'mass_balance_residual_abs_kg='
+                f'{mass_balance_residual_abs_kg:.6g} > max_abs_kg={qc_max_mass_balance_residual_kg:.6g}'
+                f' or rel={mass_balance_residual_rel:.6g} > max_rel={qc_max_mass_balance_residual_rel:.6g}'
+            )
+        df_atm.loc[0, 'integrator_runtime_qc_min_pressure_req_pa'] = float(qc_min_pressure_req_pa)
+        df_atm.loc[0, 'integrator_runtime_qc_max_pressure_pa'] = float(qc_max_pressure_pa)
+        df_atm.loc[0, 'integrator_runtime_qc_max_reject_rate'] = float(qc_max_reject_rate)
+        df_atm.loc[0, 'integrator_runtime_qc_max_mass_balance_residual_kg'] = float(
+            qc_max_mass_balance_residual_kg
+        )
+        df_atm.loc[0, 'integrator_runtime_qc_max_mass_balance_residual_rel'] = float(
+            qc_max_mass_balance_residual_rel
+        )
+        df_atm.loc[0, 'integrator_runtime_qc_require_active_rows'] = int(qc_require_active_rows)
+        df_atm.loc[0, 'integrator_runtime_qc_ok'] = int(runtime_qc_ok)
+        df_atm.loc[0, 'integrator_runtime_qc_msg'] = 'ok' if runtime_qc_ok else '; '.join(runtime_qc_msgs)
         for _idx, _label in enumerate(integ_err_group_labels):
             df_atm.loc[0, f'интегратор_err_group_max_{_label}'] = float(integ_err_group_max_global[_idx])
             df_atm.loc[0, f'интегратор_err_reject_dominant_{_label}_N'] = int(
@@ -6054,6 +6398,33 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             df_atm.loc[0, 'интегратор_err_reject_weighted_dominant_group'] = 'none'
     except Exception:
         pass
+
+    strict_qc_raw = params.get('integrator_runtime_qc_strict', False)
+    if isinstance(strict_qc_raw, str):
+        strict_token = strict_qc_raw.strip().lower()
+        if strict_token in ("1", "true", "yes", "on"):
+            strict_qc = True
+        elif strict_token in ("0", "false", "no", "off"):
+            strict_qc = False
+        else:
+            strict_qc = False
+    else:
+        try:
+            strict_num = float(strict_qc_raw)
+            strict_qc = bool(strict_num) if np.isfinite(strict_num) else False
+        except Exception:
+            strict_qc = False
+
+    if strict_qc:
+        qc_ok = False
+        qc_msg = 'integrator_runtime_qc_not_computed'
+        try:
+            qc_ok = bool(int(df_atm.loc[0, 'integrator_runtime_qc_ok']))
+            qc_msg = str(df_atm.loc[0, 'integrator_runtime_qc_msg'])
+        except Exception:
+            qc_ok = False
+        if not qc_ok:
+            raise AssertionError(f'integrator_runtime_qc_strict: {qc_msg}')
 
     # ------------------------------------------------------------
     # Autonomous self-checks (pre/post) + attach to df_atm

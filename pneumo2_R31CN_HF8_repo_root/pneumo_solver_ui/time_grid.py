@@ -50,8 +50,12 @@ def build_time_grid(*, dt: float, t_end: float, t0: float = 0.0, mode: str = "fl
     t_end = float(t_end)
     t0 = float(t0)
 
-    if dt <= 0.0:
-        raise ValueError(f"dt must be > 0, got {dt}")
+    if (not np.isfinite(dt)) or (dt <= 0.0):
+        raise ValueError(f"dt must be finite and > 0, got {dt!r}")
+    if not np.isfinite(t_end):
+        raise ValueError(f"t_end must be finite, got {t_end!r}")
+    if not np.isfinite(t0):
+        raise ValueError(f"t0 must be finite, got {t0!r}")
 
     if t_end <= t0:
         return np.array([t0], dtype=float)

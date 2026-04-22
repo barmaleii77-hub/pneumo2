@@ -178,6 +178,15 @@ class DesktopDiagnosticsBundleRecord:
     geometry_reference_action: str = ""
     latest_clipboard_status_path: str = ""
     anim_pointer_diagnostics_path: str = ""
+    latest_animation_diagnostics_handoff_path: str = ""
+    animation_diagnostics_handoff_status: str = "MISSING"
+    animation_diagnostics_handoff_hash: str = ""
+    animation_diagnostics_selected_title: str = ""
+    animation_diagnostics_selected_path: str = ""
+    animation_diagnostics_scene_npz_path: str = ""
+    animation_diagnostics_pointer_json_path: str = ""
+    animation_diagnostics_mnemo_event_log_path: str = ""
+    animation_diagnostics_next_step: str = ""
     summary_lines: list[str] = field(default_factory=list)
     clipboard_ok: Optional[bool] = None
     clipboard_message: str = ""

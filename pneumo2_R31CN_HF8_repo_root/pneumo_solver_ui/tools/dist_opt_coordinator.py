@@ -42,11 +42,17 @@ for _p in (str(_PROJECT_ROOT), str(_PNEUMO_ROOT)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from pneumo_dist.eval_core import EvaluatorCore, sample_lhs
-from pneumo_dist.expdb import ExperimentDB
-from pneumo_dist.hv_tools import fit_normalizer, hypervolume_min, infer_reference_point_min
-from pneumo_dist.mobo_propose import propose_qnehvi, propose_random
-from pneumo_dist.trial_hash import hash_params, hash_vector, make_problem_spec, hash_problem, stable_hash_problem
+from pneumo_solver_ui.pneumo_dist.eval_core import EvaluatorCore, sample_lhs
+from pneumo_solver_ui.pneumo_dist.expdb import ExperimentDB
+from pneumo_solver_ui.pneumo_dist.hv_tools import fit_normalizer, hypervolume_min, infer_reference_point_min
+from pneumo_solver_ui.pneumo_dist.mobo_propose import propose_heuristic, propose_qnehvi, propose_random
+from pneumo_solver_ui.pneumo_dist.trial_hash import (
+    hash_params,
+    hash_vector,
+    make_problem_spec,
+    hash_problem,
+    stable_hash_problem,
+)
 from pneumo_solver_ui.optimization_problem_hash_mode import (
     normalize_problem_hash_mode,
     problem_hash_mode_from_env,
@@ -70,6 +76,8 @@ from pneumo_solver_ui.optimization_defaults import (
     DIST_OPT_DB_ENGINE_DEFAULT,
     DIST_OPT_EXPORT_EVERY_DEFAULT,
     DIST_OPT_HV_LOG_DEFAULT,
+    DIST_OPT_HEURISTIC_EXPLORE_DEFAULT,
+    DIST_OPT_HEURISTIC_POOL_SIZE_DEFAULT,
     DIST_OPT_PENALTY_KEY_DEFAULT,
     DIST_OPT_PENALTY_TOL_DEFAULT,
     DIST_OPT_RAY_RUNTIME_ENV_MODE_DEFAULT,
@@ -101,6 +109,9 @@ def build_run_record_meta(
         "backend": str(getattr(args, "backend", "")),
         "seed": int(getattr(args, "seed", 0) or 0),
         "problem_hash_mode": normalize_problem_hash_mode(problem_hash_mode, default="stable"),
+        "proposer": str(getattr(args, "proposer", "auto") or "auto"),
+        "heuristic_pool_size": int(getattr(args, "heuristic_pool_size", DIST_OPT_HEURISTIC_POOL_SIZE_DEFAULT) or DIST_OPT_HEURISTIC_POOL_SIZE_DEFAULT),
+        "heuristic_explore": float(getattr(args, "heuristic_explore", DIST_OPT_HEURISTIC_EXPLORE_DEFAULT) or DIST_OPT_HEURISTIC_EXPLORE_DEFAULT),
         "objective_contract": objective_contract_payload(
             objective_keys=objective_keys,
             penalty_key=str(getattr(args, "penalty_key", "")),
@@ -198,7 +209,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
 
     # Proposer
-    p.add_argument("--proposer", choices=["random", "qnehvi", "auto", "portfolio"], default="auto")
+    p.add_argument("--proposer", choices=["random", "heuristic", "qnehvi", "auto", "portfolio"], default="auto")
     p.add_argument("--q", type=int, default=1, help="How many candidates to propose per call")
     p.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     p.add_argument("--n-init", type=int, default=DIST_OPT_BOTORCH_N_INIT_DEFAULT, help="Minimum DONE trials before qNEHVI may be used (0=auto threshold based on dim).")
@@ -208,6 +219,18 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--botorch-maxiter", type=int, default=DIST_OPT_BOTORCH_MAXITER_DEFAULT)
     p.add_argument("--botorch-ref-margin", type=float, default=DIST_OPT_BOTORCH_REF_MARGIN_DEFAULT)
     p.add_argument("--botorch-no-normalize-objectives", action="store_true", help="Disable objective normalization before qNEHVI GP fit.")
+    p.add_argument(
+        "--heuristic-pool-size",
+        type=int,
+        default=DIST_OPT_HEURISTIC_POOL_SIZE_DEFAULT,
+        help="Candidate pool size used by heuristic proposer and fallbacks.",
+    )
+    p.add_argument(
+        "--heuristic-explore",
+        type=float,
+        default=DIST_OPT_HEURISTIC_EXPLORE_DEFAULT,
+        help="Exploration weight (0..1) for heuristic proposer and fallbacks.",
+    )
 
     # Experiment DB
     p.add_argument("--db", default="runs/expdb.sqlite", help="Path to experiment DB file (sqlite/duckdb) OR DSN for postgres (e.g. postgresql://user:pass@host:5432/dbname)")
@@ -353,18 +376,170 @@ def _parse_runtime_env_json(raw: Any) -> Dict[str, Any]:
 
 
 def _count_feasible_trials(g_rows: Sequence[Sequence[float]] | None) -> int:
-    if not g_rows:
+    if g_rows is None:
         return 0
     try:
-        arr = np.asarray(g_rows, dtype=float)
-        if arr.size == 0:
-            return 0
-        if arr.ndim == 1:
-            arr = arr.reshape(-1, 1)
-        return int(np.sum(np.all(arr <= 0.0, axis=1)))
+        rows = list(g_rows)
     except Exception:
         return 0
+    if not rows:
+        return 0
 
+    feasible = 0
+    for row in rows:
+        try:
+            arr = np.asarray(row, dtype=float).reshape(-1)
+        except Exception:
+            try:
+                arr = np.asarray([row], dtype=float).reshape(-1)
+            except Exception:
+                continue
+        if arr.size == 0:
+            continue
+        if not np.all(np.isfinite(arr)):
+            continue
+        if np.all(arr <= 0.0):
+            feasible += 1
+    return int(feasible)
+
+
+
+def _heuristic_penalty_from_constraints(g_rows: Sequence[Sequence[float]] | None) -> Optional[np.ndarray]:
+    """Convert constraint vectors (<=0 feasible) into one violation scalar per point."""
+    if g_rows is None:
+        return None
+    try:
+        rows = list(g_rows)
+    except Exception:
+        return None
+    if not rows:
+        return None
+
+    penalties: List[float] = []
+    for row in rows:
+        try:
+            arr = np.asarray(row, dtype=float).reshape(-1)
+        except Exception:
+            try:
+                arr = np.asarray([row], dtype=float).reshape(-1)
+            except Exception:
+                arr = np.asarray([], dtype=float)
+        if arr.size == 0 or not np.all(np.isfinite(arr)):
+            penalties.append(float("nan"))
+            continue
+        penalties.append(float(np.max(arr)))
+    if not penalties:
+        return None
+    return np.asarray(penalties, dtype=float)
+
+
+def _clamp_unit_interval(value: Any, *, default: float = 0.0) -> float:
+    try:
+        out = float(value)
+    except Exception:
+        out = float(default)
+    if not np.isfinite(out):
+        out = float(default)
+    if out < 0.0:
+        return 0.0
+    if out > 1.0:
+        return 1.0
+    return float(out)
+
+
+def _adaptive_heuristic_explore_weight(
+    base_explore: Any,
+    *,
+    stagnation_cycles: int,
+    rescue_limit_cycles: int,
+) -> float:
+    base = _clamp_unit_interval(
+        base_explore,
+        default=float(DIST_OPT_HEURISTIC_EXPLORE_DEFAULT),
+    )
+    stagnation = max(0, int(stagnation_cycles))
+    if stagnation <= 0:
+        return float(base)
+    limit = max(1, int(rescue_limit_cycles))
+    ratio = min(1.0, float(stagnation) / float(limit))
+    return float(min(1.0, base + (1.0 - base) * ratio))
+
+
+def _coerce_positive_int(value: Any, *, default: int = 1) -> int:
+    try:
+        out = int(value)
+    except Exception:
+        out = int(default)
+    if out <= 0:
+        out = int(default)
+    return int(max(1, out))
+
+
+def _coerce_nonnegative_int(value: Any, *, default: int = 0) -> int:
+    try:
+        out = int(value)
+    except Exception:
+        out = int(default)
+    if out < 0:
+        out = int(default)
+    return int(max(0, out))
+
+
+def _adaptive_heuristic_pool_size(
+    base_pool_size: Any,
+    *,
+    stagnation_cycles: int,
+    rescue_limit_cycles: int,
+) -> int:
+    base = _coerce_positive_int(
+        base_pool_size,
+        default=int(DIST_OPT_HEURISTIC_POOL_SIZE_DEFAULT),
+    )
+    stagnation = max(0, int(stagnation_cycles))
+    if stagnation <= 0:
+        return int(base)
+    limit = max(1, int(rescue_limit_cycles))
+    ratio = min(1.0, float(stagnation) / float(limit))
+    boosted = int(math.ceil(float(base) * (1.0 + ratio)))
+    cap = int(max(base, min(4096, 2 * base)))
+    return int(max(base, min(cap, boosted)))
+
+
+def _adaptive_heuristic_q(
+    base_q: Any,
+    *,
+    need: int,
+    stagnation_cycles: int,
+    rescue_limit_cycles: int,
+) -> int:
+    base = _coerce_positive_int(base_q, default=1)
+    need_i = _coerce_positive_int(need, default=1)
+    stagnation = max(0, int(stagnation_cycles))
+    if stagnation <= 0:
+        return int(max(need_i, base))
+    limit = max(1, int(rescue_limit_cycles))
+    ratio = min(1.0, float(stagnation) / float(limit))
+    boosted = int(math.ceil(float(base) * (1.0 + ratio)))
+    cap = int(max(base, min(64, 4 * base)))
+    effective = int(max(base, min(cap, boosted)))
+    return int(max(need_i, effective))
+
+
+def _adaptive_heuristic_buffer_target(
+    base_buffer: Any,
+    *,
+    stagnation_cycles: int,
+    rescue_limit_cycles: int,
+) -> int:
+    base = _coerce_positive_int(base_buffer, default=1)
+    stagnation = max(0, int(stagnation_cycles))
+    if stagnation <= 0:
+        return int(base)
+    limit = max(1, int(rescue_limit_cycles))
+    ratio = min(1.0, float(stagnation) / float(limit))
+    boosted = int(math.ceil(float(base) * (1.0 + ratio)))
+    cap = int(max(base, min(256, 4 * base)))
+    return int(max(base, min(cap, boosted)))
 
 
 def resolve_proposer_mode(
@@ -375,6 +550,7 @@ def resolve_proposer_mode(
     dim: int,
 ) -> Dict[str, Any]:
     requested = str(getattr(args, "proposer", "auto") or "auto").strip().lower()
+    known_modes = {"auto", "random", "heuristic", "qnehvi", "portfolio"}
     auto_n_init = max(10, 2 * (int(dim) + 1))
     n_init = int(getattr(args, "n_init", 0) or 0)
     if n_init <= 0:
@@ -386,7 +562,11 @@ def resolve_proposer_mode(
 
     mode = requested
     portfolio_enabled = requested == "portfolio"
-    if requested == "auto":
+    unsupported_requested = requested not in known_modes
+    if unsupported_requested:
+        mode = "random"
+        portfolio_enabled = False
+    elif requested == "auto":
         mode = "qnehvi" if (ready_by_done and ready_by_feasible) else "random"
     elif requested in {"qnehvi", "portfolio"} and not (ready_by_done and ready_by_feasible):
         mode = "random"
@@ -402,7 +582,17 @@ def resolve_proposer_mode(
         "min_feasible": int(min_feasible),
         "ready_by_done": bool(ready_by_done),
         "ready_by_feasible": bool(ready_by_feasible),
+        "unsupported_requested": bool(unsupported_requested),
     }
+
+
+def _random_mode_reason(mode_info: Dict[str, Any]) -> str:
+    requested = str(mode_info.get("requested") or "").strip().lower()
+    if bool(mode_info.get("unsupported_requested")):
+        return "unsupported_mode"
+    if requested == "random":
+        return "forced_random"
+    return "warmup_or_feasibility_gate"
 
 
 
@@ -624,66 +814,88 @@ def _run_ray(
 
     # ---- (R59) Proposer actors (GPU pool) ----
     proposer_actors = []
-    use_pool = (args.proposer in {"qnehvi", "auto", "portfolio"}) and (float(n_gpus) > 0.0)
+    proposer_pool_requested = 0
+    proposer_pool_disabled_reason: Optional[str] = None
+    proposer_mode = str(getattr(args, "proposer", "auto") or "auto")
+    use_pool = (proposer_mode in {"qnehvi", "auto", "portfolio"}) and (float(n_gpus) > 0.0)
     if use_pool:
         if int(args.ray_num_proposers) > 0:
             n_prop = int(args.ray_num_proposers)
         else:
             # auto: try to use all visible GPUs, but cap a bit
             n_prop = int(max(1, min(4, int(math.floor(float(n_gpus))))))
+        proposer_pool_requested = int(n_prop)
+        # Cap proposer actor count by available GPU budget.
+        # This prevents oversubscription when user asks for more proposers than can run.
+        gpp = float(getattr(args, "ray_gpus_per_proposer", 1.0) or 1.0)
+        if gpp <= 0.0:
+            gpp = 1.0
+        max_prop_by_gpu = int(math.floor(float(n_gpus) / gpp))
+        if max_prop_by_gpu <= 0:
+            n_prop = 0
+            proposer_pool_disabled_reason = "gpu_budget_insufficient"
+        else:
+            n_prop = int(max(1, min(int(n_prop), int(max_prop_by_gpu))))
+            if int(n_prop) < int(proposer_pool_requested):
+                proposer_pool_disabled_reason = "gpu_budget_capped"
 
-        @ray.remote
-        class ProposerActor:
-            def __init__(self, tag: str):
-                os.environ.setdefault("OMP_NUM_THREADS", "1")
-                os.environ.setdefault("MKL_NUM_THREADS", "1")
-                self.tag = tag
-                try:
-                    import ray as _ray
+        if n_prop > 0:
+            @ray.remote
+            class ProposerActor:
+                def __init__(self, tag: str):
+                    os.environ.setdefault("OMP_NUM_THREADS", "1")
+                    os.environ.setdefault("MKL_NUM_THREADS", "1")
+                    self.tag = tag
+                    try:
+                        import ray as _ray
 
-                    self.gpu_ids = _ray.get_gpu_ids()
-                except Exception:
-                    self.gpu_ids = []
+                        self.gpu_ids = _ray.get_gpu_ids()
+                    except Exception:
+                        self.gpu_ids = []
 
-            def propose(
-                self,
-                *,
-                X_done: np.ndarray,
-                Y_done: np.ndarray,
-                G_done: Optional[np.ndarray],
-                X_pending: Optional[np.ndarray],
-                q: int,
-                seed: int,
-                device: str,
-                normalize_objectives: bool = True,
-                ref_margin: float = 0.10,
-                num_restarts: int = 10,
-                raw_samples: int = 512,
-                maxiter: int = 200,
-            ):
-                pr = propose_qnehvi(
-                    X_done=X_done,
-                    Y_min_done=Y_done,
-                    G_min_done=G_done,
-                    q=int(q),
-                    seed=int(seed),
-                    X_pending=X_pending,
-                    device=device,
-                    normalize_objectives=bool(normalize_objectives),
-                    ref_margin=float(ref_margin),
-                    num_restarts=int(num_restarts),
-                    raw_samples=int(raw_samples),
-                    maxiter=int(maxiter),
-                )
-                meta = dict(pr.meta)
-                meta["actor"] = self.tag
-                meta["gpu_ids"] = list(self.gpu_ids)
-                return pr.X, meta
+                def propose(
+                    self,
+                    *,
+                    X_done: np.ndarray,
+                    Y_done: np.ndarray,
+                    G_done: Optional[np.ndarray],
+                    X_pending: Optional[np.ndarray],
+                    q: int,
+                    seed: int,
+                    device: str,
+                    normalize_objectives: bool = True,
+                    ref_margin: float = 0.10,
+                    num_restarts: int = 10,
+                    raw_samples: int = 512,
+                    maxiter: int = 200,
+                ):
+                    pr = propose_qnehvi(
+                        X_done=X_done,
+                        Y_min_done=Y_done,
+                        G_min_done=G_done,
+                        q=int(q),
+                        seed=int(seed),
+                        X_pending=X_pending,
+                        device=device,
+                        normalize_objectives=bool(normalize_objectives),
+                        ref_margin=float(ref_margin),
+                        num_restarts=int(num_restarts),
+                        raw_samples=int(raw_samples),
+                        maxiter=int(maxiter),
+                    )
+                    meta = dict(pr.meta)
+                    meta["actor"] = self.tag
+                    meta["gpu_ids"] = list(self.gpu_ids)
+                    return pr.X, meta
 
-        proposer_actors = [
-            ProposerActor.options(num_gpus=float(args.ray_gpus_per_proposer)).remote(f"prop_{i}")
-            for i in range(n_prop)
-        ]
+            proposer_actors = [
+                ProposerActor.options(num_gpus=float(args.ray_gpus_per_proposer)).remote(f"prop_{i}")
+                for i in range(n_prop)
+            ]
+    proposer_pool_effective = int(len(proposer_actors))
+    proposer_pool_enabled = bool(proposer_pool_effective > 0)
+    if proposer_pool_enabled:
+        proposer_pool_disabled_reason = None
 
     rng = np.random.default_rng(int(args.seed))
 
@@ -691,6 +903,7 @@ def _run_ray(
     X_done: List[List[float]] = []
     Y_done: List[List[float]] = []
     G_done: List[List[float]] = []
+    counted_done_trial_ids: set[str] = set()
 
     done_rows = db.fetch_done_trials(run_id)
     for r in done_rows:
@@ -700,12 +913,43 @@ def _run_ray(
         Y_done.append(list(r["y"]))
         if isinstance(r.get("g"), list):
             G_done.append(list(r["g"]))
+        tid = str(r.get("trial_id") or "").strip()
+        if tid:
+            counted_done_trial_ids.add(tid)
 
     done_success = len(X_done)
     budget = int(args.budget)
+    dim = int(core_local.dim())
+    stall_rescue_limit_cycles = max(8, 2 * max(1, dim))
+    stall_rescue_count = 0
+    stall_last_cycles = 0
+    stall_terminated = False
+    stagnation_cycles = 0
+    dedup_skip_done_count = 0
+    dedup_skip_running_count = 0
+    dedup_skip_inflight_count = 0
+    proposer_effective_mode_counts: Dict[str, int] = {}
+    proposer_reason_counts: Dict[str, int] = {}
+    base_heuristic_buffer = int(max(0, int(getattr(args, "proposer_buffer", 0) or 0)))
+    heuristic_buffer_last_effective = int(base_heuristic_buffer)
+    heuristic_buffer_boost_events = 0
+    base_heuristic_q = _coerce_positive_int(getattr(args, "q", 1), default=1)
+    heuristic_q_last_effective = int(base_heuristic_q)
+    heuristic_q_boost_events = 0
+    base_heuristic_pool_size = _coerce_positive_int(
+        getattr(args, "heuristic_pool_size", DIST_OPT_HEURISTIC_POOL_SIZE_DEFAULT),
+        default=int(DIST_OPT_HEURISTIC_POOL_SIZE_DEFAULT),
+    )
+    heuristic_pool_size_last_effective = int(base_heuristic_pool_size)
+    heuristic_pool_size_boost_events = 0
+    base_heuristic_explore = _clamp_unit_interval(
+        getattr(args, "heuristic_explore", DIST_OPT_HEURISTIC_EXPLORE_DEFAULT),
+        default=float(DIST_OPT_HEURISTIC_EXPLORE_DEFAULT),
+    )
+    heuristic_explore_last_effective = float(base_heuristic_explore)
+    heuristic_explore_boost_events = 0
     seed_vectors, seed_meta = _load_seed_vectors(core_local, getattr(args, "seed_json", ""))
     _dump_json(run_dir / "seed_info.json", dict(seed_meta))
-    seed_queue = [] if bool(args.resume) else list(seed_vectors)
     seed_queue = [] if bool(args.resume) else list(seed_vectors)
 
     # Resume: requeue stale and pick up pending from DB
@@ -717,28 +961,62 @@ def _run_ray(
     pending_rows = db.fetch_trials(run_id, status="PENDING") if args.resume else []
 
     # ---- Run metadata ----
-    _dump_json(
-        run_dir / "run_spec.json",
-        {
-            "run_id": run_id,
-            "backend": "ray",
-            "dim": int(core_local.dim()),
-            "objective_keys": list(objective_keys),
-            "penalty_key": str(args.penalty_key),
-            "penalty_tol": float(args.penalty_tol),
-            "seed": int(args.seed),
-            "max_inflight": int(max_inflight),
-            "ray_address": addr,
-            "ray_runtime_env": runtime_env,
-            "ray_cluster_resources": cluster,
-            "ray_num_evaluators": int(n_eval),
-            "ray_num_proposers": len(proposer_actors),
-            "seed_json": str(seed_meta.get("seed_json") or ""),
-            "seed_loaded": int(seed_meta.get("loaded") or 0),
-            "seed_invalid": int(seed_meta.get("invalid") or 0),
-            "seed_duplicates": int(seed_meta.get("duplicates") or 0),
-        },
-    )
+    run_spec_path = run_dir / "run_spec.json"
+    run_spec_payload: Dict[str, Any] = {
+        "run_id": run_id,
+        "backend": "ray",
+        "dim": int(dim),
+        "objective_keys": list(objective_keys),
+        "penalty_key": str(args.penalty_key),
+        "penalty_tol": float(args.penalty_tol),
+        "seed": int(args.seed),
+        "max_inflight": int(max_inflight),
+        "proposer": proposer_mode,
+        "q": int(getattr(args, "q", 1) or 1),
+        "n_init": int(args.n_init),
+        "min_feasible": _coerce_nonnegative_int(
+            getattr(args, "min_feasible", DIST_OPT_BOTORCH_MIN_FEASIBLE_DEFAULT),
+            default=int(DIST_OPT_BOTORCH_MIN_FEASIBLE_DEFAULT),
+        ),
+        "heuristic_buffer_base": int(base_heuristic_buffer),
+        "heuristic_buffer_last_effective": int(heuristic_buffer_last_effective),
+        "heuristic_buffer_boost_events": int(heuristic_buffer_boost_events),
+        "heuristic_q_base": int(base_heuristic_q),
+        "heuristic_q_last_effective": int(heuristic_q_last_effective),
+        "heuristic_q_boost_events": int(heuristic_q_boost_events),
+        "heuristic_pool_size": int(getattr(args, "heuristic_pool_size", DIST_OPT_HEURISTIC_POOL_SIZE_DEFAULT) or DIST_OPT_HEURISTIC_POOL_SIZE_DEFAULT),
+        "heuristic_pool_size_base": int(base_heuristic_pool_size),
+        "heuristic_pool_size_last_effective": int(heuristic_pool_size_last_effective),
+        "heuristic_pool_size_boost_events": int(heuristic_pool_size_boost_events),
+        "heuristic_explore": float(getattr(args, "heuristic_explore", DIST_OPT_HEURISTIC_EXPLORE_DEFAULT) or DIST_OPT_HEURISTIC_EXPLORE_DEFAULT),
+        "heuristic_explore_base": float(base_heuristic_explore),
+        "heuristic_explore_last_effective": float(heuristic_explore_last_effective),
+        "heuristic_explore_boost_events": int(heuristic_explore_boost_events),
+        "ray_address": addr,
+        "ray_runtime_env": runtime_env,
+        "ray_cluster_resources": cluster,
+        "ray_num_evaluators": int(n_eval),
+        "ray_num_proposers": int(proposer_pool_effective),
+        "ray_num_proposers_requested": int(proposer_pool_requested),
+        "ray_proposer_pool_enabled": bool(proposer_pool_enabled),
+        "ray_proposer_pool_disabled_reason": proposer_pool_disabled_reason,
+        "seed_json": str(seed_meta.get("seed_json") or ""),
+        "seed_loaded": int(seed_meta.get("loaded") or 0),
+        "seed_invalid": int(seed_meta.get("invalid") or 0),
+        "seed_duplicates": int(seed_meta.get("duplicates") or 0),
+        "stall_rescue_limit_cycles": int(stall_rescue_limit_cycles),
+        "stall_rescue_count": int(stall_rescue_count),
+        "stall_last_cycles": int(stall_last_cycles),
+        "stall_terminated": bool(stall_terminated),
+        "dedup_skip_done_count": int(dedup_skip_done_count),
+        "dedup_skip_running_count": int(dedup_skip_running_count),
+        "dedup_skip_inflight_count": int(dedup_skip_inflight_count),
+        "dedup_skip_total": int(dedup_skip_done_count + dedup_skip_running_count + dedup_skip_inflight_count),
+        "proposer_effective_mode_counts": dict(proposer_effective_mode_counts),
+        "proposer_reason_counts": dict(proposer_reason_counts),
+        "proposer_meta_events": int(sum(int(v) for v in proposer_effective_mode_counts.values())),
+    }
+    _dump_json(run_spec_path, run_spec_payload)
 
     print(
         f"[RAY] run_id={run_id} dim={core_local.dim()} budget={budget} done={done_success} "
@@ -750,7 +1028,6 @@ def _run_ray(
     candidate_buf.extend(list(x_u) for x_u in seed_queue)
 
     # Seed LHS warmup for a new run
-    dim = int(core_local.dim())
     auto_n_init = max(8, 2 * (dim + 1))
     lhs_target = max(auto_n_init, int(getattr(args, "n_init", 0) or 0))
     lhs_pool_n = max(0, int(lhs_target - done_success - len(seed_queue)))
@@ -764,9 +1041,109 @@ def _run_ray(
         if isinstance(pr.get("x_u"), list) and isinstance(pr.get("trial_id"), str):
             candidate_buf.append(list(pr["x_u"]))
 
+    def _sync_run_spec_stall() -> None:
+        run_spec_payload["stall_rescue_count"] = int(stall_rescue_count)
+        run_spec_payload["stall_last_cycles"] = int(stall_last_cycles)
+        run_spec_payload["stall_terminated"] = bool(stall_terminated)
+        run_spec_payload["dedup_skip_done_count"] = int(dedup_skip_done_count)
+        run_spec_payload["dedup_skip_running_count"] = int(dedup_skip_running_count)
+        run_spec_payload["dedup_skip_inflight_count"] = int(dedup_skip_inflight_count)
+        run_spec_payload["dedup_skip_total"] = int(
+            dedup_skip_done_count + dedup_skip_running_count + dedup_skip_inflight_count
+        )
+        run_spec_payload["proposer_effective_mode_counts"] = dict(proposer_effective_mode_counts)
+        run_spec_payload["proposer_reason_counts"] = dict(proposer_reason_counts)
+        run_spec_payload["proposer_meta_events"] = int(
+            sum(int(v) for v in proposer_effective_mode_counts.values())
+        )
+        run_spec_payload["heuristic_buffer_base"] = int(base_heuristic_buffer)
+        run_spec_payload["heuristic_buffer_last_effective"] = int(heuristic_buffer_last_effective)
+        run_spec_payload["heuristic_buffer_boost_events"] = int(heuristic_buffer_boost_events)
+        run_spec_payload["heuristic_q_base"] = int(base_heuristic_q)
+        run_spec_payload["heuristic_q_last_effective"] = int(heuristic_q_last_effective)
+        run_spec_payload["heuristic_q_boost_events"] = int(heuristic_q_boost_events)
+        run_spec_payload["heuristic_pool_size_base"] = int(base_heuristic_pool_size)
+        run_spec_payload["heuristic_pool_size_last_effective"] = int(heuristic_pool_size_last_effective)
+        run_spec_payload["heuristic_pool_size_boost_events"] = int(heuristic_pool_size_boost_events)
+        run_spec_payload["heuristic_explore_base"] = float(base_heuristic_explore)
+        run_spec_payload["heuristic_explore_last_effective"] = float(heuristic_explore_last_effective)
+        run_spec_payload["heuristic_explore_boost_events"] = int(heuristic_explore_boost_events)
+        _dump_json(run_spec_path, run_spec_payload)
+        _sync_last_proposer_meta_diag()
+
+    last_meta_path = run_dir / "last_proposer_meta.json"
+    last_proposer_meta: Dict[str, Any] = {}
+
+    def _sync_last_proposer_meta_diag() -> None:
+        diag_nonzero = bool(
+            (stall_rescue_count > 0)
+            or (stall_last_cycles > 0)
+            or bool(stall_terminated)
+            or (dedup_skip_done_count > 0)
+            or (dedup_skip_running_count > 0)
+            or (dedup_skip_inflight_count > 0)
+        )
+        payload = dict(last_proposer_meta or {})
+        if not payload and last_meta_path.exists():
+            try:
+                loaded = json.loads(last_meta_path.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    payload = dict(loaded)
+            except Exception:
+                payload = {}
+        if not payload and not diag_nonzero:
+            return
+        if not payload:
+            payload = {
+                "requested_mode": str(getattr(args, "proposer", "") or ""),
+                "effective_mode": "random",
+                "reason": "runtime_diagnostics_sync",
+            }
+        payload["stall_rescue_limit_cycles"] = int(stall_rescue_limit_cycles)
+        payload["stall_rescue_count"] = int(stall_rescue_count)
+        payload["stall_stagnation_cycles"] = int(stagnation_cycles)
+        payload["stall_terminated"] = bool(stall_terminated)
+        payload["dedup_skip_done_count"] = int(dedup_skip_done_count)
+        payload["dedup_skip_running_count"] = int(dedup_skip_running_count)
+        payload["dedup_skip_inflight_count"] = int(dedup_skip_inflight_count)
+        payload["dedup_skip_total"] = int(
+            dedup_skip_done_count + dedup_skip_running_count + dedup_skip_inflight_count
+        )
+        payload["heuristic_buffer_base"] = int(base_heuristic_buffer)
+        payload["heuristic_buffer_last_effective"] = int(heuristic_buffer_last_effective)
+        payload["heuristic_buffer_boost_events"] = int(heuristic_buffer_boost_events)
+        payload["heuristic_q_base"] = int(base_heuristic_q)
+        payload["heuristic_q_last_effective"] = int(heuristic_q_last_effective)
+        payload["heuristic_q_boost_events"] = int(heuristic_q_boost_events)
+        payload["heuristic_pool_size_base"] = int(base_heuristic_pool_size)
+        payload["heuristic_pool_size_last_effective"] = int(heuristic_pool_size_last_effective)
+        payload["heuristic_pool_size_boost_events"] = int(heuristic_pool_size_boost_events)
+        payload["heuristic_explore_base"] = float(base_heuristic_explore)
+        payload["heuristic_explore_last_effective"] = float(heuristic_explore_last_effective)
+        payload["heuristic_explore_boost_events"] = int(heuristic_explore_boost_events)
+        _write_text(last_meta_path, json.dumps(payload, ensure_ascii=False, indent=2))
+
+    def _write_last_proposer_meta(meta_out: Dict[str, Any]) -> None:
+        nonlocal last_proposer_meta
+        last_proposer_meta = dict(meta_out or {})
+        mode_key = str(last_proposer_meta.get("effective_mode") or "").strip().lower()
+        if mode_key:
+            proposer_effective_mode_counts[mode_key] = int(proposer_effective_mode_counts.get(mode_key, 0) + 1)
+        reason_key = str(
+            last_proposer_meta.get("reason")
+            or last_proposer_meta.get("fallback_reason")
+            or ""
+        ).strip().lower()
+        if reason_key:
+            proposer_reason_counts[reason_key] = int(proposer_reason_counts.get(reason_key, 0) + 1)
+        _sync_last_proposer_meta_diag()
+
     # Helper: fill buffer using proposers / local
     def fill_buffer():
-        nonlocal lhs_i
+        nonlocal lhs_i, heuristic_explore_last_effective, heuristic_explore_boost_events
+        nonlocal heuristic_buffer_last_effective, heuristic_buffer_boost_events
+        nonlocal heuristic_q_last_effective, heuristic_q_boost_events
+        nonlocal heuristic_pool_size_last_effective, heuristic_pool_size_boost_events
         target = int(max(0, args.proposer_buffer))
         if len(candidate_buf) >= target:
             return
@@ -793,6 +1170,59 @@ def _run_ray(
         )
         prop_mode = str(mode_info["mode"])
         want_portfolio = bool(mode_info["portfolio_enabled"])
+        pool_fallback_error: Optional[str] = None
+
+        def _next_heuristic_explore() -> float:
+            nonlocal heuristic_explore_last_effective, heuristic_explore_boost_events
+            effective = _adaptive_heuristic_explore_weight(
+                base_heuristic_explore,
+                stagnation_cycles=stagnation_cycles,
+                rescue_limit_cycles=stall_rescue_limit_cycles,
+            )
+            heuristic_explore_last_effective = float(effective)
+            if effective > (base_heuristic_explore + 1e-12):
+                heuristic_explore_boost_events += 1
+            return float(effective)
+
+        def _next_heuristic_pool_size() -> int:
+            nonlocal heuristic_pool_size_last_effective, heuristic_pool_size_boost_events
+            effective = _adaptive_heuristic_pool_size(
+                base_heuristic_pool_size,
+                stagnation_cycles=stagnation_cycles,
+                rescue_limit_cycles=stall_rescue_limit_cycles,
+            )
+            heuristic_pool_size_last_effective = int(effective)
+            if int(effective) > int(base_heuristic_pool_size):
+                heuristic_pool_size_boost_events += 1
+            return int(effective)
+
+        def _next_heuristic_q(*, need: int) -> int:
+            nonlocal heuristic_q_last_effective, heuristic_q_boost_events
+            effective = _adaptive_heuristic_q(
+                base_heuristic_q,
+                need=int(need),
+                stagnation_cycles=stagnation_cycles,
+                rescue_limit_cycles=stall_rescue_limit_cycles,
+            )
+            heuristic_q_last_effective = int(effective)
+            if int(effective) > int(base_heuristic_q):
+                heuristic_q_boost_events += 1
+            return int(effective)
+
+        def _next_heuristic_buffer() -> int:
+            nonlocal heuristic_buffer_last_effective, heuristic_buffer_boost_events
+            if int(base_heuristic_buffer) <= 0:
+                heuristic_buffer_last_effective = 0
+                return 0
+            effective = _adaptive_heuristic_buffer_target(
+                int(max(1, base_heuristic_buffer)),
+                stagnation_cycles=stagnation_cycles,
+                rescue_limit_cycles=stall_rescue_limit_cycles,
+            )
+            heuristic_buffer_last_effective = int(effective)
+            if int(effective) > int(base_heuristic_buffer):
+                heuristic_buffer_boost_events += 1
+            return int(effective)
 
         # If we have GPU proposer pool and mode includes qNEHVI, ask actors
         if proposer_actors and (prop_mode in {"qnehvi"} or want_portfolio):
@@ -803,33 +1233,53 @@ def _run_ray(
             Yd = np.asarray(Y_done, dtype=float) if Y_done else np.zeros((0, len(objective_keys)), dtype=float)
             Gd = np.asarray(G_done, dtype=float) if G_done else None
 
-            futures = []
+            actor_futures: List[Tuple[Any, Any]] = []
             for i, pa in enumerate(proposer_actors):
                 seed_i = int(rng.integers(0, 2**31 - 1))
-                futures.append(
-                    pa.propose.remote(
-                        X_done=Xd,
-                        Y_done=Yd,
-                        G_done=Gd,
-                        X_pending=X_pending,
-                        q=per_actor,
-                        seed=seed_i,
-                        device=str(args.device),
-                        normalize_objectives=not bool(getattr(args, "botorch_no_normalize_objectives", False)),
-                        ref_margin=float(getattr(args, "botorch_ref_margin", 0.10)),
-                        num_restarts=int(getattr(args, "botorch_num_restarts", 10)),
-                        raw_samples=int(getattr(args, "botorch_raw_samples", 512)),
-                        maxiter=int(getattr(args, "botorch_maxiter", 200)),
+                actor_futures.append(
+                    (
+                        pa,
+                        pa.propose.remote(
+                            X_done=Xd,
+                            Y_done=Yd,
+                            G_done=Gd,
+                            X_pending=X_pending,
+                            q=per_actor,
+                            seed=seed_i,
+                            device=str(args.device),
+                            normalize_objectives=not bool(getattr(args, "botorch_no_normalize_objectives", False)),
+                            ref_margin=float(getattr(args, "botorch_ref_margin", 0.10)),
+                            num_restarts=int(getattr(args, "botorch_num_restarts", 10)),
+                            raw_samples=int(getattr(args, "botorch_raw_samples", 512)),
+                            maxiter=int(getattr(args, "botorch_maxiter", 200)),
+                        ),
                     )
                 )
-            results = ray.get(futures)
-            for X_new, meta in results:
+            results: List[Tuple[np.ndarray, Any]] = []
+            pool_errors: List[str] = []
+            alive_actors: List[Any] = []
+            for pa, fut in actor_futures:
                 try:
-                    X_new = np.asarray(X_new, dtype=float)
-                except Exception:
-                    continue
+                    got = ray.get(fut)
+                    if not (isinstance(got, (tuple, list)) and len(got) == 2):
+                        raise ValueError("invalid proposer pool result")
+                    X_new = np.asarray(got[0], dtype=float)
+                    results.append((X_new, got[1]))
+                    alive_actors.append(pa)
+                except Exception as pool_exc:
+                    pool_errors.append(f"{type(pool_exc).__name__}: {pool_exc}")
+            if pool_errors:
+                # Degrade gracefully: drop failing actors; if none left, continue with local fallback.
+                proposer_actors[:] = list(alive_actors)
+                if len(pool_errors) == 1:
+                    pool_fallback_error = pool_errors[0]
+                else:
+                    pool_fallback_error = f"{pool_errors[0]} (+{len(pool_errors) - 1} more)"
+            pool_added = False
+            for X_new, meta in results:
                 for x_u in X_new.tolist():
                     candidate_buf.append(list(x_u))
+                    pool_added = True
                 meta_out = dict(meta or {})
                 meta_out["requested_mode"] = mode_info["requested"]
                 meta_out["effective_mode"] = mode_info["mode"]
@@ -837,47 +1287,183 @@ def _run_ray(
                 meta_out["min_feasible"] = mode_info["min_feasible"]
                 meta_out["ready_by_done"] = mode_info["ready_by_done"]
                 meta_out["ready_by_feasible"] = mode_info["ready_by_feasible"]
-                _write_text(run_dir / "last_proposer_meta.json", json.dumps(meta_out, ensure_ascii=False, indent=2))
+                if pool_fallback_error:
+                    meta_out["pool_fallback_error"] = pool_fallback_error
+                _write_last_proposer_meta(meta_out)
 
-            # Portfolio: add some random points too
-            if want_portfolio:
+            # Portfolio blend is added when we obtained at least one pool proposal.
+            if want_portfolio and pool_added:
                 n_rand = max(1, need // 4)
                 Xr = propose_random(d=dim, q=int(n_rand), seed=int(rng.integers(0, 2**31 - 1))).X
                 for x_u in Xr.tolist():
                     candidate_buf.append(list(x_u))
 
-            return
+            if candidate_buf and (pool_added or not pool_fallback_error):
+                return
 
         # No proposer pool (or random): run locally
         need = max(1, target - len(candidate_buf))
-        if prop_mode == "qnehvi":
-            pr = propose_qnehvi(
-                X_done=np.asarray(X_done, dtype=float) if X_done else np.zeros((0, dim), dtype=float),
-                Y_min_done=np.asarray(Y_done, dtype=float) if Y_done else np.zeros((0, len(objective_keys)), dtype=float),
-                G_min_done=np.asarray(G_done, dtype=float) if G_done else None,
-                q=int(need),
-                seed=int(rng.integers(0, 2**31 - 1)),
-                X_pending=X_pending,
-                device=str(args.device),
-                normalize_objectives=not bool(getattr(args, "botorch_no_normalize_objectives", False)),
-                ref_margin=float(getattr(args, "botorch_ref_margin", 0.10)),
-                num_restarts=int(getattr(args, "botorch_num_restarts", 10)),
-                raw_samples=int(getattr(args, "botorch_raw_samples", 512)),
-                maxiter=int(getattr(args, "botorch_maxiter", 200)),
-            )
-            meta_out = dict(pr.meta or {})
-            meta_out["requested_mode"] = mode_info["requested"]
-            meta_out["effective_mode"] = mode_info["mode"]
-            meta_out["n_init"] = mode_info["n_init"]
-            meta_out["min_feasible"] = mode_info["min_feasible"]
-            meta_out["ready_by_done"] = mode_info["ready_by_done"]
-            meta_out["ready_by_feasible"] = mode_info["ready_by_feasible"]
-            for x_u in pr.X.tolist():
-                candidate_buf.append(list(x_u))
-            _write_text(run_dir / "last_proposer_meta.json", json.dumps(meta_out, ensure_ascii=False, indent=2))
-            return
+        if prop_mode in {"qnehvi", "portfolio"}:
+            try:
+                pr = propose_qnehvi(
+                    X_done=np.asarray(X_done, dtype=float) if X_done else np.zeros((0, dim), dtype=float),
+                    Y_min_done=np.asarray(Y_done, dtype=float) if Y_done else np.zeros((0, len(objective_keys)), dtype=float),
+                    G_min_done=np.asarray(G_done, dtype=float) if G_done else None,
+                    q=int(need),
+                    seed=int(rng.integers(0, 2**31 - 1)),
+                    X_pending=X_pending,
+                    device=str(args.device),
+                    normalize_objectives=not bool(getattr(args, "botorch_no_normalize_objectives", False)),
+                    ref_margin=float(getattr(args, "botorch_ref_margin", 0.10)),
+                    num_restarts=int(getattr(args, "botorch_num_restarts", 10)),
+                    raw_samples=int(getattr(args, "botorch_raw_samples", 512)),
+                    maxiter=int(getattr(args, "botorch_maxiter", 200)),
+                )
+                meta_out = dict(pr.meta or {})
+                meta_out["requested_mode"] = mode_info["requested"]
+                meta_out["effective_mode"] = mode_info["mode"]
+                meta_out["n_init"] = mode_info["n_init"]
+                meta_out["min_feasible"] = mode_info["min_feasible"]
+                meta_out["ready_by_done"] = mode_info["ready_by_done"]
+                meta_out["ready_by_feasible"] = mode_info["ready_by_feasible"]
+                if pool_fallback_error:
+                    meta_out["pool_fallback_error"] = pool_fallback_error
+                for x_u in pr.X.tolist():
+                    candidate_buf.append(list(x_u))
+                _write_last_proposer_meta(meta_out)
+                if want_portfolio:
+                    n_rand = max(1, need // 4)
+                    Xr = propose_random(d=dim, q=int(n_rand), seed=int(rng.integers(0, 2**31 - 1))).X
+                    for x_u in Xr.tolist():
+                        candidate_buf.append(list(x_u))
+                return
+            except Exception as q_exc:
+                try:
+                    heuristic_buffer_effective = _next_heuristic_buffer()
+                    heuristic_need = int(max(1, heuristic_buffer_effective - len(candidate_buf)))
+                    heuristic_q_effective = _next_heuristic_q(need=heuristic_need)
+                    heuristic_explore_effective = _next_heuristic_explore()
+                    heuristic_pool_size_effective = _next_heuristic_pool_size()
+                    pr = propose_heuristic(
+                        X_done=np.asarray(X_done, dtype=float) if X_done else np.zeros((0, dim), dtype=float),
+                        Y_min_done=np.asarray(Y_done, dtype=float) if Y_done else np.zeros((0, len(objective_keys)), dtype=float),
+                        penalty=_heuristic_penalty_from_constraints(G_done),
+                        q=int(heuristic_q_effective),
+                        seed=int(rng.integers(0, 2**31 - 1)),
+                        X_pending=X_pending,
+                        feasible_tol=float(args.penalty_tol),
+                        pool_size=int(heuristic_pool_size_effective),
+                        explore_weight=float(heuristic_explore_effective),
+                    )
+                    meta_out = dict(pr.meta or {})
+                    meta_out["requested_mode"] = mode_info["requested"]
+                    meta_out["effective_mode"] = "heuristic"
+                    meta_out["n_init"] = mode_info["n_init"]
+                    meta_out["min_feasible"] = mode_info["min_feasible"]
+                    meta_out["ready_by_done"] = mode_info["ready_by_done"]
+                    meta_out["ready_by_feasible"] = mode_info["ready_by_feasible"]
+                    meta_out["fallback_reason"] = "qnehvi_failed"
+                    meta_out["fallback_error"] = f"{type(q_exc).__name__}: {q_exc}"
+                    meta_out["heuristic_buffer_base"] = int(base_heuristic_buffer)
+                    meta_out["heuristic_buffer_effective"] = int(heuristic_buffer_effective)
+                    meta_out["heuristic_q_base"] = int(base_heuristic_q)
+                    meta_out["heuristic_q_effective"] = int(heuristic_q_effective)
+                    meta_out["heuristic_pool_size_base"] = int(base_heuristic_pool_size)
+                    meta_out["heuristic_pool_size_effective"] = int(heuristic_pool_size_effective)
+                    meta_out["heuristic_explore_base"] = float(base_heuristic_explore)
+                    meta_out["heuristic_explore_effective"] = float(heuristic_explore_effective)
+                    meta_out["heuristic_explore_stagnation_cycles"] = int(stagnation_cycles)
+                    if pool_fallback_error:
+                        meta_out["pool_fallback_error"] = pool_fallback_error
+                    for x_u in pr.X.tolist():
+                        candidate_buf.append(list(x_u))
+                    _write_last_proposer_meta(meta_out)
+                    if want_portfolio:
+                        n_rand = max(1, need // 4)
+                        Xr = propose_random(d=dim, q=int(n_rand), seed=int(rng.integers(0, 2**31 - 1))).X
+                        for x_u in Xr.tolist():
+                            candidate_buf.append(list(x_u))
+                    return
+                except Exception as h_exc:
+                    meta_out = {
+                        "requested_mode": mode_info["requested"],
+                        "effective_mode": "random",
+                        "n_init": mode_info["n_init"],
+                        "min_feasible": mode_info["min_feasible"],
+                        "ready_by_done": mode_info["ready_by_done"],
+                        "ready_by_feasible": mode_info["ready_by_feasible"],
+                        "reason": "qnehvi_and_heuristic_failed",
+                        "fallback_error": f"{type(q_exc).__name__}: {q_exc}; {type(h_exc).__name__}: {h_exc}",
+                    }
+                    if pool_fallback_error:
+                        meta_out["pool_fallback_error"] = pool_fallback_error
+                    _write_last_proposer_meta(meta_out)
+                    Xr = propose_random(d=dim, q=int(need), seed=int(rng.integers(0, 2**31 - 1))).X
+                    for x_u in Xr.tolist():
+                        candidate_buf.append(list(x_u))
+                    if want_portfolio:
+                        n_rand = max(1, need // 4)
+                        Xr2 = propose_random(d=dim, q=int(n_rand), seed=int(rng.integers(0, 2**31 - 1))).X
+                        for x_u in Xr2.tolist():
+                            candidate_buf.append(list(x_u))
+                    return
+        if prop_mode == "heuristic":
+            try:
+                heuristic_buffer_effective = _next_heuristic_buffer()
+                heuristic_need = int(max(1, heuristic_buffer_effective - len(candidate_buf)))
+                heuristic_q_effective = _next_heuristic_q(need=heuristic_need)
+                heuristic_explore_effective = _next_heuristic_explore()
+                heuristic_pool_size_effective = _next_heuristic_pool_size()
+                pr = propose_heuristic(
+                    X_done=np.asarray(X_done, dtype=float) if X_done else np.zeros((0, dim), dtype=float),
+                    Y_min_done=np.asarray(Y_done, dtype=float) if Y_done else np.zeros((0, len(objective_keys)), dtype=float),
+                    penalty=_heuristic_penalty_from_constraints(G_done),
+                    q=int(heuristic_q_effective),
+                    seed=int(rng.integers(0, 2**31 - 1)),
+                    X_pending=X_pending,
+                    feasible_tol=float(args.penalty_tol),
+                    pool_size=int(heuristic_pool_size_effective),
+                    explore_weight=float(heuristic_explore_effective),
+                )
+                meta_out = dict(pr.meta or {})
+                meta_out["requested_mode"] = mode_info["requested"]
+                meta_out["effective_mode"] = mode_info["mode"]
+                meta_out["n_init"] = mode_info["n_init"]
+                meta_out["min_feasible"] = mode_info["min_feasible"]
+                meta_out["ready_by_done"] = mode_info["ready_by_done"]
+                meta_out["ready_by_feasible"] = mode_info["ready_by_feasible"]
+                meta_out["heuristic_buffer_base"] = int(base_heuristic_buffer)
+                meta_out["heuristic_buffer_effective"] = int(heuristic_buffer_effective)
+                meta_out["heuristic_q_base"] = int(base_heuristic_q)
+                meta_out["heuristic_q_effective"] = int(heuristic_q_effective)
+                meta_out["heuristic_pool_size_base"] = int(base_heuristic_pool_size)
+                meta_out["heuristic_pool_size_effective"] = int(heuristic_pool_size_effective)
+                meta_out["heuristic_explore_base"] = float(base_heuristic_explore)
+                meta_out["heuristic_explore_effective"] = float(heuristic_explore_effective)
+                meta_out["heuristic_explore_stagnation_cycles"] = int(stagnation_cycles)
+                for x_u in pr.X.tolist():
+                    candidate_buf.append(list(x_u))
+                _write_last_proposer_meta(meta_out)
+                return
+            except Exception as h_exc:
+                meta_out = {
+                    "requested_mode": mode_info["requested"],
+                    "effective_mode": "random",
+                    "n_init": mode_info["n_init"],
+                    "min_feasible": mode_info["min_feasible"],
+                    "ready_by_done": mode_info["ready_by_done"],
+                    "ready_by_feasible": mode_info["ready_by_feasible"],
+                    "reason": "heuristic_failed",
+                    "fallback_error": f"{type(h_exc).__name__}: {h_exc}",
+                }
+                _write_last_proposer_meta(meta_out)
+                Xr = propose_random(d=dim, q=int(need), seed=int(rng.integers(0, 2**31 - 1))).X
+                for x_u in Xr.tolist():
+                    candidate_buf.append(list(x_u))
+                return
 
         # random fallback
+        random_reason = _random_mode_reason(mode_info)
         meta_out = {
             "requested_mode": mode_info["requested"],
             "effective_mode": prop_mode,
@@ -885,9 +1471,9 @@ def _run_ray(
             "min_feasible": mode_info["min_feasible"],
             "ready_by_done": mode_info["ready_by_done"],
             "ready_by_feasible": mode_info["ready_by_feasible"],
-            "reason": "warmup_or_feasibility_gate",
+            "reason": random_reason,
         }
-        _write_text(run_dir / "last_proposer_meta.json", json.dumps(meta_out, ensure_ascii=False, indent=2))
+        _write_last_proposer_meta(meta_out)
         Xr = propose_random(d=dim, q=int(need), seed=int(rng.integers(0, 2**31 - 1))).X
         for x_u in Xr.tolist():
             candidate_buf.append(list(x_u))
@@ -896,6 +1482,15 @@ def _run_ray(
     inflight: Dict[Any, Dict[str, Any]] = {}
     next_eval = 0
     last_export_done = done_success
+
+    def _trial_is_inflight(trial_id: str) -> bool:
+        tid = str(trial_id or "").strip()
+        if not tid:
+            return False
+        for meta in inflight.values():
+            if str(meta.get("trial_id") or "").strip() == tid:
+                return True
+        return False
 
     if args.hv_log:
         hv_csv = run_dir / "progress_hv.csv"
@@ -913,6 +1508,7 @@ def _run_ray(
 
     # ---- Main loop ----
     while done_success < budget:
+        done_before_cycle = int(done_success)
         # Keep DB heartbeat for long-running trials
         if inflight:
             for meta in list(inflight.values()):
@@ -940,14 +1536,22 @@ def _run_ray(
                 x_u=list(x_u),
                 params=params,
             )
+            res_status = str(res.status or "").strip().upper()
+            trial_id = str(res.trial_id or "").strip()
 
-            if res.status == "DONE" and res.y is not None:
+            if res_status == "DONE" and res.y is not None:
                 # Cache hit or already done in this run
+                if trial_id and trial_id in counted_done_trial_ids:
+                    dedup_skip_done_count += 1
+                    _sync_last_proposer_meta_diag()
+                    continue
                 done_success += 1
                 X_done.append(list(x_u))
                 Y_done.append(list(res.y))
                 if isinstance(res.g, list):
                     G_done.append(list(res.g))
+                if trial_id:
+                    counted_done_trial_ids.add(trial_id)
 
                 _write_trial_artifact(
                     run_dir,
@@ -964,8 +1568,18 @@ def _run_ray(
                 )
                 continue
 
+            # Skip duplicate scheduling for a trial already running elsewhere
+            # or already submitted in this coordinator loop.
+            if res_status == "RUNNING":
+                dedup_skip_running_count += 1
+                _sync_last_proposer_meta_diag()
+                continue
+            if trial_id and _trial_is_inflight(trial_id):
+                dedup_skip_inflight_count += 1
+                _sync_last_proposer_meta_diag()
+                continue
+
             # Submit evaluation
-            trial_id = res.trial_id
             db.mark_running(trial_id, worker_tag="ray")
 
             actor = evaluators[next_eval % len(evaluators)]
@@ -975,8 +1589,35 @@ def _run_ray(
             inflight[fut] = {"trial_id": trial_id, "x_u": list(x_u), "param_hash": ph, "t0": _now()}
 
         if not inflight:
-            # Nothing running and no candidates; stop
+            # No active work. If we made progress this cycle, loop again;
+            # otherwise inject a rescue random candidate to avoid duplicate stalls.
+            if done_success > done_before_cycle:
+                stagnation_cycles = 0
+                stall_last_cycles = 0
+                _sync_run_spec_stall()
+                continue
+            stagnation_cycles += 1
+            stall_last_cycles = int(stagnation_cycles)
+            if done_success < budget and stagnation_cycles <= int(stall_rescue_limit_cycles):
+                x_rescue = [float(v) for v in rng.random(dim).tolist()]
+                candidate_buf.append(x_rescue)
+                stall_rescue_count += 1
+                _sync_run_spec_stall()
+                _write_last_proposer_meta(
+                    {
+                        "requested_mode": str(getattr(args, "proposer", "") or ""),
+                        "effective_mode": "random",
+                        "reason": "stall_rescue_random",
+                    }
+                )
+                continue
+            stall_terminated = True
+            _sync_run_spec_stall()
+            print(f"[RAY] stall detected (cycles={stagnation_cycles}); stopping before budget={budget}")
             break
+        stagnation_cycles = 0
+        stall_last_cycles = 0
+        _sync_run_spec_stall()
 
         # Wait for one completion
         ready, _ = ray.wait(list(inflight.keys()), num_returns=1, timeout=5.0)
@@ -994,13 +1635,18 @@ def _run_ray(
             db.mark_done(trial_id, y=list(y), g=list(g) if g is not None else None, metrics=dict(row))
             db.upsert_cache(problem_hash=problem_hash, param_hash=meta["param_hash"], y=list(y), g=list(g) if g is not None else None, metrics=dict(row))
 
-            # In-memory
-            X_done.append(list(meta["x_u"]))
-            Y_done.append(list(y))
-            if g is not None:
-                G_done.append(list(g))
-
-            done_success += 1
+            # In-memory (count each trial_id at most once)
+            if not (trial_id and trial_id in counted_done_trial_ids):
+                X_done.append(list(meta["x_u"]))
+                Y_done.append(list(y))
+                if g is not None:
+                    G_done.append(list(g))
+                done_success += 1
+                if trial_id:
+                    counted_done_trial_ids.add(trial_id)
+            else:
+                dedup_skip_done_count += 1
+                _sync_last_proposer_meta_diag()
 
             _write_trial_artifact(
                 run_dir,
@@ -1047,6 +1693,7 @@ def _run_ray(
         print(f"done={done_success}/{budget} inflight={len(inflight)} hv={(hv if hv is not None else 'NA')}")
 
     # Final export
+    _sync_run_spec_stall()
     db.export_run_to_csv(run_id, out_dir=str(run_dir / "export"))
 
 
@@ -1128,6 +1775,7 @@ def _run_dask(
     X_done: List[List[float]] = []
     Y_done: List[List[float]] = []
     G_done: List[List[float]] = []
+    counted_done_trial_ids: set[str] = set()
 
     done_rows = db.fetch_done_trials(run_id)
     for r in done_rows:
@@ -1137,11 +1785,44 @@ def _run_dask(
         Y_done.append(list(r["y"]))
         if isinstance(r.get("g"), list):
             G_done.append(list(r["g"]))
+        tid = str(r.get("trial_id") or "").strip()
+        if tid:
+            counted_done_trial_ids.add(tid)
 
     done_success = len(X_done)
     budget = int(args.budget)
+    dim = int(core_local.dim())
+    stall_rescue_limit_cycles = max(8, 2 * max(1, dim))
+    stall_rescue_count = 0
+    stall_last_cycles = 0
+    stall_terminated = False
+    stagnation_cycles = 0
+    dedup_skip_done_count = 0
+    dedup_skip_running_count = 0
+    dedup_skip_inflight_count = 0
+    proposer_effective_mode_counts: Dict[str, int] = {}
+    proposer_reason_counts: Dict[str, int] = {}
+    base_heuristic_buffer = int(max(0, int(getattr(args, "proposer_buffer", 0) or 0)))
+    heuristic_buffer_last_effective = int(base_heuristic_buffer)
+    heuristic_buffer_boost_events = 0
+    base_heuristic_q = _coerce_positive_int(getattr(args, "q", 1), default=1)
+    heuristic_q_last_effective = int(base_heuristic_q)
+    heuristic_q_boost_events = 0
+    base_heuristic_pool_size = _coerce_positive_int(
+        getattr(args, "heuristic_pool_size", DIST_OPT_HEURISTIC_POOL_SIZE_DEFAULT),
+        default=int(DIST_OPT_HEURISTIC_POOL_SIZE_DEFAULT),
+    )
+    heuristic_pool_size_last_effective = int(base_heuristic_pool_size)
+    heuristic_pool_size_boost_events = 0
+    base_heuristic_explore = _clamp_unit_interval(
+        getattr(args, "heuristic_explore", DIST_OPT_HEURISTIC_EXPLORE_DEFAULT),
+        default=float(DIST_OPT_HEURISTIC_EXPLORE_DEFAULT),
+    )
+    heuristic_explore_last_effective = float(base_heuristic_explore)
+    heuristic_explore_boost_events = 0
     seed_vectors, seed_meta = _load_seed_vectors(core_local, getattr(args, "seed_json", ""))
     _dump_json(run_dir / "seed_info.json", dict(seed_meta))
+    seed_queue = [] if bool(args.resume) else list(seed_vectors)
 
     if args.resume:
         n_re = db.requeue_stale(run_id, ttl_sec=float(args.stale_ttl_sec))
@@ -1156,15 +1837,75 @@ def _run_dask(
         if isinstance(pr.get("x_u"), list):
             candidate_buf.append(list(pr["x_u"]))
 
-    dim = int(core_local.dim())
     auto_n_init = max(8, 2 * (dim + 1))
     lhs_target = max(auto_n_init, int(getattr(args, "n_init", 0) or 0))
     lhs_pool_n = max(0, int(lhs_target - done_success - len(seed_queue)))
     lhs_pool = sample_lhs(n=int(lhs_pool_n), d=dim, seed=int(args.seed))
     lhs_i = lhs_pool.shape[0] if args.resume else 0
 
+    run_spec_path = run_dir / "run_spec.json"
+    run_spec_payload: Dict[str, Any] = {
+        "run_id": run_id,
+        "backend": "dask",
+        "dim": int(dim),
+        "objective_keys": list(objective_keys),
+        "penalty_key": str(args.penalty_key),
+        "penalty_tol": float(args.penalty_tol),
+        "seed": int(args.seed),
+        "max_inflight": int(max_inflight),
+        "proposer": str(getattr(args, "proposer", "auto") or "auto"),
+        "q": int(getattr(args, "q", 1) or 1),
+        "n_init": int(args.n_init),
+        "min_feasible": _coerce_nonnegative_int(
+            getattr(args, "min_feasible", DIST_OPT_BOTORCH_MIN_FEASIBLE_DEFAULT),
+            default=int(DIST_OPT_BOTORCH_MIN_FEASIBLE_DEFAULT),
+        ),
+        "heuristic_buffer_base": int(base_heuristic_buffer),
+        "heuristic_buffer_last_effective": int(heuristic_buffer_last_effective),
+        "heuristic_buffer_boost_events": int(heuristic_buffer_boost_events),
+        "heuristic_q_base": int(base_heuristic_q),
+        "heuristic_q_last_effective": int(heuristic_q_last_effective),
+        "heuristic_q_boost_events": int(heuristic_q_boost_events),
+        "heuristic_pool_size": int(getattr(args, "heuristic_pool_size", DIST_OPT_HEURISTIC_POOL_SIZE_DEFAULT) or DIST_OPT_HEURISTIC_POOL_SIZE_DEFAULT),
+        "heuristic_pool_size_base": int(base_heuristic_pool_size),
+        "heuristic_pool_size_last_effective": int(heuristic_pool_size_last_effective),
+        "heuristic_pool_size_boost_events": int(heuristic_pool_size_boost_events),
+        "heuristic_explore": float(getattr(args, "heuristic_explore", DIST_OPT_HEURISTIC_EXPLORE_DEFAULT) or DIST_OPT_HEURISTIC_EXPLORE_DEFAULT),
+        "heuristic_explore_base": float(base_heuristic_explore),
+        "heuristic_explore_last_effective": float(heuristic_explore_last_effective),
+        "heuristic_explore_boost_events": int(heuristic_explore_boost_events),
+        "dask_scheduler": str(getattr(args, "dask_scheduler", "") or ""),
+        "dask_scheduler_info": info,
+        "dask_num_workers": int(n_workers),
+        "seed_json": str(seed_meta.get("seed_json") or ""),
+        "seed_loaded": int(seed_meta.get("loaded") or 0),
+        "seed_invalid": int(seed_meta.get("invalid") or 0),
+        "seed_duplicates": int(seed_meta.get("duplicates") or 0),
+        "stall_rescue_limit_cycles": int(stall_rescue_limit_cycles),
+        "stall_rescue_count": int(stall_rescue_count),
+        "stall_last_cycles": int(stall_last_cycles),
+        "stall_terminated": bool(stall_terminated),
+        "dedup_skip_done_count": int(dedup_skip_done_count),
+        "dedup_skip_running_count": int(dedup_skip_running_count),
+        "dedup_skip_inflight_count": int(dedup_skip_inflight_count),
+        "dedup_skip_total": int(dedup_skip_done_count + dedup_skip_running_count + dedup_skip_inflight_count),
+        "proposer_effective_mode_counts": dict(proposer_effective_mode_counts),
+        "proposer_reason_counts": dict(proposer_reason_counts),
+        "proposer_meta_events": int(sum(int(v) for v in proposer_effective_mode_counts.values())),
+    }
+    _dump_json(run_spec_path, run_spec_payload)
+
     inflight: Dict[Any, Dict[str, Any]] = {}
     ac = as_completed([])
+
+    def _trial_is_inflight(trial_id: str) -> bool:
+        tid = str(trial_id or "").strip()
+        if not tid:
+            return False
+        for meta in inflight.values():
+            if str(meta.get("trial_id") or "").strip() == tid:
+                return True
+        return False
 
     if args.hv_log:
         hv_csv = run_dir / "progress_hv.csv"
@@ -1182,8 +1923,108 @@ def _run_dask(
             db.export_run_to_csv(run_id, out_dir=str(out_dir))
             last_export_done = done_success
 
+    def _sync_run_spec_stall() -> None:
+        run_spec_payload["stall_rescue_count"] = int(stall_rescue_count)
+        run_spec_payload["stall_last_cycles"] = int(stall_last_cycles)
+        run_spec_payload["stall_terminated"] = bool(stall_terminated)
+        run_spec_payload["dedup_skip_done_count"] = int(dedup_skip_done_count)
+        run_spec_payload["dedup_skip_running_count"] = int(dedup_skip_running_count)
+        run_spec_payload["dedup_skip_inflight_count"] = int(dedup_skip_inflight_count)
+        run_spec_payload["dedup_skip_total"] = int(
+            dedup_skip_done_count + dedup_skip_running_count + dedup_skip_inflight_count
+        )
+        run_spec_payload["proposer_effective_mode_counts"] = dict(proposer_effective_mode_counts)
+        run_spec_payload["proposer_reason_counts"] = dict(proposer_reason_counts)
+        run_spec_payload["proposer_meta_events"] = int(
+            sum(int(v) for v in proposer_effective_mode_counts.values())
+        )
+        run_spec_payload["heuristic_buffer_base"] = int(base_heuristic_buffer)
+        run_spec_payload["heuristic_buffer_last_effective"] = int(heuristic_buffer_last_effective)
+        run_spec_payload["heuristic_buffer_boost_events"] = int(heuristic_buffer_boost_events)
+        run_spec_payload["heuristic_q_base"] = int(base_heuristic_q)
+        run_spec_payload["heuristic_q_last_effective"] = int(heuristic_q_last_effective)
+        run_spec_payload["heuristic_q_boost_events"] = int(heuristic_q_boost_events)
+        run_spec_payload["heuristic_pool_size_base"] = int(base_heuristic_pool_size)
+        run_spec_payload["heuristic_pool_size_last_effective"] = int(heuristic_pool_size_last_effective)
+        run_spec_payload["heuristic_pool_size_boost_events"] = int(heuristic_pool_size_boost_events)
+        run_spec_payload["heuristic_explore_base"] = float(base_heuristic_explore)
+        run_spec_payload["heuristic_explore_last_effective"] = float(heuristic_explore_last_effective)
+        run_spec_payload["heuristic_explore_boost_events"] = int(heuristic_explore_boost_events)
+        _dump_json(run_spec_path, run_spec_payload)
+        _sync_last_proposer_meta_diag()
+
+    last_meta_path = run_dir / "last_proposer_meta.json"
+    last_proposer_meta: Dict[str, Any] = {}
+
+    def _sync_last_proposer_meta_diag() -> None:
+        diag_nonzero = bool(
+            (stall_rescue_count > 0)
+            or (stall_last_cycles > 0)
+            or bool(stall_terminated)
+            or (dedup_skip_done_count > 0)
+            or (dedup_skip_running_count > 0)
+            or (dedup_skip_inflight_count > 0)
+        )
+        payload = dict(last_proposer_meta or {})
+        if not payload and last_meta_path.exists():
+            try:
+                loaded = json.loads(last_meta_path.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    payload = dict(loaded)
+            except Exception:
+                payload = {}
+        if not payload and not diag_nonzero:
+            return
+        if not payload:
+            payload = {
+                "requested_mode": str(getattr(args, "proposer", "") or ""),
+                "effective_mode": "random",
+                "reason": "runtime_diagnostics_sync",
+            }
+        payload["stall_rescue_limit_cycles"] = int(stall_rescue_limit_cycles)
+        payload["stall_rescue_count"] = int(stall_rescue_count)
+        payload["stall_stagnation_cycles"] = int(stagnation_cycles)
+        payload["stall_terminated"] = bool(stall_terminated)
+        payload["dedup_skip_done_count"] = int(dedup_skip_done_count)
+        payload["dedup_skip_running_count"] = int(dedup_skip_running_count)
+        payload["dedup_skip_inflight_count"] = int(dedup_skip_inflight_count)
+        payload["dedup_skip_total"] = int(
+            dedup_skip_done_count + dedup_skip_running_count + dedup_skip_inflight_count
+        )
+        payload["heuristic_buffer_base"] = int(base_heuristic_buffer)
+        payload["heuristic_buffer_last_effective"] = int(heuristic_buffer_last_effective)
+        payload["heuristic_buffer_boost_events"] = int(heuristic_buffer_boost_events)
+        payload["heuristic_q_base"] = int(base_heuristic_q)
+        payload["heuristic_q_last_effective"] = int(heuristic_q_last_effective)
+        payload["heuristic_q_boost_events"] = int(heuristic_q_boost_events)
+        payload["heuristic_pool_size_base"] = int(base_heuristic_pool_size)
+        payload["heuristic_pool_size_last_effective"] = int(heuristic_pool_size_last_effective)
+        payload["heuristic_pool_size_boost_events"] = int(heuristic_pool_size_boost_events)
+        payload["heuristic_explore_base"] = float(base_heuristic_explore)
+        payload["heuristic_explore_last_effective"] = float(heuristic_explore_last_effective)
+        payload["heuristic_explore_boost_events"] = int(heuristic_explore_boost_events)
+        _write_text(last_meta_path, json.dumps(payload, ensure_ascii=False, indent=2))
+
+    def _write_last_proposer_meta(meta_out: Dict[str, Any]) -> None:
+        nonlocal last_proposer_meta
+        last_proposer_meta = dict(meta_out or {})
+        mode_key = str(last_proposer_meta.get("effective_mode") or "").strip().lower()
+        if mode_key:
+            proposer_effective_mode_counts[mode_key] = int(proposer_effective_mode_counts.get(mode_key, 0) + 1)
+        reason_key = str(
+            last_proposer_meta.get("reason")
+            or last_proposer_meta.get("fallback_reason")
+            or ""
+        ).strip().lower()
+        if reason_key:
+            proposer_reason_counts[reason_key] = int(proposer_reason_counts.get(reason_key, 0) + 1)
+        _sync_last_proposer_meta_diag()
+
     def fill_buffer():
-        nonlocal lhs_i
+        nonlocal lhs_i, heuristic_explore_last_effective, heuristic_explore_boost_events
+        nonlocal heuristic_buffer_last_effective, heuristic_buffer_boost_events
+        nonlocal heuristic_q_last_effective, heuristic_q_boost_events
+        nonlocal heuristic_pool_size_last_effective, heuristic_pool_size_boost_events
         target = int(max(0, args.proposer_buffer))
         if len(candidate_buf) >= target:
             return
@@ -1209,40 +2050,221 @@ def _run_dask(
         )
         prop_mode = str(mode_info["mode"])
         want_portfolio = bool(mode_info["portfolio_enabled"])
+        pool_fallback_error: Optional[str] = None
+
+        def _next_heuristic_explore() -> float:
+            nonlocal heuristic_explore_last_effective, heuristic_explore_boost_events
+            effective = _adaptive_heuristic_explore_weight(
+                base_heuristic_explore,
+                stagnation_cycles=stagnation_cycles,
+                rescue_limit_cycles=stall_rescue_limit_cycles,
+            )
+            heuristic_explore_last_effective = float(effective)
+            if effective > (base_heuristic_explore + 1e-12):
+                heuristic_explore_boost_events += 1
+            return float(effective)
+
+        def _next_heuristic_pool_size() -> int:
+            nonlocal heuristic_pool_size_last_effective, heuristic_pool_size_boost_events
+            effective = _adaptive_heuristic_pool_size(
+                base_heuristic_pool_size,
+                stagnation_cycles=stagnation_cycles,
+                rescue_limit_cycles=stall_rescue_limit_cycles,
+            )
+            heuristic_pool_size_last_effective = int(effective)
+            if int(effective) > int(base_heuristic_pool_size):
+                heuristic_pool_size_boost_events += 1
+            return int(effective)
+
+        def _next_heuristic_q(*, need: int) -> int:
+            nonlocal heuristic_q_last_effective, heuristic_q_boost_events
+            effective = _adaptive_heuristic_q(
+                base_heuristic_q,
+                need=int(need),
+                stagnation_cycles=stagnation_cycles,
+                rescue_limit_cycles=stall_rescue_limit_cycles,
+            )
+            heuristic_q_last_effective = int(effective)
+            if int(effective) > int(base_heuristic_q):
+                heuristic_q_boost_events += 1
+            return int(effective)
+
+        def _next_heuristic_buffer() -> int:
+            nonlocal heuristic_buffer_last_effective, heuristic_buffer_boost_events
+            if int(base_heuristic_buffer) <= 0:
+                heuristic_buffer_last_effective = 0
+                return 0
+            effective = _adaptive_heuristic_buffer_target(
+                int(max(1, base_heuristic_buffer)),
+                stagnation_cycles=stagnation_cycles,
+                rescue_limit_cycles=stall_rescue_limit_cycles,
+            )
+            heuristic_buffer_last_effective = int(effective)
+            if int(effective) > int(base_heuristic_buffer):
+                heuristic_buffer_boost_events += 1
+            return int(effective)
 
         need = max(1, target - len(candidate_buf))
-        if prop_mode == "qnehvi":
-            pr = propose_qnehvi(
-                X_done=np.asarray(X_done, dtype=float) if X_done else np.zeros((0, dim), dtype=float),
-                Y_min_done=np.asarray(Y_done, dtype=float) if Y_done else np.zeros((0, len(objective_keys)), dtype=float),
-                G_min_done=np.asarray(G_done, dtype=float) if G_done else None,
-                q=int(need),
-                seed=int(rng.integers(0, 2**31 - 1)),
-                X_pending=X_pending,
-                device=str(args.device),
-                normalize_objectives=not bool(getattr(args, "botorch_no_normalize_objectives", False)),
-                ref_margin=float(getattr(args, "botorch_ref_margin", 0.10)),
-                num_restarts=int(getattr(args, "botorch_num_restarts", 10)),
-                raw_samples=int(getattr(args, "botorch_raw_samples", 512)),
-                maxiter=int(getattr(args, "botorch_maxiter", 200)),
-            )
-            meta_out = dict(pr.meta or {})
-            meta_out["requested_mode"] = mode_info["requested"]
-            meta_out["effective_mode"] = mode_info["mode"]
-            meta_out["n_init"] = mode_info["n_init"]
-            meta_out["min_feasible"] = mode_info["min_feasible"]
-            meta_out["ready_by_done"] = mode_info["ready_by_done"]
-            meta_out["ready_by_feasible"] = mode_info["ready_by_feasible"]
-            for x_u in pr.X.tolist():
-                candidate_buf.append(list(x_u))
-            _write_text(run_dir / "last_proposer_meta.json", json.dumps(meta_out, ensure_ascii=False, indent=2))
-            if want_portfolio:
-                n_rand = max(1, need // 4)
-                Xr = propose_random(d=dim, q=int(n_rand), seed=int(rng.integers(0, 2**31 - 1))).X
+        if prop_mode in {"qnehvi", "portfolio"}:
+            try:
+                pr = propose_qnehvi(
+                    X_done=np.asarray(X_done, dtype=float) if X_done else np.zeros((0, dim), dtype=float),
+                    Y_min_done=np.asarray(Y_done, dtype=float) if Y_done else np.zeros((0, len(objective_keys)), dtype=float),
+                    G_min_done=np.asarray(G_done, dtype=float) if G_done else None,
+                    q=int(need),
+                    seed=int(rng.integers(0, 2**31 - 1)),
+                    X_pending=X_pending,
+                    device=str(args.device),
+                    normalize_objectives=not bool(getattr(args, "botorch_no_normalize_objectives", False)),
+                    ref_margin=float(getattr(args, "botorch_ref_margin", 0.10)),
+                    num_restarts=int(getattr(args, "botorch_num_restarts", 10)),
+                    raw_samples=int(getattr(args, "botorch_raw_samples", 512)),
+                    maxiter=int(getattr(args, "botorch_maxiter", 200)),
+                )
+                meta_out = dict(pr.meta or {})
+                meta_out["requested_mode"] = mode_info["requested"]
+                meta_out["effective_mode"] = mode_info["mode"]
+                meta_out["n_init"] = mode_info["n_init"]
+                meta_out["min_feasible"] = mode_info["min_feasible"]
+                meta_out["ready_by_done"] = mode_info["ready_by_done"]
+                meta_out["ready_by_feasible"] = mode_info["ready_by_feasible"]
+                for x_u in pr.X.tolist():
+                    candidate_buf.append(list(x_u))
+                _write_last_proposer_meta(meta_out)
+                if want_portfolio:
+                    n_rand = max(1, need // 4)
+                    Xr = propose_random(d=dim, q=int(n_rand), seed=int(rng.integers(0, 2**31 - 1))).X
+                    for x_u in Xr.tolist():
+                        candidate_buf.append(list(x_u))
+                return
+            except Exception as q_exc:
+                try:
+                    heuristic_buffer_effective = _next_heuristic_buffer()
+                    heuristic_need = int(max(1, heuristic_buffer_effective - len(candidate_buf)))
+                    heuristic_q_effective = _next_heuristic_q(need=heuristic_need)
+                    heuristic_explore_effective = _next_heuristic_explore()
+                    heuristic_pool_size_effective = _next_heuristic_pool_size()
+                    pr = propose_heuristic(
+                        X_done=np.asarray(X_done, dtype=float) if X_done else np.zeros((0, dim), dtype=float),
+                        Y_min_done=np.asarray(Y_done, dtype=float) if Y_done else np.zeros((0, len(objective_keys)), dtype=float),
+                        penalty=_heuristic_penalty_from_constraints(G_done),
+                        q=int(heuristic_q_effective),
+                        seed=int(rng.integers(0, 2**31 - 1)),
+                        X_pending=X_pending,
+                        feasible_tol=float(args.penalty_tol),
+                        pool_size=int(heuristic_pool_size_effective),
+                        explore_weight=float(heuristic_explore_effective),
+                    )
+                    meta_out = dict(pr.meta or {})
+                    meta_out["requested_mode"] = mode_info["requested"]
+                    meta_out["effective_mode"] = "heuristic"
+                    meta_out["n_init"] = mode_info["n_init"]
+                    meta_out["min_feasible"] = mode_info["min_feasible"]
+                    meta_out["ready_by_done"] = mode_info["ready_by_done"]
+                    meta_out["ready_by_feasible"] = mode_info["ready_by_feasible"]
+                    meta_out["fallback_reason"] = "qnehvi_failed"
+                    meta_out["fallback_error"] = f"{type(q_exc).__name__}: {q_exc}"
+                    meta_out["heuristic_buffer_base"] = int(base_heuristic_buffer)
+                    meta_out["heuristic_buffer_effective"] = int(heuristic_buffer_effective)
+                    meta_out["heuristic_q_base"] = int(base_heuristic_q)
+                    meta_out["heuristic_q_effective"] = int(heuristic_q_effective)
+                    meta_out["heuristic_pool_size_base"] = int(base_heuristic_pool_size)
+                    meta_out["heuristic_pool_size_effective"] = int(heuristic_pool_size_effective)
+                    meta_out["heuristic_explore_base"] = float(base_heuristic_explore)
+                    meta_out["heuristic_explore_effective"] = float(heuristic_explore_effective)
+                    meta_out["heuristic_explore_stagnation_cycles"] = int(stagnation_cycles)
+                    for x_u in pr.X.tolist():
+                        candidate_buf.append(list(x_u))
+                    _write_last_proposer_meta(meta_out)
+                    if want_portfolio:
+                        n_rand = max(1, need // 4)
+                        Xr = propose_random(d=dim, q=int(n_rand), seed=int(rng.integers(0, 2**31 - 1))).X
+                        for x_u in Xr.tolist():
+                            candidate_buf.append(list(x_u))
+                    return
+                except Exception as h_exc:
+                    meta_out = {
+                        "requested_mode": mode_info["requested"],
+                        "effective_mode": "random",
+                        "n_init": mode_info["n_init"],
+                        "min_feasible": mode_info["min_feasible"],
+                        "ready_by_done": mode_info["ready_by_done"],
+                        "ready_by_feasible": mode_info["ready_by_feasible"],
+                        "reason": "qnehvi_and_heuristic_failed",
+                        "fallback_error": f"{type(q_exc).__name__}: {q_exc}; {type(h_exc).__name__}: {h_exc}",
+                    }
+                    if pool_fallback_error:
+                        meta_out["pool_fallback_error"] = pool_fallback_error
+                    _write_last_proposer_meta(meta_out)
+                    Xr = propose_random(d=dim, q=int(need), seed=int(rng.integers(0, 2**31 - 1))).X
+                    for x_u in Xr.tolist():
+                        candidate_buf.append(list(x_u))
+                    if want_portfolio:
+                        n_rand = max(1, need // 4)
+                        Xr2 = propose_random(d=dim, q=int(n_rand), seed=int(rng.integers(0, 2**31 - 1))).X
+                        for x_u in Xr2.tolist():
+                            candidate_buf.append(list(x_u))
+                    return
+        if prop_mode == "heuristic":
+            try:
+                heuristic_buffer_effective = _next_heuristic_buffer()
+                heuristic_need = int(max(1, heuristic_buffer_effective - len(candidate_buf)))
+                heuristic_q_effective = _next_heuristic_q(need=heuristic_need)
+                heuristic_explore_effective = _next_heuristic_explore()
+                heuristic_pool_size_effective = _next_heuristic_pool_size()
+                pr = propose_heuristic(
+                    X_done=np.asarray(X_done, dtype=float) if X_done else np.zeros((0, dim), dtype=float),
+                    Y_min_done=np.asarray(Y_done, dtype=float) if Y_done else np.zeros((0, len(objective_keys)), dtype=float),
+                    penalty=_heuristic_penalty_from_constraints(G_done),
+                    q=int(heuristic_q_effective),
+                    seed=int(rng.integers(0, 2**31 - 1)),
+                    X_pending=X_pending,
+                    feasible_tol=float(args.penalty_tol),
+                    pool_size=int(heuristic_pool_size_effective),
+                    explore_weight=float(heuristic_explore_effective),
+                )
+                meta_out = dict(pr.meta or {})
+                meta_out["requested_mode"] = mode_info["requested"]
+                meta_out["effective_mode"] = mode_info["mode"]
+                meta_out["n_init"] = mode_info["n_init"]
+                meta_out["min_feasible"] = mode_info["min_feasible"]
+                meta_out["ready_by_done"] = mode_info["ready_by_done"]
+                meta_out["ready_by_feasible"] = mode_info["ready_by_feasible"]
+                meta_out["heuristic_buffer_base"] = int(base_heuristic_buffer)
+                meta_out["heuristic_buffer_effective"] = int(heuristic_buffer_effective)
+                meta_out["heuristic_q_base"] = int(base_heuristic_q)
+                meta_out["heuristic_q_effective"] = int(heuristic_q_effective)
+                meta_out["heuristic_pool_size_base"] = int(base_heuristic_pool_size)
+                meta_out["heuristic_pool_size_effective"] = int(heuristic_pool_size_effective)
+                meta_out["heuristic_explore_base"] = float(base_heuristic_explore)
+                meta_out["heuristic_explore_effective"] = float(heuristic_explore_effective)
+                meta_out["heuristic_explore_stagnation_cycles"] = int(stagnation_cycles)
+                if pool_fallback_error:
+                    meta_out["pool_fallback_error"] = pool_fallback_error
+                for x_u in pr.X.tolist():
+                    candidate_buf.append(list(x_u))
+                _write_last_proposer_meta(meta_out)
+                return
+            except Exception as h_exc:
+                meta_out = {
+                    "requested_mode": mode_info["requested"],
+                    "effective_mode": "random",
+                    "n_init": mode_info["n_init"],
+                    "min_feasible": mode_info["min_feasible"],
+                    "ready_by_done": mode_info["ready_by_done"],
+                    "ready_by_feasible": mode_info["ready_by_feasible"],
+                    "reason": "heuristic_failed",
+                    "fallback_error": f"{type(h_exc).__name__}: {h_exc}",
+                }
+                if pool_fallback_error:
+                    meta_out["pool_fallback_error"] = pool_fallback_error
+                _write_last_proposer_meta(meta_out)
+                Xr = propose_random(d=dim, q=int(need), seed=int(rng.integers(0, 2**31 - 1))).X
                 for x_u in Xr.tolist():
                     candidate_buf.append(list(x_u))
-            return
+                return
 
+        random_reason = _random_mode_reason(mode_info)
         meta_out = {
             "requested_mode": mode_info["requested"],
             "effective_mode": prop_mode,
@@ -1250,9 +2272,11 @@ def _run_dask(
             "min_feasible": mode_info["min_feasible"],
             "ready_by_done": mode_info["ready_by_done"],
             "ready_by_feasible": mode_info["ready_by_feasible"],
-            "reason": "warmup_or_feasibility_gate",
+            "reason": random_reason,
         }
-        _write_text(run_dir / "last_proposer_meta.json", json.dumps(meta_out, ensure_ascii=False, indent=2))
+        if pool_fallback_error:
+            meta_out["pool_fallback_error"] = pool_fallback_error
+        _write_last_proposer_meta(meta_out)
         Xr = propose_random(d=dim, q=int(need), seed=int(rng.integers(0, 2**31 - 1))).X
         for x_u in Xr.tolist():
             candidate_buf.append(list(x_u))
@@ -1260,6 +2284,7 @@ def _run_dask(
     print(f"[DASK] run_id={run_id} dim={dim} budget={budget} done={done_success} max_inflight={max_inflight}")
 
     while done_success < budget:
+        done_before_cycle = int(done_success)
         fill_buffer()
 
         while len(inflight) < max_inflight and done_success + len(inflight) < budget and candidate_buf:
@@ -1275,24 +2300,66 @@ def _run_dask(
                 x_u=list(x_u),
                 params=params,
             )
+            res_status = str(res.status or "").strip().upper()
+            trial_id = str(res.trial_id or "").strip()
 
-            if res.status == "DONE" and res.y is not None:
+            if res_status == "DONE" and res.y is not None:
+                if trial_id and trial_id in counted_done_trial_ids:
+                    dedup_skip_done_count += 1
+                    _sync_last_proposer_meta_diag()
+                    continue
                 done_success += 1
                 X_done.append(list(x_u))
                 Y_done.append(list(res.y))
                 if isinstance(res.g, list):
                     G_done.append(list(res.g))
+                if trial_id:
+                    counted_done_trial_ids.add(trial_id)
                 _write_trial_artifact(run_dir, {"trial_id": res.trial_id, "status": "DONE", "from_cache": bool(res.from_cache), "x_u": list(x_u), "params": params, "y": res.y, "g": res.g, "metrics": res.metrics})
                 continue
 
-            trial_id = res.trial_id
+            if res_status == "RUNNING":
+                dedup_skip_running_count += 1
+                _sync_last_proposer_meta_diag()
+                continue
+            if trial_id and _trial_is_inflight(trial_id):
+                dedup_skip_inflight_count += 1
+                _sync_last_proposer_meta_diag()
+                continue
+
             db.mark_running(trial_id, worker_tag="dask")
             fut = client.submit(_eval_task, trial_id, list(x_u), pure=False)
             inflight[fut] = {"trial_id": trial_id, "x_u": list(x_u), "param_hash": ph}
             ac.add(fut)
 
         if not inflight:
+            if done_success > done_before_cycle:
+                stagnation_cycles = 0
+                stall_last_cycles = 0
+                _sync_run_spec_stall()
+                continue
+            stagnation_cycles += 1
+            stall_last_cycles = int(stagnation_cycles)
+            if done_success < budget and stagnation_cycles <= int(stall_rescue_limit_cycles):
+                x_rescue = [float(v) for v in rng.random(dim).tolist()]
+                candidate_buf.append(x_rescue)
+                stall_rescue_count += 1
+                _sync_run_spec_stall()
+                _write_last_proposer_meta(
+                    {
+                        "requested_mode": str(getattr(args, "proposer", "") or ""),
+                        "effective_mode": "random",
+                        "reason": "stall_rescue_random",
+                    }
+                )
+                continue
+            stall_terminated = True
+            _sync_run_spec_stall()
+            print(f"[DASK] stall detected (cycles={stagnation_cycles}); stopping before budget={budget}")
             break
+        stagnation_cycles = 0
+        stall_last_cycles = 0
+        _sync_run_spec_stall()
 
         fut = next(ac)
         meta = inflight.pop(fut)
@@ -1302,12 +2369,17 @@ def _run_dask(
             y, g, row = fut.result()
             db.mark_done(trial_id, y=list(y), g=list(g) if g is not None else None, metrics=dict(row))
             db.upsert_cache(problem_hash=problem_hash, param_hash=meta["param_hash"], y=list(y), g=list(g) if g is not None else None, metrics=dict(row))
-            X_done.append(list(meta["x_u"]))
-            Y_done.append(list(y))
-            if g is not None:
-                G_done.append(list(g))
-
-            done_success += 1
+            if not (trial_id and trial_id in counted_done_trial_ids):
+                X_done.append(list(meta["x_u"]))
+                Y_done.append(list(y))
+                if g is not None:
+                    G_done.append(list(g))
+                done_success += 1
+                if trial_id:
+                    counted_done_trial_ids.add(trial_id)
+            else:
+                dedup_skip_done_count += 1
+                _sync_last_proposer_meta_diag()
             _write_trial_artifact(run_dir, {"trial_id": trial_id, "status": "DONE", "x_u": list(meta["x_u"]), "params": core_local.u_to_params(meta["x_u"]), "y": list(y), "g": list(g) if g is not None else None, "metrics": row})
         except Exception as e:
             err = str(e)
@@ -1329,6 +2401,7 @@ def _run_dask(
         maybe_export()
         print(f"done={done_success}/{budget} inflight={len(inflight)} hv={(hv if hv is not None else 'NA')}")
 
+    _sync_run_spec_stall()
     db.export_run_to_csv(run_id, out_dir=str(run_dir / "export"))
     client.close()
 

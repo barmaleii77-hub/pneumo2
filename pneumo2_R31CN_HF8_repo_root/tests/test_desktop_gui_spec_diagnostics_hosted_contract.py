@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
 from PySide6 import QtWidgets
 
+from pneumo_solver_ui import desktop_diagnostics_runtime
 from pneumo_solver_ui.desktop_diagnostics_model import DesktopDiagnosticsBundleRecord
 from pneumo_solver_ui.desktop_spec_shell.diagnostics_panel import DiagnosticsWorkspacePage
 from pneumo_solver_ui.desktop_spec_shell.main_window import DesktopGuiSpecMainWindow
@@ -20,6 +22,28 @@ def _app() -> QtWidgets.QApplication:
     if app is None:
         app = QtWidgets.QApplication([])
     return app
+
+
+def test_diagnostics_state_write_falls_back_when_latest_state_file_is_locked(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    target = tmp_path / "latest_desktop_diagnostics_center_state.json"
+    target.write_text("{}", encoding="utf-8")
+    original_replace = Path.replace
+
+    def locked_replace(self: Path, target_path: Path | str) -> Path:
+        if Path(target_path) == target:
+            raise PermissionError("state file is locked")
+        return original_replace(self, target_path)
+
+    monkeypatch.setattr(Path, "replace", locked_replace)
+
+    desktop_diagnostics_runtime._safe_write_json(target, {"schema": "diagnostics_state"})
+
+    fallback = tmp_path / "latest_desktop_diagnostics_center_state.write_failed.json"
+    assert json.loads(fallback.read_text(encoding="utf-8"))["schema"] == "diagnostics_state"
+    assert target.read_text(encoding="utf-8") == "{}"
 
 
 def test_hosted_diagnostics_workspace_page_builds_offscreen_and_refreshes() -> None:
@@ -42,6 +66,62 @@ def test_hosted_diagnostics_workspace_page_builds_offscreen_and_refreshes() -> N
         assert page.progress_bar.value() == 100
         assert page.send_button.text() == "Скопировать архив"
         assert "Данные берутся из состояния проверки проекта" in page.source_label.text()
+    finally:
+        page.close()
+        page.deleteLater()
+        app.processEvents()
+
+
+def test_hosted_diagnostics_page_shows_animation_handoff_material(tmp_path: Path) -> None:
+    app = _app()
+    repo_root = tmp_path / "repo"
+    send_bundles = repo_root / "send_bundles"
+    send_bundles.mkdir(parents=True)
+    scene_path = repo_root / "result.npz"
+    pointer_path = repo_root / "result.json"
+    scene_path.write_bytes(b"NPZ")
+    pointer_path.write_text("{}", encoding="utf-8")
+    (send_bundles / "latest_animation_diagnostics_handoff.json").write_text(
+        json.dumps(
+            {
+                "schema": "desktop_animation_diagnostics_handoff",
+                "produced_by": "WS-ANIMATOR",
+                "consumed_by": "WS-DIAGNOSTICS",
+                "selected_artifact": {
+                    "title": "Выбранный файл результата",
+                    "path": str(scene_path),
+                },
+                "artifacts": {
+                    "scene_npz_path": str(scene_path),
+                    "pointer_json_path": str(pointer_path),
+                },
+                "next_step": "Сохраните архив проекта с текущим материалом.",
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    workspace = build_workspace_map()["diagnostics"]
+    page = DiagnosticsWorkspacePage(workspace, repo_root=repo_root)
+    try:
+        page.refresh_view()
+        app.processEvents()
+
+        assert page.animation_handoff_box.objectName() == "DG-ANIMATION-HANDOFF"
+        assert page.animation_handoff_source_value.text() == "Выбранный файл результата"
+        assert page.animation_handoff_scene_value.text() == str(scene_path)
+        assert page.animation_handoff_pointer_value.text() == str(pointer_path)
+        assert "Сохраните архив проекта" in page.animation_handoff_next_value.text()
+
+        state_path = send_bundles / "latest_desktop_diagnostics_center_state.json"
+        summary_path = send_bundles / "latest_desktop_diagnostics_summary.md"
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        summary = summary_path.read_text(encoding="utf-8")
+        assert state["machine_paths"]["latest_animation_diagnostics_handoff_json"]
+        assert state["animation_diagnostics_handoff"]["selected_path"] == str(scene_path)
+        assert state["animation_diagnostics_handoff"]["pointer_json_path"] == str(pointer_path)
+        assert "Материал анимации для проверки" in summary
+        assert str(scene_path) in summary
     finally:
         page.close()
         page.deleteLater()

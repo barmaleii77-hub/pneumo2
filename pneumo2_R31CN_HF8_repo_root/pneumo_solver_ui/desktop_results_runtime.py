@@ -30,6 +30,8 @@ from pneumo_solver_ui.tools.send_bundle_contract import (
 
 
 COMPARE_CURRENT_CONTEXT_SIDECAR_JSON = "latest_compare_current_context.json"
+ANALYSIS_ANIMATION_HANDOFF_JSON = "latest_analysis_animation_handoff.json"
+ANIMATION_DIAGNOSTICS_HANDOFF_JSON = "latest_animation_diagnostics_handoff.json"
 
 
 def _safe_read_json_dict(path: Path | None) -> dict[str, Any]:
@@ -149,6 +151,19 @@ def _short_text(text: Any, *, limit: int = 220) -> str:
     if len(raw) <= limit:
         return raw
     return raw[: max(0, limit - 1)].rstrip() + "..."
+
+
+def _preview_number(value: Any) -> str:
+    try:
+        number = float(value)
+    except Exception:
+        return "нет данных"
+    if not (number == number) or number in {float("inf"), float("-inf")}:
+        return "нет данных"
+    abs_number = abs(number)
+    if abs_number and (abs_number >= 10000 or abs_number < 0.001):
+        return f"{number:.3g}"
+    return f"{number:.4g}"
 
 
 def _status_ru(value: Any) -> str:
@@ -1329,6 +1344,192 @@ class DesktopResultsRuntime:
                 return artifact
         return self.artifact_for_path(snapshot, path)
 
+    def chart_preview_rows(
+        self,
+        snapshot: DesktopResultsSnapshot,
+        artifact: DesktopResultsArtifact | None = None,
+        *,
+        max_series: int = 6,
+    ) -> tuple[dict[str, str], ...]:
+        target_artifact = artifact or self.artifact_by_key(snapshot, "latest_npz")
+        target_path = self.compare_viewer_path(snapshot, artifact=target_artifact)
+        if target_path is None:
+            return (
+                {
+                    "series": "Результат",
+                    "points": "нет данных",
+                    "range": "нужен результат расчёта",
+                    "role": "сначала выполните расчёт",
+                },
+            )
+        if not target_path.exists():
+            return (
+                {
+                    "series": target_path.name,
+                    "points": "нет данных",
+                    "range": "файл не найден",
+                    "role": "обновите анализ",
+                },
+            )
+        if target_path.suffix.lower() != ".npz":
+            return (
+                {
+                    "series": target_path.name,
+                    "points": "нет данных",
+                    "range": "не файл результата",
+                    "role": "выберите файл расчёта",
+                },
+            )
+
+        try:
+            import numpy as np
+        except Exception:
+            return (
+                {
+                    "series": target_path.name,
+                    "points": "нет данных",
+                    "range": "предпросмотр временно недоступен",
+                    "role": "используйте подробное сравнение",
+                },
+            )
+
+        rows: list[dict[str, str]] = []
+        try:
+            with np.load(target_path, allow_pickle=False) as data:
+                for key in data.files:
+                    if len(rows) >= max_series:
+                        break
+                    try:
+                        array = np.asarray(data[key])
+                    except Exception:
+                        continue
+                    if array.size <= 0 or not np.issubdtype(array.dtype, np.number):
+                        continue
+                    finite = array[np.isfinite(array)]
+                    if finite.size:
+                        value_range = (
+                            f"{_preview_number(finite.min())} .. "
+                            f"{_preview_number(finite.max())}"
+                        )
+                    else:
+                        value_range = "нет конечных значений"
+                    shape = " x ".join(str(part) for part in array.shape) or "1"
+                    rows.append(
+                        {
+                            "series": str(key),
+                            "points": f"{int(array.size)}; форма {shape}",
+                            "range": value_range,
+                            "role": "готово к графику",
+                        }
+                    )
+        except Exception:
+            return (
+                {
+                    "series": target_path.name,
+                    "points": "нет данных",
+                    "range": "предпросмотр не прочитан",
+                    "role": "используйте подробное сравнение",
+                },
+            )
+
+        if rows:
+            return tuple(rows)
+        return (
+            {
+                "series": target_path.name,
+                "points": "0",
+                "range": "числовые серии не найдены",
+                "role": "проверьте файл результата",
+            },
+        )
+
+    def chart_preview_series_samples(
+        self,
+        snapshot: DesktopResultsSnapshot,
+        artifact: DesktopResultsArtifact | None = None,
+        *,
+        max_points: int = 80,
+    ) -> dict[str, Any]:
+        target_artifact = artifact or self.artifact_by_key(snapshot, "latest_npz")
+        target_path = self.compare_viewer_path(snapshot, artifact=target_artifact)
+        if target_path is None:
+            return {
+                "status": "MISSING",
+                "series": "Результат",
+                "samples": (),
+                "point_count": 0,
+                "range": "нужен результат расчёта",
+            }
+        if not target_path.exists() or target_path.suffix.lower() != ".npz":
+            return {
+                "status": "MISSING",
+                "series": target_path.name,
+                "samples": (),
+                "point_count": 0,
+                "range": "файл результата недоступен",
+                "source_path": str(target_path),
+            }
+        try:
+            import numpy as np
+        except Exception:
+            return {
+                "status": "WARN",
+                "series": target_path.name,
+                "samples": (),
+                "point_count": 0,
+                "range": "numpy недоступен",
+                "source_path": str(target_path),
+            }
+
+        try:
+            with np.load(target_path, allow_pickle=False) as data:
+                for key in data.files:
+                    try:
+                        array = np.asarray(data[key])
+                    except Exception:
+                        continue
+                    if array.size <= 0 or not np.issubdtype(array.dtype, np.number):
+                        continue
+                    flat = array.reshape(-1)
+                    finite = flat[np.isfinite(flat)]
+                    if finite.size <= 0:
+                        continue
+                    limit = max(2, int(max_points or 80))
+                    if finite.size > limit:
+                        indices = np.linspace(0, finite.size - 1, num=limit, dtype=int)
+                        sampled = finite[indices]
+                    else:
+                        sampled = finite
+                    return {
+                        "status": "READY",
+                        "series": str(key),
+                        "samples": tuple(float(value) for value in sampled.tolist()),
+                        "point_count": int(array.size),
+                        "finite_count": int(finite.size),
+                        "minimum": _preview_number(finite.min()),
+                        "maximum": _preview_number(finite.max()),
+                        "range": f"{_preview_number(finite.min())} .. {_preview_number(finite.max())}",
+                        "source_path": str(target_path),
+                    }
+        except Exception:
+            return {
+                "status": "WARN",
+                "series": target_path.name,
+                "samples": (),
+                "point_count": 0,
+                "range": "предпросмотр не прочитан",
+                "source_path": str(target_path),
+            }
+
+        return {
+            "status": "MISSING",
+            "series": target_path.name,
+            "samples": (),
+            "point_count": 0,
+            "range": "числовые серии не найдены",
+            "source_path": str(target_path),
+        }
+
     def overview_evidence_artifact(
         self,
         snapshot: DesktopResultsSnapshot,
@@ -1462,6 +1663,45 @@ class DesktopResultsRuntime:
             record["sha256_error"] = str(exc)
         return record
 
+    def _animation_diagnostics_handoff_evidence(self) -> dict[str, Any]:
+        path = self.animation_diagnostics_handoff_path()
+        payload = _safe_read_json_dict(path)
+        selected = dict(payload.get("selected_artifact") or {}) if payload else {}
+        artifacts = dict(payload.get("artifacts") or {}) if payload else {}
+        context = dict(payload.get("animation_context") or {}) if payload else {}
+        return {
+            "status": "READY" if payload else "MISSING",
+            "sidecar_path": str(path if path.exists() else ""),
+            "schema": str(payload.get("schema") or "") if payload else "",
+            "handoff_id": str(payload.get("handoff_id") or "") if payload else "",
+            "handoff_hash": str(payload.get("handoff_hash") or "") if payload else "",
+            "produced_by": str(payload.get("produced_by") or "") if payload else "",
+            "consumed_by": str(payload.get("consumed_by") or "") if payload else "",
+            "selected_artifact": {
+                "key": str(selected.get("key") or ""),
+                "title": str(selected.get("title") or ""),
+                "category": str(selected.get("category") or ""),
+                "path": str(selected.get("path") or ""),
+            },
+            "artifacts": {
+                "scene_npz_path": str(artifacts.get("scene_npz_path") or ""),
+                "pointer_json_path": str(artifacts.get("pointer_json_path") or ""),
+                "mnemo_event_log_path": str(artifacts.get("mnemo_event_log_path") or ""),
+                "capture_export_manifest_path": str(
+                    artifacts.get("capture_export_manifest_path") or ""
+                ),
+                "analysis_animation_handoff_path": str(
+                    artifacts.get("analysis_animation_handoff_path") or ""
+                ),
+            },
+            "animation_context": {
+                "scene_ready": bool(context.get("scene_ready")),
+                "mnemo_ready": bool(context.get("mnemo_ready")),
+                "capture_status": str(context.get("capture_status") or ""),
+            },
+            "next_step": str(payload.get("next_step") or "") if payload else "",
+        }
+
     def build_diagnostics_evidence_manifest(
         self,
         snapshot: DesktopResultsSnapshot,
@@ -1574,6 +1814,7 @@ class DesktopResultsRuntime:
                     "step_lines": list(handoff.step_lines) if handoff is not None else [],
                 },
             },
+            "animation_diagnostics_handoff": self._animation_diagnostics_handoff_evidence(),
         }
         payload["evidence_manifest_hash"] = _sha256_text(_json_dumps_canonical(payload))
         return payload
@@ -1595,6 +1836,12 @@ class DesktopResultsRuntime:
 
     def compare_current_context_sidecar_path(self) -> Path:
         return (self.send_bundles_dir / COMPARE_CURRENT_CONTEXT_SIDECAR_JSON).resolve()
+
+    def analysis_animation_handoff_path(self) -> Path:
+        return (self.send_bundles_dir / ANALYSIS_ANIMATION_HANDOFF_JSON).resolve()
+
+    def animation_diagnostics_handoff_path(self) -> Path:
+        return (self.send_bundles_dir / ANIMATION_DIAGNOSTICS_HANDOFF_JSON).resolve()
 
     def build_compare_current_context_sidecar(
         self,
@@ -1684,6 +1931,147 @@ class DesktopResultsRuntime:
         _atomic_write_json(path, self.build_compare_current_context_sidecar(snapshot))
         return path.resolve()
 
+    def build_analysis_animation_handoff(
+        self,
+        snapshot: DesktopResultsSnapshot,
+        artifact: DesktopResultsArtifact | None = None,
+    ) -> dict[str, Any]:
+        target_artifact = artifact or self.artifact_by_key(snapshot, "latest_npz")
+        npz_path, pointer_path = self.animator_target_paths(snapshot, artifact=target_artifact)
+        payload: dict[str, Any] = {
+            "schema": "desktop_results_analysis_animation_handoff",
+            "schema_version": "1.0.0",
+            "handoff_id": "HO-ANALYSIS-ANIMATION-001",
+            "produced_by": "WS-ANALYSIS",
+            "consumed_by": "WS-ANIMATOR",
+            "created_at": _utc_now(),
+            "project_id": self.repo_root.name,
+            "project_path": str(self.repo_root),
+            "readonly": True,
+            "source": "desktop_results_runtime",
+            "selected_artifact": {
+                "key": str(getattr(target_artifact, "key", "") or ""),
+                "title": str(getattr(target_artifact, "title", "") or ""),
+                "category": str(getattr(target_artifact, "category", "") or ""),
+                "path": str(getattr(target_artifact, "path", "") or ""),
+                "detail": str(getattr(target_artifact, "detail", "") or ""),
+            },
+            "artifacts": {
+                "selected_artifact_path": str(getattr(target_artifact, "path", "") or ""),
+                "latest_npz_path": str(npz_path or ""),
+                "latest_pointer_json_path": str(pointer_path or ""),
+                "latest_mnemo_event_log_path": str(
+                    getattr(snapshot, "latest_mnemo_event_log_path", None) or ""
+                ),
+                "latest_capture_export_manifest_path": str(
+                    getattr(snapshot, "latest_capture_export_manifest_path", None) or ""
+                ),
+                "selected_run_contract_path": str(
+                    getattr(snapshot, "selected_run_contract_path", None) or ""
+                ),
+            },
+            "result_context": {
+                "state": getattr(snapshot, "result_context_state", "UNKNOWN"),
+                "banner": getattr(snapshot, "result_context_banner", ""),
+            },
+            "next_step": "Откройте рабочий шаг анимации и проверьте движение по выбранному результату.",
+        }
+        payload["handoff_hash"] = _sha256_text(_json_dumps_canonical(payload))
+        return payload
+
+    def write_analysis_animation_handoff(
+        self,
+        snapshot: DesktopResultsSnapshot,
+        artifact: DesktopResultsArtifact | None = None,
+    ) -> Path:
+        path = self.analysis_animation_handoff_path()
+        _atomic_write_json(path, self.build_analysis_animation_handoff(snapshot, artifact=artifact))
+        return path.resolve()
+
+    def animation_handoff_artifact(
+        self,
+        snapshot: DesktopResultsSnapshot | None = None,
+    ) -> DesktopResultsArtifact | None:
+        payload = _safe_read_json_dict(self.analysis_animation_handoff_path())
+        artifacts = dict(payload.get("artifacts") or {})
+        selected = dict(payload.get("selected_artifact") or {})
+        target_path = _existing_path(
+            selected.get("path")
+            or artifacts.get("selected_artifact_path")
+            or artifacts.get("latest_npz_path")
+            or artifacts.get("latest_pointer_json_path")
+        )
+        if target_path is None:
+            return None
+        return DesktopResultsArtifact(
+            key=str(selected.get("key") or "analysis_animation_handoff"),
+            title=str(selected.get("title") or "Переданный результат анализа"),
+            category=str(selected.get("category") or "results"),
+            path=target_path,
+            detail=str(selected.get("detail") or "Материал передан из анализа результатов."),
+        )
+
+    def build_animation_diagnostics_handoff(
+        self,
+        snapshot: DesktopResultsSnapshot,
+        artifact: DesktopResultsArtifact | None = None,
+    ) -> dict[str, Any]:
+        target_artifact = artifact or self.animation_handoff_artifact(snapshot)
+        npz_path, pointer_path = self.animator_target_paths(snapshot, artifact=target_artifact)
+        payload: dict[str, Any] = {
+            "schema": "desktop_animation_diagnostics_handoff",
+            "schema_version": "1.0.0",
+            "handoff_id": "HO-ANIMATION-DIAGNOSTICS-001",
+            "produced_by": "WS-ANIMATOR",
+            "consumed_by": "WS-DIAGNOSTICS",
+            "created_at": _utc_now(),
+            "project_id": self.repo_root.name,
+            "project_path": str(self.repo_root),
+            "readonly": True,
+            "source": "desktop_results_runtime",
+            "selected_artifact": {
+                "key": str(getattr(target_artifact, "key", "") or ""),
+                "title": str(getattr(target_artifact, "title", "") or ""),
+                "category": str(getattr(target_artifact, "category", "") or ""),
+                "path": str(getattr(target_artifact, "path", "") or ""),
+                "detail": str(getattr(target_artifact, "detail", "") or ""),
+            },
+            "artifacts": {
+                "scene_npz_path": str(npz_path or ""),
+                "pointer_json_path": str(pointer_path or ""),
+                "mnemo_event_log_path": str(
+                    getattr(snapshot, "latest_mnemo_event_log_path", None) or ""
+                ),
+                "capture_export_manifest_path": str(
+                    getattr(snapshot, "latest_capture_export_manifest_path", None) or ""
+                ),
+                "analysis_animation_handoff_path": str(self.analysis_animation_handoff_path()),
+            },
+            "animation_context": {
+                "scene_ready": bool(npz_path or pointer_path),
+                "mnemo_ready": bool(
+                    npz_path
+                    or pointer_path
+                    or getattr(snapshot, "latest_mnemo_event_log_path", None)
+                ),
+                "capture_status": str(
+                    getattr(snapshot, "latest_capture_export_manifest_status", "") or ""
+                ),
+            },
+            "next_step": "Перейдите к проверке проекта и сохраните архив с этим материалом анимации.",
+        }
+        payload["handoff_hash"] = _sha256_text(_json_dumps_canonical(payload))
+        return payload
+
+    def write_animation_diagnostics_handoff(
+        self,
+        snapshot: DesktopResultsSnapshot,
+        artifact: DesktopResultsArtifact | None = None,
+    ) -> Path:
+        path = self.animation_diagnostics_handoff_path()
+        _atomic_write_json(path, self.build_animation_diagnostics_handoff(snapshot, artifact=artifact))
+        return path.resolve()
+
     def compare_viewer_path(
         self,
         snapshot: DesktopResultsSnapshot,
@@ -1732,6 +2120,132 @@ class DesktopResultsRuntime:
 
         return npz_path, pointer_path
 
+    def animation_scene_preview_points(
+        self,
+        snapshot: DesktopResultsSnapshot,
+        artifact: DesktopResultsArtifact | None = None,
+        *,
+        max_points: int = 80,
+    ) -> dict[str, Any]:
+        target_artifact = artifact or self.animation_handoff_artifact(snapshot)
+        npz_path, pointer_path = self.animator_target_paths(snapshot, artifact=target_artifact)
+        if npz_path is None:
+            return {
+                "status": "MISSING",
+                "source_path": "",
+                "pointer_path": str(pointer_path or ""),
+                "series_x": "index",
+                "series_y": "scene",
+                "points": (),
+                "point_count": 0,
+                "range": "нужен результат расчёта",
+            }
+        if not npz_path.exists() or npz_path.suffix.lower() != ".npz":
+            return {
+                "status": "MISSING",
+                "source_path": str(npz_path),
+                "pointer_path": str(pointer_path or ""),
+                "series_x": "index",
+                "series_y": npz_path.name,
+                "points": (),
+                "point_count": 0,
+                "range": "файл сцены недоступен",
+            }
+        try:
+            import numpy as np
+        except Exception:
+            return {
+                "status": "WARN",
+                "source_path": str(npz_path),
+                "pointer_path": str(pointer_path or ""),
+                "series_x": "index",
+                "series_y": npz_path.name,
+                "points": (),
+                "point_count": 0,
+                "range": "numpy недоступен",
+            }
+
+        try:
+            with np.load(npz_path, allow_pickle=False) as data:
+                numeric: list[tuple[str, Any]] = []
+                for key in data.files:
+                    try:
+                        array = np.asarray(data[key]).reshape(-1)
+                    except Exception:
+                        continue
+                    if array.size <= 0 or not np.issubdtype(array.dtype, np.number):
+                        continue
+                    finite_mask = np.isfinite(array)
+                    if not finite_mask.any():
+                        continue
+                    numeric.append((str(key), array.astype(float, copy=False)))
+                if not numeric:
+                    return {
+                        "status": "MISSING",
+                        "source_path": str(npz_path),
+                        "pointer_path": str(pointer_path or ""),
+                        "series_x": "index",
+                        "series_y": npz_path.name,
+                        "points": (),
+                        "point_count": 0,
+                        "range": "числовые координаты не найдены",
+                    }
+                y_name, y_values = numeric[0]
+                x_name = "index"
+                x_values = np.arange(y_values.size, dtype=float)
+                for candidate_name, candidate_values in numeric[1:]:
+                    if candidate_values.size == y_values.size:
+                        x_name = candidate_name
+                        x_values = candidate_values
+                        break
+                mask = np.isfinite(x_values) & np.isfinite(y_values)
+                x_values = x_values[mask]
+                y_values = y_values[mask]
+                if x_values.size <= 0:
+                    return {
+                        "status": "MISSING",
+                        "source_path": str(npz_path),
+                        "pointer_path": str(pointer_path or ""),
+                        "series_x": x_name,
+                        "series_y": y_name,
+                        "points": (),
+                        "point_count": 0,
+                        "range": "нет конечных координат",
+                    }
+                limit = max(2, int(max_points or 80))
+                if x_values.size > limit:
+                    indices = np.linspace(0, x_values.size - 1, num=limit, dtype=int)
+                    x_values = x_values[indices]
+                    y_values = y_values[indices]
+                points = tuple(
+                    (float(x), float(y))
+                    for x, y in zip(x_values.tolist(), y_values.tolist())
+                )
+                return {
+                    "status": "READY",
+                    "source_path": str(npz_path),
+                    "pointer_path": str(pointer_path or ""),
+                    "series_x": x_name,
+                    "series_y": y_name,
+                    "points": points,
+                    "point_count": int(mask.sum()),
+                    "range": (
+                        f"x {_preview_number(x_values.min())} .. {_preview_number(x_values.max())}; "
+                        f"y {_preview_number(y_values.min())} .. {_preview_number(y_values.max())}"
+                    ),
+                }
+        except Exception:
+            return {
+                "status": "WARN",
+                "source_path": str(npz_path),
+                "pointer_path": str(pointer_path or ""),
+                "series_x": "index",
+                "series_y": npz_path.name,
+                "points": (),
+                "point_count": 0,
+                "range": "предпросмотр сцены не прочитан",
+            }
+
     def compare_viewer_args(
         self,
         snapshot: DesktopResultsSnapshot,
@@ -1770,6 +2284,23 @@ class DesktopResultsRuntime:
         args.append("--no-follow")
         return args
 
+    def mnemo_args(
+        self,
+        snapshot: DesktopResultsSnapshot,
+        *,
+        follow: bool,
+        artifact: DesktopResultsArtifact | None = None,
+    ) -> list[str]:
+        npz_path, pointer_path = self.animator_target_paths(snapshot, artifact=artifact)
+        if follow and pointer_path is not None:
+            return ["--follow", "--pointer", str(pointer_path)]
+        args: list[str] = []
+        if npz_path is not None:
+            args.extend(["--npz", str(npz_path)])
+        if pointer_path is not None:
+            args.extend(["--pointer", str(pointer_path)])
+        return args
+
     def launch_compare_viewer(
         self,
         snapshot: DesktopResultsSnapshot,
@@ -1795,6 +2326,18 @@ class DesktopResultsRuntime:
         return spawn_module(
             "pneumo_solver_ui.desktop_animator.app",
             args=self.animator_args(snapshot, follow=follow, artifact=artifact),
+        )
+
+    def launch_mnemo(
+        self,
+        snapshot: DesktopResultsSnapshot,
+        *,
+        follow: bool,
+        artifact: DesktopResultsArtifact | None = None,
+    ):
+        return spawn_module(
+            "pneumo_solver_ui.desktop_mnemo.main",
+            args=self.mnemo_args(snapshot, follow=follow, artifact=artifact),
         )
 
     def launch_full_diagnostics_gui(self):

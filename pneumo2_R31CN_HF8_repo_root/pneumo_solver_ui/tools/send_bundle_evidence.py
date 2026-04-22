@@ -28,6 +28,8 @@ GEOMETRY_REFERENCE_EVIDENCE_SIDECAR_NAME = "latest_geometry_reference_evidence.j
 GEOMETRY_REFERENCE_EVIDENCE_ARCNAME = "geometry/geometry_reference_evidence.json"
 GEOMETRY_REFERENCE_EVIDENCE_WORKSPACE_ARCNAME = "workspace/exports/geometry_reference_evidence.json"
 GEOMETRY_REFERENCE_EVIDENCE_FALLBACK_ARCNAME = "exports/geometry_reference_evidence.json"
+ANIMATION_DIAGNOSTICS_HANDOFF_SIDECAR_NAME = "latest_animation_diagnostics_handoff.json"
+ANIMATION_DIAGNOSTICS_HANDOFF_ARCNAME = "animation/latest_animation_diagnostics_handoff.json"
 GEOMETRY_REFERENCE_PRODUCER_EVIDENCE_OWNER = "producer_export"
 GEOMETRY_REFERENCE_REQUIRED_PRODUCER_ARTIFACTS = (
     "workspace/_pointers/anim_latest.json or workspace/exports/anim_latest.json",
@@ -292,6 +294,21 @@ EXPECTED_EVIDENCE: tuple[dict[str, Any], ...] = (
         ),
         "notes": "Desktop Mnemo startup/runtime proof; does not close visual acceptance without operator evidence.",
     },
+    {
+        "evidence_id": "BND-023",
+        "path_patterns": (ANIMATION_DIAGNOSTICS_HANDOFF_ARCNAME,),
+        "required_when": "if animation diagnostics handoff used",
+        "release_blocking_if_missing": False,
+        "hash_required": "optional",
+        "expected_provenance_fields": (
+            "handoff_id",
+            "handoff_hash",
+            "selected_artifact",
+            "scene_npz_path",
+            "pointer_json_path",
+        ),
+        "notes": "WS-ANIMATOR to WS-DIAGNOSTICS handoff sidecar for route-visible visual verification.",
+    },
 )
 
 
@@ -422,6 +439,125 @@ def _analysis_manifest_source(
             return payload, str(manifest_path), warnings
 
     return {}, "", warnings
+
+
+def _animation_diagnostics_handoff_source(
+    *,
+    zip_path: Path | str,
+    name_set: set[str],
+    json_sources: Mapping[str, Dict[str, Any]],
+) -> tuple[Dict[str, Any], str, list[str]]:
+    warnings: list[str] = []
+    if ANIMATION_DIAGNOSTICS_HANDOFF_ARCNAME in json_sources:
+        return (
+            dict(json_sources.get(ANIMATION_DIAGNOSTICS_HANDOFF_ARCNAME) or {}),
+            ANIMATION_DIAGNOSTICS_HANDOFF_ARCNAME,
+            warnings,
+        )
+    if ANIMATION_DIAGNOSTICS_HANDOFF_ARCNAME in name_set:
+        warnings.append(
+            "Animation diagnostics handoff is present but not valid JSON: "
+            f"{ANIMATION_DIAGNOSTICS_HANDOFF_ARCNAME}"
+        )
+        return {}, ANIMATION_DIAGNOSTICS_HANDOFF_ARCNAME, warnings
+
+    try:
+        sidecar = Path(zip_path).expanduser().resolve().parent / ANIMATION_DIAGNOSTICS_HANDOFF_SIDECAR_NAME
+    except Exception:
+        sidecar = Path(str(zip_path)).parent / ANIMATION_DIAGNOSTICS_HANDOFF_SIDECAR_NAME
+    if sidecar.exists():
+        payload, warning = _load_json_from_file(sidecar)
+        if warning:
+            warnings.append(warning)
+        return payload, str(sidecar), warnings
+    return {}, "", warnings
+
+
+def summarize_animation_diagnostics_handoff(
+    payload: Mapping[str, Any] | None,
+    *,
+    source_path: str = "",
+    read_warnings: Iterable[str] = (),
+) -> Dict[str, Any]:
+    obj = dict(payload or {})
+    source = str(source_path or "").strip()
+    warnings = [str(item).strip() for item in read_warnings if str(item).strip()]
+    selected = _mapping(obj.get("selected_artifact"))
+    artifacts = _mapping(obj.get("artifacts"))
+    context = _mapping(obj.get("animation_context"))
+    schema = str(obj.get("schema") or "").strip()
+    handoff_id = str(obj.get("handoff_id") or "").strip()
+    scene_path = str(artifacts.get("scene_npz_path") or "").strip()
+    pointer_path = str(artifacts.get("pointer_json_path") or "").strip()
+    status = "READY"
+
+    if not source:
+        status = "MISSING"
+    else:
+        if not obj:
+            warnings.append("Animation diagnostics handoff is empty or unreadable.")
+        if schema != "desktop_animation_diagnostics_handoff":
+            warnings.append(
+                f"Animation diagnostics handoff has unexpected schema: {schema or 'missing'}."
+            )
+        if handoff_id and handoff_id != "HO-ANIMATION-DIAGNOSTICS-001":
+            warnings.append(f"Animation diagnostics handoff has unexpected handoff_id: {handoff_id}.")
+        if not scene_path and not pointer_path:
+            warnings.append("Animation diagnostics handoff has no scene or pointer artifact.")
+        if warnings:
+            status = "WARN"
+
+    return {
+        "status": status,
+        "source_path": source,
+        "schema": schema,
+        "handoff_id": handoff_id,
+        "handoff_hash": str(obj.get("handoff_hash") or "").strip(),
+        "produced_by": str(obj.get("produced_by") or "").strip(),
+        "consumed_by": str(obj.get("consumed_by") or "").strip(),
+        "selected_artifact": {
+            "key": str(selected.get("key") or "").strip(),
+            "title": str(selected.get("title") or "").strip(),
+            "category": str(selected.get("category") or "").strip(),
+            "path": str(selected.get("path") or "").strip(),
+        },
+        "artifacts": {
+            "scene_npz_path": scene_path,
+            "pointer_json_path": pointer_path,
+            "mnemo_event_log_path": str(artifacts.get("mnemo_event_log_path") or "").strip(),
+            "capture_export_manifest_path": str(
+                artifacts.get("capture_export_manifest_path") or ""
+            ).strip(),
+            "analysis_animation_handoff_path": str(
+                artifacts.get("analysis_animation_handoff_path") or ""
+            ).strip(),
+        },
+        "animation_context": {
+            "scene_ready": bool(context.get("scene_ready") or scene_path or pointer_path),
+            "mnemo_ready": bool(context.get("mnemo_ready")),
+            "capture_status": str(context.get("capture_status") or "").strip(),
+        },
+        "next_step": str(obj.get("next_step") or "").strip(),
+        "warnings": list(dict.fromkeys(warnings)),
+    }
+
+
+def animation_diagnostics_handoff_for_evidence_manifest(
+    *,
+    zip_path: Path | str,
+    name_set: set[str],
+    json_sources: Mapping[str, Dict[str, Any]],
+) -> Dict[str, Any]:
+    payload, source_path, read_warnings = _animation_diagnostics_handoff_source(
+        zip_path=zip_path,
+        name_set=name_set,
+        json_sources=json_sources,
+    )
+    return summarize_animation_diagnostics_handoff(
+        payload,
+        source_path=source_path,
+        read_warnings=read_warnings,
+    )
 
 
 def summarize_analysis_evidence_manifest(
@@ -1211,6 +1347,7 @@ def _required_for_row(
         "workspace/exports/desktop_mnemo_runtime_proof*.json",
         "runtime/desktop_mnemo_runtime_proof*.json",
     )
+    animation_diagnostics_handoff_used = _has_any(name_set, ANIMATION_DIAGNOSTICS_HANDOFF_ARCNAME)
 
     if evidence_id in {"BND-007", "BND-008"}:
         return scenario_exists, "scenario_exists" if scenario_exists else "no scenario evidence detected"
@@ -1249,6 +1386,13 @@ def _required_for_row(
             "desktop_mnemo_runtime_claimed"
             if desktop_mnemo_runtime_claimed
             else "no Desktop Mnemo runtime proof detected",
+        )
+    if evidence_id == "BND-023":
+        return (
+            animation_diagnostics_handoff_used,
+            "animation_diagnostics_handoff_used"
+            if animation_diagnostics_handoff_used
+            else "no animation diagnostics handoff detected",
         )
     return False, "not_applicable"
 
@@ -1408,6 +1552,11 @@ def build_evidence_manifest(
         meta=meta_dict,
         json_sources=json_sources,
     )
+    animation_diagnostics_handoff = animation_diagnostics_handoff_for_evidence_manifest(
+        zip_path=zip_path,
+        name_set=name_set,
+        json_sources=json_sources,
+    )
     payload = {
         "schema": "diagnostics_evidence_manifest",
         "schema_version": "1.0.0",
@@ -1416,7 +1565,7 @@ def build_evidence_manifest(
         "finalization_stage": final_stage,
         "finalization_order": list(finalization_order or DEFAULT_FINALIZATION_ORDER),
         "workspace": "WS-DIAGNOSTICS",
-        "handoff_ids": ["HO-009", "HO-010"],
+        "handoff_ids": ["HO-009", "HO-010", "HO-ANIMATION-DIAGNOSTICS-001"],
         "playbook_id": "PB-002",
         "release_gates": ["RGH-006", "RGH-007", "RGH-016"],
         "zip_path": str(Path(zip_path)),
@@ -1432,6 +1581,7 @@ def build_evidence_manifest(
         "evidence_manifest_hash": manifest_hash,
         "analysis_handoff": analysis_handoff,
         "geometry_reference_handoff": geometry_reference_handoff,
+        "animation_diagnostics_handoff": animation_diagnostics_handoff,
         "bundle_contents_summary": content_summary,
         "evidence_classes": rows,
         "missing_required": missing_required,
@@ -1497,6 +1647,12 @@ def evidence_manifest_warnings(manifest: Mapping[str, Any] | None) -> List[str]:
                 "Geometry reference evidence missing; open Reference Center or re-export anim_latest "
                 "before claiming graphics truth."
             )
+    animation_handoff = obj.get("animation_diagnostics_handoff")
+    if isinstance(animation_handoff, Mapping):
+        for item in animation_handoff.get("warnings") or []:
+            msg = str(item or "").strip()
+            if msg:
+                warnings.append(msg)
     baseline = obj.get("baseline_center_evidence")
     if isinstance(baseline, Mapping) and bool(baseline.get("baseline_exists", False)):
         banner = baseline.get("banner_state")
@@ -1727,6 +1883,7 @@ def read_manifest_inputs_from_zip(zf: Any) -> tuple[dict[str, Any], dict[str, Di
         GEOMETRY_REFERENCE_EVIDENCE_ARCNAME,
         GEOMETRY_REFERENCE_EVIDENCE_WORKSPACE_ARCNAME,
         GEOMETRY_REFERENCE_EVIDENCE_FALLBACK_ARCNAME,
+        ANIMATION_DIAGNOSTICS_HANDOFF_ARCNAME,
     ):
         obj = _load_json_from_zip(zf, name)
         if obj:

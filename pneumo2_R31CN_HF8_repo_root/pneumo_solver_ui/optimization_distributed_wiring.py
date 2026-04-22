@@ -28,6 +28,8 @@ from .optimization_defaults import (
     DIST_OPT_DB_ENGINE_DEFAULT,
     DIST_OPT_EXPORT_EVERY_DEFAULT,
     DIST_OPT_HV_LOG_DEFAULT,
+    DIST_OPT_HEURISTIC_EXPLORE_DEFAULT,
+    DIST_OPT_HEURISTIC_POOL_SIZE_DEFAULT,
     DIST_OPT_RAY_RUNTIME_ENV_MODE_DEFAULT,
     DIST_OPT_STALE_TTL_SEC_DEFAULT,
 )
@@ -245,6 +247,10 @@ def append_coordinator_runtime_args(
         str(_state_int(state, "opt_botorch_maxiter", DIST_OPT_BOTORCH_MAXITER_DEFAULT)),
         "--botorch-ref-margin",
         str(_state_float(state, "opt_botorch_ref_margin", DIST_OPT_BOTORCH_REF_MARGIN_DEFAULT)),
+        "--heuristic-pool-size",
+        str(_state_int(state, "opt_heuristic_pool_size", DIST_OPT_HEURISTIC_POOL_SIZE_DEFAULT)),
+        "--heuristic-explore",
+        str(_state_float(state, "opt_heuristic_explore", DIST_OPT_HEURISTIC_EXPLORE_DEFAULT)),
     ]
     if not _state_bool(state, "opt_botorch_normalize_objectives", DIST_OPT_BOTORCH_NORMALIZE_OBJECTIVES_DEFAULT):
         cmd.append("--botorch-no-normalize-objectives")

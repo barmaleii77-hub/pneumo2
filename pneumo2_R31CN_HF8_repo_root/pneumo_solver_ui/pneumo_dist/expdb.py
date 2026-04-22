@@ -124,6 +124,14 @@ def _finite_float_or_none(value: Any) -> Optional[float]:
     return out if math.isfinite(out) else None
 
 
+def _json_dumps_safe(obj: Any) -> str:
+    """JSON dump with a defensive fallback for legacy/corrupted payloads."""
+    try:
+        return _json_dumps(obj)
+    except Exception:
+        return _json_dumps({"_raw": str(obj), "_encode_error": True})
+
+
 def _export_run_scope_payload(run: Dict[str, Any] | None, *, run_id_default: str = "") -> Dict[str, Any]:
     run_payload = dict(run or {}) if isinstance(run, dict) else {}
     spec = dict(run_payload.get("spec") or {}) if isinstance(run_payload.get("spec"), dict) else {}
@@ -220,6 +228,11 @@ class ReserveResult:
     y: Optional[List[float]] = None
     g: Optional[List[float]] = None
     metrics: Optional[Dict[str, Any]] = None
+
+    def __iter__(self):
+        # Legacy callers unpack reserve_trial() as: trial_id, inserted = ...
+        yield self.trial_id
+        yield self.inserted
 
 
 @dataclass
@@ -333,6 +346,10 @@ class ExperimentDB:
 
         self.init_schema()
 
+    def connect(self) -> None:
+        # Legacy alias used by older distributed runners.
+        self.open()
+
     def _open_postgres(self) -> None:
         dsn = self.db_path
         # psycopg v3 preferred
@@ -440,6 +457,19 @@ class ExperimentDB:
         if params is None:
             return self.conn.execute(sql)
         return self.conn.execute(sql, params)
+
+    def _execute(self, sql: str, params: Sequence[Any] | None = None):
+        # Legacy alias used by older runners.
+        return self.execute(sql, params)
+
+    def commit(self) -> None:
+        # Compatibility helper for callers that manage transactions manually.
+        try:
+            fn = getattr(self.conn, "commit", None)
+            if callable(fn):
+                fn()
+        except Exception:
+            pass
 
     def fetchone(self, sql: str, params: Sequence[Any] | None = None):
         cur = self.execute(sql, params)
@@ -721,6 +751,49 @@ class ExperimentDB:
         )
         return rid
 
+    def add_run(
+        self,
+        run_id: str,
+        *,
+        problem_hash: str,
+        meta: Dict[str, Any] | None = None,
+        status: str | None = None,
+        spec: Dict[str, Any] | None = None,
+    ) -> str:
+        """Legacy-compatible helper used by older distributed runners."""
+        if self.run_exists(run_id):
+            if status:
+                self.update_run_status(run_id, status=status)
+            return str(run_id)
+        meta2 = dict(meta or {})
+        if status:
+            meta2["status"] = str(status)
+        return self.create_run(
+            problem_hash=str(problem_hash),
+            spec=dict(spec or {}),
+            meta=meta2,
+            run_id=str(run_id),
+        )
+
+    def update_run_status(self, run_id: str, status: str, *, error: str = "", error_text: str = "") -> None:
+        """Persist run-level status in run.meta for compatibility."""
+        row = self.get_run(run_id)
+        if not row:
+            return
+        meta = dict(row.get("meta") or {})
+        meta["status"] = str(status or "").strip() or "unknown"
+        meta["updated_utc"] = float(_now_ts())
+        err = str(error_text or error or "").strip()
+        if err:
+            meta["error"] = err
+        try:
+            self.execute(
+                "UPDATE runs SET meta_json=? WHERE run_id=?;",
+                [_json_dumps(meta), str(run_id)],
+            )
+        except Exception:
+            pass
+
     def get_run(self, run_id: str) -> Optional[Dict[str, Any]]:
         row = self.fetchone(
             "SELECT run_id, created_ts, problem_hash, spec_json, meta_json FROM runs WHERE run_id=?;",
@@ -824,30 +897,150 @@ class ExperimentDB:
             ],
         )
 
+    def get_cached(self, problem_hash: str, param_hash: str) -> Optional[Dict[str, Any]]:
+        """Legacy cache reader returning obj1/obj2/penalty fields."""
+        y, g, metrics = self._cache_get(problem_hash=str(problem_hash), param_hash=str(param_hash))
+        if y is None and metrics is None:
+            return None
+        metrics_map = dict(metrics or {})
+        obj1 = _finite_float_or_none(y[0] if isinstance(y, list) and len(y) >= 1 else metrics_map.get("obj1"))
+        obj2 = _finite_float_or_none(y[1] if isinstance(y, list) and len(y) >= 2 else metrics_map.get("obj2"))
+        penalty = _finite_float_or_none(
+            g[0] if isinstance(g, list) and len(g) >= 1 else metrics_map.get("penalty")
+        )
+        if penalty is None:
+            penalty = _finite_float_or_none(metrics_map.get("penalty_total"))
+        # Legacy runners parse these through float(...), so None would crash.
+        # Use NaN as the "unknown" sentinel for numeric compatibility.
+        if obj1 is None:
+            obj1 = float("nan")
+        if obj2 is None:
+            obj2 = float("nan")
+        if penalty is None:
+            penalty = float("nan")
+        return {
+            "obj1": obj1,
+            "obj2": obj2,
+            "penalty": penalty,
+            "metrics": metrics_map,
+            "y": list(y or []),
+            "g": list(g or []) if isinstance(g, list) else None,
+        }
+
+    def put_cache(
+        self,
+        problem_hash: str,
+        param_hash: str,
+        *,
+        metrics: Dict[str, Any] | None = None,
+        obj1: Any = None,
+        obj2: Any = None,
+        penalty: Any = None,
+    ) -> None:
+        """Legacy cache writer."""
+        metrics_map = dict(metrics or {})
+        y: List[float] = []
+        obj1_f = _finite_float_or_none(obj1)
+        obj2_f = _finite_float_or_none(obj2)
+        if obj1_f is not None:
+            metrics_map.setdefault("obj1", float(obj1_f))
+            y.append(float(obj1_f))
+        if obj2_f is not None:
+            metrics_map.setdefault("obj2", float(obj2_f))
+            y.append(float(obj2_f))
+        g: Optional[List[float]] = None
+        pen_f = _finite_float_or_none(penalty)
+        if pen_f is not None:
+            metrics_map.setdefault("penalty", float(pen_f))
+            g = [float(pen_f)]
+        self.upsert_cache(
+            problem_hash=str(problem_hash),
+            param_hash=str(param_hash),
+            y=y,
+            g=g,
+            metrics=metrics_map,
+        )
+
     # ---- trials ----
 
     def reserve_trial(
         self,
-        *,
-        run_id: str,
-        problem_hash: str,
-        param_hash: str,
-        x_u: List[float],
-        params: Dict[str, Any],
+        *args,
+        run_id: str | None = None,
+        problem_hash: str | None = None,
+        param_hash: str | None = None,
+        x_u: List[float] | None = None,
+        params: Dict[str, Any] | None = None,
         meta: Dict[str, Any] | None = None,
+        source: str | None = None,
     ) -> ReserveResult:
         """Reserve a trial (dedup within run, optional cache hit).
 
         - If (problem_hash,param_hash) in cache -> insert DONE trial and return.
         - Else insert PENDING trial (dedup within run). Return current status.
         """
-        meta = meta or {}
+        if args:
+            if len(args) > 5:
+                raise TypeError(
+                    "reserve_trial() accepts up to 5 positional args: "
+                    "(run_id, problem_hash, param_hash, x_u, params)"
+                )
+            if len(args) >= 1 and run_id is None:
+                run_id = str(args[0])
+            if len(args) >= 2 and problem_hash is None:
+                problem_hash = str(args[1])
+            if len(args) >= 3 and param_hash is None:
+                param_hash = str(args[2])
+            if len(args) >= 4 and x_u is None:
+                x_u = list(args[3] or [])
+            if len(args) >= 5 and params is None:
+                params = dict(args[4] or {})
+
+        if run_id is None or problem_hash is None or param_hash is None or x_u is None or params is None:
+            raise TypeError(
+                "reserve_trial() missing required arguments: "
+                "run_id, problem_hash, param_hash, x_u, params"
+            )
+
+        meta = dict(meta or {})
+        if source is not None and "source" not in meta:
+            meta["source"] = str(source)
         host = meta.get("host") or socket.gethostname()
         ts = _now_ts()
 
-        # 1) cache hit?
+        # 1) cache hit? We only accept cache entries with a usable objective vector.
         y_cached, g_cached, metrics_cached = self._cache_get(problem_hash=problem_hash, param_hash=param_hash)
-        if y_cached is not None and metrics_cached is not None:
+        metrics_cached_map = dict(metrics_cached or {}) if isinstance(metrics_cached, dict) else {}
+        y_cached_norm: List[float] = []
+        if isinstance(y_cached, list):
+            for item in y_cached:
+                val = _finite_float_or_none(item)
+                if val is not None:
+                    y_cached_norm.append(float(val))
+
+        if not y_cached_norm:
+            obj1_f = _finite_float_or_none(metrics_cached_map.get("obj1"))
+            obj2_f = _finite_float_or_none(metrics_cached_map.get("obj2"))
+            if obj1_f is not None and obj2_f is not None:
+                y_cached_norm = [float(obj1_f), float(obj2_f)]
+
+        g_cached_norm: Optional[List[float]] = None
+        if isinstance(g_cached, list):
+            g_items: List[float] = []
+            for item in g_cached:
+                val = _finite_float_or_none(item)
+                if val is not None:
+                    g_items.append(float(val))
+            if g_items:
+                g_cached_norm = g_items
+        if g_cached_norm is None:
+            penalty_f = _finite_float_or_none(metrics_cached_map.get("penalty"))
+            if penalty_f is None:
+                penalty_f = _finite_float_or_none(metrics_cached_map.get("penalty_total"))
+            if penalty_f is not None:
+                g_cached_norm = [float(penalty_f)]
+
+        if y_cached_norm:
             trial_id = uuid.uuid4().hex
             self.execute(
                 """INSERT INTO trials(
@@ -869,9 +1062,9 @@ class ExperimentDB:
                     float(ts),
                     _json_dumps(list(x_u)),
                     _json_dumps(dict(params)),
-                    _json_dumps(list(y_cached)),
-                    _json_dumps(list(g_cached)) if g_cached is not None else None,
-                    _json_dumps(metrics_cached),
+                    _json_dumps(list(y_cached_norm)),
+                    _json_dumps(list(g_cached_norm)) if g_cached_norm is not None else None,
+                    _json_dumps(metrics_cached_map),
                     "",
                     float(ts),
                     float(ts),
@@ -899,9 +1092,9 @@ class ExperimentDB:
                 status="DONE",
                 from_cache=True,
                 inserted=True,
-                y=y_cached,
-                g=g_cached,
-                metrics=metrics_cached,
+                y=y_cached_norm,
+                g=g_cached_norm,
+                metrics=metrics_cached_map,
             )
 
         # 2) insert as PENDING (dedup within run)
@@ -964,6 +1157,10 @@ class ExperimentDB:
             [float(ts), float(ts), str(worker_tag), str(trial_id)],
         )
 
+    def mark_started(self, trial_id: str, worker_id: str = "") -> None:
+        # Legacy alias used by older runners.
+        self.mark_running(str(trial_id), worker_tag=str(worker_id))
+
     def heartbeat(self, trial_id: str, *, extend_lease_sec: float | None = None) -> None:
         """Update heartbeat timestamp, optionally extending the lease.
 
@@ -989,34 +1186,75 @@ class ExperimentDB:
         self,
         trial_id: str,
         *,
-        y: List[float],
-        g: Optional[List[float]],
-        metrics: Dict[str, Any],
+        y: Optional[List[float]] = None,
+        g: Optional[List[float]] = None,
+        metrics: Optional[Dict[str, Any]] = None,
+        obj1: Any = None,
+        obj2: Any = None,
+        penalty: Any = None,
+        status: str = "DONE",
         error_text: str = "",
     ) -> None:
+        metrics_map = dict(metrics or {})
+        if y is None:
+            y_vals: List[float] = []
+            obj1_f = _finite_float_or_none(obj1)
+            obj2_f = _finite_float_or_none(obj2)
+            if obj1_f is not None:
+                y_vals.append(float(obj1_f))
+                metrics_map.setdefault("obj1", float(obj1_f))
+            if obj2_f is not None:
+                y_vals.append(float(obj2_f))
+                metrics_map.setdefault("obj2", float(obj2_f))
+            y = y_vals
+        else:
+            y = [float(v) for v in list(y)]
+
+        if g is None:
+            pen_f = _finite_float_or_none(penalty)
+            if pen_f is not None:
+                g = [float(pen_f)]
+                metrics_map.setdefault("penalty", float(pen_f))
+        else:
+            g = [float(v) for v in list(g)]
+
+        status_text = str(status or "DONE").strip().upper() or "DONE"
         ts = _now_ts()
         self.execute(
             """UPDATE trials
-               SET status='DONE', finished_ts=?, heartbeat_ts=?, y_json=?, g_json=?, metrics_json=?, error_text=?, lease_expires_ts=NULL
+               SET status=?, finished_ts=?, heartbeat_ts=?, y_json=?, g_json=?, metrics_json=?, error_text=?, lease_expires_ts=NULL
                WHERE trial_id=?;""",
             [
+                status_text,
                 float(ts),
                 float(ts),
                 _json_dumps(list(y)),
                 _json_dumps(list(g)) if g is not None else None,
-                _json_dumps(metrics),
+                _json_dumps(metrics_map),
                 (error_text or "")[:50000],
                 str(trial_id),
             ],
         )
 
-    def mark_error(self, trial_id: str, error_text: str) -> None:
+    def mark_error(
+        self,
+        trial_id: str,
+        error_text: str = "",
+        *,
+        error: str = "",
+        traceback_str: str = "",
+    ) -> None:
+        base_error = str(error_text or error or "").strip()
+        trace = str(traceback_str or "").strip()
+        msg = base_error
+        if trace:
+            msg = f"{base_error}\n{trace}" if base_error else trace
         ts = _now_ts()
         self.execute(
             """UPDATE trials
                SET status='ERROR', finished_ts=?, heartbeat_ts=?, error_text=?, lease_expires_ts=NULL
                WHERE trial_id=?;""",
-            [float(ts), float(ts), (error_text or "")[:50000], str(trial_id)],
+            [float(ts), float(ts), msg[:50000], str(trial_id)],
         )
 
     def requeue_stale(self, run_id: str, ttl_sec: float) -> int:
@@ -1050,6 +1288,11 @@ class ExperimentDB:
             [str(run_id)],
         )
         return int(row[0]) if row else 0
+
+    def requeue_stale_trials(self, run_id: str, *, ttl_sec: float, max_attempt: int | None = None) -> int:
+        # Legacy alias; max_attempt is accepted for signature compatibility.
+        _ = max_attempt
+        return int(self.requeue_stale(str(run_id), float(ttl_sec)))
 
     def requeue_errors(self, run_id: str, *, max_attempts: int = 3, base_delay_sec: float = 60.0) -> int:
         """Move ERROR trials back to PENDING with exponential backoff.
@@ -1426,6 +1669,76 @@ class ExperimentDB:
             out[str(st)] = int(cnt)
         return out
 
+    def count_status(self, run_id: str) -> Dict[str, int]:
+        """Legacy status map with lower-case keys."""
+        raw = self.count_by_status(run_id)
+        out: Dict[str, int] = {}
+        for st, cnt in raw.items():
+            key = str(st or "").strip().lower()
+            if not key:
+                continue
+            out[key] = int(out.get(key, 0) + int(cnt))
+        for key in ("pending", "running", "done", "error", "cached", "reserved"):
+            out.setdefault(key, 0)
+        return out
+
+    def fetch_dataset_arrays(self, run_id: str):
+        """Legacy helper returning (X_u, Y_min, penalty) numpy arrays."""
+        import numpy as np
+
+        done_like = {"DONE", "CACHED", "CACHE", "SUCCESS", "COMPLETED"}
+        xs: List[List[float]] = []
+        ys: List[List[float]] = []
+        ps: List[float] = []
+        dim: Optional[int] = None
+
+        for trial in self.fetch_trials(str(run_id), status=None, limit=None, order="created_ts"):
+            status_text = str(trial.get("status") or "").strip().upper()
+            if status_text not in done_like:
+                continue
+            x_raw = trial.get("x_u")
+            if not isinstance(x_raw, list):
+                continue
+            x_vals: List[float] = []
+            for item in x_raw:
+                val = _finite_float_or_none(item)
+                if val is None:
+                    x_vals = []
+                    break
+                x_vals.append(float(val))
+            if not x_vals:
+                continue
+            if dim is None:
+                dim = len(x_vals)
+            if len(x_vals) != int(dim):
+                continue
+
+            y_raw = trial.get("y")
+            y_vals = list(y_raw) if isinstance(y_raw, list) else []
+            metrics_map = dict(trial.get("metrics") or {}) if isinstance(trial.get("metrics"), dict) else {}
+            obj1 = _finite_float_or_none(y_vals[0] if len(y_vals) >= 1 else metrics_map.get("obj1"))
+            obj2 = _finite_float_or_none(y_vals[1] if len(y_vals) >= 2 else metrics_map.get("obj2"))
+            if obj1 is None or obj2 is None:
+                continue
+
+            g_raw = trial.get("g")
+            g_vals = list(g_raw) if isinstance(g_raw, list) else []
+            penalty = _finite_float_or_none(g_vals[0] if g_vals else metrics_map.get("penalty"))
+            if penalty is None:
+                penalty = _finite_float_or_none(metrics_map.get("penalty_total"))
+            if penalty is None:
+                penalty = float("nan")
+
+            xs.append(x_vals)
+            ys.append([float(obj1), float(obj2)])
+            ps.append(float(penalty))
+
+        x_dim = int(dim or 0)
+        X_u = np.asarray(xs, dtype=float) if xs else np.empty((0, x_dim), dtype=float)
+        Y_min = np.asarray(ys, dtype=float) if ys else np.empty((0, 2), dtype=float)
+        penalty = np.asarray(ps, dtype=float) if ps else np.empty((0,), dtype=float)
+        return X_u, Y_min, penalty
+
     # ---- metrics ----
 
     def add_run_metric(self, run_id: str, *, key: str, value: float | None = None, json_blob: Any | None = None) -> None:
@@ -1444,6 +1757,32 @@ class ExperimentDB:
             ],
         )
 
+    def add_metric(
+        self,
+        run_id: str,
+        *,
+        completed: int,
+        submitted: int,
+        n_feasible: int,
+        hypervolume: float,
+        best_obj1: float,
+        best_obj2: float,
+        info: Dict[str, Any] | None = None,
+    ) -> None:
+        """Legacy metric sink used by older distributed runners."""
+        payload = {
+            "completed": int(completed),
+            "submitted": int(submitted),
+            "n_feasible": int(n_feasible),
+            "hypervolume": float(hypervolume),
+            "best_obj1": float(best_obj1),
+            "best_obj2": float(best_obj2),
+            "info": dict(info or {}),
+        }
+        self.log_metric(str(run_id), key="progress", value=float(completed), json_obj=payload)
+        if math.isfinite(float(hypervolume)):
+            self.log_metric(str(run_id), key="hv", value=float(hypervolume), json_obj=payload)
+
     def fetch_metrics(self, run_id: str, *, key: str | None = None, limit: int = 2000) -> List[Dict[str, Any]]:
         if key:
             rows = self.fetchall(
@@ -1457,12 +1796,41 @@ class ExperimentDB:
             )
         out: List[Dict[str, Any]] = []
         for ts, k, v, js in rows:
-            out.append({"ts": float(ts), "key": str(k), "value": v if v is None else float(v), "json": _json_loads(js)})
+            ts_f = _finite_float_or_none(ts)
+            value_f = _finite_float_or_none(v) if v is not None else None
+            out.append(
+                {
+                    "ts": float(ts_f) if ts_f is not None else 0.0,
+                    "key": str(k or ""),
+                    "value": value_f,
+                    "json": _json_loads(js),
+                }
+            )
         return out
 
     # ---- exports ----
 
-    def export_run_to_csv(self, run_id: str, *, out_dir: str) -> None:
+    def export_run_to_csv(self, run_id: str, *args, out_dir: str | None = None) -> None:
+        legacy_trials_path: Optional[Path] = None
+        legacy_metrics_path: Optional[Path] = None
+        if len(args) > 2:
+            raise TypeError(
+                "export_run_to_csv() accepts at most 2 positional args: "
+                "(trials_csv_path, run_metrics_csv_path)"
+            )
+        if out_dir is None:
+            if len(args) == 1:
+                out_dir = str(args[0])
+            elif len(args) == 2:
+                legacy_trials_path = Path(str(args[0]))
+                legacy_metrics_path = Path(str(args[1]))
+                out_dir = str(legacy_trials_path.parent)
+            else:
+                raise TypeError("export_run_to_csv() requires out_dir or legacy csv paths")
+        elif len(args) == 2:
+            legacy_trials_path = Path(str(args[0]))
+            legacy_metrics_path = Path(str(args[1]))
+
         outp = Path(out_dir)
         outp.mkdir(parents=True, exist_ok=True)
 
@@ -1558,10 +1926,10 @@ class ExperimentDB:
                         t.get("heartbeat_ts"),
                         t.get("worker_tag", ""),
                         t.get("host", ""),
-                        _json_dumps(t.get("x_u")),
-                        _json_dumps(t.get("y")),
-                        _json_dumps(t.get("g")),
-                        _json_dumps(t.get("metrics")),
+                        _json_dumps_safe(t.get("x_u")),
+                        _json_dumps_safe(t.get("y")),
+                        _json_dumps_safe(t.get("g")),
+                        _json_dumps_safe(t.get("metrics")),
                         t.get("error_text", ""),
                     ]
                 )
@@ -1580,9 +1948,24 @@ class ExperimentDB:
                         m.get("ts"),
                         m.get("key"),
                         m.get("value"),
-                        _json_dumps(m.get("json")),
+                        _json_dumps_safe(m.get("json")),
                     ]
                 )
+
+        if legacy_trials_path is not None:
+            try:
+                legacy_trials_path.parent.mkdir(parents=True, exist_ok=True)
+                if legacy_trials_path.resolve() != trials_csv.resolve():
+                    legacy_trials_path.write_bytes(trials_csv.read_bytes())
+            except Exception:
+                pass
+        if legacy_metrics_path is not None:
+            try:
+                legacy_metrics_path.parent.mkdir(parents=True, exist_ok=True)
+                if legacy_metrics_path.resolve() != metrics_csv.resolve():
+                    legacy_metrics_path.write_bytes(metrics_csv.read_bytes())
+            except Exception:
+                pass
 
         if not (outp / "run_scope.json").exists() or not (outp / "run_scope.csv").exists():
             _write_run_scope_sidecars()

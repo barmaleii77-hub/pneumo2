@@ -1,4 +1,4 @@
-import numpy as np
+﻿import numpy as np
 
 from pneumo_solver_ui import model_pneumo_v9_mech_doublewishbone_worldroad as m
 
@@ -37,7 +37,7 @@ def test_integrator_dt_int_max_convergence_worldroad():
 
     def run(dt_int_max: float):
         params = dict(base_params)
-        params["макс_шаг_интегрирования_с"] = float(dt_int_max)
+        params["integrator_dt_int_max_s"] = float(dt_int_max)
         df_main, *_ = m.simulate(params, scenario, dt=2e-3, t_end=0.05, record_full=False)
         return df_main
 
@@ -109,7 +109,7 @@ def test_integrator_local_error_control_step_doubling_worldroad():
 
     def run(dt_int_max: float, *, err_control: bool = False):
         params = dict(base_params)
-        params["макс_шаг_интегрирования_с"] = float(dt_int_max)
+        params["integrator_dt_int_max_s"] = float(dt_int_max)
         if err_control:
             params["интегратор_контроль_локальной_ошибки"] = True
             # оставляем дефолтные atol/rtol, но явно задаём для устойчивости теста

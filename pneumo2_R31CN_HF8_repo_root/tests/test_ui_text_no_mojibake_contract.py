@@ -42,9 +42,11 @@ DESKTOP_OPERATOR_TEXT_FILES = [
 DESKTOP_MOJIBAKE_GUARDED_FILES = [
     ROOT / "pneumo_solver_ui" / "ui_preflight.py",
     ROOT / "pneumo_solver_ui" / "desktop_animator" / "app.py",
+    ROOT / "pneumo_solver_ui" / "desktop_baseline_run_runtime.py",
     ROOT / "pneumo_solver_ui" / "desktop_spec_shell" / "catalogs.py",
     ROOT / "pneumo_solver_ui" / "desktop_spec_shell" / "help_registry.py",
     ROOT / "pneumo_solver_ui" / "desktop_spec_shell" / "registry.py",
+    ROOT / "pneumo_solver_ui" / "desktop_spec_shell" / "workspace_pages.py",
     *DESKTOP_OPERATOR_TEXT_FILES,
 ]
 

@@ -77,6 +77,8 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
         "workspace.baseline_run.open",
         "workspace.ring_editor.open",
     )
+    assert "optimization.primary_launch.execute" in workspaces["optimization"].quick_action_ids
+    assert "optimization.primary_launch.soft_stop" in workspaces["optimization"].quick_action_ids
 
     assert commands["diagnostics.collect_bundle"].kind == "hosted_action"
     assert commands["diagnostics.collect_bundle"].automation_id == "DG-BTN-COLLECT"
@@ -114,16 +116,35 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert commands["results.center.open"].module is None
     assert commands["results.center.open"].automation_id == "RS-BTN-OPEN-ANALYTICS"
     assert commands["results.compare.prepare"].kind == "hosted_action"
+    assert commands["results.compare.open"].kind == "hosted_action"
+    assert commands["results.compare.open"].automation_id == "RS-BTN-OPEN-COMPARE"
+    assert commands["results.compare.open"].launch_surface == "workspace"
+    assert commands["results.animation.prepare"].kind == "hosted_action"
+    assert commands["results.animation.prepare"].automation_id == "RS-BTN-HANDOFF-ANIMATION"
+    assert commands["results.animation.prepare"].launch_surface == "workspace"
     assert commands["results.evidence.prepare"].kind == "hosted_action"
     assert commands["results.legacy_center.open"].kind == "launch_module"
     assert commands["results.legacy_center.open"].module == "pneumo_solver_ui.tools.desktop_results_center"
     assert commands["results.legacy_center.open"].launch_surface == "legacy_bridge"
+    assert commands["results.legacy_compare.open"].kind == "launch_module"
+    assert commands["results.legacy_compare.open"].module == "pneumo_solver_ui.qt_compare_viewer"
+    assert commands["results.legacy_compare.open"].launch_surface == "external_window"
     assert commands["animation.animator.open"].kind == "hosted_action"
     assert commands["animation.animator.open"].module is None
     assert commands["animation.animator.open"].launch_surface == "workspace"
+    assert commands["animation.animator.launch"].kind == "hosted_action"
+    assert commands["animation.animator.launch"].module is None
+    assert commands["animation.animator.launch"].automation_id == "AM-DETACH"
     assert commands["animation.mnemo.open"].kind == "hosted_action"
     assert commands["animation.mnemo.open"].module is None
     assert commands["animation.mnemo.open"].launch_surface == "workspace"
+    assert commands["animation.mnemo.launch"].kind == "hosted_action"
+    assert commands["animation.mnemo.launch"].module is None
+    assert commands["animation.mnemo.launch"].automation_id == "AM-BTN-DETACH-MNEMO"
+    assert commands["animation.diagnostics.prepare"].kind == "hosted_action"
+    assert commands["animation.diagnostics.prepare"].module is None
+    assert commands["animation.diagnostics.prepare"].automation_id == "AM-BTN-HANDOFF-DIAGNOSTICS"
+    assert commands["animation.diagnostics.prepare"].launch_surface == "workspace"
     assert commands["animation.legacy_animator.open"].kind == "launch_module"
     assert commands["animation.legacy_animator.open"].module == "pneumo_solver_ui.desktop_animator.app"
     assert commands["animation.legacy_animator.open"].launch_surface == "external_window"
@@ -141,6 +162,18 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert commands["baseline.run_setup.verify"].kind == "hosted_action"
     assert commands["baseline.run_setup.prepare_checked"].kind == "hosted_action"
     assert commands["baseline.run_setup.prepare"].kind == "hosted_action"
+    assert commands["baseline.run.execute"].kind == "hosted_action"
+    assert commands["baseline.run.execute"].launch_surface == "workspace"
+    assert commands["baseline.run.execute"].automation_id == "BL-BTN-RUN-EXECUTE"
+    assert commands["baseline.run.cancel"].kind == "hosted_action"
+    assert commands["baseline.run.cancel"].automation_id == "BL-BTN-RUN-CANCEL"
+    assert commands["baseline.run.open_log"].kind == "hosted_action"
+    assert commands["baseline.run.open_log"].automation_id == "BL-BTN-RUN-OPEN-LOG"
+    assert commands["baseline.run.open_result"].kind == "hosted_action"
+    assert commands["baseline.run.open_result"].automation_id == "BL-BTN-RUN-OPEN-RESULT"
+    assert commands["baseline.run_setup.verify"].automation_id == "BL-BTN-RUN-CHECK"
+    assert commands["baseline.run_setup.prepare_checked"].automation_id == "BL-BTN-RUN-CHECKED"
+    assert commands["baseline.run_setup.prepare"].automation_id == "BL-BTN-RUN-PLAIN"
     assert commands["baseline.legacy_run_setup.open"].kind == "launch_module"
     assert commands["baseline.legacy_run_setup.open"].module == "pneumo_solver_ui.tools.desktop_run_setup_center"
     assert commands["baseline.legacy_run_setup.open"].launch_surface == "legacy_bridge"
@@ -164,6 +197,13 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert commands["optimization.center.open"].module is None
     assert commands["optimization.readiness.check"].kind == "hosted_action"
     assert commands["optimization.primary_launch.prepare"].kind == "hosted_action"
+    assert commands["optimization.primary_launch.execute"].kind == "hosted_action"
+    assert commands["optimization.primary_launch.execute"].automation_id == "OP-BTN-EXECUTE"
+    assert commands["optimization.primary_launch.execute"].launch_surface == "workspace"
+    assert commands["optimization.primary_launch.soft_stop"].automation_id == "OP-BTN-SOFT-STOP"
+    assert commands["optimization.primary_launch.hard_stop"].automation_id == "OP-BTN-HARD-STOP"
+    assert commands["optimization.primary_launch.open_log"].automation_id == "OP-BTN-OPEN-LOG"
+    assert commands["optimization.primary_launch.open_run_dir"].automation_id == "OP-BTN-OPEN-RUN-DIR"
     assert commands["optimization.legacy_center.open"].kind == "launch_module"
     assert commands["optimization.legacy_center.open"].module == "pneumo_solver_ui.tools.desktop_optimizer_center"
     assert commands["optimization.legacy_center.open"].launch_surface == "legacy_bridge"
@@ -184,6 +224,7 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert workspaces["test_matrix"].quick_action_ids[0] == "test.center.open"
     assert "test.legacy_center.open" not in workspaces["test_matrix"].quick_action_ids
     assert workspaces["baseline_run"].quick_action_ids[0] == "baseline.run_setup.open"
+    assert "baseline.run.execute" in workspaces["baseline_run"].quick_action_ids
     assert "baseline.review" in workspaces["baseline_run"].quick_action_ids
     assert "baseline.adopt" in workspaces["baseline_run"].quick_action_ids
     assert "baseline.restore" in workspaces["baseline_run"].quick_action_ids
@@ -195,10 +236,15 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert "optimization.legacy_center.open" not in workspaces["optimization"].quick_action_ids
     assert "results.center.open" in workspaces["results_analysis"].quick_action_ids
     assert "results.compare.prepare" in workspaces["results_analysis"].quick_action_ids
+    assert "results.compare.open" in workspaces["results_analysis"].quick_action_ids
+    assert "results.animation.prepare" in workspaces["results_analysis"].quick_action_ids
     assert "results.evidence.prepare" in workspaces["results_analysis"].quick_action_ids
     assert "results.legacy_center.open" not in workspaces["results_analysis"].quick_action_ids
     assert "animation.animator.open" in workspaces["animation"].quick_action_ids
+    assert "animation.animator.launch" in workspaces["animation"].quick_action_ids
     assert "animation.mnemo.open" in workspaces["animation"].quick_action_ids
+    assert "animation.mnemo.launch" in workspaces["animation"].quick_action_ids
+    assert "animation.diagnostics.prepare" in workspaces["animation"].quick_action_ids
     assert "animation.legacy_animator.open" not in workspaces["animation"].quick_action_ids
     assert "animation.legacy_mnemo.open" not in workspaces["animation"].quick_action_ids
     assert workspaces["overview"].quick_action_ids == (
@@ -306,7 +352,8 @@ def test_gui_spec_shell_covers_shared_desktop_launch_catalog_without_duplicate_g
     assert "animation.legacy_mnemo.open" in tools_workspace.quick_action_ids
     assert "animation.legacy_animator.open" in tools_workspace.quick_action_ids
     assert "results.legacy_center.open" in tools_workspace.quick_action_ids
-    assert "results.compare.open" in tools_workspace.quick_action_ids
+    assert "results.legacy_compare.open" in tools_workspace.quick_action_ids
+    assert "results.compare.open" not in tools_workspace.quick_action_ids
 
 
 def test_gui_spec_shell_runtime_workspace_owners_cover_v37_contract_matrix() -> None:

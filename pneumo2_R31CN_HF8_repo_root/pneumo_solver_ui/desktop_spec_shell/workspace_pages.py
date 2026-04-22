@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 import copy
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Mapping
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
@@ -45,6 +45,13 @@ from pneumo_solver_ui.desktop_run_setup_model import (
     describe_run_launch_target,
     describe_run_setup_snapshot,
     recommended_run_launch_action,
+)
+from pneumo_solver_ui.desktop_baseline_run_runtime import (
+    append_baseline_run_execution_log,
+    complete_baseline_run_launch_request,
+    mark_baseline_run_launch_request_started,
+    prepare_baseline_run_launch_request,
+    read_baseline_run_launch_request,
 )
 from pneumo_solver_ui.optimization_baseline_source import (
     apply_baseline_center_action,
@@ -895,9 +902,10 @@ class SuiteWorkspacePage(QtWidgets.QWidget):
         if command_id == "test.center.open":
             self.refresh_view()
             self.suite_table.setFocus(QtCore.Qt.OtherFocusReason)
-            self.validation_label.setText(
-                "Проверка набора открыта в рабочем шаге. Проверьте строки, сохраните снимок и переходите к базовому прогону."
-            )
+            if self._suite_rows:
+                self.validation_label.setText(
+                    "Проверка набора открыта в рабочем шаге. Проверьте строки, сохраните снимок и переходите к базовому прогону."
+                )
 
 
 class BaselineWorkspacePage(RuntimeWorkspacePage):
@@ -909,14 +917,23 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
         *,
         repo_root: Path,
         python_executable: str | None = None,
+        on_shell_status: Callable[[str, bool], None] | None = None,
         parent: QtWidgets.QWidget | None = None,
     ) -> None:
         self.repo_root = Path(repo_root)
         self.python_executable = python_executable
+        self.on_shell_status = on_shell_status
         self._selected_history_id = ""
         self._last_surface: dict[str, Any] = {}
         self._refreshing_baseline_controls = False
         self._run_setup_snapshot: dict[str, Any] = dict(vars(DesktopRunSetupSnapshot()))
+        self._baseline_process: QtCore.QProcess | None = None
+        self._baseline_current_request_path: Path | None = None
+        self._baseline_last_request_path: Path | None = None
+        self._baseline_last_log_path: Path | None = None
+        self._baseline_last_run_dir: Path | None = None
+        self._baseline_buffered_output = ""
+        self._baseline_cancel_requested = False
         super().__init__(
             workspace,
             action_commands,
@@ -927,7 +944,15 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
             ),
             parent,
         )
+        self._init_baseline_process()
         self.setObjectName("WS-BASELINE-HOSTED-PAGE")
+
+    def _init_baseline_process(self) -> None:
+        self._baseline_process = QtCore.QProcess(self)
+        self._baseline_process.setProcessChannelMode(QtCore.QProcess.MergedChannels)
+        self._baseline_process.readyReadStandardOutput.connect(self._on_baseline_process_output)
+        self._baseline_process.finished.connect(self._on_baseline_process_finished)
+        self._baseline_process.errorOccurred.connect(self._on_baseline_process_error)
 
     def _build_extra_controls(self, layout: QtWidgets.QVBoxLayout) -> None:
         self._build_run_setup_controls(layout)
@@ -974,6 +999,27 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
         self.baseline_mismatch_matrix.verticalHeader().setVisible(False)
         self.baseline_mismatch_matrix.horizontalHeader().setStretchLastSection(True)
         center_layout.addWidget(self.baseline_mismatch_matrix)
+
+        self.baseline_review_detail_box = QtWidgets.QGroupBox("Карточка проверки выбранного результата")
+        self.baseline_review_detail_box.setObjectName("BL-REVIEW-DETAILS")
+        self.baseline_review_detail_box.setFocusPolicy(QtCore.Qt.StrongFocus)
+        detail_layout = QtWidgets.QVBoxLayout(self.baseline_review_detail_box)
+        detail_layout.setSpacing(6)
+        self.baseline_review_detail_label = QtWidgets.QLabel("")
+        self.baseline_review_detail_label.setObjectName("BL-REVIEW-DETAILS-SUMMARY")
+        self.baseline_review_detail_label.setWordWrap(True)
+        self.baseline_review_detail_label.setStyleSheet("color: #405060;")
+        detail_layout.addWidget(self.baseline_review_detail_label)
+        self.baseline_review_detail_table = QtWidgets.QTableWidget(0, 3)
+        self.baseline_review_detail_table.setObjectName("BL-REVIEW-DETAILS-TABLE")
+        self.baseline_review_detail_table.setHorizontalHeaderLabels(("Проверка", "Значение", "Следующий шаг"))
+        self.baseline_review_detail_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.baseline_review_detail_table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.baseline_review_detail_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.baseline_review_detail_table.verticalHeader().setVisible(False)
+        self.baseline_review_detail_table.horizontalHeader().setStretchLastSection(True)
+        detail_layout.addWidget(self.baseline_review_detail_table)
+        center_layout.addWidget(self.baseline_review_detail_box)
 
         self.explicit_confirmation_checkbox = QtWidgets.QCheckBox(
             "Разрешить явное принятие или восстановление выбранного опорного прогона"
@@ -1076,6 +1122,26 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
         self.run_setup_plain_launch_button.clicked.connect(
             lambda: self.handle_command("baseline.run_setup.prepare")
         )
+        self.run_setup_execute_button = QtWidgets.QPushButton("Запустить в фоне")
+        self.run_setup_execute_button.setObjectName("BL-BTN-RUN-EXECUTE")
+        self.run_setup_execute_button.clicked.connect(
+            lambda: self.handle_command("baseline.run.execute")
+        )
+        self.run_setup_cancel_button = QtWidgets.QPushButton("Отменить запуск")
+        self.run_setup_cancel_button.setObjectName("BL-BTN-RUN-CANCEL")
+        self.run_setup_cancel_button.clicked.connect(
+            lambda: self.handle_command("baseline.run.cancel")
+        )
+        self.run_setup_open_log_button = QtWidgets.QPushButton("Открыть журнал")
+        self.run_setup_open_log_button.setObjectName("BL-BTN-RUN-OPEN-LOG")
+        self.run_setup_open_log_button.clicked.connect(
+            lambda: self.handle_command("baseline.run.open_log")
+        )
+        self.run_setup_open_result_button = QtWidgets.QPushButton("Открыть папку результата")
+        self.run_setup_open_result_button.setObjectName("BL-BTN-RUN-OPEN-RESULT")
+        self.run_setup_open_result_button.clicked.connect(
+            lambda: self.handle_command("baseline.run.open_result")
+        )
         self.run_setup_advanced_button = QtWidgets.QPushButton("Расширенный центр запуска")
         self.run_setup_advanced_button.setObjectName("BL-BTN-RUN-ADVANCED")
         self.run_setup_advanced_button.clicked.connect(
@@ -1085,6 +1151,10 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
             self.run_setup_check_button,
             self.run_setup_checked_launch_button,
             self.run_setup_plain_launch_button,
+            self.run_setup_execute_button,
+            self.run_setup_cancel_button,
+            self.run_setup_open_log_button,
+            self.run_setup_open_result_button,
             self.run_setup_advanced_button,
         ):
             button_row.addWidget(button)
@@ -1130,6 +1200,58 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
         self._run_setup_snapshot = snapshot
         return snapshot
 
+    def _remember_baseline_request(self, request: Mapping[str, Any] | None) -> None:
+        payload = dict(request or {})
+        paths = dict(payload.get("paths") or {})
+        raw_request = str(paths.get("request") or "").strip()
+        raw_log = str(payload.get("process_log_path") or paths.get("log") or "").strip()
+        raw_run_dir = str(paths.get("run_dir") or "").strip()
+        raw_summary = str(payload.get("run_summary_path") or "").strip()
+        if raw_request:
+            self._baseline_last_request_path = Path(raw_request).expanduser().resolve()
+        if raw_log:
+            self._baseline_last_log_path = Path(raw_log).expanduser().resolve()
+        if raw_run_dir:
+            self._baseline_last_run_dir = Path(raw_run_dir).expanduser().resolve()
+        elif raw_summary:
+            self._baseline_last_run_dir = Path(raw_summary).expanduser().resolve().parent
+
+    def _latest_baseline_request(self) -> dict[str, Any]:
+        try:
+            request = read_baseline_run_launch_request(repo_root=self.repo_root)
+        except Exception:
+            request = {}
+        self._remember_baseline_request(request)
+        return request
+
+    def _open_baseline_path(self, path: Path | None, *, missing_message: str, opened_message: str) -> bool:
+        if path is None or not path.exists():
+            self.run_setup_result_label.setText(missing_message)
+            self._set_baseline_shell_status(missing_message, busy=False)
+            return False
+        opened = QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(path)))
+        if opened:
+            self.run_setup_result_label.setText(opened_message)
+        else:
+            self.run_setup_result_label.setText(f"Не удалось открыть: {path}")
+        return bool(opened)
+
+    def _open_baseline_log(self) -> bool:
+        self._latest_baseline_request()
+        return self._open_baseline_path(
+            self._baseline_last_log_path,
+            missing_message="Журнал базового прогона пока не найден.",
+            opened_message="Журнал базового прогона открыт.",
+        )
+
+    def _open_baseline_result_dir(self) -> bool:
+        self._latest_baseline_request()
+        return self._open_baseline_path(
+            self._baseline_last_run_dir,
+            missing_message="Папка результата базового прогона пока не найдена.",
+            opened_message="Папка результата базового прогона открыта.",
+        )
+
     def _run_setup_gate(self) -> dict[str, Any]:
         snapshot = self._current_run_setup_snapshot()
         return baseline_suite_handoff_launch_gate(
@@ -1168,6 +1290,10 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
         )
         gate_allowed = bool(gate.get("baseline_launch_allowed", False))
         gate_banner = _baseline_launch_gate_text(gate.get("banner"))
+        self._latest_baseline_request()
+        busy = self._baseline_run_is_busy()
+        has_log = self._baseline_last_log_path is not None and self._baseline_last_log_path.exists()
+        has_run_dir = self._baseline_last_run_dir is not None and self._baseline_last_run_dir.exists()
         self.run_setup_summary_label.setText(
             "\n".join(
                 part
@@ -1199,12 +1325,66 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
             f"{launch_target.get('hint_line') or 'Целевой запуск: опорный прогон.'} "
             f"{recommendation_text}. Обычный запуск: {plain_detail}."
         )
-        self.run_setup_plain_launch_button.setEnabled(gate_allowed)
+        self.run_setup_check_button.setEnabled(not busy)
+        self.run_setup_checked_launch_button.setEnabled(not busy)
+        self.run_setup_plain_launch_button.setEnabled(gate_allowed and not busy)
         self.run_setup_plain_launch_button.setToolTip(
             "Доступно после актуального снимка набора испытаний."
             if gate_allowed
             else "Сначала обновите и сохраните снимок набора испытаний."
         )
+        self.run_setup_execute_button.setEnabled(gate_allowed and not busy)
+        self.run_setup_execute_button.setToolTip(
+            "Запустить подготовленный расчёт без открытия расширенного центра."
+            if gate_allowed
+            else "Сначала обновите и сохраните снимок набора испытаний."
+        )
+        self.run_setup_cancel_button.setEnabled(busy)
+        self.run_setup_cancel_button.setToolTip(
+            "Остановить текущий фоновый базовый прогон."
+            if busy
+            else "Нет выполняющегося базового прогона."
+        )
+        self.run_setup_open_log_button.setEnabled(has_log)
+        self.run_setup_open_log_button.setToolTip(
+            "Открыть журнал последнего фонового запуска."
+            if has_log
+            else "Журнал появится после подготовки или запуска базового прогона."
+        )
+        self.run_setup_open_result_button.setEnabled(has_run_dir)
+        self.run_setup_open_result_button.setToolTip(
+            "Открыть папку результата последнего базового прогона."
+            if has_run_dir
+            else "Папка результата появится после подготовки или запуска базового прогона."
+        )
+
+    def _baseline_run_is_busy(self) -> bool:
+        return self._baseline_process is not None and self._baseline_process.state() != QtCore.QProcess.NotRunning
+
+    def _set_baseline_shell_status(self, text: str, *, busy: bool) -> None:
+        if callable(self.on_shell_status):
+            self.on_shell_status(text, busy)
+
+    def _set_baseline_run_busy(self, busy: bool) -> None:
+        for button_name in (
+            "run_setup_check_button",
+            "run_setup_checked_launch_button",
+            "run_setup_plain_launch_button",
+            "run_setup_execute_button",
+            "run_setup_advanced_button",
+        ):
+            button = getattr(self, button_name, None)
+            if button is not None:
+                button.setEnabled(not busy)
+        cancel_button = getattr(self, "run_setup_cancel_button", None)
+        if cancel_button is not None:
+            cancel_button.setEnabled(busy)
+        log_button = getattr(self, "run_setup_open_log_button", None)
+        if log_button is not None:
+            log_button.setEnabled(self._baseline_last_log_path is not None and self._baseline_last_log_path.exists())
+        result_button = getattr(self, "run_setup_open_result_button", None)
+        if result_button is not None:
+            result_button.setEnabled(self._baseline_last_run_dir is not None and self._baseline_last_run_dir.exists())
 
     def _activate_run_setup_panel(self, message: str = "") -> None:
         self._refresh_run_setup_controls()
@@ -1223,17 +1403,155 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
 
     def _prepare_run_setup_launch(self, *, checked: bool) -> dict[str, Any]:
         gate = self._verify_run_setup_gate()
-        if checked:
+        request = prepare_baseline_run_launch_request(
+            self._current_run_setup_snapshot(),
+            repo_root=self.repo_root,
+            python_executable=self.python_executable,
+            checked=checked,
+        )
+        self._remember_baseline_request(request)
+        request_ready = bool(request.get("execution_ready", False))
+        request_path = str(dict(request.get("paths") or {}).get("request") or "").strip()
+        if request_ready:
+            run_dir = str(dict(request.get("paths") or {}).get("run_dir") or "").strip()
             self.run_setup_result_label.setText(
-                "Проверка перед запуском запрошена. "
-                + self.run_setup_result_label.text()
+                "Команда запуска подготовлена. "
+                f"Запрос сохранён {request_path}. Папка результата {run_dir}."
             )
-            return {"action": "prepare_checked", "allowed": bool(gate.get("baseline_launch_allowed", False))}
-        if bool(gate.get("baseline_launch_allowed", False)):
+        else:
+            blockers = "; ".join(str(item) for item in list(request.get("operator_blockers") or []) if str(item).strip())
+            detail = blockers or _baseline_launch_gate_text(gate.get("banner"))
+            prefix = "Проверка выполнена. " if checked else ""
             self.run_setup_result_label.setText(
-                "Запуск подготовлен: профиль, режим выполнения и снимок набора испытаний согласованы."
+                f"{prefix}Подготовка запуска сохранена, но выполнение ждёт данных. {detail}. "
+                f"Запрос сохранён {request_path}."
             )
-        return {"action": "prepare", "allowed": bool(gate.get("baseline_launch_allowed", False))}
+        return {
+            **request,
+            "action": "prepare_checked" if checked else "prepare",
+            "allowed": bool(gate.get("baseline_launch_allowed", False)),
+        }
+
+    def _execute_baseline_run(self) -> dict[str, Any]:
+        if self._baseline_run_is_busy():
+            self.run_setup_result_label.setText("Базовый прогон уже выполняется. Дождитесь завершения текущего запуска.")
+            self._set_baseline_shell_status("Базовый прогон уже выполняется.", busy=True)
+            return {"status": "running"}
+
+        request = self._prepare_run_setup_launch(checked=True)
+        if not bool(request.get("execution_ready", False)):
+            self._set_baseline_shell_status("Базовый прогон ждёт готовых данных.", busy=False)
+            return {**request, "status": "blocked"}
+        command = [str(part) for part in list(request.get("command") or []) if str(part).strip()]
+        if not command:
+            self.run_setup_result_label.setText("Запуск не начат: команда расчёта не подготовлена.")
+            self._set_baseline_shell_status("Команда базового прогона не подготовлена.", busy=False)
+            return {**request, "status": "blocked"}
+        if self._baseline_process is None:
+            self._init_baseline_process()
+
+        paths = dict(request.get("paths") or {})
+        self._baseline_current_request_path = Path(str(paths.get("request") or "")).expanduser().resolve()
+        self._baseline_buffered_output = ""
+        self._baseline_cancel_requested = False
+        started_request = mark_baseline_run_launch_request_started(request)
+        self._remember_baseline_request(started_request)
+        process = self._baseline_process
+        process.setWorkingDirectory(str(self.repo_root))
+        process.setProgram(command[0])
+        process.setArguments(command[1:])
+        process.start()
+        self._set_baseline_run_busy(True)
+        self.run_setup_result_label.setText("Базовый прогон выполняется в фоне. Окно остаётся доступным.")
+        self._set_baseline_shell_status("Базовый прогон выполняется...", busy=True)
+        return {**request, "status": "running"}
+
+    def _kill_baseline_process_if_running(self) -> None:
+        if self._baseline_process is not None and self._baseline_run_is_busy():
+            self._baseline_process.kill()
+
+    def _cancel_baseline_run(self) -> dict[str, Any]:
+        if not self._baseline_run_is_busy() or self._baseline_process is None:
+            self.run_setup_result_label.setText("Нет выполняющегося базового прогона для отмены.")
+            self._set_baseline_shell_status("Нет выполняющегося базового прогона.", busy=False)
+            self._refresh_run_setup_controls()
+            return {"status": "idle"}
+        self._baseline_cancel_requested = True
+        self.run_setup_result_label.setText("Отмена базового прогона запрошена. Ждём остановки процесса.")
+        self._set_baseline_shell_status("Отмена базового прогона...", busy=True)
+        self._baseline_process.terminate()
+        self._baseline_process.kill()
+        self._set_baseline_run_busy(True)
+        return {"status": "cancelling"}
+
+    def _on_baseline_process_output(self) -> None:
+        if self._baseline_current_request_path is None:
+            return
+        if self._baseline_process is None:
+            return
+        text = bytes(self._baseline_process.readAllStandardOutput()).decode("utf-8", errors="replace")
+        if not text:
+            return
+        self._baseline_buffered_output += text
+        append_baseline_run_execution_log(self._baseline_current_request_path, text)
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        if lines:
+            self.run_setup_result_label.setText(f"Базовый прогон выполняется. Последнее сообщение {lines[-1][:180]}.")
+
+    def _on_baseline_process_finished(self, exit_code: int, _exit_status: QtCore.QProcess.ExitStatus) -> None:
+        request_path = self._baseline_current_request_path
+        self._set_baseline_run_busy(False)
+        self._baseline_current_request_path = None
+        if request_path is None:
+            self.run_setup_result_label.setText("Базовый прогон завершился, но сведения о запросе не найдены.")
+            self._set_baseline_shell_status("Базовый прогон завершился без сведений о запросе.", busy=False)
+            return
+        cancelled = bool(self._baseline_cancel_requested)
+        self._baseline_cancel_requested = False
+        result = complete_baseline_run_launch_request(
+            request_path,
+            returncode=-15 if cancelled and int(exit_code) == 0 else int(exit_code),
+            stdout_tail=self._baseline_buffered_output[-4000:],
+            stderr_tail="Запуск отменён оператором." if cancelled else "",
+        )
+        self._remember_baseline_request(result)
+        if cancelled:
+            self.run_setup_result_label.setText("Базовый прогон отменён оператором. Журнал запуска сохранён.")
+            self._set_baseline_shell_status("Базовый прогон отменён.", busy=False)
+        elif int(exit_code) == 0:
+            candidate = dict(result.get("baseline_candidate") or {})
+            if candidate.get("history_id"):
+                self.run_setup_result_label.setText(
+                    "Базовый прогон завершён. Результат добавлен в историю для просмотра и явного принятия."
+                )
+            else:
+                self.run_setup_result_label.setText(
+                    "Базовый прогон завершён. Сводка результата сохранена, но запись истории требует проверки."
+                )
+            self._set_baseline_shell_status("Базовый прогон завершён.", busy=False)
+        else:
+            self.run_setup_result_label.setText(
+                f"Базовый прогон завершился с кодом {int(exit_code)}. Проверьте журнал запуска."
+            )
+            self._set_baseline_shell_status("Базовый прогон завершился с ошибкой.", busy=False)
+        self.refresh_view()
+
+    def _on_baseline_process_error(self, error: QtCore.QProcess.ProcessError) -> None:
+        if self._baseline_cancel_requested:
+            return
+        request_path = self._baseline_current_request_path
+        self._set_baseline_run_busy(False)
+        self._baseline_current_request_path = None
+        self._baseline_cancel_requested = False
+        if request_path is not None:
+            result = complete_baseline_run_launch_request(
+                request_path,
+                returncode=127,
+                stderr_tail=str(error),
+            )
+            self._remember_baseline_request(result)
+        self.run_setup_result_label.setText("Не удалось начать базовый прогон. Проверьте путь к Python и журнал запуска.")
+        self._set_baseline_shell_status("Не удалось начать базовый прогон.", busy=False)
 
     def refresh_view(self) -> None:
         super().refresh_view()
@@ -1298,6 +1616,7 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
                 f"Состояние сверки: {mismatch_text}. Молчаливая подмена запрещена."
             )
             self._populate_mismatch_matrix(active, selected)
+            self._populate_review_details(active, selected, action_strip, explicit=self.explicit_confirmation_checkbox.isChecked())
 
             review = dict(action_strip.get("review") or {})
             adopt = dict(action_strip.get("adopt") or {})
@@ -1385,6 +1704,124 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
             return text
         return f"{text[:12]}...{text[-8:]}"
 
+    def _review_next_step(
+        self,
+        *,
+        selected: dict[str, Any],
+        action_strip: dict[str, Any],
+        explicit: bool,
+    ) -> str:
+        if not str(selected.get("history_id") or "").strip():
+            return "Выберите строку истории или выполните новый базовый прогон."
+        mismatch_fields = tuple(str(field) for field in selected.get("mismatch_fields") or ())
+        if mismatch_fields:
+            return f"Есть расхождения: {_baseline_field_list(mismatch_fields)}. Перед передачей в оптимизацию нужен явный выбор."
+        adopt = dict(action_strip.get("adopt") or {})
+        restore = dict(action_strip.get("restore") or {})
+        if explicit and bool(adopt.get("enabled", False)):
+            return "Можно нажать «Принять» и сделать результат активным опорным прогоном."
+        if explicit and bool(restore.get("enabled", False)):
+            return "Можно нажать «Восстановить» и явно вернуть исторический результат."
+        if not explicit:
+            return "Сначала выполните просмотр и включите явное подтверждение, если этот результат должен стать активным."
+        return "Доступен безопасный просмотр; активный опорный прогон не меняется."
+
+    def _populate_review_details(
+        self,
+        active: dict[str, Any],
+        selected: dict[str, Any],
+        action_strip: dict[str, Any],
+        *,
+        explicit: bool,
+    ) -> None:
+        selected_id = str(selected.get("history_id") or "").strip()
+        selected_hash = str(selected.get("active_baseline_hash") or "").strip()
+        active_hash = str(active.get("active_baseline_hash") or "").strip()
+        compare_state = str(selected.get("compare_state") or "").strip()
+        mismatch_fields = tuple(str(field) for field in selected.get("mismatch_fields") or ())
+        next_step = self._review_next_step(selected=selected, action_strip=action_strip, explicit=explicit)
+        optimizer_ready = bool(active.get("optimizer_baseline_can_consume", False))
+        if selected_id:
+            self.baseline_review_detail_label.setText(
+                "Карточка проверки показывает, какой результат выбран, откуда он взят и что можно безопасно сделать дальше. "
+                "Автоматическое принятие результата запрещено."
+            )
+        else:
+            self.baseline_review_detail_label.setText(
+                "История опорных прогонов пока пуста. Выполните базовый прогон или выберите существующую запись."
+            )
+        rows = (
+            (
+                "Выбранная запись",
+                selected_id or "нет",
+                "Просмотрите карточку перед любым изменением активного результата." if selected_id else "Нет выбранной записи истории.",
+            ),
+            (
+                "Действие истории",
+                _baseline_action_label(str(selected.get("action") or "")),
+                "Это происхождение записи; оно не применяет результат автоматически.",
+            ),
+            (
+                "Файл результата",
+                str(selected.get("baseline_path") or "нет"),
+                "Откройте файл/папку результата перед принятием." if selected.get("baseline_path") else "Файл результата не указан.",
+            ),
+            (
+                "Папка запуска",
+                str(selected.get("source_run_dir") or "нет"),
+                "Проверьте артефакты запуска и журнал." if selected.get("source_run_dir") else "Папка запуска не указана.",
+            ),
+            (
+                "Контроль прогона",
+                self._short_matrix_value(selected_hash),
+                "Должен быть осознанно выбран перед оптимизацией.",
+            ),
+            (
+                "Активный контроль",
+                self._short_matrix_value(active_hash),
+                "Это текущий результат, который видит оптимизация.",
+            ),
+            (
+                "Снимок набора",
+                self._short_matrix_value(str(selected.get("suite_snapshot_hash") or active.get("suite_snapshot_hash") or "")),
+                "При расхождении нужен новый прогон или явное восстановление.",
+            ),
+            (
+                "Исходные данные",
+                self._short_matrix_value(str(selected.get("inputs_snapshot_hash") or active.get("inputs_snapshot_hash") or "")),
+                "При расхождении проверьте WS-INPUTS и WS-SUITE.",
+            ),
+            (
+                "Циклический сценарий",
+                self._short_matrix_value(str(selected.get("ring_source_hash") or active.get("ring_source_hash") or "")),
+                "При расхождении проверьте WS-RING.",
+            ),
+            (
+                "Состояние сверки",
+                _baseline_state_label(compare_state or "unknown"),
+                _baseline_field_list(mismatch_fields) if mismatch_fields else "Критичных расхождений с активным контекстом не показано.",
+            ),
+            (
+                "Доступность оптимизации",
+                "готов" if optimizer_ready else "не готов",
+                "Оптимизация берёт только активный явно принятый опорный прогон.",
+            ),
+            ("Следующий безопасный шаг", next_step, "Молчаливая подмена запрещена."),
+        )
+        blocker = QtCore.QSignalBlocker(self.baseline_review_detail_table)
+        self.baseline_review_detail_table.setRowCount(len(rows))
+        for row_index, (label, value, hint) in enumerate(rows):
+            values = (label, value, hint)
+            for column, text in enumerate(values):
+                item = QtWidgets.QTableWidgetItem(str(text or "—"))
+                if row_index == len(rows) - 1:
+                    item.setBackground(QtGui.QColor("#eef5ff"))
+                elif mismatch_fields and label in {"Состояние сверки", "Снимок набора", "Исходные данные", "Циклический сценарий"}:
+                    item.setBackground(QtGui.QColor("#fff4e5"))
+                self.baseline_review_detail_table.setItem(row_index, column, item)
+        self.baseline_review_detail_table.resizeColumnsToContents()
+        del blocker
+
     def _on_history_selection_changed(self) -> None:
         if self._refreshing_baseline_controls:
             return
@@ -1455,6 +1892,8 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
             note=f"explicit {requested_action} from baseline center",
         )
         self.action_result_label.setText(self._format_action_result(result))
+        if requested_action == "review":
+            self.baseline_review_detail_box.setFocus(QtCore.Qt.OtherFocusReason)
         if requested_action in {"adopt", "restore"} and result.get("status") == "applied":
             self.explicit_confirmation_checkbox.setChecked(False)
         self.refresh_view()
@@ -1486,6 +1925,18 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
             return
         if command_id == "baseline.run_setup.prepare":
             self._prepare_run_setup_launch(checked=False)
+            return
+        if command_id == "baseline.run.execute":
+            self._execute_baseline_run()
+            return
+        if command_id == "baseline.run.cancel":
+            self._cancel_baseline_run()
+            return
+        if command_id == "baseline.run.open_log":
+            self._open_baseline_log()
+            return
+        if command_id == "baseline.run.open_result":
+            self._open_baseline_result_dir()
             return
         if command_id == "baseline.center.open":
             self.refresh_view()
@@ -2049,10 +2500,16 @@ class OptimizationWorkspacePage(RuntimeWorkspacePage):
         *,
         repo_root: Path,
         python_executable: str | None = None,
+        on_shell_status: Callable[[str, bool], None] | None = None,
         parent: QtWidgets.QWidget | None = None,
     ) -> None:
         self.repo_root = Path(repo_root)
         self.python_executable = python_executable
+        self.on_shell_status = on_shell_status
+        self._optimizer_runtime_instance: DesktopOptimizerRuntime | None = None
+        self._optimization_last_run_dir: Path | None = None
+        self._optimization_last_log_path: Path | None = None
+        self._optimization_refresh_timer: QtCore.QTimer | None = None
         super().__init__(
             workspace,
             action_commands,
@@ -2064,6 +2521,10 @@ class OptimizationWorkspacePage(RuntimeWorkspacePage):
             parent,
         )
         self.setObjectName("WS-OPTIMIZATION-HOSTED-PAGE")
+        self._optimization_refresh_timer = QtCore.QTimer(self)
+        self._optimization_refresh_timer.setInterval(1000)
+        self._optimization_refresh_timer.timeout.connect(self._refresh_optimization_controls)
+        self._optimization_refresh_timer.start()
 
     def _build_extra_controls(self, layout: QtWidgets.QVBoxLayout) -> None:
         self.optimization_launch_box = QtWidgets.QGroupBox("Оптимизация и основной запуск")
@@ -2126,6 +2587,46 @@ class OptimizationWorkspacePage(RuntimeWorkspacePage):
             lambda: self.on_command("optimization.primary_launch.prepare")
         )
         self.optimization_advanced_button = QtWidgets.QPushButton("Расширенная настройка")
+        self.optimization_execute_button = QtWidgets.QPushButton("Запустить оптимизацию")
+        self.optimization_execute_button.setObjectName("OP-BTN-EXECUTE")
+        self.optimization_execute_button.setToolTip(
+            "Запустить рекомендуемый основной путь из текущего рабочего шага оптимизации."
+        )
+        self.optimization_execute_button.clicked.connect(
+            lambda: self.on_command("optimization.primary_launch.execute")
+        )
+        self.optimization_soft_stop_button = QtWidgets.QPushButton("Мягкая остановка")
+        self.optimization_soft_stop_button.setObjectName("OP-BTN-SOFT-STOP")
+        self.optimization_soft_stop_button.setToolTip(
+            "Попросить активный запуск остановиться через stop-файл без немедленного убийства процесса."
+        )
+        self.optimization_soft_stop_button.clicked.connect(
+            lambda: self.on_command("optimization.primary_launch.soft_stop")
+        )
+        self.optimization_hard_stop_button = QtWidgets.QPushButton("Остановить сейчас")
+        self.optimization_hard_stop_button.setObjectName("OP-BTN-HARD-STOP")
+        self.optimization_hard_stop_button.setToolTip(
+            "Жёстко остановить активный запуск оптимизации, если мягкая остановка не подходит."
+        )
+        self.optimization_hard_stop_button.clicked.connect(
+            lambda: self.on_command("optimization.primary_launch.hard_stop")
+        )
+        self.optimization_open_log_button = QtWidgets.QPushButton("Открыть журнал")
+        self.optimization_open_log_button.setObjectName("OP-BTN-OPEN-LOG")
+        self.optimization_open_log_button.setToolTip(
+            "Открыть журнал последнего активного или подготовленного запуска оптимизации."
+        )
+        self.optimization_open_log_button.clicked.connect(
+            lambda: self.on_command("optimization.primary_launch.open_log")
+        )
+        self.optimization_open_run_dir_button = QtWidgets.QPushButton("Открыть папку запуска")
+        self.optimization_open_run_dir_button.setObjectName("OP-BTN-OPEN-RUN-DIR")
+        self.optimization_open_run_dir_button.setToolTip(
+            "Открыть папку артефактов последнего активного запуска оптимизации."
+        )
+        self.optimization_open_run_dir_button.clicked.connect(
+            lambda: self.on_command("optimization.primary_launch.open_run_dir")
+        )
         self.optimization_advanced_button.setObjectName("OP-BTN-ADVANCED")
         self.optimization_advanced_button.setToolTip(
             "Открыть подробную настройку для специальных сценариев."
@@ -2136,6 +2637,11 @@ class OptimizationWorkspacePage(RuntimeWorkspacePage):
         for button in (
             self.optimization_check_button,
             self.optimization_prepare_button,
+            self.optimization_execute_button,
+            self.optimization_soft_stop_button,
+            self.optimization_hard_stop_button,
+            self.optimization_open_log_button,
+            self.optimization_open_run_dir_button,
             self.optimization_advanced_button,
         ):
             button_row.addWidget(button)
@@ -2151,10 +2657,12 @@ class OptimizationWorkspacePage(RuntimeWorkspacePage):
         layout.addWidget(self.optimization_launch_box)
 
     def _optimizer_runtime(self) -> DesktopOptimizerRuntime:
-        return DesktopOptimizerRuntime(
-            ui_root=self.repo_root,
-            python_executable=self.python_executable,
-        )
+        if self._optimizer_runtime_instance is None:
+            self._optimizer_runtime_instance = DesktopOptimizerRuntime(
+                ui_root=self.repo_root,
+                python_executable=self.python_executable,
+            )
+        return self._optimizer_runtime_instance
 
     @staticmethod
     def _token_text(raw: object, fallback: str = "не задано") -> str:
@@ -2211,6 +2719,7 @@ class OptimizationWorkspacePage(RuntimeWorkspacePage):
             snapshot = runtime.contract_snapshot()
             pointer = runtime.latest_pointer_summary()
             current_job = runtime.current_job()
+            active_surface = runtime.active_job_surface() if current_job is not None else {}
         except Exception as exc:
             message = f"Сводка оптимизации временно недоступна: {exc}"
             for label in (
@@ -2223,6 +2732,11 @@ class OptimizationWorkspacePage(RuntimeWorkspacePage):
             ):
                 label.setText(message)
             self.optimization_prepare_button.setEnabled(False)
+            self.optimization_execute_button.setEnabled(False)
+            self.optimization_soft_stop_button.setEnabled(False)
+            self.optimization_hard_stop_button.setEnabled(False)
+            self.optimization_open_log_button.setEnabled(False)
+            self.optimization_open_run_dir_button.setEnabled(False)
             return
 
         objectives = tuple(str(item) for item in getattr(snapshot, "objective_keys", ()) or ())
@@ -2281,12 +2795,132 @@ class OptimizationWorkspacePage(RuntimeWorkspacePage):
                 "Последний запуск пока не найден. После запуска здесь появится ссылка на результат."
             )
 
-        self.optimization_prepare_button.setEnabled(ready)
+        if current_job is not None:
+            self._remember_optimization_job(current_job)
+        busy = self._optimization_job_is_busy(runtime)
+        has_log = self._optimization_last_log_path is not None and self._optimization_last_log_path.exists()
+        has_run_dir = self._optimization_last_run_dir is not None and self._optimization_last_run_dir.exists()
+        self.optimization_prepare_button.setEnabled(ready and not busy)
+        self.optimization_execute_button.setEnabled(ready and not busy)
+        self.optimization_soft_stop_button.setEnabled(busy)
+        self.optimization_hard_stop_button.setEnabled(busy)
+        self.optimization_open_log_button.setEnabled(has_log)
+        self.optimization_open_run_dir_button.setEnabled(has_run_dir)
         self.optimization_prepare_button.setToolTip(
             "Готово к подготовке основного запуска."
             if ready
             else "Сначала устраните блокирующие причины в целях, опорном прогоне или наборе испытаний."
         )
+
+    def _remember_optimization_job(self, job: Any) -> None:
+        run_dir = getattr(job, "run_dir", None)
+        log_path = getattr(job, "log_path", None)
+        self._optimization_last_run_dir = Path(run_dir) if run_dir else None
+        self._optimization_last_log_path = Path(log_path) if log_path else None
+
+    def _optimization_job_is_busy(self, runtime: DesktopOptimizerRuntime | None = None) -> bool:
+        runtime = runtime or self._optimizer_runtime()
+        job = runtime.current_job()
+        if job is None:
+            return False
+        self._remember_optimization_job(job)
+        poll = getattr(getattr(job, "proc", None), "poll", None)
+        if not callable(poll):
+            return True
+        try:
+            return poll() is None
+        except Exception:
+            return True
+
+    def _set_optimization_shell_status(self, text: str, *, busy: bool) -> None:
+        if callable(self.on_shell_status):
+            self.on_shell_status(text, busy)
+
+    def _open_optimization_path(self, path: Path | None, *, missing_message: str, opened_message: str) -> bool:
+        if path is None or not path.exists():
+            self.optimization_result_label.setText(missing_message)
+            self._set_optimization_shell_status(missing_message, busy=False)
+            return False
+        opened = QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(path)))
+        self.optimization_result_label.setText(opened_message if opened else "Не удалось открыть путь запуска оптимизации.")
+        self._set_optimization_shell_status(self.optimization_result_label.text(), busy=False)
+        return bool(opened)
+
+    def _open_optimization_log(self) -> bool:
+        runtime = self._optimizer_runtime()
+        job = runtime.current_job()
+        if job is not None:
+            self._remember_optimization_job(job)
+        return self._open_optimization_path(
+            self._optimization_last_log_path,
+            missing_message="Журнал запуска оптимизации пока не найден.",
+            opened_message="Журнал запуска оптимизации открыт.",
+        )
+
+    def _open_optimization_run_dir(self) -> bool:
+        runtime = self._optimizer_runtime()
+        job = runtime.current_job()
+        if job is not None:
+            self._remember_optimization_job(job)
+        return self._open_optimization_path(
+            self._optimization_last_run_dir,
+            missing_message="Папка запуска оптимизации пока не найдена.",
+            opened_message="Папка запуска оптимизации открыта.",
+        )
+
+    def _execute_primary_launch(self) -> dict[str, Any]:
+        runtime = self._optimizer_runtime()
+        if self._optimization_job_is_busy(runtime):
+            self.optimization_result_label.setText("Оптимизация уже выполняется. Дождитесь завершения или остановите текущий запуск.")
+            self._set_optimization_shell_status("Оптимизация уже выполняется.", busy=True)
+            return {"status": "running"}
+        ready, blockers = self._verify_optimization_readiness()
+        if not ready:
+            self.optimization_result_label.setText("Запуск оптимизации остановлен: " + ", ".join(blockers) + ".")
+            self._set_optimization_shell_status("Запуск оптимизации заблокирован.", busy=False)
+            return {"status": "blocked", "blockers": blockers}
+        try:
+            job = runtime.start_job()
+        except Exception as exc:
+            self.optimization_result_label.setText(f"Не удалось запустить оптимизацию: {exc}")
+            self._set_optimization_shell_status("Ошибка запуска оптимизации.", busy=False)
+            self._refresh_optimization_controls()
+            return {"status": "failed", "error": str(exc)}
+        self._remember_optimization_job(job)
+        self.optimization_result_label.setText(
+            f"Оптимизация запущена в фоне. Папка запуска: {self._short_value(getattr(job, 'run_dir', ''))}."
+        )
+        self._set_optimization_shell_status("Оптимизация выполняется...", busy=True)
+        self._refresh_optimization_controls()
+        return {"status": "running", "run_dir": str(getattr(job, "run_dir", ""))}
+
+    def _request_optimization_soft_stop(self) -> bool:
+        runtime = self._optimizer_runtime()
+        if not self._optimization_job_is_busy(runtime):
+            self.optimization_result_label.setText("Нет активного запуска оптимизации для мягкой остановки.")
+            self._set_optimization_shell_status("Нет активного запуска оптимизации.", busy=False)
+            return False
+        requested = runtime.request_soft_stop()
+        self.optimization_result_label.setText(
+            "Мягкая остановка запрошена. Дождитесь завершения текущей итерации."
+            if requested
+            else "Не удалось записать stop-файл для мягкой остановки."
+        )
+        self._set_optimization_shell_status("Мягкая остановка оптимизации запрошена.", busy=True)
+        self._refresh_optimization_controls()
+        return bool(requested)
+
+    def _request_optimization_hard_stop(self) -> bool:
+        runtime = self._optimizer_runtime()
+        if runtime.current_job() is None:
+            self.optimization_result_label.setText("Нет активного запуска оптимизации для остановки.")
+            self._set_optimization_shell_status("Нет активного запуска оптимизации.", busy=False)
+            return False
+        stopped = runtime.request_hard_stop()
+        self.optimization_result_label.setText("Остановка активного запуска оптимизации запрошена.")
+        self._set_optimization_shell_status("Останавливаю оптимизацию...", busy=True)
+        self._refresh_optimization_controls()
+        return bool(stopped)
 
     def _activate_optimization_panel(self, message: str = "") -> None:
         self._refresh_optimization_controls()
@@ -2335,6 +2969,22 @@ class OptimizationWorkspacePage(RuntimeWorkspacePage):
             return
         if command_id == "optimization.primary_launch.prepare":
             self._prepare_primary_launch()
+            return
+        if command_id == "optimization.primary_launch.execute":
+            self._execute_primary_launch()
+            return
+        if command_id == "optimization.primary_launch.soft_stop":
+            self._request_optimization_soft_stop()
+            return
+        if command_id == "optimization.primary_launch.hard_stop":
+            self._request_optimization_hard_stop()
+            return
+        if command_id == "optimization.primary_launch.open_log":
+            self._open_optimization_log()
+            return
+        if command_id == "optimization.primary_launch.open_run_dir":
+            self._open_optimization_run_dir()
+            return
 
 
 class ResultsWorkspacePage(RuntimeWorkspacePage):
@@ -2404,12 +3054,60 @@ class ResultsWorkspacePage(RuntimeWorkspacePage):
         self.results_artifacts_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.results_artifacts_table.verticalHeader().setVisible(False)
         self.results_artifacts_table.horizontalHeader().setStretchLastSection(True)
+        self.results_artifacts_table.itemSelectionChanged.connect(
+            self._refresh_selected_result_preview
+        )
         analysis_layout.addWidget(self.results_artifacts_table)
 
         self.results_compare_label = QtWidgets.QLabel("")
         self.results_compare_label.setObjectName("RS-COMPARE-SUMMARY")
         self.results_compare_label.setWordWrap(True)
         analysis_layout.addWidget(self.results_compare_label)
+
+        self.results_compare_preview_box = QtWidgets.QGroupBox("Предпросмотр сравнения")
+        self.results_compare_preview_box.setObjectName("RS-COMPARE-PREVIEW")
+        preview_layout = QtWidgets.QVBoxLayout(self.results_compare_preview_box)
+        self.results_compare_preview_table = QtWidgets.QTableWidget(0, 2)
+        self.results_compare_preview_table.setObjectName("RS-COMPARE-PREVIEW-TABLE")
+        self.results_compare_preview_table.setHorizontalHeaderLabels(("Пункт", "Значение"))
+        self.results_compare_preview_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.results_compare_preview_table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.results_compare_preview_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.results_compare_preview_table.verticalHeader().setVisible(False)
+        self.results_compare_preview_table.horizontalHeader().setStretchLastSection(True)
+        preview_layout.addWidget(self.results_compare_preview_table)
+        analysis_layout.addWidget(self.results_compare_preview_box)
+
+        self.results_chart_preview_box = QtWidgets.QGroupBox("Предпросмотр графиков")
+        self.results_chart_preview_box.setObjectName("RS-CHART-PREVIEW")
+        chart_layout = QtWidgets.QVBoxLayout(self.results_chart_preview_box)
+        chart_layout.setSpacing(6)
+        chart_intro = QtWidgets.QLabel(
+            "Сводка серий показывает, какие числовые данные уже готовы для графического разбора."
+        )
+        chart_intro.setWordWrap(True)
+        chart_layout.addWidget(chart_intro)
+        self.results_chart_preview_table = QtWidgets.QTableWidget(0, 4)
+        self.results_chart_preview_table.setObjectName("RS-CHART-PREVIEW-TABLE")
+        self.results_chart_preview_table.setHorizontalHeaderLabels(
+            ("Серия", "Точки", "Диапазон", "Готовность")
+        )
+        self.results_chart_preview_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.results_chart_preview_table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.results_chart_preview_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.results_chart_preview_table.verticalHeader().setVisible(False)
+        self.results_chart_preview_table.horizontalHeader().setStretchLastSection(True)
+        chart_layout.addWidget(self.results_chart_preview_table)
+        self.results_chart_preview_scene = QtWidgets.QGraphicsScene(self.results_chart_preview_box)
+        self.results_chart_preview_view = QtWidgets.QGraphicsView(self.results_chart_preview_scene)
+        self.results_chart_preview_view.setObjectName("RS-CHART-NATIVE-PREVIEW")
+        self.results_chart_preview_view.setMinimumHeight(132)
+        self.results_chart_preview_view.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        self.results_chart_preview_view.setToolTip(
+            "Встроенный предпросмотр первой числовой серии выбранного результата."
+        )
+        chart_layout.addWidget(self.results_chart_preview_view)
+        analysis_layout.addWidget(self.results_chart_preview_box)
 
         button_row = QtWidgets.QHBoxLayout()
         self.results_refresh_button = QtWidgets.QPushButton("Обновить анализ")
@@ -2431,10 +3129,18 @@ class ResultsWorkspacePage(RuntimeWorkspacePage):
         self.results_prepare_evidence_button.clicked.connect(
             lambda: self.on_command("results.evidence.prepare")
         )
-        self.results_compare_window_button = QtWidgets.QPushButton("Окно сравнения")
+        self.results_animation_handoff_button = QtWidgets.QPushButton("Передать в анимацию")
+        self.results_animation_handoff_button.setObjectName("RS-BTN-HANDOFF-ANIMATION")
+        self.results_animation_handoff_button.setToolTip(
+            "Передать выбранный материал анализа в следующий рабочий шаг маршрута."
+        )
+        self.results_animation_handoff_button.clicked.connect(
+            lambda: self.on_command("results.animation.prepare")
+        )
+        self.results_compare_window_button = QtWidgets.QPushButton("Открыть сравнение")
         self.results_compare_window_button.setObjectName("RS-BTN-OPEN-COMPARE")
         self.results_compare_window_button.setToolTip(
-            "Открыть отдельное окно сравнения, если нужен подробный графический просмотр."
+            "Открыть подробный просмотр сравнения, если нужен графический разбор."
         )
         self.results_compare_window_button.clicked.connect(
             lambda: self.on_command("results.compare.open")
@@ -2451,6 +3157,7 @@ class ResultsWorkspacePage(RuntimeWorkspacePage):
             self.results_refresh_button,
             self.results_prepare_compare_button,
             self.results_prepare_evidence_button,
+            self.results_animation_handoff_button,
             self.results_compare_window_button,
             self.results_advanced_button,
         ):
@@ -2517,6 +3224,15 @@ class ResultsWorkspacePage(RuntimeWorkspacePage):
         return text[: limit - 1].rstrip() + "…"
 
     @staticmethod
+    def _preview_value_text(raw: object, *, fallback: str = "нет данных", limit: int = 120) -> str:
+        text = " ".join(str(raw or "").split()).strip()
+        if not text:
+            return fallback
+        if len(text) <= limit:
+            return text
+        return text[: limit - 1].rstrip() + "…"
+
+    @staticmethod
     def _path_label(path: Path | None) -> str:
         if path is None:
             return "нет файла"
@@ -2536,6 +3252,8 @@ class ResultsWorkspacePage(RuntimeWorkspacePage):
             self.results_compare_label.setText(message)
             self.results_overview_table.setRowCount(0)
             self.results_artifacts_table.setRowCount(0)
+            if hasattr(self, "results_chart_preview_table"):
+                self.results_chart_preview_table.setRowCount(0)
             return
 
         context_state = self._status_text(snapshot.result_context_state)
@@ -2569,6 +3287,7 @@ class ResultsWorkspacePage(RuntimeWorkspacePage):
             for column, value in enumerate(values):
                 item = QtWidgets.QTableWidgetItem(value)
                 item.setToolTip(str(artifact.path))
+                item.setData(QtCore.Qt.UserRole, artifact.key)
                 self.results_artifacts_table.setItem(row_index, column, item)
         self.results_artifacts_table.resizeColumnsToContents()
 
@@ -2582,16 +3301,246 @@ class ResultsWorkspacePage(RuntimeWorkspacePage):
         )
         self.results_compare_window_button.setEnabled(compare_ready)
         self.results_compare_window_button.setToolTip(
-            "Открыть отдельное окно сравнения."
+            "Открыть подробный просмотр сравнения."
             if compare_ready
             else "Сначала нужен файл результата для сравнения."
         )
+        self._populate_compare_preview(runtime, snapshot)
+        self._populate_chart_preview(runtime, snapshot)
 
     def _activate_results_panel(self, message: str = "") -> None:
         self._refresh_results_controls()
         self.results_analysis_box.setFocus(QtCore.Qt.OtherFocusReason)
         if message:
             self.results_action_label.setText(message)
+
+    def _populate_compare_preview(
+        self,
+        runtime: DesktopResultsRuntime,
+        snapshot: Any,
+        *,
+        artifact: Any | None = None,
+    ) -> None:
+        target_artifact = artifact if artifact is not None else runtime.artifact_by_key(snapshot, "latest_npz")
+        sidecar_artifact = runtime.artifact_by_key(snapshot, "compare_current_context_sidecar")
+        target_path = runtime.compare_viewer_path(snapshot, artifact=target_artifact)
+        rows: list[tuple[str, str]] = [
+            (
+                "Файл результата",
+                target_path.name if target_path is not None else "нужен результат расчёта",
+            ),
+            (
+                "Контекст сравнения",
+                self._path_label(getattr(sidecar_artifact, "path", None)) if sidecar_artifact is not None else "подготовьте сравнение",
+            ),
+            (
+                "Выбранный прогон",
+                self._status_text(getattr(snapshot, "selected_run_contract_status", "")),
+            ),
+            (
+                "Следующий шаг",
+                "откройте сравнение" if target_path is not None else "сначала выполните расчёт",
+            ),
+        ]
+        if target_artifact is not None and hasattr(runtime, "artifact_preview_lines"):
+            for index, line in enumerate(runtime.artifact_preview_lines(target_artifact)[:3], start=1):
+                rows.append((f"Деталь {index}", self._short_text(line, limit=120)))
+
+        self.results_compare_preview_table.setRowCount(len(rows))
+        for row_index, (label, value) in enumerate(rows):
+            self.results_compare_preview_table.setItem(row_index, 0, QtWidgets.QTableWidgetItem(label))
+            self.results_compare_preview_table.setItem(row_index, 1, QtWidgets.QTableWidgetItem(value))
+        self.results_compare_preview_table.resizeColumnsToContents()
+
+    def _populate_chart_preview(
+        self,
+        runtime: DesktopResultsRuntime,
+        snapshot: Any,
+        *,
+        artifact: Any | None = None,
+    ) -> None:
+        if not hasattr(self, "results_chart_preview_table"):
+            return
+        target_artifact = artifact
+        if hasattr(runtime, "artifact_by_key"):
+            try:
+                target_artifact = target_artifact or runtime.artifact_by_key(snapshot, "latest_npz")
+            except Exception:
+                target_artifact = None
+
+        chart_rows: list[tuple[str, str, str, str]] = []
+        if hasattr(runtime, "chart_preview_rows"):
+            try:
+                raw_rows = runtime.chart_preview_rows(snapshot, artifact=target_artifact)
+            except Exception:
+                raw_rows = ()
+            for raw in raw_rows:
+                if isinstance(raw, Mapping):
+                    chart_rows.append(
+                        (
+                            self._preview_value_text(raw.get("series")),
+                            self._preview_value_text(raw.get("points")),
+                            self._preview_value_text(raw.get("range")),
+                            self._preview_value_text(raw.get("role")),
+                        )
+                    )
+                elif isinstance(raw, (tuple, list)) and len(raw) >= 4:
+                    chart_rows.append(
+                        (
+                            self._preview_value_text(raw[0]),
+                            self._preview_value_text(raw[1]),
+                            self._preview_value_text(raw[2]),
+                            self._preview_value_text(raw[3]),
+                        )
+                    )
+
+        if not chart_rows:
+            target_path = getattr(snapshot, "latest_npz_path", None)
+            chart_rows.append(
+                (
+                    "Файл результата",
+                    "1" if target_path is not None else "0",
+                    Path(target_path).name if target_path is not None else "нужен результат расчёта",
+                    "готово к графику" if target_path is not None else "сначала выполните расчёт",
+                )
+            )
+            if target_artifact is not None and hasattr(runtime, "artifact_preview_lines"):
+                try:
+                    preview_lines = runtime.artifact_preview_lines(target_artifact)
+                except Exception:
+                    preview_lines = ()
+                for index, line in enumerate(preview_lines[:2], start=1):
+                    chart_rows.append(
+                        (
+                            f"Деталь {index}",
+                            "сводка",
+                            self._preview_value_text(line, limit=140),
+                            "проверьте перед передачей",
+                        )
+                    )
+
+        preview_payload: Mapping[str, Any] | None = None
+        if hasattr(runtime, "chart_preview_series_samples"):
+            try:
+                candidate = runtime.chart_preview_series_samples(
+                    snapshot,
+                    artifact=target_artifact,
+                )
+            except Exception:
+                candidate = None
+            if isinstance(candidate, Mapping):
+                preview_payload = candidate
+
+        self.results_chart_preview_table.setRowCount(len(chart_rows))
+        for row_index, values in enumerate(chart_rows):
+            for column, value in enumerate(values):
+                self.results_chart_preview_table.setItem(
+                    row_index,
+                    column,
+                    QtWidgets.QTableWidgetItem(self._preview_value_text(value)),
+                )
+        self.results_chart_preview_table.resizeColumnsToContents()
+        self._draw_native_chart_preview(chart_rows, preview_payload)
+
+    def _draw_native_chart_preview(
+        self,
+        chart_rows: Iterable[tuple[str, str, str, str]],
+        preview_payload: Mapping[str, Any] | None,
+    ) -> None:
+        if not hasattr(self, "results_chart_preview_scene"):
+            return
+        scene = self.results_chart_preview_scene
+        scene.clear()
+        width = 460.0
+        height = 118.0
+        margin_left = 36.0
+        margin_right = 18.0
+        margin_top = 18.0
+        margin_bottom = 24.0
+        scene.setSceneRect(0.0, 0.0, width, height)
+        scene.addRect(
+            0.0,
+            0.0,
+            width,
+            height,
+            QtGui.QPen(QtGui.QColor("#d5dde6")),
+            QtGui.QBrush(QtGui.QColor("#f8fafc")),
+        )
+        axis_pen = QtGui.QPen(QtGui.QColor("#7f8fa6"))
+        scene.addLine(margin_left, height - margin_bottom, width - margin_right, height - margin_bottom, axis_pen)
+        scene.addLine(margin_left, margin_top, margin_left, height - margin_bottom, axis_pen)
+
+        payload = dict(preview_payload or {})
+        raw_samples = payload.get("samples") or ()
+        samples: list[float] = []
+        for raw in raw_samples:
+            try:
+                value = float(raw)
+            except Exception:
+                continue
+            if value == value and value not in {float("inf"), float("-inf")}:
+                samples.append(value)
+
+        series_name = self._preview_value_text(payload.get("series"), fallback="серия")
+        point_count = self._preview_value_text(payload.get("point_count"), fallback=str(len(samples)))
+        if len(samples) >= 2:
+            minimum = min(samples)
+            maximum = max(samples)
+            span = maximum - minimum
+            if span == 0:
+                span = 1.0
+            plot_width = width - margin_left - margin_right
+            plot_height = height - margin_top - margin_bottom
+            path = QtGui.QPainterPath()
+            for index, value in enumerate(samples):
+                x = margin_left + plot_width * index / max(1, len(samples) - 1)
+                y = margin_top + plot_height * (1.0 - ((value - minimum) / span))
+                if index == 0:
+                    path.moveTo(x, y)
+                else:
+                    path.lineTo(x, y)
+            scene.addPath(path, QtGui.QPen(QtGui.QColor("#0f766e"), 2.2))
+            scene.addText(series_name).setPos(margin_left, 0.0)
+            scene.addText(f"{minimum:g} .. {maximum:g}").setPos(margin_left, height - 22.0)
+            scene.addText(f"{point_count} точек").setPos(width - 118.0, height - 22.0)
+            self.results_chart_preview_view.setToolTip(
+                f"{series_name}: {minimum:g} .. {maximum:g}; {point_count} точек"
+            )
+            return
+
+        bars = list(chart_rows)[:3]
+        if not bars:
+            bars = [("Результат", "0", "нужен результат расчёта", "сначала выполните расчёт")]
+        bar_width = width - margin_left - margin_right
+        for index, (series, points, value_range, role) in enumerate(bars):
+            y = margin_top + 12.0 + index * 24.0
+            fill = QtGui.QColor("#9fb3c8") if index else QtGui.QColor("#38bdf8")
+            scene.addRect(margin_left, y, bar_width * max(0.2, 1.0 - index * 0.18), 9.0, QtGui.QPen(fill), QtGui.QBrush(fill))
+            scene.addText(self._preview_value_text(series, limit=32)).setPos(margin_left, y + 8.0)
+            scene.addText(self._preview_value_text(points, fallback="", limit=24)).setPos(width - 122.0, y + 8.0)
+        first = bars[0]
+        self.results_chart_preview_view.setToolTip(
+            f"{self._preview_value_text(first[0])}: {self._preview_value_text(first[2])}; {self._preview_value_text(first[3])}"
+        )
+
+    def _refresh_selected_result_preview(self) -> None:
+        if not hasattr(self, "results_artifacts_table"):
+            return
+        try:
+            runtime = self._results_runtime()
+            snapshot = runtime.snapshot()
+            artifact = self._selected_results_artifact(runtime, snapshot)
+            self._populate_compare_preview(runtime, snapshot, artifact=artifact)
+            self._populate_chart_preview(runtime, snapshot, artifact=artifact)
+            target_path = runtime.compare_viewer_path(snapshot, artifact=artifact)
+        except Exception:
+            return
+        self.results_compare_window_button.setEnabled(target_path is not None)
+        self.results_compare_window_button.setToolTip(
+            "Открыть подробный просмотр сравнения."
+            if target_path is not None
+            else "Сначала нужен файл результата для сравнения."
+        )
 
     def _prepare_compare_context(self) -> Path:
         runtime = self._results_runtime()
@@ -2613,6 +3562,56 @@ class ResultsWorkspacePage(RuntimeWorkspacePage):
         )
         return path
 
+    def _prepare_animation_handoff(self) -> Path:
+        runtime = self._results_runtime()
+        snapshot = runtime.snapshot()
+        artifact = self._selected_results_artifact(runtime, snapshot)
+        path = runtime.write_analysis_animation_handoff(snapshot, artifact=artifact)
+        self._refresh_results_controls()
+        self.results_action_label.setText(
+            f"Материал передан в анимацию: {self._path_label(path)}."
+        )
+        return path
+
+    def _selected_results_artifact(
+        self,
+        runtime: DesktopResultsRuntime,
+        snapshot: Any,
+    ) -> Any:
+        selected_rows = self.results_artifacts_table.selectionModel().selectedRows()
+        if not selected_rows:
+            return None
+        row = selected_rows[0].row()
+        item = self.results_artifacts_table.item(row, 0)
+        if item is None:
+            return None
+        key = str(item.data(QtCore.Qt.UserRole) or "").strip()
+        if not key:
+            return None
+        return runtime.artifact_by_key(snapshot, key)
+
+    def _open_compare_viewer(self) -> dict[str, Any]:
+        runtime = self._results_runtime()
+        snapshot = runtime.snapshot()
+        artifact = self._selected_results_artifact(runtime, snapshot)
+        if runtime.compare_viewer_path(snapshot, artifact=artifact) is None:
+            self._refresh_results_controls()
+            self.results_action_label.setText(
+                "Сравнение пока недоступно: нужен файл результата расчёта."
+            )
+            return {"status": "blocked"}
+        try:
+            runtime.launch_compare_viewer(snapshot, artifact=artifact)
+        except Exception as exc:
+            self._refresh_results_controls()
+            self.results_action_label.setText(f"Не удалось открыть сравнение: {exc}")
+            return {"status": "failed", "error": str(exc)}
+        self._refresh_results_controls()
+        self.results_action_label.setText(
+            "Сравнение открывается: текущий контекст подготовлен."
+        )
+        return {"status": "opening"}
+
     def refresh_view(self) -> None:
         super().refresh_view()
         self._refresh_results_controls()
@@ -2628,6 +3627,12 @@ class ResultsWorkspacePage(RuntimeWorkspacePage):
             return
         if command_id == "results.evidence.prepare":
             self._prepare_evidence_manifest()
+            return
+        if command_id == "results.animation.prepare":
+            self._prepare_animation_handoff()
+            return
+        if command_id == "results.compare.open":
+            self._open_compare_viewer()
 
 
 class AnimationWorkspacePage(RuntimeWorkspacePage):
@@ -2694,6 +3699,35 @@ class AnimationWorkspacePage(RuntimeWorkspacePage):
         self.animation_status_table.horizontalHeader().setStretchLastSection(True)
         hub_layout.addWidget(self.animation_status_table)
 
+        self.animation_scene_preview_box = QtWidgets.QGroupBox("Предпросмотр сцены")
+        self.animation_scene_preview_box.setObjectName("AM-SCENE-PREVIEW")
+        preview_layout = QtWidgets.QVBoxLayout(self.animation_scene_preview_box)
+        preview_layout.setSpacing(6)
+        preview_intro = QtWidgets.QLabel(
+            "Короткая сводка показывает, какие данные сцены будут переданы в проверку движения и мнемосхемы."
+        )
+        preview_intro.setWordWrap(True)
+        preview_layout.addWidget(preview_intro)
+        self.animation_scene_preview_table = QtWidgets.QTableWidget(0, 2)
+        self.animation_scene_preview_table.setObjectName("AM-SCENE-PREVIEW-TABLE")
+        self.animation_scene_preview_table.setHorizontalHeaderLabels(("Пункт", "Значение"))
+        self.animation_scene_preview_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.animation_scene_preview_table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.animation_scene_preview_table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.animation_scene_preview_table.verticalHeader().setVisible(False)
+        self.animation_scene_preview_table.horizontalHeader().setStretchLastSection(True)
+        preview_layout.addWidget(self.animation_scene_preview_table)
+        self.animation_scene_preview_scene = QtWidgets.QGraphicsScene(self.animation_scene_preview_box)
+        self.animation_scene_preview_view = QtWidgets.QGraphicsView(self.animation_scene_preview_scene)
+        self.animation_scene_preview_view.setObjectName("AM-SCENE-NATIVE-PREVIEW")
+        self.animation_scene_preview_view.setMinimumHeight(132)
+        self.animation_scene_preview_view.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        self.animation_scene_preview_view.setToolTip(
+            "Встроенный контур движения по текущему файлу сцены."
+        )
+        preview_layout.addWidget(self.animation_scene_preview_view)
+        hub_layout.addWidget(self.animation_scene_preview_box)
+
         button_row = QtWidgets.QHBoxLayout()
         self.animation_refresh_button = QtWidgets.QPushButton("Обновить анимацию")
         self.animation_refresh_button.setObjectName("AM-BTN-REFRESH")
@@ -2706,20 +3740,29 @@ class AnimationWorkspacePage(RuntimeWorkspacePage):
         self.animation_mnemo_button.setObjectName("AM-BTN-CHECK-MNEMO")
         self.animation_mnemo_button.setToolTip("Показать журнал и события мнемосхемы внутри рабочего шага.")
         self.animation_mnemo_button.clicked.connect(lambda: self.on_command("animation.mnemo.open"))
-        self.animation_detach_button = QtWidgets.QPushButton("Расширенный просмотр анимации")
+        self.animation_detach_button = QtWidgets.QPushButton("Проверить движение")
         self.animation_detach_button.setObjectName("AM-DETACH")
-        self.animation_detach_button.setToolTip("Открыть подробную графическую проверку.")
-        self.animation_detach_button.clicked.connect(lambda: self.on_command("animation.legacy_animator.open"))
-        self.animation_mnemo_detach_button = QtWidgets.QPushButton("Расширенный просмотр мнемосхемы")
+        self.animation_detach_button.setToolTip("Открыть подробную графическую проверку с текущими данными сцены.")
+        self.animation_detach_button.clicked.connect(lambda: self.on_command("animation.animator.launch"))
+        self.animation_mnemo_detach_button = QtWidgets.QPushButton("Проверить схему")
         self.animation_mnemo_detach_button.setObjectName("AM-BTN-DETACH-MNEMO")
-        self.animation_mnemo_detach_button.setToolTip("Открыть подробную мнемосхему.")
-        self.animation_mnemo_detach_button.clicked.connect(lambda: self.on_command("animation.legacy_mnemo.open"))
+        self.animation_mnemo_detach_button.setToolTip("Запустить подробную проверку мнемосхемы с текущими данными.")
+        self.animation_mnemo_detach_button.clicked.connect(lambda: self.on_command("animation.mnemo.launch"))
+        self.animation_diagnostics_button = QtWidgets.QPushButton("Передать в проверку проекта")
+        self.animation_diagnostics_button.setObjectName("AM-BTN-HANDOFF-DIAGNOSTICS")
+        self.animation_diagnostics_button.setToolTip(
+            "Передать текущий материал сцены в рабочий шаг проверки проекта."
+        )
+        self.animation_diagnostics_button.clicked.connect(
+            lambda: self.on_command("animation.diagnostics.prepare")
+        )
         for button in (
             self.animation_refresh_button,
             self.animation_open_button,
             self.animation_mnemo_button,
             self.animation_detach_button,
             self.animation_mnemo_detach_button,
+            self.animation_diagnostics_button,
         ):
             button_row.addWidget(button)
         button_row.addStretch(1)
@@ -2769,6 +3812,241 @@ class AnimationWorkspacePage(RuntimeWorkspacePage):
             return text
         return text[: limit - 1].rstrip() + "…"
 
+    @staticmethod
+    def _path_name(path: object, *, fallback: str = "нет данных") -> str:
+        if path is None:
+            return fallback
+        try:
+            return Path(path).name or str(path)
+        except Exception:
+            return str(path) or fallback
+
+    @staticmethod
+    def _preview_value_text(raw: object, *, fallback: str = "нет данных", limit: int = 160) -> str:
+        text = " ".join(str(raw or "").split()).strip()
+        if not text:
+            return fallback
+        if len(text) <= limit:
+            return text
+        return text[: limit - 1].rstrip() + "…"
+
+    @staticmethod
+    def _artifact_by_key_safe(
+        runtime: DesktopResultsRuntime,
+        snapshot: Any,
+        artifact_key: str,
+    ) -> Any | None:
+        if not hasattr(runtime, "artifact_by_key"):
+            return None
+        try:
+            return runtime.artifact_by_key(snapshot, artifact_key)
+        except Exception:
+            return None
+
+    def _artifact_preview_lines_safe(
+        self,
+        runtime: DesktopResultsRuntime,
+        artifact: Any | None,
+    ) -> tuple[str, ...]:
+        if artifact is None or not hasattr(runtime, "artifact_preview_lines"):
+            return ()
+        try:
+            lines = runtime.artifact_preview_lines(artifact)
+        except Exception:
+            return ()
+        return tuple(
+            self._preview_value_text(line, fallback="", limit=140)
+            for line in lines
+            if self._preview_value_text(line, fallback="", limit=140)
+        )
+
+    @staticmethod
+    def _analysis_animation_artifact_safe(
+        runtime: DesktopResultsRuntime,
+        snapshot: Any,
+    ) -> Any | None:
+        if not hasattr(runtime, "animation_handoff_artifact"):
+            return None
+        try:
+            return runtime.animation_handoff_artifact(snapshot)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _animation_target_paths_safe(
+        runtime: DesktopResultsRuntime,
+        snapshot: Any,
+        artifact: Any | None = None,
+    ) -> tuple[Any | None, Any | None]:
+        if hasattr(runtime, "animator_target_paths"):
+            try:
+                return runtime.animator_target_paths(snapshot, artifact=artifact)
+            except Exception:
+                pass
+        return (
+            getattr(snapshot, "latest_npz_path", None),
+            getattr(snapshot, "latest_pointer_json_path", None),
+        )
+
+    def _populate_scene_preview(
+        self,
+        runtime: DesktopResultsRuntime,
+        snapshot: Any,
+        *,
+        artifact: Any | None = None,
+    ) -> None:
+        if not hasattr(self, "animation_scene_preview_table"):
+            return
+        scene_artifact = artifact or self._artifact_by_key_safe(runtime, snapshot, "latest_npz")
+        pointer_artifact = self._artifact_by_key_safe(runtime, snapshot, "latest_pointer")
+        mnemo_artifact = self._artifact_by_key_safe(runtime, snapshot, "mnemo_event_log")
+        capture_artifact = self._artifact_by_key_safe(runtime, snapshot, "capture_export_manifest")
+
+        latest_npz_path, latest_pointer_path = self._animation_target_paths_safe(
+            runtime,
+            snapshot,
+            artifact=artifact,
+        )
+        latest_mnemo_path = getattr(snapshot, "latest_mnemo_event_log_path", None)
+        has_scene = latest_npz_path is not None or latest_pointer_path is not None
+        rows: list[tuple[str, str]] = [
+            ("Источник", "передано из анализа" if artifact is not None else "последний результат"),
+            ("Файл сцены", self._path_name(latest_npz_path, fallback="нужен результат расчёта")),
+            ("Данные проигрывания", self._path_name(latest_pointer_path)),
+            ("Журнал мнемосхемы", self._path_name(latest_mnemo_path)),
+            (
+                "Достоверность",
+                self._status_text(getattr(snapshot, "latest_capture_export_manifest_status", "")),
+            ),
+            ("Следующий шаг", "проверьте движение" if has_scene else "сначала выполните расчёт"),
+        ]
+        if capture_artifact is not None and getattr(capture_artifact, "path", None) is not None:
+            rows.append(("Запись сохранения", self._path_name(getattr(capture_artifact, "path", None))))
+
+        preview_source = scene_artifact or pointer_artifact or mnemo_artifact
+        for index, line in enumerate(self._artifact_preview_lines_safe(runtime, preview_source)[:3], start=1):
+            rows.append((f"Деталь {index}", line))
+
+        scene_payload: Mapping[str, Any] | None = None
+        if hasattr(runtime, "animation_scene_preview_points"):
+            try:
+                candidate = runtime.animation_scene_preview_points(
+                    snapshot,
+                    artifact=artifact,
+                )
+            except Exception:
+                candidate = None
+            if isinstance(candidate, Mapping):
+                scene_payload = candidate
+
+        self.animation_scene_preview_table.setRowCount(len(rows))
+        for row_index, (label, value) in enumerate(rows):
+            self.animation_scene_preview_table.setItem(
+                row_index,
+                0,
+                QtWidgets.QTableWidgetItem(self._operator_text(label, limit=80)),
+            )
+            self.animation_scene_preview_table.setItem(
+                row_index,
+                1,
+                QtWidgets.QTableWidgetItem(self._preview_value_text(value, limit=160)),
+            )
+        self.animation_scene_preview_table.resizeColumnsToContents()
+        self._draw_native_animation_scene_preview(
+            rows,
+            scene_payload,
+            scene_path=latest_npz_path,
+            pointer_path=latest_pointer_path,
+        )
+
+    def _draw_native_animation_scene_preview(
+        self,
+        rows: Iterable[tuple[str, str]],
+        preview_payload: Mapping[str, Any] | None,
+        *,
+        scene_path: Any | None,
+        pointer_path: Any | None,
+    ) -> None:
+        if not hasattr(self, "animation_scene_preview_scene"):
+            return
+        scene = self.animation_scene_preview_scene
+        scene.clear()
+        width = 460.0
+        height = 118.0
+        margin_left = 34.0
+        margin_right = 18.0
+        margin_top = 16.0
+        margin_bottom = 24.0
+        scene.setSceneRect(0.0, 0.0, width, height)
+        scene.addRect(
+            0.0,
+            0.0,
+            width,
+            height,
+            QtGui.QPen(QtGui.QColor("#d8e1ea")),
+            QtGui.QBrush(QtGui.QColor("#f8fafc")),
+        )
+        axis_pen = QtGui.QPen(QtGui.QColor("#8a9bad"))
+        scene.addLine(margin_left, height - margin_bottom, width - margin_right, height - margin_bottom, axis_pen)
+        scene.addLine(margin_left, margin_top, margin_left, height - margin_bottom, axis_pen)
+
+        payload = dict(preview_payload or {})
+        raw_points = payload.get("points") or ()
+        points: list[tuple[float, float]] = []
+        for raw in raw_points:
+            if not isinstance(raw, (tuple, list)) or len(raw) < 2:
+                continue
+            try:
+                x = float(raw[0])
+                y = float(raw[1])
+            except Exception:
+                continue
+            if x == x and y == y and x not in {float("inf"), float("-inf")} and y not in {float("inf"), float("-inf")}:
+                points.append((x, y))
+
+        source_name = self._path_name(scene_path, fallback="нет файла сцены")
+        pointer_name = self._path_name(pointer_path, fallback="нет данных проигрывания")
+        if len(points) >= 2:
+            xs = [point[0] for point in points]
+            ys = [point[1] for point in points]
+            x_min, x_max = min(xs), max(xs)
+            y_min, y_max = min(ys), max(ys)
+            x_span = x_max - x_min or 1.0
+            y_span = y_max - y_min or 1.0
+            plot_width = width - margin_left - margin_right
+            plot_height = height - margin_top - margin_bottom
+            path = QtGui.QPainterPath()
+            for index, (x, y) in enumerate(points):
+                px = margin_left + plot_width * ((x - x_min) / x_span)
+                py = margin_top + plot_height * (1.0 - ((y - y_min) / y_span))
+                if index == 0:
+                    path.moveTo(px, py)
+                else:
+                    path.lineTo(px, py)
+            scene.addPath(path, QtGui.QPen(QtGui.QColor("#2563eb"), 2.2))
+            scene.addText(self._preview_value_text(payload.get("series_y"), fallback="траектория")).setPos(margin_left, 0.0)
+            scene.addText(source_name).setPos(margin_left, height - 22.0)
+            scene.addText(f"{int(payload.get('point_count') or len(points))} точек").setPos(width - 118.0, height - 22.0)
+            self.animation_scene_preview_view.setToolTip(
+                f"{source_name}: {self._preview_value_text(payload.get('range'), fallback='контур готов')}"
+            )
+            return
+
+        status_rows = list(rows)[:4] or [
+            ("Сцена", source_name),
+            ("Данные проигрывания", pointer_name),
+        ]
+        colors = ("#60a5fa", "#38bdf8", "#5eead4", "#a7f3d0")
+        for index, (label, value) in enumerate(status_rows):
+            y = margin_top + 8.0 + index * 22.0
+            color = QtGui.QColor(colors[index % len(colors)])
+            scene.addRect(margin_left, y, 16.0, 10.0, QtGui.QPen(color), QtGui.QBrush(color))
+            scene.addText(self._preview_value_text(label, limit=26)).setPos(margin_left + 22.0, y - 7.0)
+            scene.addText(self._preview_value_text(value, limit=38)).setPos(width - 176.0, y - 7.0)
+        self.animation_scene_preview_view.setToolTip(
+            f"{source_name}; {pointer_name}"
+        )
+
     def _refresh_animation_controls(self) -> None:
         if not hasattr(self, "animation_hub_box"):
             return
@@ -2782,10 +4060,20 @@ class AnimationWorkspacePage(RuntimeWorkspacePage):
             self.animation_mnemo_label.setText(message)
             self.animation_next_label.setText(message)
             self.animation_status_table.setRowCount(0)
+            if hasattr(self, "animation_scene_preview_table"):
+                self.animation_scene_preview_table.setRowCount(0)
+            if hasattr(self, "animation_scene_preview_scene"):
+                self.animation_scene_preview_scene.clear()
             return
 
-        scene_state = self._present(snapshot.latest_npz_path)
-        pointer_state = self._present(snapshot.latest_pointer_json_path)
+        handoff_artifact = self._analysis_animation_artifact_safe(runtime, snapshot)
+        scene_path, pointer_path = self._animation_target_paths_safe(
+            runtime,
+            snapshot,
+            artifact=handoff_artifact,
+        )
+        scene_state = self._present(scene_path)
+        pointer_state = self._present(pointer_path)
         mnemo_state = self._present(snapshot.latest_mnemo_event_log_path)
         capture_state = self._status_text(snapshot.latest_capture_export_manifest_status)
         mode_text = self._operator_text(snapshot.mnemo_current_mode, fallback="режим не выбран")
@@ -2813,7 +4101,7 @@ class AnimationWorkspacePage(RuntimeWorkspacePage):
             (
                 "Сцена",
                 f"данные сцены - {scene_state}; данные проигрывания - {pointer_state}",
-                "проверьте движение в отдельном окне, если данные найдены",
+                "проверьте движение, если данные найдены",
             ),
             (
                 "Мнемосхема",
@@ -2833,19 +4121,89 @@ class AnimationWorkspacePage(RuntimeWorkspacePage):
                 self.animation_status_table.setItem(row_index, column, item)
         self.animation_status_table.resizeColumnsToContents()
 
-        has_scene = snapshot.latest_npz_path is not None or snapshot.latest_pointer_json_path is not None
+        has_scene = scene_path is not None or pointer_path is not None
+        has_mnemo = has_scene or snapshot.latest_mnemo_event_log_path is not None
         self.animation_detach_button.setEnabled(has_scene)
         self.animation_detach_button.setToolTip(
-            "Открыть подробную графическую проверку."
+            "Открыть подробную графическую проверку с текущими данными сцены."
             if has_scene
             else "Сначала нужен результат для отображения."
         )
+        self.animation_mnemo_detach_button.setEnabled(has_mnemo)
+        self.animation_mnemo_detach_button.setToolTip(
+            "Запустить подробную проверку мнемосхемы с текущими данными."
+            if has_mnemo
+            else "Сначала нужны данные сцены или журнал мнемосхемы."
+        )
+        self._populate_scene_preview(runtime, snapshot, artifact=handoff_artifact)
 
     def _activate_animation_panel(self, message: str = "") -> None:
         self._refresh_animation_controls()
         self.animation_hub_box.setFocus(QtCore.Qt.OtherFocusReason)
         if message:
             self.animation_action_label.setText(message)
+
+    def _launch_animator_viewer(self) -> dict[str, Any]:
+        runtime = self._results_runtime()
+        snapshot = runtime.snapshot()
+        artifact = self._analysis_animation_artifact_safe(runtime, snapshot)
+        args = runtime.animator_args(snapshot, follow=True, artifact=artifact)
+        if not args:
+            self._refresh_animation_controls()
+            self.animation_action_label.setText(
+                "Аниматор пока недоступен: нужен результат или данные проигрывания."
+            )
+            return {"status": "blocked"}
+        try:
+            runtime.launch_animator(snapshot, follow=True, artifact=artifact)
+        except Exception as exc:
+            self._refresh_animation_controls()
+            self.animation_action_label.setText(f"Не удалось запустить проверку движения: {exc}")
+            return {"status": "failed", "error": str(exc)}
+        self._refresh_animation_controls()
+        self.animation_action_label.setText(
+            "Аниматор открывается: текущие данные сцены переданы."
+        )
+        return {"status": "opening", "args": args}
+
+    def _launch_mnemo_viewer(self) -> dict[str, Any]:
+        runtime = self._results_runtime()
+        snapshot = runtime.snapshot()
+        artifact = self._analysis_animation_artifact_safe(runtime, snapshot)
+        args = runtime.mnemo_args(snapshot, follow=True, artifact=artifact)
+        if not args:
+            self._refresh_animation_controls()
+            self.animation_action_label.setText(
+                "Мнемосхема пока недоступна: нужны данные сцены или журнал событий."
+            )
+            return {"status": "blocked"}
+        try:
+            runtime.launch_mnemo(snapshot, follow=True, artifact=artifact)
+        except Exception as exc:
+            self._refresh_animation_controls()
+            self.animation_action_label.setText(f"Не удалось запустить проверку схемы: {exc}")
+            return {"status": "failed", "error": str(exc)}
+        self._refresh_animation_controls()
+        self.animation_action_label.setText(
+            "Мнемосхема запускается: текущие данные переданы."
+        )
+        return {"status": "opening", "args": args}
+
+    def _prepare_diagnostics_handoff(self) -> dict[str, Any]:
+        runtime = self._results_runtime()
+        snapshot = runtime.snapshot()
+        artifact = self._analysis_animation_artifact_safe(runtime, snapshot)
+        try:
+            path = runtime.write_animation_diagnostics_handoff(snapshot, artifact=artifact)
+        except Exception as exc:
+            self._refresh_animation_controls()
+            self.animation_action_label.setText(f"Не удалось передать материал в проверку проекта: {exc}")
+            return {"status": "failed", "error": str(exc)}
+        self._refresh_animation_controls()
+        self.animation_action_label.setText(
+            f"Материал передан в проверку проекта: {self._path_name(path)}."
+        )
+        return {"status": "prepared", "path": path}
 
     def refresh_view(self) -> None:
         super().refresh_view()
@@ -2854,13 +4212,22 @@ class AnimationWorkspacePage(RuntimeWorkspacePage):
     def handle_command(self, command_id: str) -> None:
         if command_id == "animation.animator.open":
             self._activate_animation_panel(
-                "Анимация открыта в рабочем шаге. Проверьте готовность данных сцены перед отдельным просмотром."
+                "Анимация открыта в рабочем шаге. Проверьте готовность данных сцены перед подробным просмотром."
             )
+            return
+        if command_id == "animation.animator.launch":
+            self._launch_animator_viewer()
             return
         if command_id == "animation.mnemo.open":
             self._activate_animation_panel(
-                "Мнемосхема открыта в рабочем шаге. Проверьте журнал и последнее событие перед отдельным просмотром."
+                "Мнемосхема открыта в рабочем шаге. Проверьте журнал и последнее событие перед подробным просмотром."
             )
+            return
+        if command_id == "animation.mnemo.launch":
+            self._launch_mnemo_viewer()
+            return
+        if command_id == "animation.diagnostics.prepare":
+            self._prepare_diagnostics_handoff()
 
 
 class DiagnosticsWorkspacePage(RuntimeWorkspacePage):

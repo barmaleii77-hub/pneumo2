@@ -48,6 +48,29 @@ from pneumo_solver_ui.optimization_problem_scope import (
 )
 from pneumo_solver_ui.packaging_surface_helpers import collect_packaging_surface_metrics
 
+_DONE_TRIAL_STATUSES = {
+    'DONE',
+    'CACHED',
+    'CACHE',
+    'SUCCESS',
+    'COMPLETED',
+}
+_RUNNING_TRIAL_STATUSES = {
+    'RUNNING',
+    'PENDING',
+    'QUEUED',
+    'RESERVED',
+    'STARTED',
+    'IN_PROGRESS',
+}
+_ERROR_TRIAL_STATUSES = {
+    'ERROR',
+    'FAILED',
+    'FAIL',
+    'EXCEPTION',
+    'CRASHED',
+}
+
 
 @dataclass(frozen=True)
 class OptimizationRunSummary:
@@ -149,6 +172,17 @@ def _status_label(status: str) -> str:
     return mapping.get(str(status or 'unknown').strip().lower(), 'UNKNOWN')
 
 
+def _trial_status_bucket(raw_status: Any) -> str:
+    status = str(raw_status or '').strip().upper()
+    if status in _DONE_TRIAL_STATUSES:
+        return 'done'
+    if status in _RUNNING_TRIAL_STATUSES:
+        return 'running'
+    if status in _ERROR_TRIAL_STATUSES:
+        return 'error'
+    return ''
+
+
 def _float_or_none(value: Any) -> Optional[float]:
     try:
         out = float(value)
@@ -206,8 +240,8 @@ def summarize_run_packaging_snapshot(result_path: Optional[Path]) -> Optimizatio
 
     try:
         for row in _iter_result_rows(result_path):
-            row_status = str((row or {}).get('status') or '').strip().upper()
-            if row_status and row_status != 'DONE':
+            row_status_bucket = _trial_status_bucket((row or {}).get('status'))
+            if row_status_bucket and row_status_bucket != 'done':
                 continue
             rows_considered += 1
 
@@ -503,12 +537,12 @@ def _summarize_coordinator_trials(trials_csv: Path) -> tuple[int, int, int, str]
         with trials_csv.open('r', encoding='utf-8', errors='ignore', newline='') as fh:
             reader = csv.DictReader(fh)
             for row in reader:
-                status = str((row or {}).get('status') or '').strip().upper()
-                if status == 'DONE':
+                status_bucket = _trial_status_bucket((row or {}).get('status'))
+                if status_bucket == 'done':
                     done += 1
-                elif status == 'RUNNING':
+                elif status_bucket == 'running':
                     running += 1
-                elif status == 'ERROR':
+                elif status_bucket == 'error':
                     error += 1
                     if not last_error:
                         last_error = str((row or {}).get('error_text') or '').strip()

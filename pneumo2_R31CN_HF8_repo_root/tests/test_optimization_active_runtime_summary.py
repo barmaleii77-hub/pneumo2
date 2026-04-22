@@ -192,3 +192,48 @@ def test_active_runtime_summary_reads_progress_and_trial_health(tmp_path: Path) 
         active_handoff_provenance_caption(summary)
         == "Handoff provenance: source=staged_source; pool=promotable; seeds=6 from 6 unique / 7 promotable / 9 valid; pipeline=staged_then_coordinator; fragments=4; full-ring=yes."
     )
+
+
+def test_active_runtime_summary_maps_cached_reserved_and_failed_trial_statuses(tmp_path: Path) -> None:
+    run_dir = tmp_path / "coord_aliases"
+    export_dir = run_dir / "export"
+    export_dir.mkdir(parents=True)
+    log_path = run_dir / "coordinator.log"
+    log_path.write_text("done=1/4\n", encoding="utf-8")
+
+    with (export_dir / "trials.csv").open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.DictWriter(
+            fh,
+            fieldnames=["trial_id", "status", "error_text", "g_json", "y_json", "metrics_json"],
+        )
+        writer.writeheader()
+        writer.writerow(
+            {
+                "trial_id": "1",
+                "status": "CACHED",
+                "error_text": "",
+                "g_json": "[]",
+                "y_json": "[1.0]",
+                "metrics_json": '{"comfort": 1.0, "penalty_total": 0.0}',
+            }
+        )
+        writer.writerow({"trial_id": "2", "status": "RESERVED", "error_text": "", "g_json": "", "y_json": "", "metrics_json": ""})
+        writer.writerow({"trial_id": "3", "status": "FAILED", "error_text": "worker timeout", "g_json": "", "y_json": "", "metrics_json": ""})
+
+    job = SimpleNamespace(
+        proc=_FakeProc(None),
+        run_dir=run_dir,
+        log_path=log_path,
+        budget=4,
+        backend="ray",
+        pipeline_mode="coordinator",
+    )
+
+    summary = build_active_runtime_summary(
+        job,
+        tail_file_text_fn=lambda path: Path(path).read_text(encoding="utf-8"),
+        parse_done_from_log_fn=lambda text: 1 if "done=1/4" in text else None,
+    )
+
+    assert summary["trial_health"] == {"done": 1, "running": 1, "error": 1}
+    assert summary["recent_errors"] == ["worker timeout"]

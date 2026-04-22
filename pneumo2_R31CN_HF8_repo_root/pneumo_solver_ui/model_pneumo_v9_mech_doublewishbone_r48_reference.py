@@ -2497,6 +2497,35 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     road_func = test.get('road_func', lambda t: np.zeros(4))
     label_func = test.get('label_func', lambda t: 0)
 
+    def _finite_scalar_input(fn, name):
+        def _wrapped(t):
+            value = float(fn(t))
+            if not np.isfinite(value):
+                raise RuntimeError(f"Non-finite {name} input at t={float(t):.9g}: {value!r}")
+            return value
+        return _wrapped
+
+    def _coerce_road_vec4(value, name, t):
+        vec = np.asarray(value, dtype=float).reshape(-1)
+        if vec.size == 1:
+            vec = np.repeat(float(vec[0]), 4)
+        if vec.size != 4:
+            raise RuntimeError(
+                f"{name} must return 4 values at t={float(t):.9g}, got size={int(vec.size)}"
+            )
+        if not np.all(np.isfinite(vec)):
+            raise RuntimeError(f"Non-finite {name} input at t={float(t):.9g}")
+        return vec.reshape(4,)
+
+    def _finite_road_input(fn):
+        def _wrapped(t):
+            return _coerce_road_vec4(fn(t), "road_func", t)
+        return _wrapped
+
+    ay_func = _finite_scalar_input(ay_func, "ay_func")
+    ax_func = _finite_scalar_input(ax_func, "ax_func")
+    road_func = _finite_road_input(road_func)
+
     def compute_pressures(state):
         z, phi, theta = state[0], state[1], state[2]
         zw = state[3:7]
@@ -3081,11 +3110,40 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     # Внутренний шаг интегрирования (численная устойчивость)
     # dt (аргумент simulate) используем как шаг логирования/дискретизации выходных рядов,
     # а интегрирование делаем с подшагами dt_int <= dt_int_max.
-    dt_int_max = float(params.get('макс_шаг_интегрирования_с', 5e-4))
+    dt_int_max_raw = params.get(
+        'integrator_dt_int_max_s',
+        params.get('макс_шаг_интегрирования_с', 5e-4),
+    )
+    try:
+        dt_int_max = float(dt_int_max_raw)
+    except Exception:
+        dt_int_max = 5e-4
+    if (not np.isfinite(dt_int_max)) or (dt_int_max <= 0.0):
+        dt_int_max = 5e-4
     dt_int_max = min(dt_int_max, dt)
 
     # Защита от зависания при слишком малом внутреннем шаге
-    max_internal_steps = int(params.get('макс_число_внутренних_шагов_на_dt', 500000))
+    max_internal_steps_raw = params.get(
+        'integrator_max_internal_steps_per_dt',
+        params.get('макс_число_внутренних_шагов_на_dt', 500000),
+    )
+    try:
+        max_internal_steps = int(float(max_internal_steps_raw))
+    except Exception:
+        max_internal_steps = 500000
+    if max_internal_steps < 1:
+        max_internal_steps = 1
+    lim_rel_V_raw = params.get(
+        'integrator_lim_rel_volume_per_step',
+        params.get('лимит_относит_изменения_объёма_за_шаг', 0.05),
+    )
+    try:
+        lim_rel_V = float(lim_rel_V_raw)
+    except Exception:
+        lim_rel_V = 0.05
+    if (not np.isfinite(lim_rel_V)) or (lim_rel_V <= 0.0):
+        lim_rel_V = 0.05
+    lim_rel_V = float(np.clip(lim_rel_V, 1e-4, 0.5))
 
     # Фиксированная масса "атмосферы" (граничное условие постоянного давления)
     idx_atm = node_index['АТМ']
@@ -3146,6 +3204,7 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
     edges_to_atm = [ei for ei, e in enumerate(edges) if (e.n1 == idx_atm) or (e.n2 == idx_atm)]
 
     state = state0.copy()
+    mass_state_initial_total_kg = float(np.sum(np.asarray(state0[14:14 + N], dtype=float)))
     t_cur = 0.0
     for k, t in enumerate(time):
         # Синхронизация времени с сеткой логирования (защита от накопления float)
@@ -3372,18 +3431,32 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                 dm_dt = B @ md_i
                 dm_dt[idx_atm] = 0.0
                 m_state = state[idx_m0:idx_m0+N]
-                mask = (dm_dt < 0.0)
+                m_margin = np.maximum(m_state, 0.0)
+                mask = (dm_dt < -1e-15) & np.isfinite(dm_dt) & np.isfinite(m_margin)
                 mask[idx_atm] = False
                 if np.any(mask):
-                    dt_mass = 0.5 * float(np.min(m_state[mask] / (-dm_dt[mask] + 1e-12)))
-                    dt_sub = min(dt_sub, dt_mass)
+                    dt_mass_candidates = 0.5 * (m_margin[mask] / (-dm_dt[mask] + 1e-12))
+                    dt_mass_candidates = dt_mass_candidates[
+                        np.isfinite(dt_mass_candidates) & (dt_mass_candidates > 0.0)
+                    ]
+                    if dt_mass_candidates.size:
+                        dt_sub = min(dt_sub, float(np.min(dt_mass_candidates)))
 
                 # Ограничение по относительному изменению объёма за шаг (численная устойчивость)
-                fracV = float(params.get('лимит_относит_изменения_объёма_за_шаг', 0.05))
-                maskV = (np.abs(dV_i) > 0.0) & (V_i > 0.0)
-                if np.any(maskV) and fracV > 0.0:
-                    dt_vol = fracV * float(np.min(V_i[maskV] / (np.abs(dV_i[maskV]) + 1e-12)))
-                    dt_sub = min(dt_sub, dt_vol)
+                maskV = np.isfinite(dV_i) & np.isfinite(V_i) & (np.abs(dV_i) > 0.0) & (V_i > 0.0)
+                if np.any(maskV):
+                    dt_vol_candidates = lim_rel_V * (V_i[maskV] / (np.abs(dV_i[maskV]) + 1e-12))
+                    dt_vol_candidates = dt_vol_candidates[
+                        np.isfinite(dt_vol_candidates) & (dt_vol_candidates > 0.0)
+                    ]
+                    if dt_vol_candidates.size:
+                        dt_sub = min(dt_sub, float(np.min(dt_vol_candidates)))
+
+                if (not np.isfinite(dt_sub)) or (dt_sub <= 0.0):
+                    dt_sub = 1e-12
+                else:
+                    dt_sub = max(float(dt_sub), 1e-12)
+                dt_sub = min(dt_sub, t_next - t_cur)
 
                 # статистика подшага интегратора
                 hmin = min(hmin, dt_sub)
@@ -3733,6 +3806,8 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
 
                 # Контроль физичности масс
                 m_new = state[idx_m0:idx_m0+N]
+                if np.any(~np.isfinite(m_new)):
+                    raise RuntimeError("Non-finite gas mass state (NaN/inf) after substep.")
                 if np.any(m_new < -1e-8):
                     raise RuntimeError("Отрицательная масса газа после шага (численная нестабильность).")
                 state[idx_m0:idx_m0+N] = np.maximum(m_new, 0.0)
@@ -3753,6 +3828,9 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
                 if n_ctrl:
                     x_new = state[idx_x0:idx_x0+n_ctrl]
                     state[idx_x0:idx_x0+n_ctrl] = np.clip(x_new, 0.0, 1.0)
+
+                if not np.all(np.isfinite(state)):
+                    raise RuntimeError("Non-finite integrator state (NaN/inf) after substep.")
 
                 # Контроль опрокидывания на внутреннем шаге
                 if (abs(state[1]) > phi_abort) or (abs(state[2]) > theta_abort):
@@ -4137,8 +4215,229 @@ def simulate(params: dict, test: dict, dt: float = 1e-3, t_end: float = 3.0, rec
             df_atm.loc[0, 'интегратор_err_max_global'] = 0.0
 
         df_atm.loc[0, 'интегратор_dt_int_max_с'] = float(dt_int_max)
+        df_atm.loc[0, 'интегратор_max_internal_steps'] = int(max_internal_steps)
+        df_atm.loc[0, 'интегратор_lim_rel_V'] = float(lim_rel_V)
+
+        # Runtime diagnostics for numerical/physical QC.
+        def _qc_float(key: str, default: float) -> float:
+            raw = params.get(key, default)
+            try:
+                return float(raw)
+            except Exception:
+                return float(default)
+
+        def _qc_bool(key: str, default: bool) -> bool:
+            raw = params.get(key, default)
+            if isinstance(raw, str):
+                token = raw.strip().lower()
+                if token in ("1", "true", "yes", "on"):
+                    return True
+                if token in ("0", "false", "no", "off"):
+                    return False
+                return bool(default)
+            try:
+                val = float(raw)
+            except Exception:
+                return bool(default)
+            if not np.isfinite(val):
+                return bool(default)
+            return bool(val)
+
+        qc_min_pressure_req_pa = _qc_float('integrator_runtime_qc_min_pressure_pa', 0.0)
+        qc_max_pressure_pa = _qc_float('integrator_runtime_qc_max_pressure_pa', np.inf)
+        qc_max_reject_rate = _qc_float('integrator_runtime_qc_max_reject_rate', np.inf)
+        qc_max_mass_balance_residual_kg = _qc_float(
+            'integrator_runtime_qc_max_mass_balance_residual_kg',
+            np.inf,
+        )
+        qc_max_mass_balance_residual_rel = _qc_float(
+            'integrator_runtime_qc_max_mass_balance_residual_rel',
+            np.inf,
+        )
+        qc_require_active_rows = _qc_bool('integrator_runtime_qc_require_active_rows', True)
+        if (not np.isfinite(qc_min_pressure_req_pa)) or (qc_min_pressure_req_pa < 0.0):
+            qc_min_pressure_req_pa = 0.0
+        if (not np.isfinite(qc_max_pressure_pa)) or (qc_max_pressure_pa <= 0.0):
+            qc_max_pressure_pa = float(np.inf)
+        if (not np.isfinite(qc_max_reject_rate)) or (qc_max_reject_rate < 0.0):
+            qc_max_reject_rate = float(np.inf)
+        if (not np.isfinite(qc_max_mass_balance_residual_kg)) or (qc_max_mass_balance_residual_kg < 0.0):
+            qc_max_mass_balance_residual_kg = float(np.inf)
+        if (not np.isfinite(qc_max_mass_balance_residual_rel)) or (qc_max_mass_balance_residual_rel < 0.0):
+            qc_max_mass_balance_residual_rel = float(np.inf)
+        active_rows = int(np.sum(mask))
+        hmax_limit = float(dt_int_max) * (1.0 + 1e-9) + 1e-15
+        hmax_violation_count = 0
+        hmax_violation_max_over = 0.0
+        if active_rows > 0:
+            hmax_active = hmax_arr[mask]
+            hmax_viol_mask = np.isfinite(hmax_active) & (hmax_active > hmax_limit)
+            hmax_violation_count = int(np.sum(hmax_viol_mask))
+            if hmax_violation_count > 0:
+                hmax_violation_max_over = float(np.max(hmax_active[hmax_viol_mask] - hmax_limit))
+            rej_total = float(np.sum(rej_arr[mask]))
+            nsub_total = float(np.sum(nsub_arr[mask]))
+            rej_rate = float(rej_total / max(1.0, nsub_total))
+        else:
+            rej_rate = 0.0
+        df_atm.loc[0, 'integrator_active_rows_N'] = active_rows
+        df_atm.loc[0, 'integrator_hmax_limit_s'] = float(hmax_limit)
+        df_atm.loc[0, 'integrator_hmax_violation_count'] = int(hmax_violation_count)
+        df_atm.loc[0, 'integrator_hmax_violation_max_over_s'] = float(hmax_violation_max_over)
+        df_atm.loc[0, 'integrator_hmax_le_dt_int_max_ok'] = int(hmax_violation_count == 0)
+        df_atm.loc[0, 'integrator_reject_rate'] = float(rej_rate)
+
+        core_start = min(7, int(df_main.shape[1]))
+        core_end = min(163, int(df_main.shape[1]))
+        if core_end > core_start:
+            core_arr = np.asarray(df_main.iloc[:, core_start:core_end], dtype=float)
+            core_finite_mask = np.isfinite(core_arr)
+            core_col_has_finite = np.any(core_finite_mask, axis=0)
+            if np.any(core_col_has_finite):
+                core_arr_eval = core_arr[:, core_col_has_finite]
+                core_nonfinite_count = int(
+                    core_arr_eval.size - int(np.count_nonzero(np.isfinite(core_arr_eval)))
+                )
+            else:
+                core_nonfinite_count = 0
+        else:
+            core_nonfinite_count = 0
+        df_atm.loc[0, 'solver_core_nonfinite_count'] = int(core_nonfinite_count)
+        df_atm.loc[0, 'solver_core_finite_ok'] = int(core_nonfinite_count == 0)
+
+        pa_suffix = "_\u041f\u0430"
+        pressure_cols = [c for c in df_main.columns if isinstance(c, str) and c.endswith(pa_suffix)]
+        if pressure_cols:
+            pressure_arr = np.asarray(df_main.loc[:, pressure_cols], dtype=float)
+            pressure_finite_mask = np.isfinite(pressure_arr)
+            pressure_nonfinite_count = int(pressure_arr.size - int(np.count_nonzero(pressure_finite_mask)))
+            if np.any(pressure_finite_mask):
+                pressure_min = float(np.min(pressure_arr[pressure_finite_mask]))
+                pressure_max = float(np.max(pressure_arr[pressure_finite_mask]))
+            else:
+                pressure_min = float('nan')
+                pressure_max = float('nan')
+        else:
+            pressure_nonfinite_count = 0
+            pressure_min = float('nan')
+            pressure_max = float('nan')
+        df_atm.loc[0, 'solver_pressure_nonfinite_count'] = int(pressure_nonfinite_count)
+        df_atm.loc[0, 'solver_pressure_finite_ok'] = int(pressure_nonfinite_count == 0)
+        df_atm.loc[0, 'solver_pressure_min_pa'] = float(pressure_min)
+        df_atm.loc[0, 'solver_pressure_max_pa'] = float(pressure_max)
+        df_atm.loc[0, 'solver_pressure_positive_ok'] = int(
+            bool(np.isfinite(pressure_min)) and (pressure_min > 0.0)
+        )
+        mass_state_final_total_kg = float(np.sum(np.asarray(state[14:14 + N], dtype=float)))
+        mass_state_delta_kg = float(mass_state_final_total_kg - mass_state_initial_total_kg)
+        mass_atm_net_kg = float(M_from_atm - M_to_atm)
+        mass_balance_residual_kg = float(mass_state_delta_kg - mass_atm_net_kg)
+        mass_balance_residual_abs_kg = float(abs(mass_balance_residual_kg))
+        mass_balance_scale_kg = float(
+            max(
+                1e-12,
+                abs(mass_state_initial_total_kg),
+                abs(mass_state_final_total_kg),
+                abs(mass_atm_net_kg),
+            )
+        )
+        mass_balance_residual_rel = float(mass_balance_residual_abs_kg / mass_balance_scale_kg)
+        df_atm.loc[0, 'solver_mass_state_initial_kg'] = float(mass_state_initial_total_kg)
+        df_atm.loc[0, 'solver_mass_state_final_kg'] = float(mass_state_final_total_kg)
+        df_atm.loc[0, 'solver_mass_state_delta_kg'] = float(mass_state_delta_kg)
+        df_atm.loc[0, 'solver_mass_atm_net_kg'] = float(mass_atm_net_kg)
+        df_atm.loc[0, 'solver_mass_balance_residual_kg'] = float(mass_balance_residual_kg)
+        df_atm.loc[0, 'solver_mass_balance_residual_abs_kg'] = float(mass_balance_residual_abs_kg)
+        df_atm.loc[0, 'solver_mass_balance_residual_rel'] = float(mass_balance_residual_rel)
+        active_rows_ok = (active_rows > 0) if qc_require_active_rows else True
+        hmax_ok = (hmax_violation_count == 0)
+        core_ok = (core_nonfinite_count == 0)
+        pressure_finite_ok = (pressure_nonfinite_count == 0) and bool(np.isfinite(pressure_min))
+        pressure_min_ok = bool(np.isfinite(pressure_min)) and (pressure_min > qc_min_pressure_req_pa)
+        pressure_max_ok = bool(np.isfinite(pressure_max)) and (pressure_max <= qc_max_pressure_pa)
+        reject_rate_ok = bool(np.isfinite(rej_rate)) and (rej_rate <= qc_max_reject_rate)
+        mass_balance_ok = bool(np.isfinite(mass_balance_residual_abs_kg)) and bool(np.isfinite(mass_balance_residual_rel))
+        mass_balance_ok = mass_balance_ok and (mass_balance_residual_abs_kg <= qc_max_mass_balance_residual_kg)
+        mass_balance_ok = mass_balance_ok and (mass_balance_residual_rel <= qc_max_mass_balance_residual_rel)
+        df_atm.loc[0, 'solver_mass_balance_ok'] = int(mass_balance_ok)
+        runtime_qc_ok = bool(
+            active_rows_ok
+            and hmax_ok
+            and core_ok
+            and pressure_finite_ok
+            and pressure_min_ok
+            and pressure_max_ok
+            and reject_rate_ok
+            and mass_balance_ok
+        )
+        runtime_qc_msgs = []
+        if not active_rows_ok:
+            runtime_qc_msgs.append('no_active_integrator_rows')
+        if not hmax_ok:
+            runtime_qc_msgs.append(f'hmax_violation_count={hmax_violation_count}')
+        if not core_ok:
+            runtime_qc_msgs.append(f'core_nonfinite_count={core_nonfinite_count}')
+        if not pressure_finite_ok:
+            runtime_qc_msgs.append(f'pressure_nonfinite_count={pressure_nonfinite_count}')
+        if not pressure_min_ok:
+            runtime_qc_msgs.append(
+                f'pressure_min_pa={pressure_min:.6g} <= required_min_pa={qc_min_pressure_req_pa:.6g}'
+            )
+        if not pressure_max_ok:
+            runtime_qc_msgs.append(
+                f'pressure_max_pa={pressure_max:.6g} > max_pa={qc_max_pressure_pa:.6g}'
+            )
+        if not reject_rate_ok:
+            runtime_qc_msgs.append(
+                f'reject_rate={rej_rate:.6g} > max_reject_rate={qc_max_reject_rate:.6g}'
+            )
+        if not mass_balance_ok:
+            runtime_qc_msgs.append(
+                'mass_balance_residual_abs_kg='
+                f'{mass_balance_residual_abs_kg:.6g} > max_abs_kg={qc_max_mass_balance_residual_kg:.6g}'
+                f' or rel={mass_balance_residual_rel:.6g} > max_rel={qc_max_mass_balance_residual_rel:.6g}'
+            )
+        df_atm.loc[0, 'integrator_runtime_qc_min_pressure_req_pa'] = float(qc_min_pressure_req_pa)
+        df_atm.loc[0, 'integrator_runtime_qc_max_pressure_pa'] = float(qc_max_pressure_pa)
+        df_atm.loc[0, 'integrator_runtime_qc_max_reject_rate'] = float(qc_max_reject_rate)
+        df_atm.loc[0, 'integrator_runtime_qc_max_mass_balance_residual_kg'] = float(
+            qc_max_mass_balance_residual_kg
+        )
+        df_atm.loc[0, 'integrator_runtime_qc_max_mass_balance_residual_rel'] = float(
+            qc_max_mass_balance_residual_rel
+        )
+        df_atm.loc[0, 'integrator_runtime_qc_require_active_rows'] = int(qc_require_active_rows)
+        df_atm.loc[0, 'integrator_runtime_qc_ok'] = int(runtime_qc_ok)
+        df_atm.loc[0, 'integrator_runtime_qc_msg'] = 'ok' if runtime_qc_ok else '; '.join(runtime_qc_msgs)
     except Exception:
         pass
+
+    strict_qc_raw = params.get('integrator_runtime_qc_strict', False)
+    if isinstance(strict_qc_raw, str):
+        strict_token = strict_qc_raw.strip().lower()
+        if strict_token in ("1", "true", "yes", "on"):
+            strict_qc = True
+        elif strict_token in ("0", "false", "no", "off"):
+            strict_qc = False
+        else:
+            strict_qc = False
+    else:
+        try:
+            strict_num = float(strict_qc_raw)
+            strict_qc = bool(strict_num) if np.isfinite(strict_num) else False
+        except Exception:
+            strict_qc = False
+
+    if strict_qc:
+        qc_ok = False
+        qc_msg = 'integrator_runtime_qc_not_computed'
+        try:
+            qc_ok = bool(int(df_atm.loc[0, 'integrator_runtime_qc_ok']))
+            qc_msg = str(df_atm.loc[0, 'integrator_runtime_qc_msg'])
+        except Exception:
+            qc_ok = False
+        if not qc_ok:
+            raise AssertionError(f'integrator_runtime_qc_strict: {qc_msg}')
 
     if record_full:
         df_p = pd.DataFrame(p_full, columns=[n.name for n in nodes])

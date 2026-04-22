@@ -35,6 +35,7 @@ from pneumo_solver_ui.tools.send_bundle_evidence import (
     summarize_geometry_reference_evidence,
 )
 
+from .desktop_results_runtime import ANIMATION_DIAGNOSTICS_HANDOFF_JSON
 from .desktop_diagnostics_model import (
     LATEST_DESKTOP_DIAGNOSTICS_CENTER_JSON,
     LATEST_DESKTOP_DIAGNOSTICS_RUN_JSON,
@@ -59,7 +60,25 @@ def _safe_read_json_dict(path: Path) -> dict:
 
 def _safe_write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    text = json.dumps(payload, ensure_ascii=False, indent=2)
+    tmp_path = path.with_name(f".{path.name}.tmp")
+    try:
+        tmp_path.write_text(text, encoding="utf-8")
+        tmp_path.replace(path)
+    except PermissionError:
+        fallback_path = path.with_name(f"{path.stem}.write_failed{path.suffix}")
+        try:
+            fallback_path.write_text(text, encoding="utf-8")
+        except OSError:
+            # Diagnostics state is a UI cache. A locked cache file must not crash
+            # the hosted diagnostics workspace.
+            return
+    finally:
+        try:
+            if tmp_path.exists():
+                tmp_path.unlink()
+        except OSError:
+            pass
 
 
 def _safe_write_text(path: Path, text: str) -> None:
@@ -275,6 +294,88 @@ def _load_geometry_reference_evidence_summary(repo_root: Path, out_dir: Path) ->
     return summary
 
 
+def _load_animation_diagnostics_handoff_summary(repo_root: Path, out_dir: Path) -> dict:
+    candidates = (
+        out_dir / ANIMATION_DIAGNOSTICS_HANDOFF_JSON,
+        repo_root / "send_bundles" / ANIMATION_DIAGNOSTICS_HANDOFF_JSON,
+    )
+    seen: set[str] = set()
+    for candidate in candidates:
+        try:
+            path = Path(candidate).expanduser().resolve()
+        except Exception:
+            path = Path(candidate)
+        key = str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        if not path.exists() or not path.is_file():
+            continue
+
+        payload = _safe_read_json_dict(path)
+        selected = dict(payload.get("selected_artifact") or {}) if payload else {}
+        artifacts = dict(payload.get("artifacts") or {}) if payload else {}
+        context = dict(payload.get("animation_context") or {}) if payload else {}
+        warnings: list[str] = []
+        schema = str(payload.get("schema") or "") if payload else ""
+        status = "READY"
+        if not payload:
+            status = "WARN"
+            warnings.append("Animation diagnostics handoff is present but unreadable.")
+        elif schema != "desktop_animation_diagnostics_handoff":
+            status = "WARN"
+            warnings.append(f"Unexpected animation diagnostics handoff schema: {schema or 'missing'}.")
+        scene_path = str(artifacts.get("scene_npz_path") or "").strip()
+        pointer_path = str(artifacts.get("pointer_json_path") or "").strip()
+        if payload and not scene_path and not pointer_path:
+            status = "WARN"
+            warnings.append("Animation diagnostics handoff has no scene or pointer artifact.")
+        return {
+            "status": status,
+            "source_path": path_str(path),
+            "schema": schema,
+            "handoff_id": str(payload.get("handoff_id") or "") if payload else "",
+            "handoff_hash": str(payload.get("handoff_hash") or "") if payload else "",
+            "produced_by": str(payload.get("produced_by") or "") if payload else "",
+            "consumed_by": str(payload.get("consumed_by") or "") if payload else "",
+            "selected_title": str(selected.get("title") or ""),
+            "selected_path": str(selected.get("path") or ""),
+            "selected_key": str(selected.get("key") or ""),
+            "scene_npz_path": scene_path,
+            "pointer_json_path": pointer_path,
+            "mnemo_event_log_path": str(artifacts.get("mnemo_event_log_path") or ""),
+            "capture_export_manifest_path": str(artifacts.get("capture_export_manifest_path") or ""),
+            "analysis_animation_handoff_path": str(artifacts.get("analysis_animation_handoff_path") or ""),
+            "scene_ready": bool(context.get("scene_ready") or scene_path or pointer_path),
+            "mnemo_ready": bool(context.get("mnemo_ready")),
+            "capture_status": str(context.get("capture_status") or ""),
+            "next_step": str(payload.get("next_step") or "") if payload else "",
+            "warnings": warnings,
+        }
+    return {
+        "status": "MISSING",
+        "source_path": "",
+        "schema": "",
+        "handoff_id": "",
+        "handoff_hash": "",
+        "produced_by": "",
+        "consumed_by": "",
+        "selected_title": "",
+        "selected_path": "",
+        "selected_key": "",
+        "scene_npz_path": "",
+        "pointer_json_path": "",
+        "mnemo_event_log_path": "",
+        "capture_export_manifest_path": "",
+        "analysis_animation_handoff_path": "",
+        "scene_ready": False,
+        "mnemo_ready": False,
+        "capture_status": "",
+        "next_step": "",
+        "warnings": [],
+    }
+
+
 def _load_embedded_evidence_manifest(zip_path: Path | None) -> dict:
     if zip_path is None or not zip_path.exists():
         return {}
@@ -443,8 +544,24 @@ def load_desktop_diagnostics_bundle_record(
     analysis = _load_analysis_evidence_summary(repo_root, resolved_out_dir)
     engineering_analysis = _load_engineering_analysis_evidence_summary(repo_root, resolved_out_dir)
     geometry_reference = _load_geometry_reference_evidence_summary(repo_root, resolved_out_dir)
+    animation_handoff = _load_animation_diagnostics_handoff_summary(repo_root, resolved_out_dir)
     latest_integrity = _load_latest_integrity_proof(resolved_out_dir, latest_zip)
     self_check_snapshot = _load_self_check_silent_warnings_snapshot(repo_root, latest_zip)
+
+    animation_handoff_summary_lines: list[str] = []
+    if animation_handoff.get("source_path"):
+        scene_name = Path(str(
+            animation_handoff.get("scene_npz_path")
+            or animation_handoff.get("pointer_json_path")
+            or animation_handoff.get("selected_path")
+            or animation_handoff.get("source_path")
+        )).name
+        animation_handoff_summary_lines.append(
+            "Animation diagnostics handoff: "
+            f"{animation_handoff.get('status') or 'MISSING'} "
+            f"scene={scene_name or '—'} "
+            f"sidecar={Path(str(animation_handoff.get('source_path') or '')).name}"
+        )
 
     integrity_summary_lines: list[str] = []
     if latest_integrity:
@@ -479,8 +596,10 @@ def load_desktop_diagnostics_bundle_record(
             "Engineering Analysis / HO-007 open gaps remain warning-only: "
             + (", ".join(reasons[:4]) if reasons else "readiness is not clear")
         )
-    if integrity_summary_lines:
-        summary_lines = list(dict.fromkeys(integrity_summary_lines + summary_lines))
+    if animation_handoff_summary_lines or integrity_summary_lines:
+        summary_lines = list(
+            dict.fromkeys(animation_handoff_summary_lines + integrity_summary_lines + summary_lines)
+        )
 
     return DesktopDiagnosticsBundleRecord(
         out_dir=path_str(resolved_out_dir),
@@ -681,6 +800,15 @@ def load_desktop_diagnostics_bundle_record(
             if (resolved_out_dir / ANIM_DIAG_SIDECAR_JSON).exists()
             else summary.get("anim_pointer_diagnostics_path") or ""
         ),
+        latest_animation_diagnostics_handoff_path=str(animation_handoff.get("source_path") or ""),
+        animation_diagnostics_handoff_status=str(animation_handoff.get("status") or "MISSING"),
+        animation_diagnostics_handoff_hash=str(animation_handoff.get("handoff_hash") or ""),
+        animation_diagnostics_selected_title=str(animation_handoff.get("selected_title") or ""),
+        animation_diagnostics_selected_path=str(animation_handoff.get("selected_path") or ""),
+        animation_diagnostics_scene_npz_path=str(animation_handoff.get("scene_npz_path") or ""),
+        animation_diagnostics_pointer_json_path=str(animation_handoff.get("pointer_json_path") or ""),
+        animation_diagnostics_mnemo_event_log_path=str(animation_handoff.get("mnemo_event_log_path") or ""),
+        animation_diagnostics_next_step=str(animation_handoff.get("next_step") or ""),
         summary_lines=summary_lines,
         clipboard_ok=(
             bool(clipboard_status.get("ok"))
@@ -857,6 +985,9 @@ def write_desktop_diagnostics_center_state(
             "latest_geometry_reference_evidence_json": bundle_record.latest_geometry_reference_evidence_path,
             "latest_clipboard_status_json": bundle_record.latest_clipboard_status_path,
             "anim_pointer_diagnostics_json": bundle_record.anim_pointer_diagnostics_path,
+            "latest_animation_diagnostics_handoff_json": (
+                bundle_record.latest_animation_diagnostics_handoff_path
+            ),
             "latest_run_state_json": run_record.state_path if run_record is not None else "",
             "latest_run_log": run_record.log_path if run_record is not None else "",
         },
@@ -961,6 +1092,17 @@ def write_desktop_diagnostics_center_state(
             "evidence_missing": list(bundle_record.geometry_reference_evidence_missing),
             "warnings": list(bundle_record.geometry_reference_warnings),
             "action": bundle_record.geometry_reference_action,
+        },
+        "animation_diagnostics_handoff": {
+            "status": bundle_record.animation_diagnostics_handoff_status,
+            "handoff_hash": bundle_record.animation_diagnostics_handoff_hash,
+            "sidecar_path": bundle_record.latest_animation_diagnostics_handoff_path,
+            "selected_title": bundle_record.animation_diagnostics_selected_title,
+            "selected_path": bundle_record.animation_diagnostics_selected_path,
+            "scene_npz_path": bundle_record.animation_diagnostics_scene_npz_path,
+            "pointer_json_path": bundle_record.animation_diagnostics_pointer_json_path,
+            "mnemo_event_log_path": bundle_record.animation_diagnostics_mnemo_event_log_path,
+            "next_step": bundle_record.animation_diagnostics_next_step,
         },
     }
     _safe_write_json(path, payload)
