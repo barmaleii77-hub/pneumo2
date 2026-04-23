@@ -1072,17 +1072,18 @@ def test_desktop_qt_shell_tree_click_opens_route_surface_directly(
         app.processEvents()
 
         manager = _FakeCoexistenceManager.instances[-1]
-        assert [session.spec.key for session in manager.opened] == ["desktop_ring_editor"]
+        assert manager.opened == []
         assert window._selected_surface_key == "ws_ring"
         assert window._selected_tool_key == "desktop_ring_editor"
         ring_dock = window.workspace_docks["ws_ring"]
         assert ring_dock.objectName() == "DesktopQtShellWorkspaceDock_WS_RING"
         assert ring_dock.isHidden() is False
         assert ring_dock.windowTitle() == "Редактор циклического сценария"
-        state_label = window.findChild(_QtWidgets.QLabel, "WorkspaceDockState_ws_ring")
-        assert state_label is not None
-        assert "Открыто" in state_label.text()
-        assert "Рабочее окно запущено: Редактор циклического сценария" in window.status_label.text()
+        assert ring_dock.property("workspace_hosting") == "native"
+        hosted_page = window.workspace_hosted_widgets["ws_ring"]
+        assert hosted_page.objectName() == "HostedWorkspacePage_ring_editor"
+        assert window.findChild(_QtWidgets.QPushButton, "RG-BTN-SAVE-SOURCE") is not None
+        assert "Рабочий этап открыт в док-поверхности: Редактор циклического сценария" in window.status_label.text()
         assert "Запустить раздел" not in "\n".join(window.operator_visible_audit()["direct_visible_texts"])
     finally:
         window.close()
@@ -1138,10 +1139,66 @@ def test_desktop_qt_shell_diagnostics_route_is_hosted_workspace(
         assert hosted_page.verify_button.text() == "Проверить архив"
         assert hosted_page.send_button.text() == "Отправить результаты"
         assert window.findChild(_QtWidgets.QPushButton, "DG-BTN-COLLECT") is hosted_page.collect_button
-        assert "Диагностика открыта в рабочей поверхности." in window.status_label.text()
+        assert "Рабочий этап открыт в док-поверхности: Диагностика" in window.status_label.text()
 
         assert window.open_tool("desktop_diagnostics_center", force_external=True) is True
         assert [session.spec.key for session in manager.opened] == ["desktop_diagnostics_center"]
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_desktop_qt_shell_primary_route_docks_are_hosted_without_external_windows(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _QtCore, _QtGui, _QtWidgets = _qt_modules()
+    settings_path = tmp_path / "main_shell_state.ini"
+    monkeypatch.setenv("PNEUMO_QT_MAIN_SHELL_STATE_PATH", str(settings_path))
+    monkeypatch.setattr(
+        qt_main_window_module,
+        "build_shell_project_context",
+        lambda: _test_project_context(tmp_path),
+    )
+    _FakeCoexistenceManager.instances.clear()
+    monkeypatch.setattr(
+        qt_main_window_module,
+        "DesktopShellCoexistenceManager",
+        _FakeCoexistenceManager,
+    )
+
+    expected_pages = {
+        "ws_inputs": "HostedWorkspacePage_input_data",
+        "ws_ring": "HostedWorkspacePage_ring_editor",
+        "ws_suite": "HostedWorkspacePage_test_matrix",
+        "ws_baseline": "HostedWorkspacePage_baseline_run",
+        "ws_optimization": "HostedWorkspacePage_optimization",
+        "ws_analysis": "HostedWorkspacePage_results_analysis",
+        "ws_animator": "HostedWorkspacePage_animation",
+        "ws_diagnostics": "HostedWorkspacePage_diagnostics",
+    }
+
+    app = _qt_app()
+    window = qt_main_window_module.DesktopQtMainShell()
+    try:
+        app.processEvents()
+        manager = _FakeCoexistenceManager.instances[-1]
+        for surface_key, object_name in expected_pages.items():
+            item = _find_tree_item_by_data(
+                window.browser_tree,
+                qt_main_window_module.SURFACE_ROLE,
+                surface_key,
+            )
+            assert item is not None
+            window.browser_tree.setCurrentItem(item)
+            app.processEvents()
+
+            dock = window.workspace_docks[surface_key]
+            assert dock.property("workspace_hosting") == "native"
+            assert dock.isHidden() is False
+            assert window.workspace_hosted_widgets[surface_key].objectName() == object_name
+            assert manager.opened == []
     finally:
         window.close()
         window.deleteLater()
@@ -1185,9 +1242,14 @@ def test_desktop_qt_shell_handoff_payload_and_layout_state_are_runtime_checked(
         assert window.open_tool("desktop_animator") is True
 
         manager = _FakeCoexistenceManager.instances[-1]
+        assert manager.opened == []
+        assert window.workspace_docks["ws_inputs"].property("workspace_hosting") == "native"
+        assert window.workspace_docks["ws_animator"].property("workspace_hosting") == "native"
+        assert window.findChild(_QtWidgets.QPushButton, "ID-BTN-SAVE-WORKING-COPY") is not None
+        assert window.findChild(_QtWidgets.QPushButton, "AM-BTN-CHECK-ANIMATOR") is not None
+
+        assert window.open_tool("desktop_animator", force_external=True) is True
         assert [session.spec.key for session in manager.opened] == [
-            "desktop_ring_editor",
-            "desktop_input_editor",
             "desktop_animator",
         ]
         payload = manager.opened[-1].context_payload
@@ -1196,7 +1258,7 @@ def test_desktop_qt_shell_handoff_payload_and_layout_state_are_runtime_checked(
         assert payload["project_name"] == "Runtime Shell"
         assert payload["workspace_dir"] == str((tmp_path / "workspace").resolve())
         assert payload["repo_root"] == str((tmp_path / "repo").resolve())
-        assert window.runtime_table.topLevelItemCount() == 3
+        assert window.runtime_table.topLevelItemCount() == 1
         assert window.runtime_table.columnCount() == 3
         runtime_rows = [
             " | ".join(

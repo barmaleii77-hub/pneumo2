@@ -33,8 +33,21 @@ from pneumo_solver_ui.desktop_shell.command_search import (
 )
 from pneumo_solver_ui.desktop_shell.contracts import DesktopShellToolSpec
 from pneumo_solver_ui.desktop_shell.registry import build_desktop_shell_specs
-from pneumo_solver_ui.desktop_spec_shell.contracts import DesktopWorkspaceSpec
+from pneumo_solver_ui.desktop_spec_shell.contracts import (
+    DesktopShellCommandSpec,
+    DesktopWorkspaceSpec,
+)
 from pneumo_solver_ui.desktop_spec_shell.diagnostics_panel import DiagnosticsWorkspacePage
+from pneumo_solver_ui.desktop_spec_shell.registry import build_command_map, build_workspace_map
+from pneumo_solver_ui.desktop_spec_shell.workspace_pages import (
+    AnimationWorkspacePage,
+    BaselineWorkspacePage,
+    InputWorkspacePage,
+    OptimizationWorkspacePage,
+    ResultsWorkspacePage,
+    RingWorkspacePage,
+    SuiteWorkspacePage,
+)
 from pneumo_solver_ui.desktop_animator.analysis_context import load_analysis_context
 from pneumo_solver_ui.release_info import get_release
 
@@ -114,6 +127,39 @@ RESULT_DETAIL_WINDOW_KEYS = (
     "compare_viewer",
     "desktop_mnemo",
 )
+
+HOSTED_TOOL_WORKSPACE_IDS = {
+    "desktop_input_editor": "input_data",
+    "desktop_ring_editor": "ring_editor",
+    "test_center": "test_matrix",
+    "desktop_run_setup_center": "baseline_run",
+    "desktop_optimizer_center": "optimization",
+    "desktop_results_center": "results_analysis",
+    "desktop_animator": "animation",
+    "desktop_diagnostics_center": "diagnostics",
+}
+
+HOSTED_WORKSPACE_SURFACE_KEYS = {
+    "input_data": "ws_inputs",
+    "ring_editor": "ws_ring",
+    "test_matrix": "ws_suite",
+    "baseline_run": "ws_baseline",
+    "optimization": "ws_optimization",
+    "results_analysis": "ws_analysis",
+    "animation": "ws_animator",
+    "diagnostics": "ws_diagnostics",
+}
+
+LEGACY_COMMAND_TOOL_KEYS = {
+    "input.legacy_editor.open": "desktop_input_editor",
+    "ring.legacy_editor.open": "desktop_ring_editor",
+    "test.legacy_center.open": "test_center",
+    "baseline.legacy_run_setup.open": "desktop_run_setup_center",
+    "optimization.legacy_center.open": "desktop_optimizer_center",
+    "results.legacy_center.open": "desktop_results_center",
+    "animation.legacy_animator.open": "desktop_animator",
+    "diagnostics.legacy_center.open": "desktop_diagnostics_center",
+}
 
 VISUAL_TRUTH_ROWS = (
     (
@@ -256,6 +302,8 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         super().__init__()
         self.specs = build_desktop_shell_specs()
         self.spec_by_key = {spec.key: spec for spec in self.specs}
+        self.hosted_workspace_by_id = build_workspace_map()
+        self.hosted_command_by_id = build_command_map()
         self.pipeline_surfaces = V38_PIPELINE_SURFACES
         self.pipeline_surface_by_key = build_pipeline_surface_by_key()
         self.command_entries = (
@@ -878,6 +926,20 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             ),
         )
 
+    def _hosted_action_commands(
+        self,
+        workspace: DesktopWorkspaceSpec,
+    ) -> tuple[DesktopShellCommandSpec, ...]:
+        commands: list[DesktopShellCommandSpec] = []
+        seen: set[str] = set()
+        for command_id in workspace.quick_action_ids:
+            command = self.hosted_command_by_id.get(command_id)
+            if command is None or command.command_id in seen:
+                continue
+            seen.add(command.command_id)
+            commands.append(command)
+        return tuple(commands)
+
     def _on_hosted_workspace_status(self, text: str, busy: bool) -> None:
         self._set_status_message(text)
         if busy:
@@ -889,39 +951,160 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.status_progress_bar.setFormat("Готово")
 
     def _handle_hosted_workspace_command(self, command_id: str) -> None:
-        if command_id == "baseline.center.open":
+        command = self.hosted_command_by_id.get(command_id)
+        if command is None and command_id == "baseline.center.open":
             self.open_tool("desktop_run_setup_center")
             return
-        if command_id == "diagnostics.legacy_center.open":
-            self.open_tool("desktop_diagnostics_center", force_external=True)
+        if command is None:
+            self._set_status_message(f"Команда рабочего шага пока не подключена: {command_id}")
             return
-        self._set_status_message(f"Команда рабочего шага пока не подключена: {command_id}")
 
-    def _ensure_hosted_diagnostics_workspace(
+        legacy_tool_key = LEGACY_COMMAND_TOOL_KEYS.get(command.command_id)
+        if legacy_tool_key is not None:
+            self.open_tool(legacy_tool_key, force_external=True)
+            return
+
+        if command.kind == "open_workspace" and command.target_workspace_id:
+            self._open_hosted_workspace_id(command.target_workspace_id)
+            return
+
+        if command.kind == "hosted_action":
+            page = self._open_hosted_workspace_id(command.workspace_id)
+            handler = getattr(page, "handle_command", None)
+            if callable(handler):
+                handler(command.command_id)
+                self._set_status_message(f"Выполнено действие: {command.title}")
+                return
+            self._set_status_message(f"Действие пока недоступно в рабочем шаге: {command.title}")
+            return
+
+        if command.module and legacy_tool_key is None:
+            self._set_status_message(
+                "Старое окно скрыто из основного маршрута. Используйте сервисный fallback только явно."
+            )
+            return
+
+    def _open_hosted_workspace_id(self, workspace_id: str) -> QtWidgets.QWidget | None:
+        surface_key = HOSTED_WORKSPACE_SURFACE_KEYS.get(workspace_id)
+        if surface_key is None:
+            self._select_surface("ws_project")
+            return None
+        surface = self.pipeline_surface_by_key.get(surface_key)
+        if surface is None or not surface.tool_key:
+            return None
+        self._apply_selected_tool(surface.tool_key, reveal_child_dock=True)
+        return self.workspace_hosted_widgets.get(surface.key)
+
+    def _build_hosted_workspace_page(
         self,
         surface: ShellPipelineSurface,
-    ) -> DiagnosticsWorkspacePage | None:
-        if surface.key != "ws_diagnostics":
+        dock: QtWidgets.QDockWidget,
+    ) -> QtWidgets.QWidget | None:
+        workspace_id = HOSTED_TOOL_WORKSPACE_IDS.get(surface.tool_key or "")
+        if workspace_id is None:
+            return None
+        workspace = (
+            self._diagnostics_workspace_spec(surface)
+            if workspace_id == "diagnostics"
+            else self.hosted_workspace_by_id.get(workspace_id)
+        )
+        if workspace is None:
+            return None
+
+        actions = self._hosted_action_commands(workspace)
+        repo_root = self.project_context.repo_root
+        if workspace_id == "input_data":
+            page = InputWorkspacePage(
+                workspace,
+                actions,
+                self._handle_hosted_workspace_command,
+                repo_root=repo_root,
+                parent=dock,
+            )
+        elif workspace_id == "ring_editor":
+            page = RingWorkspacePage(
+                workspace,
+                actions,
+                self._handle_hosted_workspace_command,
+                repo_root=repo_root,
+                parent=dock,
+            )
+        elif workspace_id == "test_matrix":
+            page = SuiteWorkspacePage(
+                workspace,
+                actions,
+                self._handle_hosted_workspace_command,
+                repo_root=repo_root,
+                parent=dock,
+            )
+        elif workspace_id == "baseline_run":
+            page = BaselineWorkspacePage(
+                workspace,
+                actions,
+                self._handle_hosted_workspace_command,
+                repo_root=repo_root,
+                on_shell_status=self._on_hosted_workspace_status,
+                parent=dock,
+            )
+        elif workspace_id == "optimization":
+            page = OptimizationWorkspacePage(
+                workspace,
+                actions,
+                self._handle_hosted_workspace_command,
+                repo_root=repo_root,
+                on_shell_status=self._on_hosted_workspace_status,
+                parent=dock,
+            )
+        elif workspace_id == "results_analysis":
+            page = ResultsWorkspacePage(
+                workspace,
+                actions,
+                self._handle_hosted_workspace_command,
+                repo_root=repo_root,
+                parent=dock,
+            )
+        elif workspace_id == "animation":
+            page = AnimationWorkspacePage(
+                workspace,
+                actions,
+                self._handle_hosted_workspace_command,
+                repo_root=repo_root,
+                parent=dock,
+            )
+        elif workspace_id == "diagnostics":
+            page = DiagnosticsWorkspacePage(
+                workspace,
+                repo_root=repo_root,
+                on_shell_status=self._on_hosted_workspace_status,
+                on_command=self._handle_hosted_workspace_command,
+                parent=dock,
+            )
+            page.collect_button.setText("Собрать диагностику")
+            page.verify_button.setText("Проверить архив")
+            page.send_button.setText("Отправить результаты")
+        else:
+            return None
+
+        page.setObjectName(f"HostedWorkspacePage_{workspace_id}")
+        return page
+
+    def _ensure_hosted_workspace(
+        self,
+        surface: ShellPipelineSurface,
+    ) -> QtWidgets.QWidget | None:
+        if surface.tool_key not in HOSTED_TOOL_WORKSPACE_IDS:
             return None
         dock = self.workspace_docks.get(surface.key)
         if dock is None:
             return None
         existing = self.workspace_hosted_widgets.get(surface.key)
-        if isinstance(existing, DiagnosticsWorkspacePage):
+        if existing is not None:
             return existing
 
         old_widget = dock.widget()
-        page = DiagnosticsWorkspacePage(
-            self._diagnostics_workspace_spec(surface),
-            repo_root=self.project_context.repo_root,
-            on_shell_status=self._on_hosted_workspace_status,
-            on_command=self._handle_hosted_workspace_command,
-            parent=dock,
-        )
-        page.setObjectName("HostedDiagnosticsWorkspacePage")
-        page.collect_button.setText("Собрать диагностику")
-        page.verify_button.setText("Проверить архив")
-        page.send_button.setText("Отправить результаты")
+        page = self._build_hosted_workspace_page(surface, dock)
+        if page is None:
+            return None
         dock.setWidget(page)
         dock.setProperty("workspace_hosting", "native")
         self.workspace_hosted_widgets[surface.key] = page
@@ -1326,7 +1509,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         dock = self.workspace_docks.get(surface.key)
         if dock is None:
             return
-        hosted_page = self._ensure_hosted_diagnostics_workspace(surface)
+        hosted_page = self._ensure_hosted_workspace(surface)
         if hosted_page is not None:
             hosted_page.refresh_view()
         dock.show()
@@ -1970,9 +2153,10 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         if spec is None:
             self._set_status_message(f"Неизвестный ключ окна: {key}")
             return False
-        if key == "desktop_diagnostics_center" and not force_external:
+        if key in HOSTED_TOOL_WORKSPACE_IDS and not force_external:
             self._apply_selected_tool(key, reveal_child_dock=True)
-            self._set_status_message("Диагностика открыта в рабочей поверхности.")
+            surface = self._surface_for_tool(key)
+            self._set_status_message(f"Рабочий этап открыт в док-поверхности: {surface.title}")
             self._refresh_runtime_table()
             return True
         self._apply_selected_tool(key, reveal_child_dock=True)
