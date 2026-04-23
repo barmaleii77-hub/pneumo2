@@ -5,6 +5,10 @@
 .tmp.drivedownload/
 .tmp.driveupload/
 
+# Windows / Google Drive folder metadata
+desktop.ini
+Thumbs.db
+
 # Local Python environments and caches
 pneumo2_R31CN_HF8_repo_root/.venv/
 pneumo2_R31CN_HF8_repo_root/**/__pycache__/
