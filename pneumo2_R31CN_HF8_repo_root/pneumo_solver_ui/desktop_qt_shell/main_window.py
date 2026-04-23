@@ -730,6 +730,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             "desktop_input_editor",
             "desktop_ring_editor",
             "test_center",
+            "desktop_run_setup_center",
             "desktop_optimizer_center",
         ):
             spec = self.spec_by_key.get(key)
@@ -737,7 +738,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                 continue
             self._add_tool_action(run_menu, spec)
         all_tools_menu = run_menu.addMenu("Дополнительные проверки")
-        for group_title, group_specs in self._launch_surface_groups():
+        for group_title, group_specs in self._browser_service_surface_groups():
             group_menu = all_tools_menu.addMenu(group_title)
             for spec in group_specs:
                 self._add_tool_action(group_menu, spec)
@@ -774,6 +775,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
 
         diagnostics_menu = menubar.addMenu("Диагностика")
         collect_diag_action = diagnostics_menu.addAction("Собрать диагностику")
+        collect_diag_action.setData("desktop_diagnostics_center")
         collect_diag_action.setShortcut(QtGui.QKeySequence("F7"))
         collect_diag_action.triggered.connect(lambda: self.open_tool("desktop_diagnostics_center"))
         focus_messages_action = diagnostics_menu.addAction("Перейти к сообщениям рабочего места")

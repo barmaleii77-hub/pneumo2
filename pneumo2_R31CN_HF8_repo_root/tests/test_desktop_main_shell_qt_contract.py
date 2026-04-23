@@ -377,6 +377,8 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert 'menubar.addMenu("Инструменты")' in src
     assert 'menubar.addMenu("Справка")' in src
     assert 'run_menu.addMenu("Дополнительные проверки")' in src
+    assert "for group_title, group_specs in self._browser_service_surface_groups():" in src
+    assert 'collect_diag_action.setData("desktop_diagnostics_center")' in src
     assert 'run_menu.addMenu("Все окна")' not in src
     assert '("Справочники и проверки", support_specs)' in src
     assert '("Детальная проверка результата", result_detail_specs)' in src
@@ -936,6 +938,30 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
         assert "Справочники и проверки" in visible_audit["menu_actions"]
         assert "Детальная проверка результата" in visible_audit["menu_actions"]
         assert "Дополнительная визуализация" in visible_audit["menu_actions"]
+        additional_action = next(
+            action
+            for action in window.findChildren(QtGui.QAction)
+            if action.text().replace("&", "").strip() == "Дополнительные проверки"
+            and action.menu() is not None
+        )
+        additional_menu_tool_keys: set[str] = set()
+
+        def collect_menu_tool_keys(menu):
+            for action in menu.actions():
+                data = action.data()
+                if isinstance(data, str) and data:
+                    additional_menu_tool_keys.add(data)
+                submenu = action.menu()
+                if submenu is not None:
+                    collect_menu_tool_keys(submenu)
+
+        collect_menu_tool_keys(additional_action.menu())
+        assert additional_menu_tool_keys.isdisjoint(qt_main_window_module.MAIN_ROUTE_KEYS)
+        assert {
+            "desktop_geometry_reference_center",
+            "desktop_engineering_analysis_center",
+            "compare_viewer",
+        } <= additional_menu_tool_keys
         assert "Все окна" not in visible_audit["menu_actions"]
         assert "Окно восстановления" not in visible_audit["menu_actions"]
         assert "Панель восстановления окон" not in visible_audit["menu_actions"]
