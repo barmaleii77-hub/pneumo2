@@ -572,8 +572,9 @@ def test_desktop_shell_command_search_home_and_project_tree_actions_are_routable
 
     assert by_label["Панель проекта"].action_kind == "home"
     assert by_label["Панель проекта"].action_value == "home"
-    assert by_label["Перейти к списку рабочих окон"].action_kind == "focus"
-    assert by_label["Перейти к списку рабочих окон"].action_value == "project_tree"
+    assert by_label["Перейти к дереву проекта"].action_kind == "focus"
+    assert by_label["Перейти к дереву проекта"].action_value == "project_tree"
+    assert rank_shell_command_search_entries("список проекта", entries)[0].action_value == "project_tree"
     assert by_label["Инженерный анализ"].action_kind == "tool"
     assert by_label["Инженерный анализ"].action_value == "desktop_engineering_analysis_center"
     assert "HO-007" in by_label["Инженерный анализ"].keywords
@@ -610,7 +611,7 @@ def test_desktop_shell_command_search_home_and_project_tree_actions_are_routable
 def test_desktop_shell_command_search_manual_keywords_are_operator_language() -> None:
     entries = build_shell_command_search_entries(build_desktop_shell_specs())
     checked_labels = {
-        "Перейти к списку рабочих окон",
+        "Перейти к дереву проекта",
         "Собрать диагностику",
         "Анимировать результат",
         "Проверить подготовку анимации",
@@ -1084,22 +1085,24 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
             "Артефакт",
             "артефакт",
             "статус миграции",
+            "Перейти к списку рабочих окон",
             "Показать список рабочих окон",
         ):
             assert fragment not in visible_text
         catalog_labels = {
             entry["label"] for entry in visible_audit["command_search_catalog"]
         }
-        assert "Перейти к списку рабочих окон" in catalog_labels
+        assert "Перейти к дереву проекта" in catalog_labels
+        assert "Перейти к списку рабочих окон" not in catalog_labels
         assert any(
             result["action_value"] == "project_tree"
-            for result in visible_audit["command_search_results"]["список проекта"]
+            for result in visible_audit["command_search_results"]["дерево проекта"]
         )
         pipeline_sync = window.prove_v38_pipeline_selection_sync()
         assert pipeline_sync["missing_workspace_ids"] == []
         assert all(row["synced"] is True for row in pipeline_sync["rows"])
 
-        window.command_search_edit.setText("список проекта")
+        window.command_search_edit.setText("дерево проекта")
         app.processEvents()
         assert window.search_results_list.count() > 0
         window._activate_primary_search_result()

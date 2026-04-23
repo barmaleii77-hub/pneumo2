@@ -650,7 +650,7 @@ def collect_qt_main_shell_runtime_proof(*, offscreen: bool = False, state_path: 
             window.show()
             app.processEvents()
 
-            window.command_search_edit.setText("список проекта")
+            window.command_search_edit.setText("дерево проекта")
             app.processEvents()
             search_result_count = int(window.search_results_list.count())
             if search_result_count:
@@ -769,7 +769,7 @@ def collect_qt_main_shell_runtime_proof(*, offscreen: bool = False, state_path: 
                     else "",
                 },
                 "command_search": {
-                    "query": "список проекта",
+                    "query": "дерево проекта",
                     "result_count": search_result_count,
                     "current_surface": command_search_surface,
                     "status_text": command_search_status_text,

@@ -739,7 +739,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         search_action = edit_menu.addAction("Быстрый поиск")
         search_action.setShortcut(QtGui.QKeySequence("Ctrl+K"))
         search_action.triggered.connect(self._focus_command_search)
-        tree_action = edit_menu.addAction("Фокус на список проекта")
+        tree_action = edit_menu.addAction("Фокус на дерево проекта")
         tree_action.triggered.connect(self._focus_project_tree)
 
         view_menu = menubar.addMenu("Вид")
@@ -1916,7 +1916,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                 for entry in rank_shell_command_search_entries(query, self.command_entries)[:8]
             ]
             for query in (
-                "список проекта",
+                "дерево проекта",
                 "исходные данные",
                 "диагностика",
                 "проверка проекта",
@@ -2616,7 +2616,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.resizeDocks((self.runtime_dock,), (190,), QtCore.Qt.Orientation.Vertical)
         self._localize_builtin_accessibility()
         self.resize(1640, 980)
-        self._set_status_message("Раскладка сброшена к базовой: список проекта слева, инспектор справа, ход выполнения снизу.")
+        self._set_status_message("Раскладка сброшена к базовой: дерево проекта слева, инспектор справа, ход выполнения снизу.")
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         self._save_layout()
