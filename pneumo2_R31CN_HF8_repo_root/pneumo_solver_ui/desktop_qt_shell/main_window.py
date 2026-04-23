@@ -273,12 +273,15 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self._selected_search_entries: list[ShellCommandSearchEntry] = []
         self._focus_regions: list[QtWidgets.QWidget] = []
         self._message_log: list[str] = []
+        self.workspace_docks: dict[str, QtWidgets.QDockWidget] = {}
+        self.workspace_dock_labels: dict[str, dict[str, QtWidgets.QLabel]] = {}
 
         self._configure_window()
         self._build_command_toolbar()
         self._build_browser_dock()
         self._build_inspector_dock()
         self._build_runtime_dock()
+        self._build_workspace_child_docks()
         self._build_central_surface()
         self._build_status_bar()
         self._build_menu()
@@ -529,6 +532,10 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         for dock in (self.browser_dock, self.inspector_dock, self.runtime_dock):
             dock.show()
             dock.raise_()
+        current_workspace_dock = self.workspace_docks.get(self._selected_surface_key)
+        if current_workspace_dock is not None:
+            current_workspace_dock.show()
+            current_workspace_dock.raise_()
         self._set_status_message("Все панели возвращены. Ширину и высоту меняйте границами между панелями.")
 
     def _localize_builtin_accessibility(self) -> None:
@@ -578,6 +585,16 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             action.setStatusTip("Включить или скрыть панель рабочего места.")
             action.setToolTip("Панель можно открепить, вернуть в окно и изменить размер границей.")
             panels_menu.addAction(action)
+        workspace_panels_menu = panels_menu.addMenu("Рабочие поверхности")
+        for surface in self.pipeline_surfaces:
+            dock = self.workspace_docks.get(surface.key)
+            if dock is None:
+                continue
+            action = dock.toggleViewAction()
+            action.setText(surface.title)
+            action.setStatusTip("Показать или скрыть дочернюю док-поверхность рабочего шага.")
+            action.setToolTip("Док-поверхность можно оставить в главном окне или открепить как дочернее окно.")
+            workspace_panels_menu.addAction(action)
         panels_menu.addSeparator()
         show_all_panels_action = panels_menu.addAction("Вернуть все панели")
         show_all_panels_action.setStatusTip("Вернуть видимость списка проекта, свойств и хода выполнения.")
@@ -823,6 +840,75 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
 
         self.runtime_dock.setWidget(runtime_widget)
         self.addDockWidget(QtCore.Qt.DockWidgetArea.BottomDockWidgetArea, self.runtime_dock)
+
+    def _build_workspace_child_docks(self) -> None:
+        for surface in self.pipeline_surfaces:
+            if not surface.tool_key:
+                continue
+            dock = QtWidgets.QDockWidget(surface.title, self)
+            object_suffix = surface.workspace_id.replace("-", "_")
+            dock.setObjectName(f"DesktopQtShellWorkspaceDock_{object_suffix}")
+            dock.setFeatures(self._dock_features())
+            dock.setAllowedAreas(
+                QtCore.Qt.DockWidgetArea.LeftDockWidgetArea
+                | QtCore.Qt.DockWidgetArea.RightDockWidgetArea
+                | QtCore.Qt.DockWidgetArea.TopDockWidgetArea
+                | QtCore.Qt.DockWidgetArea.BottomDockWidgetArea
+            )
+            dock.setMinimumWidth(360)
+            dock.setToolTip(
+                "Дочерняя док-поверхность рабочего шага: можно открепить, вернуть в окно и изменить размер."
+            )
+
+            widget = QtWidgets.QWidget(dock)
+            layout = QtWidgets.QVBoxLayout(widget)
+            title_label = QtWidgets.QLabel(surface.title, widget)
+            title_font = title_label.font()
+            title_font.setBold(True)
+            title_label.setFont(title_font)
+            layout.addWidget(title_label)
+
+            state_label = QtWidgets.QLabel("Состояние: готово к открытию", widget)
+            state_label.setObjectName(f"WorkspaceDockState_{surface.key}")
+            state_label.setWordWrap(True)
+            layout.addWidget(state_label)
+
+            source_label = QtWidgets.QLabel(f"Источник данных: {surface.source_label}", widget)
+            source_label.setWordWrap(True)
+            layout.addWidget(source_label)
+
+            next_label = QtWidgets.QLabel(f"Следующее действие: {surface.next_action}", widget)
+            next_label.setWordWrap(True)
+            layout.addWidget(next_label)
+
+            handoff_label = QtWidgets.QLabel(f"Дальше по работе: {surface.handoff_label}", widget)
+            handoff_label.setWordWrap(True)
+            layout.addWidget(handoff_label)
+
+            details = QtWidgets.QTreeWidget(widget)
+            details.setHeaderLabels(("Что видно", "Значение"))
+            linked_spec = self.spec_by_key.get(surface.tool_key)
+            for name, value in (
+                ("Рабочий шаг", surface.title),
+                ("Связанное окно", linked_spec.title if linked_spec is not None else surface.tool_key),
+                ("Источник", surface.source_label),
+                ("Передача дальше", surface.handoff_label),
+            ):
+                details.addTopLevelItem(QtWidgets.QTreeWidgetItem((name, value)))
+            details.resizeColumnToContents(0)
+            layout.addWidget(details, 1)
+
+            dock.setWidget(widget)
+            self.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock)
+            self.tabifyDockWidget(self.inspector_dock, dock)
+            dock.hide()
+            self.workspace_docks[surface.key] = dock
+            self.workspace_dock_labels[surface.key] = {
+                "state": state_label,
+                "source": source_label,
+                "next": next_label,
+                "handoff": handoff_label,
+            }
 
     def _build_central_surface(self) -> None:
         central = QtWidgets.QWidget(self)
@@ -1126,12 +1212,53 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             f"Активный режим: {self.optimization_mode_combo.currentText().strip()}"
         )
 
-    def _apply_selected_tool(self, key: str, *, announce: bool = True) -> None:
+    def _refresh_workspace_child_dock(
+        self,
+        surface: ShellPipelineSurface,
+        spec: DesktopShellToolSpec | None,
+    ) -> None:
+        labels = self.workspace_dock_labels.get(surface.key)
+        if labels is None:
+            return
+        state_text = "готово к открытию"
+        if spec is not None:
+            session = self.coexistence.session_for(spec.key)
+            if session is not None:
+                try:
+                    state_text = str(session.status_label()).strip() or "открыто"
+                except Exception:
+                    state_text = "открыто"
+        labels["state"].setText(f"Состояние: {state_text}")
+        labels["source"].setText(f"Источник данных: {surface.source_label}")
+        labels["next"].setText(f"Следующее действие: {surface.next_action}")
+        labels["handoff"].setText(f"Дальше по работе: {surface.handoff_label}")
+
+    def _show_workspace_child_dock(self, surface: ShellPipelineSurface) -> None:
+        dock = self.workspace_docks.get(surface.key)
+        if dock is None:
+            return
+        dock.show()
+        dock.raise_()
+        if dock.isFloating():
+            dock.activateWindow()
+
+    def _apply_selected_tool(
+        self,
+        key: str,
+        *,
+        announce: bool = True,
+        reveal_child_dock: bool = False,
+    ) -> None:
         spec = self.spec_by_key.get(key)
         if spec is None:
             return
         surface = self._surface_for_tool(key)
-        self._apply_selected_surface(surface.key, announce=announce, selected_tool_key=key)
+        self._apply_selected_surface(
+            surface.key,
+            announce=announce,
+            selected_tool_key=key,
+            reveal_child_dock=reveal_child_dock,
+        )
 
     def _apply_selected_surface(
         self,
@@ -1139,6 +1266,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         *,
         announce: bool = True,
         selected_tool_key: str | None = None,
+        reveal_child_dock: bool = False,
     ) -> None:
         surface = self.pipeline_surface_by_key.get(key)
         if surface is None:
@@ -1171,6 +1299,9 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self._refresh_workflow_list()
         self._refresh_inspector(surface, spec)
         self._refresh_runtime_table()
+        self._refresh_workspace_child_dock(surface, spec)
+        if reveal_child_dock:
+            self._show_workspace_child_dock(surface)
         self._select_browser_item(surface.key)
         if hasattr(self, "launch_tool_combo"):
             index = self.launch_tool_combo.findData(surface.tool_key)
@@ -1747,7 +1878,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         if spec is None:
             self._set_status_message(f"Неизвестный ключ окна: {key}")
             return False
-        self._apply_selected_tool(key)
+        self._apply_selected_tool(key, reveal_child_dock=True)
         try:
             session = self.coexistence.open_tool(
                 spec,
@@ -1761,6 +1892,9 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                 f"{spec.title}\n\n{exc}",
             )
             return False
+        surface = self._surface_for_tool(key)
+        self._refresh_workspace_child_dock(surface, spec)
+        self._show_workspace_child_dock(surface)
         self._set_status_message(f"Рабочее окно запущено: {spec.title}")
         self._refresh_runtime_table()
         return True
@@ -1831,7 +1965,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             self.workspace_combo.blockSignals(False)
 
     def _select_surface(self, key: str) -> None:
-        self._apply_selected_surface(key)
+        self._apply_selected_surface(key, reveal_child_dock=True)
         index = self.workspace_combo.findData(key)
         if index >= 0 and self.workspace_combo.currentIndex() != index:
             self.workspace_combo.blockSignals(True)
@@ -1991,9 +2125,18 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         for dock in (self.browser_dock, self.inspector_dock, self.runtime_dock):
             dock.setFloating(False)
             dock.show()
+        for dock in self.workspace_docks.values():
+            dock.setFloating(False)
+            dock.hide()
         self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, self.browser_dock)
         self.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, self.inspector_dock)
         self.addDockWidget(QtCore.Qt.DockWidgetArea.BottomDockWidgetArea, self.runtime_dock)
+        current_workspace_dock = self.workspace_docks.get(self._selected_surface_key)
+        if current_workspace_dock is not None:
+            self.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, current_workspace_dock)
+            self.tabifyDockWidget(self.inspector_dock, current_workspace_dock)
+            current_workspace_dock.show()
+            current_workspace_dock.raise_()
         self.resizeDocks((self.browser_dock, self.inspector_dock), (320, 360), QtCore.Qt.Orientation.Horizontal)
         self.resizeDocks((self.runtime_dock,), (190,), QtCore.Qt.Orientation.Vertical)
         self._localize_builtin_accessibility()

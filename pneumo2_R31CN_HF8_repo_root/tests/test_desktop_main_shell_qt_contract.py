@@ -230,6 +230,12 @@ class _FakeCoexistenceManager:
     def all_sessions(self) -> tuple[SimpleNamespace, ...]:
         return tuple(self.opened)
 
+    def session_for(self, key: str) -> SimpleNamespace | None:
+        for session in reversed(self.opened):
+            if session.spec.key == key:
+                return session
+        return None
+
     def poll(self) -> tuple[SimpleNamespace, ...]:
         return ()
 
@@ -390,6 +396,10 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert 'self.browser_dock = QtWidgets.QDockWidget("Панель проекта", self)' in src
     assert 'self.inspector_dock = QtWidgets.QDockWidget("Свойства и помощь", self)' in src
     assert 'self.runtime_dock = QtWidgets.QDockWidget("Ход выполнения и внешние окна", self)' in src
+    assert "def _build_workspace_child_docks(self) -> None:" in src
+    assert 'dock.setObjectName(f"DesktopQtShellWorkspaceDock_{object_suffix}")' in src
+    assert "self.tabifyDockWidget(self.inspector_dock, dock)" in src
+    assert "def _show_workspace_child_dock(self, surface: ShellPipelineSurface) -> None:" in src
     assert "def _dock_features(self) -> QtWidgets.QDockWidget.DockWidgetFeature:" in src
     assert "setAllowedAreas(" in src
     assert "resizeDocks((self.browser_dock, self.inspector_dock)" in src
@@ -806,6 +816,8 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
             "DesktopQtShellBrowserDock",
             "DesktopQtShellInspectorDock",
             "DesktopQtShellRuntimeDock",
+            "DesktopQtShellWorkspaceDock_WS_RING",
+            "DesktopQtShellWorkspaceDock_WS_DIAGNOSTICS",
         } <= dock_names
         assert window.browser_dock.features() & QtWidgets.QDockWidget.DockWidgetFeature.DockWidgetFloatable
 
@@ -1063,6 +1075,13 @@ def test_desktop_qt_shell_tree_click_opens_route_surface_directly(
         assert [session.spec.key for session in manager.opened] == ["desktop_ring_editor"]
         assert window._selected_surface_key == "ws_ring"
         assert window._selected_tool_key == "desktop_ring_editor"
+        ring_dock = window.workspace_docks["ws_ring"]
+        assert ring_dock.objectName() == "DesktopQtShellWorkspaceDock_WS_RING"
+        assert ring_dock.isHidden() is False
+        assert ring_dock.windowTitle() == "Редактор циклического сценария"
+        state_label = window.findChild(_QtWidgets.QLabel, "WorkspaceDockState_ws_ring")
+        assert state_label is not None
+        assert "Открыто" in state_label.text()
         assert "Рабочее окно запущено: Редактор циклического сценария" in window.status_label.text()
         assert "Запустить раздел" not in "\n".join(window.operator_visible_audit()["direct_visible_texts"])
     finally:
