@@ -17,6 +17,10 @@ from pneumo_solver_ui.desktop_spec_shell.workspace_pages import (
     ResultsWorkspacePage,
     RingWorkspacePage,
     SuiteWorkspacePage,
+    ToolsWorkspacePage,
+)
+from pneumo_solver_ui.desktop_spec_shell.diagnostics_panel import (
+    DiagnosticsWorkspacePage as HostedDiagnosticsWorkspacePage,
 )
 
 
@@ -29,6 +33,25 @@ def _app() -> QtWidgets.QApplication:
     if app is None:
         app = QtWidgets.QApplication([])
     return app
+
+
+def _route_tree_item(
+    window: DesktopGuiSpecMainWindow,
+    *,
+    workspace_id: str = "",
+    command_id: str = "",
+) -> QtWidgets.QTreeWidgetItem | None:
+    for item in window._iter_route_tree_items():
+        item_workspace_id = str(item.data(0, QtCore.Qt.UserRole) or "")
+        item_command_id = str(item.data(0, QtCore.Qt.UserRole + 1) or "")
+        if workspace_id and item_workspace_id != workspace_id:
+            continue
+        if command_id and item_command_id != command_id:
+            continue
+        if not command_id and item_command_id:
+            continue
+        return item
+    return None
 
 
 def test_main_window_applies_v3_shortcuts_and_docking_contracts(tmp_path, monkeypatch) -> None:
@@ -56,6 +79,25 @@ def test_main_window_applies_v3_shortcuts_and_docking_contracts(tmp_path, monkey
         )
         assert window.route_dock.property("spec_panel_id") == "левая_навигация"
         assert window.inspector_dock.property("spec_can_second_monitor") is True
+        assert window._workspace_dock_by_workspace_id["input_data"].property("spec_child_window_role") == "workspace"
+        assert window._workspace_dock_by_workspace_id["animation"].features() & QtWidgets.QDockWidget.DockWidgetFloatable
+        workspace_ids = tuple(workspace.workspace_id for workspace in window.workspaces)
+        assert tuple(window._workspace_dock_by_workspace_id) == workspace_ids
+        for workspace in window.workspaces:
+            dock = window._workspace_dock_by_workspace_id[workspace.workspace_id]
+            assert dock.widget() is window._page_widget_by_workspace_id[workspace.workspace_id]
+            assert dock.property("spec_workspace_id") == workspace.workspace_id
+            assert dock.property("spec_child_window_role") == "workspace"
+            assert dock.features() & QtWidgets.QDockWidget.DockWidgetMovable
+            assert dock.features() & QtWidgets.QDockWidget.DockWidgetFloatable
+            assert dock.features() & QtWidgets.QDockWidget.DockWidgetClosable
+        menu_titles = [
+            action.text()
+            for action in window.windows_menu.actions()
+            if action.text().strip()
+        ]
+        assert menu_titles == [workspace.title for workspace in window.workspaces]
+        assert len(menu_titles) == len(set(menu_titles))
         assert window.status_primary_label.property("ui_state_id") == "STATE-VALID"
         assert window.warning_label.property("ui_state_id") == "STATE-WARNING"
         assert window.findChild(QtWidgets.QGroupBox, "V16-VISIBILITY-WS-PROJECT") is not None
@@ -197,7 +239,7 @@ def test_main_window_hosts_suite_workspace_as_ring_consumer(tmp_path, monkeypatc
         )
         visible_buttons = {button.text() for button in page.findChildren(QtWidgets.QPushButton)}
         assert "Перейти к базовому прогону" in visible_buttons
-        assert "Расширенная настройка набора" in visible_buttons
+        assert "Расширенная настройка набора" not in visible_buttons
     finally:
         window.close()
         window.deleteLater()
@@ -306,6 +348,226 @@ def test_main_window_routes_animation_to_hosted_page(tmp_path, monkeypatch) -> N
         window.run_command("animation.mnemo.open")
         app.processEvents()
         assert "Мнемосхема открыта" in page.animation_action_label.text()
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_main_window_route_tree_directly_opens_workspace_and_action_docks(tmp_path, monkeypatch) -> None:
+    settings_path = tmp_path / "desktop_spec_shell_tree_direct_open.ini"
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
+
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        target_workspace_item = _route_tree_item(window, workspace_id="ring_editor")
+        target_action_item = _route_tree_item(window, command_id="ring.editor.open")
+        assert target_workspace_item is not None
+        assert target_action_item is not None
+
+        window._activate_route_tree_item(target_workspace_item)
+        app.processEvents()
+        assert window._current_workspace_id == "ring_editor"
+        assert not window._workspace_dock_by_workspace_id["ring_editor"].isHidden()
+
+        window._activate_route_tree_item(target_action_item)
+        app.processEvents()
+        page = window._page_widget_by_workspace_id["ring_editor"]
+        assert isinstance(page, RingWorkspacePage)
+        assert "Редактор циклического сценария открыт" in page.ring_action_label.text()
+        assert "ring.editor.open" in window.recent_command_ids
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_main_window_route_tree_actions_are_direct_dock_routes_without_legacy_launchers(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    settings_path = tmp_path / "desktop_spec_shell_tree_actions.ini"
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
+
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        visible_command_ids: list[str] = []
+        for item in window._iter_route_tree_items():
+            command_id = str(item.data(0, QtCore.Qt.UserRole + 1) or "")
+            if not command_id:
+                continue
+            visible_command_ids.append(command_id)
+            command = window.command_by_id[command_id]
+            assert command.availability != "support_fallback", command_id
+            assert command.kind != "launch_module", command_id
+            assert command.module is None, command_id
+
+        assert "tools.autotest.legacy_open" not in visible_command_ids
+        assert "animation.legacy_animator.open" not in visible_command_ids
+        assert "diagnostics.legacy_center.open" not in visible_command_ids
+
+        safe_direct_commands = {
+            "input.editor.open": "input_data",
+            "ring.editor.open": "ring_editor",
+            "test.center.open": "test_matrix",
+            "baseline.run_setup.open": "baseline_run",
+            "optimization.center.open": "optimization",
+            "results.center.open": "results_analysis",
+            "animation.animator.open": "animation",
+            "diagnostics.verify_bundle": "diagnostics",
+            "tools.geometry_reference.open": "tools",
+        }
+        for command_id, workspace_id in safe_direct_commands.items():
+            item = _route_tree_item(window, command_id=command_id)
+            assert item is not None, command_id
+            window._activate_route_tree_item(item)
+            app.processEvents()
+            assert window._current_workspace_id == workspace_id
+            assert not window._workspace_dock_by_workspace_id[workspace_id].isHidden()
+            assert command_id in window.recent_command_ids
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_main_window_route_tree_actions_land_on_functional_surfaces(tmp_path, monkeypatch) -> None:
+    settings_path = tmp_path / "desktop_spec_shell_tree_functional_surfaces.ini"
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
+
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        surface_contracts = {
+            "input.editor.open": (
+                "input_data",
+                InputWorkspacePage,
+                lambda page: (
+                    page.input_editor_box.objectName() == "ID-PARAM-TABLE"
+                    and page.input_table.rowCount() > 0
+                    and "Редактирование исходных данных открыто" in page.input_action_label.text()
+                ),
+            ),
+            "ring.editor.open": (
+                "ring_editor",
+                RingWorkspacePage,
+                lambda page: (
+                    page.ring_editor_box.objectName() == "RG-SEGMENT-LIST"
+                    and page.ring_segment_table.rowCount() > 0
+                    and "Редактор циклического сценария открыт" in page.ring_action_label.text()
+                ),
+            ),
+            "test.center.open": (
+                "test_matrix",
+                SuiteWorkspacePage,
+                lambda page: (
+                    page.suite_table.objectName() == "TS-TABLE"
+                    and page.suite_table.rowCount() > 0
+                    and "Проверка набора открыта" in page.validation_label.text()
+                ),
+            ),
+            "baseline.run_setup.open": (
+                "baseline_run",
+                BaselineWorkspacePage,
+                lambda page: (
+                    page.run_setup_box.objectName() == "BL-RUN-SETUP-PANEL"
+                    and "Настройка запуска открыта" in page.run_setup_result_label.text()
+                ),
+            ),
+            "optimization.center.open": (
+                "optimization",
+                OptimizationWorkspacePage,
+                lambda page: (
+                    page.optimization_launch_box.objectName() == "OP-STAGERUNNER-BLOCK"
+                    and "Настройка основного запуска открыта" in page.optimization_result_label.text()
+                ),
+            ),
+            "results.center.open": (
+                "results_analysis",
+                ResultsWorkspacePage,
+                lambda page: (
+                    page.results_analysis_box.objectName() == "RS-LEADERBOARD"
+                    and "Анализ результатов открыт" in page.results_action_label.text()
+                ),
+            ),
+            "animation.animator.open": (
+                "animation",
+                AnimationWorkspacePage,
+                lambda page: (
+                    page.animation_hub_box.objectName() == "AM-VIEWPORT"
+                    and "Анимация открыта" in page.animation_action_label.text()
+                ),
+            ),
+            "diagnostics.verify_bundle": (
+                "diagnostics",
+                HostedDiagnosticsWorkspacePage,
+                lambda page: (
+                    page.check_box.title() == "Проверка архива проекта"
+                    and "Провер" in page.status_label.text()
+                ),
+            ),
+            "tools.geometry_reference.open": (
+                "tools",
+                ToolsWorkspacePage,
+                lambda page: (
+                    page.geometry_box.objectName() == "TOOLS-GEOMETRY-REFERENCE"
+                    and page.geometry_cylinder_table.rowCount() > 0
+                ),
+            ),
+        }
+
+        for command_id, (workspace_id, page_type, assert_surface_ready) in surface_contracts.items():
+            item = _route_tree_item(window, command_id=command_id)
+            assert item is not None, command_id
+            window._activate_route_tree_item(item)
+            app.processEvents()
+
+            assert window._current_workspace_id == workspace_id, command_id
+            dock = window._workspace_dock_by_workspace_id[workspace_id]
+            assert not dock.isHidden(), command_id
+            page = window._page_widget_by_workspace_id[workspace_id]
+            assert isinstance(page, page_type), command_id
+            assert assert_surface_ready(page), command_id
+            assert command_id in window.recent_command_ids
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_main_window_command_search_opens_direct_hosted_surfaces(tmp_path, monkeypatch) -> None:
+    settings_path = tmp_path / "desktop_spec_shell_search_direct_surfaces.ini"
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
+
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        search_routes = {
+            "редактировать исходные данные": ("input.editor.open", "input_data"),
+            "редактор кольца": ("ring.editor.open", "ring_editor"),
+            "настройка расчёта": ("baseline.run_setup.open", "baseline_run"),
+            "аниматор": ("animation.animator.open", "animation"),
+            "проверить архив": ("diagnostics.verify_bundle", "diagnostics"),
+            "справочник геометрии": ("tools.geometry_reference.open", "tools"),
+        }
+
+        for query, (command_id, workspace_id) in search_routes.items():
+            window._refresh_search_results(query)
+            app.processEvents()
+            assert window._search_ids_by_index, query
+            assert window._search_ids_by_index[0] == command_id
+
+            window._activate_first_search_result()
+            app.processEvents()
+
+            command = window.command_by_id[command_id]
+            assert command.availability != "support_fallback"
+            assert command.kind != "launch_module"
+            assert window._current_workspace_id == workspace_id
+            assert not window._workspace_dock_by_workspace_id[workspace_id].isHidden()
+            assert command_id in window.recent_command_ids
     finally:
         window.close()
         window.deleteLater()

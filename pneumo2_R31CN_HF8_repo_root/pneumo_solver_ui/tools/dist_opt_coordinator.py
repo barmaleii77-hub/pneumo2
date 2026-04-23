@@ -542,6 +542,124 @@ def _adaptive_heuristic_buffer_target(
     return int(max(base, min(cap, boosted)))
 
 
+def _adaptive_portfolio_rand_q(
+    need: Any,
+    *,
+    stagnation_cycles: int,
+    rescue_limit_cycles: int,
+) -> Tuple[int, int]:
+    need_i = _coerce_positive_int(need, default=1)
+    base = int(max(1, need_i // 4))
+    stagnation = max(0, int(stagnation_cycles))
+    if stagnation <= 0:
+        return int(base), int(base)
+    limit = max(1, int(rescue_limit_cycles))
+    ratio = min(1.0, float(stagnation) / float(limit))
+    bonus = int(max(1, math.ceil(ratio * max(1, base))))
+    cap = int(max(base, min(64, max(2, 2 * base))))
+    effective = int(max(base, min(cap, base + bonus)))
+    return int(base), int(effective)
+
+
+def _portfolio_record_event(
+    history: List[Dict[str, Any]],
+    *,
+    mode: str,
+    success: bool,
+    maxlen: int = 12,
+) -> None:
+    mode_key = str(mode or "").strip().lower()
+    if mode_key not in {"qnehvi", "heuristic"}:
+        return
+    history.append({"mode": mode_key, "success": bool(success)})
+    cap = max(1, int(maxlen))
+    if len(history) > cap:
+        del history[:-cap]
+
+
+def _portfolio_choose_primary_mode(
+    history: Sequence[Mapping[str, Any]],
+    *,
+    lookback: int = 8,
+    min_attempts_per_mode: int = 3,
+    min_success_gap: float = 0.20,
+    previous_choice: Optional[str] = None,
+    switch_hysteresis_gap: float = 0.10,
+    switch_cooldown_ticks: int = 0,
+    cooldown_override_gap: float = 0.35,
+) -> Tuple[str, str, Dict[str, int]]:
+    records = list(history)[-max(1, int(lookback)) :]
+    stats = {
+        "qnehvi_attempts": 0,
+        "qnehvi_successes": 0,
+        "heuristic_attempts": 0,
+        "heuristic_successes": 0,
+    }
+    for rec in records:
+        mode_key = str(rec.get("mode") or "").strip().lower()
+        ok = bool(rec.get("success"))
+        if mode_key == "qnehvi":
+            stats["qnehvi_attempts"] += 1
+            if ok:
+                stats["qnehvi_successes"] += 1
+        elif mode_key == "heuristic":
+            stats["heuristic_attempts"] += 1
+            if ok:
+                stats["heuristic_successes"] += 1
+
+    q_att = int(stats["qnehvi_attempts"])
+    h_att = int(stats["heuristic_attempts"])
+    q_rate = (float(stats["qnehvi_successes"]) / float(q_att)) if q_att > 0 else 0.0
+    h_rate = (float(stats["heuristic_successes"]) / float(h_att)) if h_att > 0 else 0.0
+
+    min_att = max(1, int(min_attempts_per_mode))
+    gap = max(0.0, float(min_success_gap))
+    hysteresis = max(0.0, float(switch_hysteresis_gap))
+    prev_key = str(previous_choice or "").strip().lower()
+    cooldown = max(0, int(switch_cooldown_ticks))
+    cooldown_boost = max(0.0, float(cooldown_override_gap))
+    if q_att >= min_att and h_att >= min_att:
+        decision = ""
+        decision_reason = ""
+        if prev_key == "heuristic":
+            if h_rate >= (q_rate + gap):
+                decision = "heuristic"
+                decision_reason = "recent_heuristic_outperforming"
+            elif q_rate >= (h_rate + gap + hysteresis):
+                decision = "qnehvi"
+                decision_reason = "recent_qnehvi_outperforming"
+            else:
+                decision = "heuristic"
+                decision_reason = "sticky_hysteresis"
+        elif prev_key == "qnehvi":
+            if q_rate >= (h_rate + gap):
+                decision = "qnehvi"
+                decision_reason = "recent_qnehvi_outperforming"
+            elif h_rate >= (q_rate + gap + hysteresis):
+                decision = "heuristic"
+                decision_reason = "recent_heuristic_outperforming"
+            else:
+                decision = "qnehvi"
+                decision_reason = "sticky_hysteresis"
+        else:
+            if h_rate >= (q_rate + gap):
+                decision = "heuristic"
+                decision_reason = "recent_heuristic_outperforming"
+            elif q_rate >= (h_rate + gap):
+                decision = "qnehvi"
+                decision_reason = "recent_qnehvi_outperforming"
+        if decision:
+            if prev_key in {"qnehvi", "heuristic"} and decision in {"qnehvi", "heuristic"} and decision != prev_key and cooldown > 0:
+                rate_delta = abs(float(q_rate) - float(h_rate))
+                strong_switch_gap = float(gap + hysteresis + cooldown_boost)
+                if rate_delta < strong_switch_gap:
+                    return str(prev_key), "cooldown_hold", stats
+            return str(decision), str(decision_reason), stats
+    if records and prev_key == "heuristic":
+        return "heuristic", "sticky_previous_choice", stats
+    return "qnehvi", "default_qnehvi", stats
+
+
 def resolve_proposer_mode(
     args: argparse.Namespace,
     *,
@@ -930,6 +1048,17 @@ def _run_ray(
     dedup_skip_inflight_count = 0
     proposer_effective_mode_counts: Dict[str, int] = {}
     proposer_reason_counts: Dict[str, int] = {}
+    portfolio_rand_q_last_base = 0
+    portfolio_rand_q_last_effective = 0
+    portfolio_rand_q_boost_events = 0
+    portfolio_history: List[Dict[str, Any]] = []
+    portfolio_primary_last_choice = "qnehvi"
+    portfolio_primary_last_reason = "default_qnehvi"
+    portfolio_primary_switches = 0
+    portfolio_primary_switch_cooldown_span = 2
+    portfolio_primary_cooldown_ticks = 0
+    portfolio_primary_cooldown_holds = 0
+    portfolio_primary_choice_counts: Dict[str, int] = {"qnehvi": 0, "heuristic": 0}
     base_heuristic_buffer = int(max(0, int(getattr(args, "proposer_buffer", 0) or 0)))
     heuristic_buffer_last_effective = int(base_heuristic_buffer)
     heuristic_buffer_boost_events = 0
@@ -992,6 +1121,17 @@ def _run_ray(
         "heuristic_explore_base": float(base_heuristic_explore),
         "heuristic_explore_last_effective": float(heuristic_explore_last_effective),
         "heuristic_explore_boost_events": int(heuristic_explore_boost_events),
+        "portfolio_rand_q_last_base": int(portfolio_rand_q_last_base),
+        "portfolio_rand_q_last_effective": int(portfolio_rand_q_last_effective),
+        "portfolio_rand_q_boost_events": int(portfolio_rand_q_boost_events),
+        "portfolio_primary_last_choice": str(portfolio_primary_last_choice),
+        "portfolio_primary_last_reason": str(portfolio_primary_last_reason),
+        "portfolio_primary_switches": int(portfolio_primary_switches),
+        "portfolio_primary_switch_cooldown_span": int(portfolio_primary_switch_cooldown_span),
+        "portfolio_primary_cooldown_ticks": int(portfolio_primary_cooldown_ticks),
+        "portfolio_primary_cooldown_holds": int(portfolio_primary_cooldown_holds),
+        "portfolio_primary_choice_counts": dict(portfolio_primary_choice_counts),
+        "portfolio_history_size": int(len(portfolio_history)),
         "ray_address": addr,
         "ray_runtime_env": runtime_env,
         "ray_cluster_resources": cluster,
@@ -1068,6 +1208,17 @@ def _run_ray(
         run_spec_payload["heuristic_explore_base"] = float(base_heuristic_explore)
         run_spec_payload["heuristic_explore_last_effective"] = float(heuristic_explore_last_effective)
         run_spec_payload["heuristic_explore_boost_events"] = int(heuristic_explore_boost_events)
+        run_spec_payload["portfolio_rand_q_last_base"] = int(portfolio_rand_q_last_base)
+        run_spec_payload["portfolio_rand_q_last_effective"] = int(portfolio_rand_q_last_effective)
+        run_spec_payload["portfolio_rand_q_boost_events"] = int(portfolio_rand_q_boost_events)
+        run_spec_payload["portfolio_primary_last_choice"] = str(portfolio_primary_last_choice)
+        run_spec_payload["portfolio_primary_last_reason"] = str(portfolio_primary_last_reason)
+        run_spec_payload["portfolio_primary_switches"] = int(portfolio_primary_switches)
+        run_spec_payload["portfolio_primary_switch_cooldown_span"] = int(portfolio_primary_switch_cooldown_span)
+        run_spec_payload["portfolio_primary_cooldown_ticks"] = int(portfolio_primary_cooldown_ticks)
+        run_spec_payload["portfolio_primary_cooldown_holds"] = int(portfolio_primary_cooldown_holds)
+        run_spec_payload["portfolio_primary_choice_counts"] = dict(portfolio_primary_choice_counts)
+        run_spec_payload["portfolio_history_size"] = int(len(portfolio_history))
         _dump_json(run_spec_path, run_spec_payload)
         _sync_last_proposer_meta_diag()
 
@@ -1121,6 +1272,17 @@ def _run_ray(
         payload["heuristic_explore_base"] = float(base_heuristic_explore)
         payload["heuristic_explore_last_effective"] = float(heuristic_explore_last_effective)
         payload["heuristic_explore_boost_events"] = int(heuristic_explore_boost_events)
+        payload["portfolio_rand_q_last_base"] = int(portfolio_rand_q_last_base)
+        payload["portfolio_rand_q_last_effective"] = int(portfolio_rand_q_last_effective)
+        payload["portfolio_rand_q_boost_events"] = int(portfolio_rand_q_boost_events)
+        payload["portfolio_primary_last_choice"] = str(portfolio_primary_last_choice)
+        payload["portfolio_primary_last_reason"] = str(portfolio_primary_last_reason)
+        payload["portfolio_primary_switches"] = int(portfolio_primary_switches)
+        payload["portfolio_primary_switch_cooldown_span"] = int(portfolio_primary_switch_cooldown_span)
+        payload["portfolio_primary_cooldown_ticks"] = int(portfolio_primary_cooldown_ticks)
+        payload["portfolio_primary_cooldown_holds"] = int(portfolio_primary_cooldown_holds)
+        payload["portfolio_primary_choice_counts"] = dict(portfolio_primary_choice_counts)
+        payload["portfolio_history_size"] = int(len(portfolio_history))
         _write_text(last_meta_path, json.dumps(payload, ensure_ascii=False, indent=2))
 
     def _write_last_proposer_meta(meta_out: Dict[str, Any]) -> None:
@@ -1144,6 +1306,9 @@ def _run_ray(
         nonlocal heuristic_buffer_last_effective, heuristic_buffer_boost_events
         nonlocal heuristic_q_last_effective, heuristic_q_boost_events
         nonlocal heuristic_pool_size_last_effective, heuristic_pool_size_boost_events
+        nonlocal portfolio_rand_q_last_base, portfolio_rand_q_last_effective, portfolio_rand_q_boost_events
+        nonlocal portfolio_primary_last_choice, portfolio_primary_last_reason, portfolio_primary_switches
+        nonlocal portfolio_primary_cooldown_ticks, portfolio_primary_cooldown_holds
         target = int(max(0, args.proposer_buffer))
         if len(candidate_buf) >= target:
             return
@@ -1224,8 +1389,61 @@ def _run_ray(
                 heuristic_buffer_boost_events += 1
             return int(effective)
 
+        def _next_portfolio_rand_q(*, need: int) -> int:
+            nonlocal portfolio_rand_q_last_base, portfolio_rand_q_last_effective, portfolio_rand_q_boost_events
+            base_q, effective_q = _adaptive_portfolio_rand_q(
+                int(need),
+                stagnation_cycles=stagnation_cycles,
+                rescue_limit_cycles=stall_rescue_limit_cycles,
+            )
+            portfolio_rand_q_last_base = int(base_q)
+            portfolio_rand_q_last_effective = int(effective_q)
+            if int(effective_q) > int(base_q):
+                portfolio_rand_q_boost_events += 1
+            return int(effective_q)
+
+        def _record_portfolio_event(*, mode: str, success: bool) -> None:
+            _portfolio_record_event(
+                portfolio_history,
+                mode=str(mode),
+                success=bool(success),
+                maxlen=12,
+            )
+
+        def _resolve_portfolio_primary() -> Tuple[str, str]:
+            nonlocal portfolio_primary_last_choice, portfolio_primary_last_reason, portfolio_primary_switches
+            nonlocal portfolio_primary_cooldown_ticks, portfolio_primary_cooldown_holds
+            primary, reason, _stats = _portfolio_choose_primary_mode(
+                portfolio_history,
+                lookback=8,
+                min_attempts_per_mode=3,
+                min_success_gap=0.20,
+                previous_choice=portfolio_primary_last_choice,
+                switch_cooldown_ticks=int(portfolio_primary_cooldown_ticks),
+            )
+            primary_key = str(primary or "qnehvi").strip().lower()
+            if primary_key not in {"qnehvi", "heuristic"}:
+                primary_key = "qnehvi"
+            prev_key = str(portfolio_primary_last_choice or "qnehvi").strip().lower()
+            portfolio_primary_last_choice = str(primary_key)
+            portfolio_primary_last_reason = str(reason or "default_qnehvi")
+            if prev_key != primary_key:
+                portfolio_primary_switches += 1
+                portfolio_primary_cooldown_ticks = int(max(0, int(portfolio_primary_switch_cooldown_span)))
+            elif int(portfolio_primary_cooldown_ticks) > 0:
+                portfolio_primary_cooldown_ticks = int(portfolio_primary_cooldown_ticks) - 1
+            if str(portfolio_primary_last_reason).strip().lower() == "cooldown_hold":
+                portfolio_primary_cooldown_holds += 1
+            portfolio_primary_choice_counts[primary_key] = int(portfolio_primary_choice_counts.get(primary_key, 0) + 1)
+            return str(primary_key), str(portfolio_primary_last_reason)
+
+        portfolio_primary = "qnehvi"
+        portfolio_primary_reason = "not_portfolio"
+        if want_portfolio:
+            portfolio_primary, portfolio_primary_reason = _resolve_portfolio_primary()
+
         # If we have GPU proposer pool and mode includes qNEHVI, ask actors
-        if proposer_actors and (prop_mode in {"qnehvi"} or want_portfolio):
+        if proposer_actors and (prop_mode in {"qnehvi"} or (want_portfolio and portfolio_primary == "qnehvi")):
             need = max(1, target - len(candidate_buf))
             per_actor = int(max(1, math.ceil(need / max(1, len(proposer_actors)))))
 
@@ -1287,13 +1505,21 @@ def _run_ray(
                 meta_out["min_feasible"] = mode_info["min_feasible"]
                 meta_out["ready_by_done"] = mode_info["ready_by_done"]
                 meta_out["ready_by_feasible"] = mode_info["ready_by_feasible"]
+                if want_portfolio:
+                    meta_out["portfolio_primary_choice"] = str(portfolio_primary)
+                    meta_out["portfolio_preference_reason"] = str(portfolio_primary_reason)
                 if pool_fallback_error:
                     meta_out["pool_fallback_error"] = pool_fallback_error
                 _write_last_proposer_meta(meta_out)
+            if want_portfolio:
+                if pool_added:
+                    _record_portfolio_event(mode="qnehvi", success=True)
+                elif pool_fallback_error:
+                    _record_portfolio_event(mode="qnehvi", success=False)
 
             # Portfolio blend is added when we obtained at least one pool proposal.
             if want_portfolio and pool_added:
-                n_rand = max(1, need // 4)
+                n_rand = _next_portfolio_rand_q(need=need)
                 Xr = propose_random(d=dim, q=int(n_rand), seed=int(rng.integers(0, 2**31 - 1))).X
                 for x_u in Xr.tolist():
                     candidate_buf.append(list(x_u))
@@ -1303,6 +1529,117 @@ def _run_ray(
 
         # No proposer pool (or random): run locally
         need = max(1, target - len(candidate_buf))
+        if prop_mode in {"qnehvi", "portfolio"} and want_portfolio and portfolio_primary == "heuristic":
+            try:
+                heuristic_buffer_effective = _next_heuristic_buffer()
+                heuristic_need = int(max(1, heuristic_buffer_effective - len(candidate_buf)))
+                heuristic_q_effective = _next_heuristic_q(need=heuristic_need)
+                heuristic_explore_effective = _next_heuristic_explore()
+                heuristic_pool_size_effective = _next_heuristic_pool_size()
+                pr = propose_heuristic(
+                    X_done=np.asarray(X_done, dtype=float) if X_done else np.zeros((0, dim), dtype=float),
+                    Y_min_done=np.asarray(Y_done, dtype=float) if Y_done else np.zeros((0, len(objective_keys)), dtype=float),
+                    penalty=_heuristic_penalty_from_constraints(G_done),
+                    q=int(heuristic_q_effective),
+                    seed=int(rng.integers(0, 2**31 - 1)),
+                    X_pending=X_pending,
+                    feasible_tol=float(args.penalty_tol),
+                    pool_size=int(heuristic_pool_size_effective),
+                    explore_weight=float(heuristic_explore_effective),
+                )
+                meta_out = dict(pr.meta or {})
+                meta_out["requested_mode"] = mode_info["requested"]
+                meta_out["effective_mode"] = "heuristic"
+                meta_out["n_init"] = mode_info["n_init"]
+                meta_out["min_feasible"] = mode_info["min_feasible"]
+                meta_out["ready_by_done"] = mode_info["ready_by_done"]
+                meta_out["ready_by_feasible"] = mode_info["ready_by_feasible"]
+                meta_out["portfolio_primary_choice"] = str(portfolio_primary)
+                meta_out["portfolio_preference_reason"] = str(portfolio_primary_reason)
+                meta_out["heuristic_buffer_base"] = int(base_heuristic_buffer)
+                meta_out["heuristic_buffer_effective"] = int(heuristic_buffer_effective)
+                meta_out["heuristic_q_base"] = int(base_heuristic_q)
+                meta_out["heuristic_q_effective"] = int(heuristic_q_effective)
+                meta_out["heuristic_pool_size_base"] = int(base_heuristic_pool_size)
+                meta_out["heuristic_pool_size_effective"] = int(heuristic_pool_size_effective)
+                meta_out["heuristic_explore_base"] = float(base_heuristic_explore)
+                meta_out["heuristic_explore_effective"] = float(heuristic_explore_effective)
+                meta_out["heuristic_explore_stagnation_cycles"] = int(stagnation_cycles)
+                if pool_fallback_error:
+                    meta_out["pool_fallback_error"] = pool_fallback_error
+                for x_u in pr.X.tolist():
+                    candidate_buf.append(list(x_u))
+                _record_portfolio_event(mode="heuristic", success=True)
+                _write_last_proposer_meta(meta_out)
+                n_rand = _next_portfolio_rand_q(need=need)
+                Xr = propose_random(d=dim, q=int(n_rand), seed=int(rng.integers(0, 2**31 - 1))).X
+                for x_u in Xr.tolist():
+                    candidate_buf.append(list(x_u))
+                return
+            except Exception as h_exc:
+                _record_portfolio_event(mode="heuristic", success=False)
+                try:
+                    pr = propose_qnehvi(
+                        X_done=np.asarray(X_done, dtype=float) if X_done else np.zeros((0, dim), dtype=float),
+                        Y_min_done=np.asarray(Y_done, dtype=float) if Y_done else np.zeros((0, len(objective_keys)), dtype=float),
+                        G_min_done=np.asarray(G_done, dtype=float) if G_done else None,
+                        q=int(need),
+                        seed=int(rng.integers(0, 2**31 - 1)),
+                        X_pending=X_pending,
+                        device=str(args.device),
+                        normalize_objectives=not bool(getattr(args, "botorch_no_normalize_objectives", False)),
+                        ref_margin=float(getattr(args, "botorch_ref_margin", 0.10)),
+                        num_restarts=int(getattr(args, "botorch_num_restarts", 10)),
+                        raw_samples=int(getattr(args, "botorch_raw_samples", 512)),
+                        maxiter=int(getattr(args, "botorch_maxiter", 200)),
+                    )
+                    meta_out = dict(pr.meta or {})
+                    meta_out["requested_mode"] = mode_info["requested"]
+                    meta_out["effective_mode"] = "qnehvi"
+                    meta_out["n_init"] = mode_info["n_init"]
+                    meta_out["min_feasible"] = mode_info["min_feasible"]
+                    meta_out["ready_by_done"] = mode_info["ready_by_done"]
+                    meta_out["ready_by_feasible"] = mode_info["ready_by_feasible"]
+                    meta_out["portfolio_primary_choice"] = str(portfolio_primary)
+                    meta_out["portfolio_preference_reason"] = str(portfolio_primary_reason)
+                    meta_out["fallback_reason"] = "heuristic_primary_failed"
+                    meta_out["fallback_error"] = f"{type(h_exc).__name__}: {h_exc}"
+                    if pool_fallback_error:
+                        meta_out["pool_fallback_error"] = pool_fallback_error
+                    for x_u in pr.X.tolist():
+                        candidate_buf.append(list(x_u))
+                    _record_portfolio_event(mode="qnehvi", success=True)
+                    _write_last_proposer_meta(meta_out)
+                    n_rand = _next_portfolio_rand_q(need=need)
+                    Xr = propose_random(d=dim, q=int(n_rand), seed=int(rng.integers(0, 2**31 - 1))).X
+                    for x_u in Xr.tolist():
+                        candidate_buf.append(list(x_u))
+                    return
+                except Exception as q_exc:
+                    _record_portfolio_event(mode="qnehvi", success=False)
+                    meta_out = {
+                        "requested_mode": mode_info["requested"],
+                        "effective_mode": "random",
+                        "n_init": mode_info["n_init"],
+                        "min_feasible": mode_info["min_feasible"],
+                        "ready_by_done": mode_info["ready_by_done"],
+                        "ready_by_feasible": mode_info["ready_by_feasible"],
+                        "portfolio_primary_choice": str(portfolio_primary),
+                        "portfolio_preference_reason": str(portfolio_primary_reason),
+                        "reason": "heuristic_and_qnehvi_failed",
+                        "fallback_error": f"{type(h_exc).__name__}: {h_exc}; {type(q_exc).__name__}: {q_exc}",
+                    }
+                    if pool_fallback_error:
+                        meta_out["pool_fallback_error"] = pool_fallback_error
+                    _write_last_proposer_meta(meta_out)
+                    Xr = propose_random(d=dim, q=int(need), seed=int(rng.integers(0, 2**31 - 1))).X
+                    for x_u in Xr.tolist():
+                        candidate_buf.append(list(x_u))
+                    n_rand = _next_portfolio_rand_q(need=need)
+                    Xr2 = propose_random(d=dim, q=int(n_rand), seed=int(rng.integers(0, 2**31 - 1))).X
+                    for x_u in Xr2.tolist():
+                        candidate_buf.append(list(x_u))
+                    return
         if prop_mode in {"qnehvi", "portfolio"}:
             try:
                 pr = propose_qnehvi(
@@ -1326,18 +1663,25 @@ def _run_ray(
                 meta_out["min_feasible"] = mode_info["min_feasible"]
                 meta_out["ready_by_done"] = mode_info["ready_by_done"]
                 meta_out["ready_by_feasible"] = mode_info["ready_by_feasible"]
+                if want_portfolio:
+                    meta_out["portfolio_primary_choice"] = str(portfolio_primary)
+                    meta_out["portfolio_preference_reason"] = str(portfolio_primary_reason)
                 if pool_fallback_error:
                     meta_out["pool_fallback_error"] = pool_fallback_error
                 for x_u in pr.X.tolist():
                     candidate_buf.append(list(x_u))
+                if want_portfolio:
+                    _record_portfolio_event(mode="qnehvi", success=True)
                 _write_last_proposer_meta(meta_out)
                 if want_portfolio:
-                    n_rand = max(1, need // 4)
+                    n_rand = _next_portfolio_rand_q(need=need)
                     Xr = propose_random(d=dim, q=int(n_rand), seed=int(rng.integers(0, 2**31 - 1))).X
                     for x_u in Xr.tolist():
                         candidate_buf.append(list(x_u))
                 return
             except Exception as q_exc:
+                if want_portfolio:
+                    _record_portfolio_event(mode="qnehvi", success=False)
                 try:
                     heuristic_buffer_effective = _next_heuristic_buffer()
                     heuristic_need = int(max(1, heuristic_buffer_effective - len(candidate_buf)))
@@ -1364,6 +1708,9 @@ def _run_ray(
                     meta_out["ready_by_feasible"] = mode_info["ready_by_feasible"]
                     meta_out["fallback_reason"] = "qnehvi_failed"
                     meta_out["fallback_error"] = f"{type(q_exc).__name__}: {q_exc}"
+                    if want_portfolio:
+                        meta_out["portfolio_primary_choice"] = str(portfolio_primary)
+                        meta_out["portfolio_preference_reason"] = str(portfolio_primary_reason)
                     meta_out["heuristic_buffer_base"] = int(base_heuristic_buffer)
                     meta_out["heuristic_buffer_effective"] = int(heuristic_buffer_effective)
                     meta_out["heuristic_q_base"] = int(base_heuristic_q)
@@ -1377,14 +1724,18 @@ def _run_ray(
                         meta_out["pool_fallback_error"] = pool_fallback_error
                     for x_u in pr.X.tolist():
                         candidate_buf.append(list(x_u))
+                    if want_portfolio:
+                        _record_portfolio_event(mode="heuristic", success=True)
                     _write_last_proposer_meta(meta_out)
                     if want_portfolio:
-                        n_rand = max(1, need // 4)
+                        n_rand = _next_portfolio_rand_q(need=need)
                         Xr = propose_random(d=dim, q=int(n_rand), seed=int(rng.integers(0, 2**31 - 1))).X
                         for x_u in Xr.tolist():
                             candidate_buf.append(list(x_u))
                     return
                 except Exception as h_exc:
+                    if want_portfolio:
+                        _record_portfolio_event(mode="heuristic", success=False)
                     meta_out = {
                         "requested_mode": mode_info["requested"],
                         "effective_mode": "random",
@@ -1395,6 +1746,9 @@ def _run_ray(
                         "reason": "qnehvi_and_heuristic_failed",
                         "fallback_error": f"{type(q_exc).__name__}: {q_exc}; {type(h_exc).__name__}: {h_exc}",
                     }
+                    if want_portfolio:
+                        meta_out["portfolio_primary_choice"] = str(portfolio_primary)
+                        meta_out["portfolio_preference_reason"] = str(portfolio_primary_reason)
                     if pool_fallback_error:
                         meta_out["pool_fallback_error"] = pool_fallback_error
                     _write_last_proposer_meta(meta_out)
@@ -1402,7 +1756,7 @@ def _run_ray(
                     for x_u in Xr.tolist():
                         candidate_buf.append(list(x_u))
                     if want_portfolio:
-                        n_rand = max(1, need // 4)
+                        n_rand = _next_portfolio_rand_q(need=need)
                         Xr2 = propose_random(d=dim, q=int(n_rand), seed=int(rng.integers(0, 2**31 - 1))).X
                         for x_u in Xr2.tolist():
                             candidate_buf.append(list(x_u))
@@ -1802,6 +2156,17 @@ def _run_dask(
     dedup_skip_inflight_count = 0
     proposer_effective_mode_counts: Dict[str, int] = {}
     proposer_reason_counts: Dict[str, int] = {}
+    portfolio_rand_q_last_base = 0
+    portfolio_rand_q_last_effective = 0
+    portfolio_rand_q_boost_events = 0
+    portfolio_history: List[Dict[str, Any]] = []
+    portfolio_primary_last_choice = "qnehvi"
+    portfolio_primary_last_reason = "default_qnehvi"
+    portfolio_primary_switches = 0
+    portfolio_primary_switch_cooldown_span = 2
+    portfolio_primary_cooldown_ticks = 0
+    portfolio_primary_cooldown_holds = 0
+    portfolio_primary_choice_counts: Dict[str, int] = {"qnehvi": 0, "heuristic": 0}
     base_heuristic_buffer = int(max(0, int(getattr(args, "proposer_buffer", 0) or 0)))
     heuristic_buffer_last_effective = int(base_heuristic_buffer)
     heuristic_buffer_boost_events = 0
@@ -1874,6 +2239,17 @@ def _run_dask(
         "heuristic_explore_base": float(base_heuristic_explore),
         "heuristic_explore_last_effective": float(heuristic_explore_last_effective),
         "heuristic_explore_boost_events": int(heuristic_explore_boost_events),
+        "portfolio_rand_q_last_base": int(portfolio_rand_q_last_base),
+        "portfolio_rand_q_last_effective": int(portfolio_rand_q_last_effective),
+        "portfolio_rand_q_boost_events": int(portfolio_rand_q_boost_events),
+        "portfolio_primary_last_choice": str(portfolio_primary_last_choice),
+        "portfolio_primary_last_reason": str(portfolio_primary_last_reason),
+        "portfolio_primary_switches": int(portfolio_primary_switches),
+        "portfolio_primary_switch_cooldown_span": int(portfolio_primary_switch_cooldown_span),
+        "portfolio_primary_cooldown_ticks": int(portfolio_primary_cooldown_ticks),
+        "portfolio_primary_cooldown_holds": int(portfolio_primary_cooldown_holds),
+        "portfolio_primary_choice_counts": dict(portfolio_primary_choice_counts),
+        "portfolio_history_size": int(len(portfolio_history)),
         "dask_scheduler": str(getattr(args, "dask_scheduler", "") or ""),
         "dask_scheduler_info": info,
         "dask_num_workers": int(n_workers),
@@ -1950,6 +2326,17 @@ def _run_dask(
         run_spec_payload["heuristic_explore_base"] = float(base_heuristic_explore)
         run_spec_payload["heuristic_explore_last_effective"] = float(heuristic_explore_last_effective)
         run_spec_payload["heuristic_explore_boost_events"] = int(heuristic_explore_boost_events)
+        run_spec_payload["portfolio_rand_q_last_base"] = int(portfolio_rand_q_last_base)
+        run_spec_payload["portfolio_rand_q_last_effective"] = int(portfolio_rand_q_last_effective)
+        run_spec_payload["portfolio_rand_q_boost_events"] = int(portfolio_rand_q_boost_events)
+        run_spec_payload["portfolio_primary_last_choice"] = str(portfolio_primary_last_choice)
+        run_spec_payload["portfolio_primary_last_reason"] = str(portfolio_primary_last_reason)
+        run_spec_payload["portfolio_primary_switches"] = int(portfolio_primary_switches)
+        run_spec_payload["portfolio_primary_switch_cooldown_span"] = int(portfolio_primary_switch_cooldown_span)
+        run_spec_payload["portfolio_primary_cooldown_ticks"] = int(portfolio_primary_cooldown_ticks)
+        run_spec_payload["portfolio_primary_cooldown_holds"] = int(portfolio_primary_cooldown_holds)
+        run_spec_payload["portfolio_primary_choice_counts"] = dict(portfolio_primary_choice_counts)
+        run_spec_payload["portfolio_history_size"] = int(len(portfolio_history))
         _dump_json(run_spec_path, run_spec_payload)
         _sync_last_proposer_meta_diag()
 
@@ -2003,6 +2390,17 @@ def _run_dask(
         payload["heuristic_explore_base"] = float(base_heuristic_explore)
         payload["heuristic_explore_last_effective"] = float(heuristic_explore_last_effective)
         payload["heuristic_explore_boost_events"] = int(heuristic_explore_boost_events)
+        payload["portfolio_rand_q_last_base"] = int(portfolio_rand_q_last_base)
+        payload["portfolio_rand_q_last_effective"] = int(portfolio_rand_q_last_effective)
+        payload["portfolio_rand_q_boost_events"] = int(portfolio_rand_q_boost_events)
+        payload["portfolio_primary_last_choice"] = str(portfolio_primary_last_choice)
+        payload["portfolio_primary_last_reason"] = str(portfolio_primary_last_reason)
+        payload["portfolio_primary_switches"] = int(portfolio_primary_switches)
+        payload["portfolio_primary_switch_cooldown_span"] = int(portfolio_primary_switch_cooldown_span)
+        payload["portfolio_primary_cooldown_ticks"] = int(portfolio_primary_cooldown_ticks)
+        payload["portfolio_primary_cooldown_holds"] = int(portfolio_primary_cooldown_holds)
+        payload["portfolio_primary_choice_counts"] = dict(portfolio_primary_choice_counts)
+        payload["portfolio_history_size"] = int(len(portfolio_history))
         _write_text(last_meta_path, json.dumps(payload, ensure_ascii=False, indent=2))
 
     def _write_last_proposer_meta(meta_out: Dict[str, Any]) -> None:
@@ -2025,6 +2423,9 @@ def _run_dask(
         nonlocal heuristic_buffer_last_effective, heuristic_buffer_boost_events
         nonlocal heuristic_q_last_effective, heuristic_q_boost_events
         nonlocal heuristic_pool_size_last_effective, heuristic_pool_size_boost_events
+        nonlocal portfolio_rand_q_last_base, portfolio_rand_q_last_effective, portfolio_rand_q_boost_events
+        nonlocal portfolio_primary_last_choice, portfolio_primary_last_reason, portfolio_primary_switches
+        nonlocal portfolio_primary_cooldown_ticks, portfolio_primary_cooldown_holds
         target = int(max(0, args.proposer_buffer))
         if len(candidate_buf) >= target:
             return
@@ -2104,7 +2505,171 @@ def _run_dask(
                 heuristic_buffer_boost_events += 1
             return int(effective)
 
+        def _next_portfolio_rand_q(*, need: int) -> int:
+            nonlocal portfolio_rand_q_last_base, portfolio_rand_q_last_effective, portfolio_rand_q_boost_events
+            base_q, effective_q = _adaptive_portfolio_rand_q(
+                int(need),
+                stagnation_cycles=stagnation_cycles,
+                rescue_limit_cycles=stall_rescue_limit_cycles,
+            )
+            portfolio_rand_q_last_base = int(base_q)
+            portfolio_rand_q_last_effective = int(effective_q)
+            if int(effective_q) > int(base_q):
+                portfolio_rand_q_boost_events += 1
+            return int(effective_q)
+
+        def _record_portfolio_event(*, mode: str, success: bool) -> None:
+            _portfolio_record_event(
+                portfolio_history,
+                mode=str(mode),
+                success=bool(success),
+                maxlen=12,
+            )
+
+        def _resolve_portfolio_primary() -> Tuple[str, str]:
+            nonlocal portfolio_primary_last_choice, portfolio_primary_last_reason, portfolio_primary_switches
+            nonlocal portfolio_primary_cooldown_ticks, portfolio_primary_cooldown_holds
+            primary, reason, _stats = _portfolio_choose_primary_mode(
+                portfolio_history,
+                lookback=8,
+                min_attempts_per_mode=3,
+                min_success_gap=0.20,
+                previous_choice=portfolio_primary_last_choice,
+                switch_cooldown_ticks=int(portfolio_primary_cooldown_ticks),
+            )
+            primary_key = str(primary or "qnehvi").strip().lower()
+            if primary_key not in {"qnehvi", "heuristic"}:
+                primary_key = "qnehvi"
+            prev_key = str(portfolio_primary_last_choice or "qnehvi").strip().lower()
+            portfolio_primary_last_choice = str(primary_key)
+            portfolio_primary_last_reason = str(reason or "default_qnehvi")
+            if prev_key != primary_key:
+                portfolio_primary_switches += 1
+                portfolio_primary_cooldown_ticks = int(max(0, int(portfolio_primary_switch_cooldown_span)))
+            elif int(portfolio_primary_cooldown_ticks) > 0:
+                portfolio_primary_cooldown_ticks = int(portfolio_primary_cooldown_ticks) - 1
+            if str(portfolio_primary_last_reason).strip().lower() == "cooldown_hold":
+                portfolio_primary_cooldown_holds += 1
+            portfolio_primary_choice_counts[primary_key] = int(portfolio_primary_choice_counts.get(primary_key, 0) + 1)
+            return str(primary_key), str(portfolio_primary_last_reason)
+
+        portfolio_primary = "qnehvi"
+        portfolio_primary_reason = "not_portfolio"
+        if want_portfolio:
+            portfolio_primary, portfolio_primary_reason = _resolve_portfolio_primary()
+
         need = max(1, target - len(candidate_buf))
+        if prop_mode in {"qnehvi", "portfolio"} and want_portfolio and portfolio_primary == "heuristic":
+            try:
+                heuristic_buffer_effective = _next_heuristic_buffer()
+                heuristic_need = int(max(1, heuristic_buffer_effective - len(candidate_buf)))
+                heuristic_q_effective = _next_heuristic_q(need=heuristic_need)
+                heuristic_explore_effective = _next_heuristic_explore()
+                heuristic_pool_size_effective = _next_heuristic_pool_size()
+                pr = propose_heuristic(
+                    X_done=np.asarray(X_done, dtype=float) if X_done else np.zeros((0, dim), dtype=float),
+                    Y_min_done=np.asarray(Y_done, dtype=float) if Y_done else np.zeros((0, len(objective_keys)), dtype=float),
+                    penalty=_heuristic_penalty_from_constraints(G_done),
+                    q=int(heuristic_q_effective),
+                    seed=int(rng.integers(0, 2**31 - 1)),
+                    X_pending=X_pending,
+                    feasible_tol=float(args.penalty_tol),
+                    pool_size=int(heuristic_pool_size_effective),
+                    explore_weight=float(heuristic_explore_effective),
+                )
+                meta_out = dict(pr.meta or {})
+                meta_out["requested_mode"] = mode_info["requested"]
+                meta_out["effective_mode"] = "heuristic"
+                meta_out["n_init"] = mode_info["n_init"]
+                meta_out["min_feasible"] = mode_info["min_feasible"]
+                meta_out["ready_by_done"] = mode_info["ready_by_done"]
+                meta_out["ready_by_feasible"] = mode_info["ready_by_feasible"]
+                meta_out["portfolio_primary_choice"] = str(portfolio_primary)
+                meta_out["portfolio_preference_reason"] = str(portfolio_primary_reason)
+                meta_out["heuristic_buffer_base"] = int(base_heuristic_buffer)
+                meta_out["heuristic_buffer_effective"] = int(heuristic_buffer_effective)
+                meta_out["heuristic_q_base"] = int(base_heuristic_q)
+                meta_out["heuristic_q_effective"] = int(heuristic_q_effective)
+                meta_out["heuristic_pool_size_base"] = int(base_heuristic_pool_size)
+                meta_out["heuristic_pool_size_effective"] = int(heuristic_pool_size_effective)
+                meta_out["heuristic_explore_base"] = float(base_heuristic_explore)
+                meta_out["heuristic_explore_effective"] = float(heuristic_explore_effective)
+                meta_out["heuristic_explore_stagnation_cycles"] = int(stagnation_cycles)
+                if pool_fallback_error:
+                    meta_out["pool_fallback_error"] = pool_fallback_error
+                for x_u in pr.X.tolist():
+                    candidate_buf.append(list(x_u))
+                _record_portfolio_event(mode="heuristic", success=True)
+                _write_last_proposer_meta(meta_out)
+                n_rand = _next_portfolio_rand_q(need=need)
+                Xr = propose_random(d=dim, q=int(n_rand), seed=int(rng.integers(0, 2**31 - 1))).X
+                for x_u in Xr.tolist():
+                    candidate_buf.append(list(x_u))
+                return
+            except Exception as h_exc:
+                _record_portfolio_event(mode="heuristic", success=False)
+                try:
+                    pr = propose_qnehvi(
+                        X_done=np.asarray(X_done, dtype=float) if X_done else np.zeros((0, dim), dtype=float),
+                        Y_min_done=np.asarray(Y_done, dtype=float) if Y_done else np.zeros((0, len(objective_keys)), dtype=float),
+                        G_min_done=np.asarray(G_done, dtype=float) if G_done else None,
+                        q=int(need),
+                        seed=int(rng.integers(0, 2**31 - 1)),
+                        X_pending=X_pending,
+                        device=str(args.device),
+                        normalize_objectives=not bool(getattr(args, "botorch_no_normalize_objectives", False)),
+                        ref_margin=float(getattr(args, "botorch_ref_margin", 0.10)),
+                        num_restarts=int(getattr(args, "botorch_num_restarts", 10)),
+                        raw_samples=int(getattr(args, "botorch_raw_samples", 512)),
+                        maxiter=int(getattr(args, "botorch_maxiter", 200)),
+                    )
+                    meta_out = dict(pr.meta or {})
+                    meta_out["requested_mode"] = mode_info["requested"]
+                    meta_out["effective_mode"] = "qnehvi"
+                    meta_out["n_init"] = mode_info["n_init"]
+                    meta_out["min_feasible"] = mode_info["min_feasible"]
+                    meta_out["ready_by_done"] = mode_info["ready_by_done"]
+                    meta_out["ready_by_feasible"] = mode_info["ready_by_feasible"]
+                    meta_out["portfolio_primary_choice"] = str(portfolio_primary)
+                    meta_out["portfolio_preference_reason"] = str(portfolio_primary_reason)
+                    meta_out["fallback_reason"] = "heuristic_primary_failed"
+                    meta_out["fallback_error"] = f"{type(h_exc).__name__}: {h_exc}"
+                    if pool_fallback_error:
+                        meta_out["pool_fallback_error"] = pool_fallback_error
+                    for x_u in pr.X.tolist():
+                        candidate_buf.append(list(x_u))
+                    _record_portfolio_event(mode="qnehvi", success=True)
+                    _write_last_proposer_meta(meta_out)
+                    n_rand = _next_portfolio_rand_q(need=need)
+                    Xr = propose_random(d=dim, q=int(n_rand), seed=int(rng.integers(0, 2**31 - 1))).X
+                    for x_u in Xr.tolist():
+                        candidate_buf.append(list(x_u))
+                    return
+                except Exception as q_exc:
+                    _record_portfolio_event(mode="qnehvi", success=False)
+                    meta_out = {
+                        "requested_mode": mode_info["requested"],
+                        "effective_mode": "random",
+                        "n_init": mode_info["n_init"],
+                        "min_feasible": mode_info["min_feasible"],
+                        "ready_by_done": mode_info["ready_by_done"],
+                        "ready_by_feasible": mode_info["ready_by_feasible"],
+                        "portfolio_primary_choice": str(portfolio_primary),
+                        "portfolio_preference_reason": str(portfolio_primary_reason),
+                        "reason": "heuristic_and_qnehvi_failed",
+                        "fallback_error": f"{type(h_exc).__name__}: {h_exc}; {type(q_exc).__name__}: {q_exc}",
+                    }
+                    if pool_fallback_error:
+                        meta_out["pool_fallback_error"] = pool_fallback_error
+                    _write_last_proposer_meta(meta_out)
+                    Xr = propose_random(d=dim, q=int(need), seed=int(rng.integers(0, 2**31 - 1))).X
+                    for x_u in Xr.tolist():
+                        candidate_buf.append(list(x_u))
+                    n_rand = _next_portfolio_rand_q(need=need)
+                    Xr2 = propose_random(d=dim, q=int(n_rand), seed=int(rng.integers(0, 2**31 - 1))).X
+                    for x_u in Xr2.tolist():
+                        candidate_buf.append(list(x_u))
+                    return
         if prop_mode in {"qnehvi", "portfolio"}:
             try:
                 pr = propose_qnehvi(
@@ -2128,16 +2693,25 @@ def _run_dask(
                 meta_out["min_feasible"] = mode_info["min_feasible"]
                 meta_out["ready_by_done"] = mode_info["ready_by_done"]
                 meta_out["ready_by_feasible"] = mode_info["ready_by_feasible"]
+                if want_portfolio:
+                    meta_out["portfolio_primary_choice"] = str(portfolio_primary)
+                    meta_out["portfolio_preference_reason"] = str(portfolio_primary_reason)
+                if pool_fallback_error:
+                    meta_out["pool_fallback_error"] = pool_fallback_error
                 for x_u in pr.X.tolist():
                     candidate_buf.append(list(x_u))
+                if want_portfolio:
+                    _record_portfolio_event(mode="qnehvi", success=True)
                 _write_last_proposer_meta(meta_out)
                 if want_portfolio:
-                    n_rand = max(1, need // 4)
+                    n_rand = _next_portfolio_rand_q(need=need)
                     Xr = propose_random(d=dim, q=int(n_rand), seed=int(rng.integers(0, 2**31 - 1))).X
                     for x_u in Xr.tolist():
                         candidate_buf.append(list(x_u))
                 return
             except Exception as q_exc:
+                if want_portfolio:
+                    _record_portfolio_event(mode="qnehvi", success=False)
                 try:
                     heuristic_buffer_effective = _next_heuristic_buffer()
                     heuristic_need = int(max(1, heuristic_buffer_effective - len(candidate_buf)))
@@ -2164,6 +2738,9 @@ def _run_dask(
                     meta_out["ready_by_feasible"] = mode_info["ready_by_feasible"]
                     meta_out["fallback_reason"] = "qnehvi_failed"
                     meta_out["fallback_error"] = f"{type(q_exc).__name__}: {q_exc}"
+                    if want_portfolio:
+                        meta_out["portfolio_primary_choice"] = str(portfolio_primary)
+                        meta_out["portfolio_preference_reason"] = str(portfolio_primary_reason)
                     meta_out["heuristic_buffer_base"] = int(base_heuristic_buffer)
                     meta_out["heuristic_buffer_effective"] = int(heuristic_buffer_effective)
                     meta_out["heuristic_q_base"] = int(base_heuristic_q)
@@ -2173,16 +2750,22 @@ def _run_dask(
                     meta_out["heuristic_explore_base"] = float(base_heuristic_explore)
                     meta_out["heuristic_explore_effective"] = float(heuristic_explore_effective)
                     meta_out["heuristic_explore_stagnation_cycles"] = int(stagnation_cycles)
+                    if pool_fallback_error:
+                        meta_out["pool_fallback_error"] = pool_fallback_error
                     for x_u in pr.X.tolist():
                         candidate_buf.append(list(x_u))
+                    if want_portfolio:
+                        _record_portfolio_event(mode="heuristic", success=True)
                     _write_last_proposer_meta(meta_out)
                     if want_portfolio:
-                        n_rand = max(1, need // 4)
+                        n_rand = _next_portfolio_rand_q(need=need)
                         Xr = propose_random(d=dim, q=int(n_rand), seed=int(rng.integers(0, 2**31 - 1))).X
                         for x_u in Xr.tolist():
                             candidate_buf.append(list(x_u))
                     return
                 except Exception as h_exc:
+                    if want_portfolio:
+                        _record_portfolio_event(mode="heuristic", success=False)
                     meta_out = {
                         "requested_mode": mode_info["requested"],
                         "effective_mode": "random",
@@ -2193,6 +2776,9 @@ def _run_dask(
                         "reason": "qnehvi_and_heuristic_failed",
                         "fallback_error": f"{type(q_exc).__name__}: {q_exc}; {type(h_exc).__name__}: {h_exc}",
                     }
+                    if want_portfolio:
+                        meta_out["portfolio_primary_choice"] = str(portfolio_primary)
+                        meta_out["portfolio_preference_reason"] = str(portfolio_primary_reason)
                     if pool_fallback_error:
                         meta_out["pool_fallback_error"] = pool_fallback_error
                     _write_last_proposer_meta(meta_out)
@@ -2200,7 +2786,7 @@ def _run_dask(
                     for x_u in Xr.tolist():
                         candidate_buf.append(list(x_u))
                     if want_portfolio:
-                        n_rand = max(1, need // 4)
+                        n_rand = _next_portfolio_rand_q(need=need)
                         Xr2 = propose_random(d=dim, q=int(n_rand), seed=int(rng.integers(0, 2**31 - 1))).X
                         for x_u in Xr2.tolist():
                             candidate_buf.append(list(x_u))

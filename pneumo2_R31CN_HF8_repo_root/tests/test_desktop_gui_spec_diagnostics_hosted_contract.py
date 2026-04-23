@@ -7,6 +7,7 @@ from pathlib import Path
 from PySide6 import QtWidgets
 
 from pneumo_solver_ui import desktop_diagnostics_runtime
+from pneumo_solver_ui.desktop_spec_shell import diagnostics_panel as diagnostics_panel_module
 from pneumo_solver_ui.desktop_diagnostics_model import DesktopDiagnosticsBundleRecord
 from pneumo_solver_ui.desktop_spec_shell.diagnostics_panel import DiagnosticsWorkspacePage
 from pneumo_solver_ui.desktop_spec_shell.main_window import DesktopGuiSpecMainWindow
@@ -128,27 +129,59 @@ def test_hosted_diagnostics_page_shows_animation_handoff_material(tmp_path: Path
         app.processEvents()
 
 
-def test_hosted_diagnostics_page_routes_send_and_legacy_actions_through_panel() -> None:
+def test_hosted_diagnostics_page_routes_send_and_legacy_actions_through_panel(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
     app = _app()
     workspace = build_workspace_map()["diagnostics"]
     spawns: list[str] = []
+    out_dir = tmp_path / "send_bundles"
+    out_dir.mkdir()
+    zip_path = out_dir / "SEND_mock_bundle.zip"
+    zip_path.write_bytes(b"ZIP")
+
+    def fake_copy_latest_bundle_to_clipboard(
+        repo_root: Path,
+        *,
+        out_dir: Path | str | None = None,
+        zip_path: Path | str | None = None,
+    ):
+        return (
+            DesktopDiagnosticsBundleRecord(
+                out_dir=str(Path(out_dir or tmp_path).resolve()),
+                latest_zip_path=str(Path(zip_path or "").resolve()),
+                clipboard_ok=True,
+                clipboard_message="Clipboard updated for latest bundle: SEND_mock_bundle.zip",
+            ),
+            True,
+            "Clipboard updated for latest bundle: SEND_mock_bundle.zip",
+        )
+
+    monkeypatch.setattr(
+        diagnostics_panel_module,
+        "copy_latest_bundle_to_clipboard",
+        fake_copy_latest_bundle_to_clipboard,
+    )
     page = DiagnosticsWorkspacePage(
         workspace,
-        repo_root=ROOT,
+        repo_root=tmp_path,
         spawn_module_fn=lambda module: spawns.append(module),
     )
     try:
         page.controller._current_bundle = DesktopDiagnosticsBundleRecord(
-            out_dir=str((ROOT / "send_bundles").resolve()),
-            latest_zip_path=str((ROOT / "send_bundles" / "SEND_mock_bundle.zip").resolve()),
+            out_dir=str(out_dir.resolve()),
+            latest_zip_path=str(zip_path.resolve()),
         )
 
         page.handle_command("diagnostics.send_results")
+        app.processEvents()
+        assert "Архив проекта скопирован" in page.status_label.text()
         page.handle_command("diagnostics.legacy_center.open")
         app.processEvents()
 
-        assert "pneumo_solver_ui.tools.send_results_gui" in spawns
-        assert "pneumo_solver_ui.tools.desktop_diagnostics_center" in spawns
+        assert "pneumo_solver_ui.tools.send_results_gui" not in spawns
+        assert spawns == ["pneumo_solver_ui.tools.desktop_diagnostics_center"]
     finally:
         page.close()
         page.deleteLater()
@@ -272,7 +305,8 @@ def test_diagnostics_fallback_command_remains_available() -> None:
     assert commands["diagnostics.send_results"].title == "Скопировать архив"
     assert commands["diagnostics.legacy_center.open"].kind == "launch_module"
     assert commands["diagnostics.legacy_center.open"].module == "pneumo_solver_ui.tools.desktop_diagnostics_center"
-    assert commands["diagnostics.legacy_center.open"].title == "Расширенная проверка проекта"
+    assert commands["diagnostics.legacy_center.open"].title == "Сервисная проверка проекта"
+    assert commands["diagnostics.legacy_center.open"].availability == "support_fallback"
     assert "центр диагностики" not in commands["diagnostics.legacy_center.open"].title.lower()
     assert "диагностику" not in commands["diagnostics.legacy_center.open"].title.lower()
     assert "отдельным окном" not in commands["diagnostics.legacy_center.open"].title.lower()

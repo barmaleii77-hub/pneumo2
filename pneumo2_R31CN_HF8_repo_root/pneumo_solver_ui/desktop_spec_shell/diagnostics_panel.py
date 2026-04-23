@@ -20,6 +20,7 @@ from pneumo_solver_ui.desktop_diagnostics_model import (
 )
 from pneumo_solver_ui.desktop_diagnostics_runtime import (
     append_desktop_diagnostics_run_log,
+    copy_latest_bundle_to_clipboard,
     load_desktop_diagnostics_bundle_record,
     load_last_desktop_diagnostics_center_state,
     load_last_desktop_diagnostics_run_log_text,
@@ -408,8 +409,19 @@ class DiagnosticsShellController(QtCore.QObject):
             self._set_status("Копирование архива недоступно: архив проекта ещё не сохранён.", busy=False)
             self.refresh(regenerate_reports=False)
             return
-        self.spawn_module_fn("pneumo_solver_ui.tools.send_results_gui")
-        self._set_status("Копирование архива открыто.", busy=False)
+        updated_bundle, ok, message = copy_latest_bundle_to_clipboard(
+            self.repo_root,
+            out_dir=bundle.out_dir,
+            zip_path=bundle.latest_zip_path,
+        )
+        self._current_bundle = updated_bundle
+        if ok:
+            self._set_status("Архив проекта скопирован. Его можно передать вручную.", busy=False)
+        else:
+            self._set_status(
+                f"Не удалось скопировать архив проекта: {_operator_message_text(message)}",
+                busy=False,
+            )
         self.refresh(regenerate_reports=False)
 
     def open_bundle_folder(self) -> None:
@@ -730,20 +742,17 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         self.send_button = QtWidgets.QPushButton("Скопировать архив")
         self.open_dir_button = QtWidgets.QPushButton("Открыть каталог")
         self.refresh_button = QtWidgets.QPushButton("Обновить состояние")
-        self.legacy_button = QtWidgets.QPushButton("Расширенная проверка проекта")
         _apply_action_contract(self.collect_button, "DG-BTN-COLLECT")
         self.collect_button.clicked.connect(lambda: self.handle_command("diagnostics.collect_bundle"))
         self.verify_button.clicked.connect(lambda: self.handle_command("diagnostics.verify_bundle"))
         self.send_button.clicked.connect(lambda: self.handle_command("diagnostics.send_results"))
         self.open_dir_button.clicked.connect(self.controller.open_bundle_folder)
         self.refresh_button.clicked.connect(self.refresh_view)
-        self.legacy_button.clicked.connect(lambda: self.handle_command("diagnostics.legacy_center.open"))
         actions_layout.addWidget(self.collect_button, 0, 0)
         actions_layout.addWidget(self.verify_button, 0, 1)
         actions_layout.addWidget(self.send_button, 0, 2)
         actions_layout.addWidget(self.open_dir_button, 1, 0)
         actions_layout.addWidget(self.refresh_button, 1, 1)
-        actions_layout.addWidget(self.legacy_button, 1, 2)
         layout.addWidget(self.actions_box)
 
         self.log_box = QtWidgets.QGroupBox("Журнал / последние сообщения")
@@ -889,4 +898,3 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         self.verify_button.setEnabled(not busy)
         self.send_button.setEnabled(not busy)
         self.refresh_button.setEnabled(not busy)
-        self.legacy_button.setEnabled(not busy)

@@ -5,7 +5,7 @@ from collections import deque
 import os
 from pathlib import Path
 import traceback
-from typing import Callable
+from typing import Callable, Mapping
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
@@ -41,6 +41,7 @@ from .workspace_pages import (
     ResultsWorkspacePage,
     RingWorkspacePage,
     SuiteWorkspacePage,
+    ToolsWorkspacePage,
 )
 
 try:
@@ -52,14 +53,12 @@ except Exception:
 
 
 DEFAULT_PINNED_COMMAND_IDS = (
-    "workspace.input_data.open",
-    "workspace.ring_editor.open",
-    "workspace.test_matrix.open",
-    "workspace.baseline_run.open",
-    "workspace.optimization.open",
-    "workspace.results_analysis.open",
-    "workspace.animation.open",
-    "workspace.diagnostics.open",
+    "input.editor.open",
+    "ring.editor.open",
+    "test.center.open",
+    "baseline.run.execute",
+    "optimization.primary_launch.execute",
+    "diagnostics.collect_bundle",
 )
 
 DEFAULT_SHELL_STATE_RELATIVE_PATH = Path("pneumo_solver_ui") / "workspace" / "desktop_spec_shell_settings.ini"
@@ -355,6 +354,8 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         self._page_index_by_workspace_id: dict[str, int] = {}
         self._page_widget_by_workspace_id: dict[str, QtWidgets.QWidget] = {}
         self._dock_widget_by_panel: dict[str, QtWidgets.QDockWidget] = {}
+        self._workspace_dock_by_workspace_id: dict[str, QtWidgets.QDockWidget] = {}
+        self._child_dock_by_command_id: dict[str, QtWidgets.QDockWidget] = {}
         self._shortcut_objects: list[QtGui.QShortcut] = []
         self._primary_command_id: str | None = None
         self._current_workspace_id = "overview"
@@ -366,7 +367,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
             point_size = self.font().pointSize()
             self.setFont(QtGui.QFont(self._operator_font_family, point_size if point_size > 0 else 10))
 
-        self.setWindowTitle(f"PneumoApp - Панель восстановления окон ({RELEASE})")
+        self.setWindowTitle(f"PneumoApp - Рабочее место инженера ({RELEASE})")
         self.resize(1680, 980)
         self.setMinimumSize(1320, 840)
         self._build_ui()
@@ -476,8 +477,16 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         header_layout.addWidget(info_panel)
         central_layout.addWidget(header)
 
-        self.page_stack = QtWidgets.QStackedWidget()
-        central_layout.addWidget(self.page_stack, 1)
+        self.workspace_center_placeholder = QtWidgets.QLabel(
+            "Выберите этап в дереве слева. Рабочие поверхности открываются как дочерние dock-окна этого рабочего места."
+        )
+        self.workspace_center_placeholder.setObjectName("dock_center_placeholder")
+        self.workspace_center_placeholder.setAlignment(QtCore.Qt.AlignCenter)
+        self.workspace_center_placeholder.setWordWrap(True)
+        self.workspace_center_placeholder.setStyleSheet(
+            "QLabel{color:#6b778c;background:#f8fafc;border:1px dashed #ccd6e0;border-radius:12px;padding:18px;}"
+        )
+        central_layout.addWidget(self.workspace_center_placeholder, 1)
         self.setCentralWidget(central)
 
         self._build_left_dock()
@@ -488,18 +497,10 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
 
     def _build_menu(self) -> None:
         file_menu = self.menuBar().addMenu("Файл")
-        open_legacy = file_menu.addAction("Рабочие окна во вкладках")
-        open_legacy.triggered.connect(lambda: self.run_command("tools.legacy_shell.open"))
-        file_menu.addSeparator()
         exit_action = file_menu.addAction("Выход")
         exit_action.triggered.connect(self.close)
 
-        workspace_menu = self.menuBar().addMenu("Окна")
-        for workspace in self.workspaces:
-            action = workspace_menu.addAction(workspace.title)
-            action.triggered.connect(
-                lambda _checked=False, wid=workspace.workspace_id: self.open_workspace(wid)
-            )
+        self.windows_menu = self.menuBar().addMenu("Окна")
 
         diagnostics_menu = self.menuBar().addMenu("Проверка проекта")
         for command_id in (
@@ -512,19 +513,39 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
             action.triggered.connect(
                 lambda _checked=False, cid=command.command_id: self.run_command(cid)
             )
-        diagnostics_menu.addSeparator()
-        legacy_command = self.command_by_id["diagnostics.legacy_center.open"]
-        legacy_action = diagnostics_menu.addAction(legacy_command.title)
-        legacy_action.triggered.connect(
-            lambda: self.run_command("diagnostics.legacy_center.open")
-        )
+        if self._legacy_tools_visible():
+            service_menu = self.menuBar().addMenu("Сервис")
+            for command_id in (
+                "input.legacy_editor.open",
+                "ring.legacy_editor.open",
+                "test.legacy_center.open",
+                "baseline.legacy_run_setup.open",
+                "optimization.legacy_center.open",
+                "results.legacy_center.open",
+                "results.legacy_compare.open",
+                "animation.legacy_animator.open",
+                "animation.legacy_mnemo.open",
+                "diagnostics.legacy_center.open",
+                "tools.geometry_reference.legacy_open",
+                "tools.autotest.legacy_open",
+                "tools.qt_main_shell.open",
+                "tools.legacy_shell.open",
+            ):
+                command = self.command_by_id[command_id]
+                action = service_menu.addAction(command.title)
+                action.triggered.connect(
+                    lambda _checked=False, cid=command.command_id: self.run_command(cid)
+                )
 
         help_menu = self.menuBar().addMenu("Справка")
         about_action = help_menu.addAction("О рабочем месте")
         about_action.triggered.connect(self._show_about_dialog)
 
+    def _legacy_tools_visible(self) -> bool:
+        return os.environ.get("PNEUMO_SHOW_LEGACY_TOOLS", "").strip() == "1"
+
     def _build_left_dock(self) -> None:
-        dock = QtWidgets.QDockWidget("Навигация и действия", self)
+        dock = QtWidgets.QDockWidget("Маршрут работы", self)
         dock.setObjectName("route_dock")
         dock.setMinimumWidth(280)
         body = QtWidgets.QWidget()
@@ -533,14 +554,16 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
 
-        layout.addWidget(QtWidgets.QLabel("Основные окна"))
-        self.workspace_list = QtWidgets.QListWidget()
+        layout.addWidget(QtWidgets.QLabel("Дерево маршрута"))
+        self.workspace_list = QtWidgets.QTreeWidget()
+        self.workspace_list.setHeaderHidden(True)
         self.workspace_list.setFocusPolicy(QtCore.Qt.StrongFocus)
-        self.workspace_list.itemSelectionChanged.connect(self._on_workspace_selected)
+        self.workspace_list.itemClicked.connect(self._activate_route_tree_item)
+        self.workspace_list.itemActivated.connect(self._activate_route_tree_item)
         _apply_element_contract(self.workspace_list, "SH-NAV-TREE")
-        layout.addWidget(self.workspace_list, 2)
+        layout.addWidget(self.workspace_list, 3)
 
-        layout.addWidget(QtWidgets.QLabel("Закреплённые действия"))
+        layout.addWidget(QtWidgets.QLabel("Прямые действия этапов"))
         self.pinned_list = QtWidgets.QListWidget()
         self.pinned_list.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.pinned_list.itemActivated.connect(self._activate_recent_item)
@@ -575,7 +598,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         status.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.setStatusBar(status)
         self.status_primary_label = QtWidgets.QLabel("Готово")
-        self.status_mode_label = QtWidgets.QLabel("Панель восстановления окон")
+        self.status_mode_label = QtWidgets.QLabel("Рабочее место инженера")
         self.status_progress = QtWidgets.QProgressBar()
         self.status_progress.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.status_progress.setRange(0, 100)
@@ -612,6 +635,141 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         dock.topLevelChanged.connect(lambda _floating, self=self: self._save_window_state())
         dock.dockLocationChanged.connect(lambda _area, self=self: self._save_window_state())
         dock.visibilityChanged.connect(lambda _visible, self=self: self._save_window_state())
+
+    def _register_window_toggle(self, dock: QtWidgets.QDockWidget, title: str) -> None:
+        menu = getattr(self, "windows_menu", None)
+        if menu is None:
+            return
+        action = dock.toggleViewAction()
+        try:
+            action.setText(title)
+        except Exception:
+            pass
+        menu.addAction(action)
+
+    @staticmethod
+    def _safe_dock_object_name(prefix: str, raw_id: str) -> str:
+        cleaned = "".join(
+            char if char.isalnum() or char in {"_"} else "_"
+            for char in str(raw_id or "").replace(".", "_").replace("-", "_")
+        ).strip("_")
+        return f"{prefix}_{cleaned or 'surface'}"
+
+    def _install_workspace_dock(
+        self,
+        workspace: DesktopWorkspaceSpec,
+        page: QtWidgets.QWidget,
+    ) -> QtWidgets.QDockWidget:
+        dock = QtWidgets.QDockWidget(workspace.title, self)
+        dock.setObjectName(self._safe_dock_object_name("workspace_dock", workspace.workspace_id))
+        dock.setWidget(page)
+        dock.setAllowedAreas(QtCore.Qt.AllDockWidgetAreas)
+        dock.setFeatures(
+            QtWidgets.QDockWidget.DockWidgetMovable
+            | QtWidgets.QDockWidget.DockWidgetFloatable
+            | QtWidgets.QDockWidget.DockWidgetClosable
+        )
+        dock.setProperty("spec_panel_id", f"workspace:{workspace.workspace_id}")
+        dock.setProperty("spec_workspace_id", workspace.workspace_id)
+        dock.setProperty("spec_child_window_role", "workspace")
+        dock.setToolTip(
+            "Дочернее окно рабочего этапа. Его можно пристыковать, вынести на второй монитор и вернуть в рабочее место."
+        )
+        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, dock)
+        existing_docks = tuple(self._workspace_dock_by_workspace_id.values())
+        if existing_docks:
+            try:
+                self.tabifyDockWidget(existing_docks[0], dock)
+            except Exception:
+                pass
+        self._workspace_dock_by_workspace_id[workspace.workspace_id] = dock
+        self._register_window_toggle(dock, workspace.title)
+        dock.topLevelChanged.connect(lambda _floating, self=self: self._save_window_state())
+        dock.dockLocationChanged.connect(lambda _area, self=self: self._save_window_state())
+        dock.visibilityChanged.connect(lambda _visible, self=self: self._save_window_state())
+        dock.hide()
+        return dock
+
+    def _show_child_dock_from_result(
+        self,
+        command: DesktopShellCommandSpec,
+        result: object,
+    ) -> None:
+        if not isinstance(result, Mapping):
+            return
+        payload = result.get("child_dock")
+        if not isinstance(payload, Mapping):
+            return
+        title = str(payload.get("title") or command.title)
+        summary = str(payload.get("summary") or command.summary)
+        rows = payload.get("rows") or ()
+
+        body = QtWidgets.QWidget()
+        body.setObjectName(str(payload.get("content_object_name") or self._safe_dock_object_name("child_dock_content", command.command_id)))
+        layout = QtWidgets.QVBoxLayout(body)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(8)
+        label = QtWidgets.QLabel(summary)
+        label.setWordWrap(True)
+        label.setStyleSheet("color:#334e68;")
+        layout.addWidget(label)
+
+        table = QtWidgets.QTableWidget(0, 2)
+        table.setObjectName(str(payload.get("table_object_name") or self._safe_dock_object_name("child_dock_table", command.command_id)))
+        table.setHorizontalHeaderLabels(("Пункт", "Значение"))
+        table.verticalHeader().setVisible(False)
+        table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        normalized_rows: list[tuple[str, str]] = []
+        for raw in rows:
+            if isinstance(raw, Mapping):
+                key = str(raw.get("label") or raw.get("name") or raw.get("key") or "").strip()
+                value = str(raw.get("value") or raw.get("detail") or "").strip()
+            elif isinstance(raw, (tuple, list)) and len(raw) >= 2:
+                key = str(raw[0]).strip()
+                value = " | ".join(str(part).strip() for part in raw[1:] if str(part).strip())
+            else:
+                key = "Состояние"
+                value = str(raw).strip()
+            if key or value:
+                normalized_rows.append((key or "Пункт", value or "нет данных"))
+        table.setRowCount(len(normalized_rows))
+        for row_index, (key, value) in enumerate(normalized_rows):
+            table.setItem(row_index, 0, QtWidgets.QTableWidgetItem(key))
+            table.setItem(row_index, 1, QtWidgets.QTableWidgetItem(value))
+        table.resizeColumnsToContents()
+        layout.addWidget(table, 1)
+
+        dock = self._child_dock_by_command_id.get(command.command_id)
+        if dock is None:
+            dock = QtWidgets.QDockWidget(title, self)
+            dock.setObjectName(str(payload.get("object_name") or self._safe_dock_object_name("child_dock", command.command_id)))
+            dock.setAllowedAreas(QtCore.Qt.AllDockWidgetAreas)
+            dock.setFeatures(
+                QtWidgets.QDockWidget.DockWidgetMovable
+                | QtWidgets.QDockWidget.DockWidgetFloatable
+                | QtWidgets.QDockWidget.DockWidgetClosable
+            )
+            dock.setProperty("spec_panel_id", f"child:{command.command_id}")
+            dock.setProperty("spec_command_id", command.command_id)
+            dock.setProperty("spec_workspace_id", command.workspace_id)
+            dock.setProperty("spec_child_window_role", "detail")
+            self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, dock)
+            self._register_window_toggle(dock, title)
+            self._child_dock_by_command_id[command.command_id] = dock
+            dock.topLevelChanged.connect(lambda _floating, self=self: self._save_window_state())
+            dock.dockLocationChanged.connect(lambda _area, self=self: self._save_window_state())
+            dock.visibilityChanged.connect(lambda _visible, self=self: self._save_window_state())
+        old_widget = dock.widget()
+        if old_widget is not None:
+            old_widget.setParent(None)
+            old_widget.deleteLater()
+        dock.setWindowTitle(title)
+        dock.setWidget(body)
+        dock.show()
+        dock.raise_()
+        body.setFocus(QtCore.Qt.OtherFocusReason)
+        self._save_window_state()
 
     def _apply_state_style(self, widget: QtWidgets.QWidget, state_id: str) -> None:
         entry = self._ui_state_palette.get(state_id)
@@ -680,7 +838,10 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         mapping: dict[str, QtWidgets.QWidget] = {
             "верхняя_командная_панель": self.command_search.lineEdit(),
             "левая_навигация": self.workspace_list,
-            "центральная_рабочая_область": self._page_widget_by_workspace_id.get(self._current_workspace_id, self.page_stack),
+            "центральная_рабочая_область": self._page_widget_by_workspace_id.get(
+                self._current_workspace_id,
+                self.workspace_center_placeholder,
+            ),
             "правая_панель_свойств_и_справки": self.inspector,
             "нижняя_строка_состояния": self.statusBar(),
         }
@@ -737,6 +898,23 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         state = self._settings.value("window/state")
         if isinstance(state, QtCore.QByteArray):
             self.restoreState(state)
+        QtCore.QTimer.singleShot(0, self._ensure_window_visible)
+
+    def _ensure_window_visible(self) -> None:
+        screens = QtGui.QGuiApplication.screens()
+        if not screens:
+            return
+        frame = self.frameGeometry()
+        available_rects = [screen.availableGeometry() for screen in screens]
+        if any(rect.intersects(frame) for rect in available_rects):
+            return
+        primary = QtGui.QGuiApplication.primaryScreen() or screens[0]
+        target = primary.availableGeometry()
+        width = min(max(self.minimumWidth(), self.width()), max(self.minimumWidth(), target.width() - 80))
+        height = min(max(self.minimumHeight(), self.height()), max(self.minimumHeight(), target.height() - 80))
+        self.resize(width, height)
+        center = target.center()
+        self.move(center.x() - width // 2, center.y() - height // 2)
 
     def _save_window_state(self) -> None:
         if getattr(self, "_state_save_suppressed", False):
@@ -779,29 +957,52 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
 
     def _populate_workspaces(self) -> None:
         self.workspace_list.clear()
+        main_index = 1
+        support_root: QtWidgets.QTreeWidgetItem | None = None
         for workspace in self.workspaces:
-            item = QtWidgets.QListWidgetItem(workspace.title)
-            item.setToolTip(workspace.summary)
-            item.setData(QtCore.Qt.UserRole, workspace.workspace_id)
             if workspace.kind == "support":
-                item.setForeground(QtGui.QColor("#576574"))
-            self.workspace_list.addItem(item)
+                if support_root is None:
+                    support_root = QtWidgets.QTreeWidgetItem(["Сервис и справка"])
+                    support_root.setData(0, QtCore.Qt.UserRole, "")
+                    support_root.setForeground(0, QtGui.QColor("#576574"))
+                    self.workspace_list.addTopLevelItem(support_root)
+                item = QtWidgets.QTreeWidgetItem([workspace.title])
+                item.setForeground(0, QtGui.QColor("#576574"))
+                support_root.addChild(item)
+            else:
+                item = QtWidgets.QTreeWidgetItem([f"{main_index}. {workspace.title}"])
+                self.workspace_list.addTopLevelItem(item)
+                main_index += 1
+            item.setToolTip(0, workspace.summary)
+            item.setData(0, QtCore.Qt.UserRole, workspace.workspace_id)
+            item.setData(0, QtCore.Qt.UserRole + 1, "")
+            for command in self._command_specs_for_workspace(workspace):
+                if command.availability == "support_fallback":
+                    continue
+                child = QtWidgets.QTreeWidgetItem([command.title])
+                child.setToolTip(0, command.summary)
+                child.setData(0, QtCore.Qt.UserRole, workspace.workspace_id)
+                child.setData(0, QtCore.Qt.UserRole + 1, command.command_id)
+                item.addChild(child)
+            item.setExpanded(workspace.kind == "main")
+        if support_root is not None:
+            support_root.setExpanded(False)
 
         overview_page = OverviewPage(
             self.repo_root,
             self.workspace_by_id["overview"],
             self.run_command,
         )
-        self.page_stack.addWidget(overview_page)
         self._page_index_by_workspace_id = {"overview": 0}
         self._page_widget_by_workspace_id = {"overview": overview_page}
+        self._install_workspace_dock(self.workspace_by_id["overview"], overview_page)
         for workspace in self.workspaces:
             if workspace.workspace_id == "overview":
                 continue
             page = self._build_workspace_page(workspace)
-            self._page_index_by_workspace_id[workspace.workspace_id] = self.page_stack.count()
+            self._page_index_by_workspace_id[workspace.workspace_id] = len(self._page_index_by_workspace_id)
             self._page_widget_by_workspace_id[workspace.workspace_id] = page
-            self.page_stack.addWidget(page)
+            self._install_workspace_dock(workspace, page)
 
     def _command_specs_for_workspace(self, workspace: DesktopWorkspaceSpec) -> tuple[DesktopShellCommandSpec, ...]:
         command_ids = workspace.quick_action_ids or ()
@@ -875,6 +1076,13 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
                 on_shell_status=self.set_shell_status,
                 on_command=self.run_command,
             )
+        if workspace.workspace_id == "tools":
+            return ToolsWorkspacePage(
+                workspace,
+                actions,
+                self.run_command,
+                repo_root=self.repo_root,
+            )
         return ControlHubWorkspacePage(workspace, actions, self.run_command)
 
     def _refresh_search_results(self, query: str) -> None:
@@ -901,12 +1109,28 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         if 0 <= index < len(self._search_ids_by_index):
             self.run_command(self._search_ids_by_index[index])
 
-    def _on_workspace_selected(self) -> None:
-        items = self.workspace_list.selectedItems()
-        if items:
-            workspace_id = str(items[0].data(QtCore.Qt.UserRole) or "")
-            if workspace_id:
-                self.open_workspace(workspace_id)
+    def _activate_route_tree_item(self, item: QtWidgets.QTreeWidgetItem, _column: int = 0) -> None:
+        command_id = str(item.data(0, QtCore.Qt.UserRole + 1) or "")
+        workspace_id = str(item.data(0, QtCore.Qt.UserRole) or "")
+        if command_id:
+            self.run_command(command_id)
+            return
+        if workspace_id:
+            self.open_workspace(workspace_id)
+
+    def _iter_route_tree_items(self) -> list[QtWidgets.QTreeWidgetItem]:
+        items: list[QtWidgets.QTreeWidgetItem] = []
+        stack = [
+            self.workspace_list.topLevelItem(index)
+            for index in range(self.workspace_list.topLevelItemCount())
+        ]
+        while stack:
+            item = stack.pop(0)
+            if item is None:
+                continue
+            items.append(item)
+            stack[0:0] = [item.child(index) for index in range(item.childCount())]
+        return items
 
     def _activate_recent_item(self, item: QtWidgets.QListWidgetItem) -> None:
         command_id = str(item.data(QtCore.Qt.UserRole) or "")
@@ -981,7 +1205,8 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         page = self._page_widget_by_workspace_id.get(command.workspace_id)
         handler = getattr(page, "handle_command", None)
         if callable(handler):
-            handler(command.command_id)
+            result = handler(command.command_id)
+            self._show_child_dock_from_result(command, result)
             self.status_mode_label.setText(f"Последнее действие: {command.title}")
             self._push_recent_action(command.command_id)
             return
@@ -996,7 +1221,10 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
     def open_workspace(self, workspace_id: str) -> None:
         workspace = self.workspace_by_id[workspace_id]
         self._current_workspace_id = workspace_id
-        self.page_stack.setCurrentIndex(self._page_index_by_workspace_id[workspace_id])
+        dock = self._workspace_dock_by_workspace_id.get(workspace_id)
+        if dock is not None:
+            dock.show()
+            dock.raise_()
         page = self._page_widget_by_workspace_id.get(workspace_id)
         if page is not None:
             page.setFocusPolicy(QtCore.Qt.StrongFocus)
@@ -1016,10 +1244,11 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         self._save_window_state()
 
         blocker = QtCore.QSignalBlocker(self.workspace_list)
-        for index in range(self.workspace_list.count()):
-            item = self.workspace_list.item(index)
-            if str(item.data(QtCore.Qt.UserRole) or "") == workspace_id:
-                self.workspace_list.setCurrentRow(index)
+        for item in self._iter_route_tree_items():
+            item_workspace_id = str(item.data(0, QtCore.Qt.UserRole) or "")
+            item_command_id = str(item.data(0, QtCore.Qt.UserRole + 1) or "")
+            if item_workspace_id == workspace_id and not item_command_id:
+                self.workspace_list.setCurrentItem(item)
                 break
         del blocker
 
@@ -1032,6 +1261,13 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
 
     def run_command(self, command_id: str) -> None:
         command = self.command_by_id[command_id]
+        if command.availability == "support_fallback" and not self._legacy_tools_visible():
+            self.set_shell_status(
+                "Старое окно скрыто из основного маршрута. Вся работа должна выполняться в текущем рабочем месте.",
+                busy=False,
+                state_id="STATE-WARNING",
+            )
+            return
         if command.kind == "open_workspace" and command.target_workspace_id:
             self.open_workspace(command.target_workspace_id)
             self._push_recent_action(command_id)

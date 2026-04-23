@@ -23,12 +23,12 @@ class DesktopLaunchCatalogItem:
 def build_desktop_launch_catalog(*, include_mnemo: bool = True) -> tuple[DesktopLaunchCatalogItem, ...]:
     items: list[DesktopLaunchCatalogItem] = [
         DesktopLaunchCatalogItem(
-            key="desktop_main_shell_qt",
+            key="desktop_gui_spec_shell",
             title="Рабочее место инженера",
-            module="pneumo_solver_ui.tools.desktop_main_shell_qt",
+            module="pneumo_solver_ui.tools.desktop_gui_spec_shell",
             description=(
-                "Классическое Windows-рабочее место: верхнее меню, быстрый поиск, список порядка работы, "
-            "инспектор, строка состояния, индикатор выполнения и единый доступ к рабочим местам."
+                "Основное desktop-рабочее место: дерево этапов слева, рабочие dock-виджеты в центре, "
+                "инспектор, строка состояния, индикатор выполнения и прямые действия этапов."
             ),
             group="Рабочее место",
             runtime_kind="qt",
@@ -39,6 +39,7 @@ def build_desktop_launch_catalog(*, include_mnemo: bool = True) -> tuple[Desktop
                 "рабочее место инженера",
                 "основное рабочее место",
                 "панель проекта",
+                "desktop gui",
             ),
             context_handoff_keys=(
                 "selected_tool_key",
@@ -51,21 +52,20 @@ def build_desktop_launch_catalog(*, include_mnemo: bool = True) -> tuple[Desktop
             ),
         ),
         DesktopLaunchCatalogItem(
-            key="desktop_gui_spec_shell",
-            title="Панель восстановления окон",
-            module="pneumo_solver_ui.tools.desktop_gui_spec_shell",
+            key="desktop_main_shell_qt",
+            title="Старое рабочее место Qt",
+            module="pneumo_solver_ui.tools.desktop_main_shell_qt",
             description=(
-                "Панель помогает вернуть доступ к рабочим окнам и проверить порядок работы."
+                "Сервисный fallback прежнего Qt-shell для восстановления и сравнения поведения."
             ),
-            group="Восстановление окон",
+            group="Сервисный fallback",
             runtime_kind="qt",
-            workspace_role="workspace",
+            workspace_role="support",
             source_of_truth_role="launcher",
-            migration_status="in_development",
+            migration_status="legacy_fallback",
             search_aliases=(
-                "восстановление окон",
-                "восстановление доступа",
-                "рабочие окна",
+                "старое рабочее место",
+                "qt fallback",
             ),
             context_handoff_keys=(
                 "selected_tool_key",

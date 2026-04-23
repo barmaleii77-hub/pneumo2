@@ -261,11 +261,12 @@ def test_desktop_qt_shell_launcher_catalog_keeps_runtime_and_migration_metadata(
     catalog = build_desktop_launch_catalog(include_mnemo=True)
     by_key = {item.key: item for item in catalog}
 
-    assert catalog[0].key == "desktop_main_shell_qt"
-    assert by_key["desktop_main_shell_qt"].module == "pneumo_solver_ui.tools.desktop_main_shell_qt"
-    assert by_key["desktop_main_shell_qt"].group == "Рабочее место"
-    assert by_key["desktop_gui_spec_shell"].group == "Восстановление окон"
+    assert catalog[0].key == "desktop_gui_spec_shell"
+    assert by_key["desktop_gui_spec_shell"].group == "Рабочее место"
     assert by_key["desktop_gui_spec_shell"].module == "pneumo_solver_ui.tools.desktop_gui_spec_shell"
+    assert by_key["desktop_main_shell_qt"].module == "pneumo_solver_ui.tools.desktop_main_shell_qt"
+    assert by_key["desktop_main_shell_qt"].group == "Сервисный fallback"
+    assert by_key["desktop_main_shell_qt"].migration_status == "legacy_fallback"
 
     assert by_key["desktop_input_editor"].runtime_kind == "tk"
     assert by_key["desktop_input_editor"].migration_status == "managed_external"

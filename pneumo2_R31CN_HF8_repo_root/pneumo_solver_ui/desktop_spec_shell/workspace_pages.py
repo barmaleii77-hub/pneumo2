@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from pathlib import Path
 import sys
 import copy
@@ -36,6 +37,7 @@ from pneumo_solver_ui.desktop_suite_runtime import (
 )
 from pneumo_solver_ui.desktop_suite_snapshot import load_suite_rows
 from pneumo_solver_ui.desktop_optimizer_runtime import DesktopOptimizerRuntime
+from pneumo_solver_ui.desktop_geometry_reference_runtime import DesktopGeometryReferenceRuntime
 from pneumo_solver_ui.desktop_run_setup_model import (
     DESKTOP_RUN_CACHE_POLICY_OPTIONS,
     DESKTOP_RUN_PROFILE_OPTIONS,
@@ -88,6 +90,36 @@ def _clear_layout(layout: QtWidgets.QLayout) -> None:
             widget.deleteLater()
         elif child_layout is not None:
             _clear_layout(child_layout)
+
+
+def _table_snapshot_rows(
+    table: QtWidgets.QTableWidget,
+    *,
+    max_rows: int = 16,
+) -> tuple[tuple[str, str], ...]:
+    rows: list[tuple[str, str]] = []
+    for row_index in range(min(table.rowCount(), max_rows)):
+        first = table.item(row_index, 0)
+        label = " ".join((first.text() if first is not None else f"Строка {row_index + 1}").split())
+        values: list[str] = []
+        for column in range(1, table.columnCount()):
+            item = table.item(row_index, column)
+            text = " ".join((item.text() if item is not None else "").split()).strip()
+            if text:
+                values.append(text)
+        rows.append((label, " | ".join(values) if values else "нет данных"))
+    return tuple(rows)
+
+
+def _value_text(value: object, *, unit: str = "", precision: int = 3, fallback: str = "нет данных") -> str:
+    if isinstance(value, (int, float)):
+        number = float(value)
+        if not math.isfinite(number):
+            return fallback
+        text = f"{number:.{precision}f}".rstrip("0").rstrip(".")
+        return f"{text} {unit}".strip()
+    text = " ".join(str(value or "").split()).strip()
+    return text if text else fallback
 
 
 def _baseline_field_label(field: str) -> str:
@@ -211,8 +243,8 @@ def _workspace_owner_text(raw: str) -> str:
 def _launch_surface_text(raw: str) -> str:
     labels = {
         "workspace": "встроенное окно",
-        "legacy_bridge": "рабочее окно",
-        "external_window": "отдельное специализированное окно",
+        "legacy_bridge": "сервисный fallback",
+        "external_window": "вторичная графическая проверка",
         "tooling": "инструментальное окно",
     }
     return labels.get(str(raw or "").strip(), "обычное окно")
@@ -652,6 +684,297 @@ class ControlHubWorkspacePage(QtWidgets.QWidget):
             self.actions_layout.addWidget(meta)
 
 
+class ToolsWorkspacePage(QtWidgets.QWidget):
+    def __init__(
+        self,
+        workspace: DesktopWorkspaceSpec,
+        action_commands: Iterable[DesktopShellCommandSpec],
+        on_command: Callable[[str], None],
+        *,
+        repo_root: Path,
+        python_executable: str | None = None,
+        parent: QtWidgets.QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.setObjectName("WS-TOOLS-HOSTED-PAGE")
+        self.workspace = workspace
+        self.action_commands = tuple(action_commands)
+        self.on_command = on_command
+        self.repo_root = Path(repo_root)
+        self.python_executable = python_executable or sys.executable
+        self.geometry_runtime = DesktopGeometryReferenceRuntime(ui_root=self.repo_root / "pneumo_solver_ui")
+        self.autotest_process: QtCore.QProcess | None = None
+
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        inner = QtWidgets.QWidget()
+        scroll.setWidget(inner)
+        layout = QtWidgets.QVBoxLayout(inner)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(14)
+
+        title = QtWidgets.QLabel(workspace.title)
+        title_font = title.font()
+        title_font.setPointSize(title_font.pointSize() + 5)
+        title_font.setBold(True)
+        title.setFont(title_font)
+        layout.addWidget(title)
+
+        summary = QtWidgets.QLabel(
+            "Сервисные функции остаются внутри рабочего места: справочник геометрии и проверки проекта "
+            "открываются как виджеты, без отдельного окна-хаба."
+        )
+        summary.setWordWrap(True)
+        layout.addWidget(summary)
+
+        self._build_geometry_reference_widget(layout)
+        self._build_autotest_widget(layout)
+        layout.addStretch(1)
+
+        outer = QtWidgets.QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(scroll)
+        self.refresh_view()
+
+    def _build_geometry_reference_widget(self, layout: QtWidgets.QVBoxLayout) -> None:
+        self.geometry_box = QtWidgets.QGroupBox("Справочник геометрии")
+        self.geometry_box.setObjectName("TOOLS-GEOMETRY-REFERENCE")
+        box_layout = QtWidgets.QVBoxLayout(self.geometry_box)
+        self.geometry_source_label = QtWidgets.QLabel("")
+        self.geometry_source_label.setWordWrap(True)
+        self.geometry_road_label = QtWidgets.QLabel("")
+        self.geometry_road_label.setWordWrap(True)
+        box_layout.addWidget(self.geometry_source_label)
+        box_layout.addWidget(self.geometry_road_label)
+
+        self.geometry_cylinder_table = QtWidgets.QTableWidget(0, 6)
+        self.geometry_cylinder_table.setObjectName("TOOLS-GEOMETRY-CYLINDERS")
+        self.geometry_cylinder_table.setHorizontalHeaderLabels(
+            ("Семейство", "Поршень, мм", "Шток, мм", "Ход, мм", "Площадь поршня, см2", "Кольцевая, см2")
+        )
+        box_layout.addWidget(self.geometry_cylinder_table)
+
+        self.geometry_fit_table = QtWidgets.QTableWidget(0, 6)
+        self.geometry_fit_table.setObjectName("TOOLS-GEOMETRY-FIT")
+        self.geometry_fit_table.setHorizontalHeaderLabels(
+            ("Семейство", "Статус", "Использование хода", "Текущий ход", "Рекомендация", "Что сделать")
+        )
+        box_layout.addWidget(self.geometry_fit_table)
+
+        self.geometry_spring_table = QtWidgets.QTableWidget(0, 6)
+        self.geometry_spring_table.setObjectName("TOOLS-GEOMETRY-SPRINGS")
+        self.geometry_spring_table.setHorizontalHeaderLabels(
+            ("Семейство", "Проволока, мм", "Средний диаметр, мм", "Жёсткость, Н/мм", "Свободная длина, мм", "Запас до смыкания, мм")
+        )
+        box_layout.addWidget(self.geometry_spring_table)
+
+        button_row = QtWidgets.QHBoxLayout()
+        self.geometry_refresh_button = QtWidgets.QPushButton("Обновить справочник")
+        self.geometry_refresh_button.setObjectName("TOOLS-BTN-GEOMETRY-REFRESH")
+        self.geometry_refresh_button.clicked.connect(self.refresh_geometry_reference)
+        button_row.addWidget(self.geometry_refresh_button)
+        button_row.addStretch(1)
+        box_layout.addLayout(button_row)
+        layout.addWidget(self.geometry_box)
+
+    def _build_autotest_widget(self, layout: QtWidgets.QVBoxLayout) -> None:
+        self.autotest_box = QtWidgets.QGroupBox("Проверки проекта")
+        self.autotest_box.setObjectName("TOOLS-AUTOTEST")
+        box_layout = QtWidgets.QVBoxLayout(self.autotest_box)
+        intro = QtWidgets.QLabel(
+            "Запуск проверок выполняется внутри рабочего места. Результаты пишутся в папку autotest_runs, "
+            "а ход выполнения виден ниже."
+        )
+        intro.setWordWrap(True)
+        box_layout.addWidget(intro)
+
+        controls = QtWidgets.QHBoxLayout()
+        self.autotest_level_combo = QtWidgets.QComboBox()
+        self.autotest_level_combo.setObjectName("TOOLS-AUTOTEST-LEVEL")
+        self.autotest_level_combo.addItem("Быстрая проверка", "quick")
+        self.autotest_level_combo.addItem("Стандартная проверка", "standard")
+        self.autotest_level_combo.addItem("Полная проверка", "full")
+        controls.addWidget(self.autotest_level_combo)
+        self.autotest_run_button = QtWidgets.QPushButton("Запустить проверки")
+        self.autotest_run_button.setObjectName("TOOLS-BTN-AUTOTEST-RUN")
+        self.autotest_run_button.clicked.connect(self.run_autotest)
+        controls.addWidget(self.autotest_run_button)
+        self.autotest_stop_button = QtWidgets.QPushButton("Остановить")
+        self.autotest_stop_button.setObjectName("TOOLS-BTN-AUTOTEST-STOP")
+        self.autotest_stop_button.clicked.connect(self.stop_autotest)
+        controls.addWidget(self.autotest_stop_button)
+        self.autotest_open_dir_button = QtWidgets.QPushButton("Открыть папку проверок")
+        self.autotest_open_dir_button.setObjectName("TOOLS-BTN-AUTOTEST-OPEN-DIR")
+        self.autotest_open_dir_button.clicked.connect(self.open_autotest_runs_dir)
+        controls.addWidget(self.autotest_open_dir_button)
+        controls.addStretch(1)
+        box_layout.addLayout(controls)
+
+        self.autotest_status_label = QtWidgets.QLabel("Проверки не запускались в этой сессии.")
+        self.autotest_status_label.setWordWrap(True)
+        box_layout.addWidget(self.autotest_status_label)
+        self.autotest_log_view = QtWidgets.QPlainTextEdit()
+        self.autotest_log_view.setObjectName("TOOLS-AUTOTEST-LOG")
+        self.autotest_log_view.setReadOnly(True)
+        self.autotest_log_view.setMinimumHeight(220)
+        box_layout.addWidget(self.autotest_log_view)
+        layout.addWidget(self.autotest_box)
+
+    def _fill_table(self, table: QtWidgets.QTableWidget, rows: Iterable[Iterable[object]]) -> None:
+        materialized = [tuple(row) for row in rows]
+        table.setRowCount(len(materialized))
+        for row_index, row in enumerate(materialized):
+            for column_index, value in enumerate(row):
+                item = QtWidgets.QTableWidgetItem(str(value))
+                item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable)
+                table.setItem(row_index, column_index, item)
+        table.resizeColumnsToContents()
+        table.horizontalHeader().setStretchLastSection(True)
+
+    def refresh_geometry_reference(self) -> None:
+        try:
+            source = self.geometry_runtime.describe_base_source()
+            cylinders = self.geometry_runtime.current_cylinder_rows()
+            fit_rows = self.geometry_runtime.component_fit_rows()
+            spring_snapshot = self.geometry_runtime.current_spring_snapshot()
+            road = self.geometry_runtime.road_width_reference()
+        except Exception as exc:
+            self.geometry_source_label.setText(f"Справочник временно недоступен: {exc}")
+            self._fill_table(self.geometry_cylinder_table, ())
+            self._fill_table(self.geometry_fit_table, ())
+            self._fill_table(self.geometry_spring_table, ())
+            return
+
+        self.geometry_source_label.setText(f"Источник данных: {source}")
+        self.geometry_road_label.setText(
+            f"{road.label}: {_value_text(road.effective_road_width_m, unit=road.unit_label)}. "
+            f"Источник: {road.source}. {road.explanation}"
+        )
+        self._fill_table(
+            self.geometry_cylinder_table,
+            (
+                (
+                    row.family,
+                    _value_text(row.bore_mm),
+                    _value_text(row.rod_mm),
+                    _value_text(row.stroke_mm),
+                    _value_text(row.cap_area_cm2),
+                    _value_text(row.annulus_area_cm2),
+                )
+                for row in cylinders
+            ),
+        )
+        self._fill_table(
+            self.geometry_fit_table,
+            (
+                (
+                    row.family,
+                    row.status,
+                    _value_text(row.stroke_usage_pct, unit="%"),
+                    _value_text(row.current_stroke_mm, unit="мм"),
+                    f"{row.recommended_catalog_label}, {_value_text(row.recommended_stroke_mm, unit='мм')}",
+                    row.action_summary,
+                )
+                for row in fit_rows
+            ),
+        )
+        self._fill_table(
+            self.geometry_spring_table,
+            (
+                (
+                    row.family,
+                    _value_text(row.wire_mm),
+                    _value_text(row.mean_diameter_mm),
+                    _value_text(row.rate_N_per_mm),
+                    _value_text(row.free_length_mm),
+                    _value_text(row.bind_travel_margin_mm),
+                )
+                for row in spring_snapshot.families
+            ),
+        )
+
+    def refresh_autotest_state(self) -> None:
+        busy = self.autotest_process is not None and self.autotest_process.state() != QtCore.QProcess.NotRunning
+        self.autotest_run_button.setEnabled(not busy)
+        self.autotest_stop_button.setEnabled(busy)
+
+    def _autotest_runs_dir(self) -> Path:
+        return self.repo_root / "pneumo_solver_ui" / "autotest_runs"
+
+    def run_autotest(self) -> None:
+        if self.autotest_process is not None and self.autotest_process.state() != QtCore.QProcess.NotRunning:
+            self.autotest_status_label.setText("Проверки уже выполняются.")
+            return
+        level = str(self.autotest_level_combo.currentData() or "quick")
+        self.autotest_log_view.clear()
+        self.autotest_status_label.setText(f"Запущена проверка: {level}.")
+        process = QtCore.QProcess(self)
+        process.setProgram(str(self.python_executable))
+        process.setArguments(["-m", "pneumo_solver_ui.tools.run_autotest", "--level", level])
+        process.setWorkingDirectory(str(self.repo_root))
+        env = QtCore.QProcessEnvironment.systemEnvironment()
+        env.insert("PYTHONUTF8", "1")
+        env.insert("PYTHONIOENCODING", "utf-8")
+        env.insert("PYTHONUNBUFFERED", "1")
+        process.setProcessEnvironment(env)
+        process.setProcessChannelMode(QtCore.QProcess.MergedChannels)
+        process.readyReadStandardOutput.connect(self._read_autotest_output)
+        process.finished.connect(self._on_autotest_finished)
+        process.errorOccurred.connect(self._on_autotest_error)
+        self.autotest_process = process
+        self.refresh_autotest_state()
+        process.start()
+
+    def _read_autotest_output(self) -> None:
+        process = self.autotest_process
+        if process is None:
+            return
+        data = bytes(process.readAllStandardOutput()).decode("utf-8", errors="replace")
+        if data:
+            self.autotest_log_view.appendPlainText(data.rstrip())
+
+    def _on_autotest_finished(self, exit_code: int, _exit_status: QtCore.QProcess.ExitStatus) -> None:
+        self._read_autotest_output()
+        self.autotest_status_label.setText(
+            "Проверки завершены успешно." if int(exit_code) == 0 else f"Проверки завершены с кодом {int(exit_code)}."
+        )
+        self.refresh_autotest_state()
+
+    def _on_autotest_error(self, error: QtCore.QProcess.ProcessError) -> None:
+        self.autotest_status_label.setText(f"Не удалось выполнить проверки: {error.name}.")
+        self.refresh_autotest_state()
+
+    def stop_autotest(self) -> None:
+        process = self.autotest_process
+        if process is None or process.state() == QtCore.QProcess.NotRunning:
+            return
+        process.terminate()
+        QtCore.QTimer.singleShot(1500, self._kill_autotest_if_running)
+        self.autotest_status_label.setText("Остановка проверок запрошена.")
+
+    def _kill_autotest_if_running(self) -> None:
+        process = self.autotest_process
+        if process is not None and process.state() != QtCore.QProcess.NotRunning:
+            process.kill()
+
+    def open_autotest_runs_dir(self) -> None:
+        path = self._autotest_runs_dir()
+        path.mkdir(parents=True, exist_ok=True)
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(path)))
+
+    def refresh_view(self) -> None:
+        self.refresh_geometry_reference()
+        self.refresh_autotest_state()
+
+    def handle_command(self, command_id: str) -> None:
+        if command_id == "tools.geometry_reference.open":
+            self.refresh_geometry_reference()
+            self.geometry_box.setFocus(QtCore.Qt.OtherFocusReason)
+            return
+        if command_id == "tools.autotest.open":
+            self.run_autotest()
+
+
 class SuiteWorkspacePage(QtWidgets.QWidget):
     def __init__(
         self,
@@ -761,12 +1084,6 @@ class SuiteWorkspacePage(QtWidgets.QWidget):
                 lambda _checked=False, cid=baseline_command.command_id: self.on_command(cid)
             )
             actions_layout.addWidget(baseline_button)
-        advanced_button = QtWidgets.QPushButton("Расширенная настройка набора")
-        advanced_button.setToolTip("Открыть прежний центр набора испытаний для детальной настройки.")
-        advanced_button.clicked.connect(
-            lambda _checked=False: self.on_command("test.legacy_center.open")
-        )
-        actions_layout.addWidget(advanced_button)
         layout.addWidget(actions_box)
 
         v16_box = build_v16_visibility_priority_box(workspace)
@@ -1142,11 +1459,6 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
         self.run_setup_open_result_button.clicked.connect(
             lambda: self.handle_command("baseline.run.open_result")
         )
-        self.run_setup_advanced_button = QtWidgets.QPushButton("Расширенный центр запуска")
-        self.run_setup_advanced_button.setObjectName("BL-BTN-RUN-ADVANCED")
-        self.run_setup_advanced_button.clicked.connect(
-            lambda: self.on_command("baseline.legacy_run_setup.open")
-        )
         for button in (
             self.run_setup_check_button,
             self.run_setup_checked_launch_button,
@@ -1155,7 +1467,6 @@ class BaselineWorkspacePage(RuntimeWorkspacePage):
             self.run_setup_cancel_button,
             self.run_setup_open_log_button,
             self.run_setup_open_result_button,
-            self.run_setup_advanced_button,
         ):
             button_row.addWidget(button)
         button_row.addStretch(1)
@@ -2025,12 +2336,6 @@ class InputWorkspacePage(RuntimeWorkspacePage):
         self.input_snapshot_button.clicked.connect(self._save_input_handoff_snapshot)
         actions.addWidget(self.input_snapshot_button)
 
-        self.input_advanced_button = QtWidgets.QPushButton("Расширенный редактор")
-        self.input_advanced_button.setObjectName("ID-BTN-LEGACY-EDITOR")
-        self.input_advanced_button.clicked.connect(
-            lambda _checked=False: self.on_command("input.legacy_editor.open")
-        )
-        actions.addWidget(self.input_advanced_button)
         editor_layout.addLayout(actions)
 
         self.input_action_label = QtWidgets.QLabel("")
@@ -2282,12 +2587,6 @@ class RingWorkspacePage(RuntimeWorkspacePage):
         )
         route_actions.addWidget(self.ring_to_suite_button)
 
-        self.ring_advanced_button = QtWidgets.QPushButton("Расширенный редактор")
-        self.ring_advanced_button.setObjectName("RG-BTN-LEGACY-EDITOR")
-        self.ring_advanced_button.clicked.connect(
-            lambda _checked=False: self.on_command("ring.legacy_editor.open")
-        )
-        route_actions.addWidget(self.ring_advanced_button)
         editor_layout.addLayout(route_actions)
 
         self.ring_action_label = QtWidgets.QLabel("")
@@ -2586,7 +2885,6 @@ class OptimizationWorkspacePage(RuntimeWorkspacePage):
         self.optimization_prepare_button.clicked.connect(
             lambda: self.on_command("optimization.primary_launch.prepare")
         )
-        self.optimization_advanced_button = QtWidgets.QPushButton("Расширенная настройка")
         self.optimization_execute_button = QtWidgets.QPushButton("Запустить оптимизацию")
         self.optimization_execute_button.setObjectName("OP-BTN-EXECUTE")
         self.optimization_execute_button.setToolTip(
@@ -2627,13 +2925,6 @@ class OptimizationWorkspacePage(RuntimeWorkspacePage):
         self.optimization_open_run_dir_button.clicked.connect(
             lambda: self.on_command("optimization.primary_launch.open_run_dir")
         )
-        self.optimization_advanced_button.setObjectName("OP-BTN-ADVANCED")
-        self.optimization_advanced_button.setToolTip(
-            "Открыть подробную настройку для специальных сценариев."
-        )
-        self.optimization_advanced_button.clicked.connect(
-            lambda: self.on_command("optimization.legacy_center.open")
-        )
         for button in (
             self.optimization_check_button,
             self.optimization_prepare_button,
@@ -2642,7 +2933,6 @@ class OptimizationWorkspacePage(RuntimeWorkspacePage):
             self.optimization_hard_stop_button,
             self.optimization_open_log_button,
             self.optimization_open_run_dir_button,
-            self.optimization_advanced_button,
         ):
             button_row.addWidget(button)
         button_row.addStretch(1)
@@ -3137,21 +3427,13 @@ class ResultsWorkspacePage(RuntimeWorkspacePage):
         self.results_animation_handoff_button.clicked.connect(
             lambda: self.on_command("results.animation.prepare")
         )
-        self.results_compare_window_button = QtWidgets.QPushButton("Открыть сравнение")
+        self.results_compare_window_button = QtWidgets.QPushButton("Показать сравнение")
         self.results_compare_window_button.setObjectName("RS-BTN-OPEN-COMPARE")
         self.results_compare_window_button.setToolTip(
-            "Открыть подробный просмотр сравнения, если нужен графический разбор."
+            "Показать подробный просмотр сравнения внутри рабочего шага."
         )
         self.results_compare_window_button.clicked.connect(
             lambda: self.on_command("results.compare.open")
-        )
-        self.results_advanced_button = QtWidgets.QPushButton("Расширенный анализ")
-        self.results_advanced_button.setObjectName("RS-BTN-ADVANCED")
-        self.results_advanced_button.setToolTip(
-            "Открыть подробный анализ для специальных сценариев."
-        )
-        self.results_advanced_button.clicked.connect(
-            lambda: self.on_command("results.legacy_center.open")
         )
         for button in (
             self.results_refresh_button,
@@ -3159,7 +3441,6 @@ class ResultsWorkspacePage(RuntimeWorkspacePage):
             self.results_prepare_evidence_button,
             self.results_animation_handoff_button,
             self.results_compare_window_button,
-            self.results_advanced_button,
         ):
             button_row.addWidget(button)
         button_row.addStretch(1)
@@ -3301,7 +3582,7 @@ class ResultsWorkspacePage(RuntimeWorkspacePage):
         )
         self.results_compare_window_button.setEnabled(compare_ready)
         self.results_compare_window_button.setToolTip(
-            "Открыть подробный просмотр сравнения."
+            "Показать подробный просмотр сравнения внутри рабочего шага."
             if compare_ready
             else "Сначала нужен файл результата для сравнения."
         )
@@ -3537,7 +3818,7 @@ class ResultsWorkspacePage(RuntimeWorkspacePage):
             return
         self.results_compare_window_button.setEnabled(target_path is not None)
         self.results_compare_window_button.setToolTip(
-            "Открыть подробный просмотр сравнения."
+            "Показать подробный просмотр сравнения внутри рабочего шага."
             if target_path is not None
             else "Сначала нужен файл результата для сравнения."
         )
@@ -3594,29 +3875,51 @@ class ResultsWorkspacePage(RuntimeWorkspacePage):
         runtime = self._results_runtime()
         snapshot = runtime.snapshot()
         artifact = self._selected_results_artifact(runtime, snapshot)
-        if runtime.compare_viewer_path(snapshot, artifact=artifact) is None:
+        target_path = runtime.compare_viewer_path(snapshot, artifact=artifact)
+        if target_path is None:
             self._refresh_results_controls()
             self.results_action_label.setText(
                 "Сравнение пока недоступно: нужен файл результата расчёта."
             )
             return {"status": "blocked"}
         try:
-            runtime.launch_compare_viewer(snapshot, artifact=artifact)
+            sidecar_path = runtime.write_compare_current_context_sidecar(snapshot)
         except Exception as exc:
             self._refresh_results_controls()
-            self.results_action_label.setText(f"Не удалось открыть сравнение: {exc}")
+            self.results_action_label.setText(f"Не удалось подготовить сравнение: {exc}")
             return {"status": "failed", "error": str(exc)}
-        self._refresh_results_controls()
+        self._populate_compare_preview(runtime, snapshot, artifact=artifact)
+        self._populate_chart_preview(runtime, snapshot, artifact=artifact)
+        self.results_compare_preview_box.setFocus(QtCore.Qt.OtherFocusReason)
         self.results_action_label.setText(
-            "Сравнение открывается: текущий контекст подготовлен."
+            f"Сравнение показано в рабочем шаге: {self._path_label(target_path)}; контекст {self._path_label(sidecar_path)}."
         )
-        return {"status": "opening"}
+        rows = list(_table_snapshot_rows(self.results_compare_preview_table))
+        rows.extend(
+            (f"График: {label}", value)
+            for label, value in _table_snapshot_rows(self.results_chart_preview_table, max_rows=8)
+        )
+        rows.append(("Файл результата", self._path_label(target_path)))
+        rows.append(("Контекст сравнения", self._path_label(sidecar_path)))
+        return {
+            "status": "shown",
+            "path": target_path,
+            "sidecar": sidecar_path,
+            "child_dock": {
+                "title": "Сравнение результатов",
+                "object_name": "child_dock_results_compare",
+                "content_object_name": "CHILD-COMPARE-CONTENT",
+                "table_object_name": "CHILD-COMPARE-TABLE",
+                "summary": self.results_action_label.text(),
+                "rows": tuple(rows),
+            },
+        }
 
     def refresh_view(self) -> None:
         super().refresh_view()
         self._refresh_results_controls()
 
-    def handle_command(self, command_id: str) -> None:
+    def handle_command(self, command_id: str) -> object:
         if command_id == "results.center.open":
             self._activate_results_panel(
                 "Анализ результатов открыт в рабочем шаге анализа."
@@ -3632,7 +3935,7 @@ class ResultsWorkspacePage(RuntimeWorkspacePage):
             self._prepare_animation_handoff()
             return
         if command_id == "results.compare.open":
-            self._open_compare_viewer()
+            return self._open_compare_viewer()
 
 
 class AnimationWorkspacePage(RuntimeWorkspacePage):
@@ -3742,11 +4045,11 @@ class AnimationWorkspacePage(RuntimeWorkspacePage):
         self.animation_mnemo_button.clicked.connect(lambda: self.on_command("animation.mnemo.open"))
         self.animation_detach_button = QtWidgets.QPushButton("Проверить движение")
         self.animation_detach_button.setObjectName("AM-DETACH")
-        self.animation_detach_button.setToolTip("Открыть подробную графическую проверку с текущими данными сцены.")
+        self.animation_detach_button.setToolTip("Показать проверку движения с текущими данными сцены внутри рабочего шага.")
         self.animation_detach_button.clicked.connect(lambda: self.on_command("animation.animator.launch"))
         self.animation_mnemo_detach_button = QtWidgets.QPushButton("Проверить схему")
         self.animation_mnemo_detach_button.setObjectName("AM-BTN-DETACH-MNEMO")
-        self.animation_mnemo_detach_button.setToolTip("Запустить подробную проверку мнемосхемы с текущими данными.")
+        self.animation_mnemo_detach_button.setToolTip("Показать проверку мнемосхемы с текущими данными внутри рабочего шага.")
         self.animation_mnemo_detach_button.clicked.connect(lambda: self.on_command("animation.mnemo.launch"))
         self.animation_diagnostics_button = QtWidgets.QPushButton("Передать в проверку проекта")
         self.animation_diagnostics_button.setObjectName("AM-BTN-HANDOFF-DIAGNOSTICS")
@@ -4125,13 +4428,13 @@ class AnimationWorkspacePage(RuntimeWorkspacePage):
         has_mnemo = has_scene or snapshot.latest_mnemo_event_log_path is not None
         self.animation_detach_button.setEnabled(has_scene)
         self.animation_detach_button.setToolTip(
-            "Открыть подробную графическую проверку с текущими данными сцены."
+            "Показать проверку движения с текущими данными сцены внутри рабочего шага."
             if has_scene
             else "Сначала нужен результат для отображения."
         )
         self.animation_mnemo_detach_button.setEnabled(has_mnemo)
         self.animation_mnemo_detach_button.setToolTip(
-            "Запустить подробную проверку мнемосхемы с текущими данными."
+            "Показать проверку мнемосхемы с текущими данными внутри рабочего шага."
             if has_mnemo
             else "Сначала нужны данные сцены или журнал мнемосхемы."
         )
@@ -4143,7 +4446,7 @@ class AnimationWorkspacePage(RuntimeWorkspacePage):
         if message:
             self.animation_action_label.setText(message)
 
-    def _launch_animator_viewer(self) -> dict[str, Any]:
+    def _show_animator_check(self) -> dict[str, Any]:
         runtime = self._results_runtime()
         snapshot = runtime.snapshot()
         artifact = self._analysis_animation_artifact_safe(runtime, snapshot)
@@ -4154,19 +4457,25 @@ class AnimationWorkspacePage(RuntimeWorkspacePage):
                 "Аниматор пока недоступен: нужен результат или данные проигрывания."
             )
             return {"status": "blocked"}
-        try:
-            runtime.launch_animator(snapshot, follow=True, artifact=artifact)
-        except Exception as exc:
-            self._refresh_animation_controls()
-            self.animation_action_label.setText(f"Не удалось запустить проверку движения: {exc}")
-            return {"status": "failed", "error": str(exc)}
-        self._refresh_animation_controls()
+        self._populate_scene_preview(runtime, snapshot, artifact=artifact)
+        self.animation_scene_preview_box.setFocus(QtCore.Qt.OtherFocusReason)
         self.animation_action_label.setText(
-            "Аниматор открывается: текущие данные сцены переданы."
+            "Проверка движения показана в дочерней dock-панели главного окна. Standalone-окно не запускалось."
         )
-        return {"status": "opening", "args": args}
+        return {
+            "status": "shown",
+            "args": args,
+            "child_dock": {
+                "title": "Проверка движения",
+                "object_name": "child_dock_animation_motion",
+                "content_object_name": "CHILD-ANIMATION-MOTION-CONTENT",
+                "table_object_name": "CHILD-ANIMATION-MOTION-TABLE",
+                "summary": self.animation_action_label.text(),
+                "rows": _table_snapshot_rows(self.animation_scene_preview_table),
+            },
+        }
 
-    def _launch_mnemo_viewer(self) -> dict[str, Any]:
+    def _show_mnemo_check(self) -> dict[str, Any]:
         runtime = self._results_runtime()
         snapshot = runtime.snapshot()
         artifact = self._analysis_animation_artifact_safe(runtime, snapshot)
@@ -4177,17 +4486,23 @@ class AnimationWorkspacePage(RuntimeWorkspacePage):
                 "Мнемосхема пока недоступна: нужны данные сцены или журнал событий."
             )
             return {"status": "blocked"}
-        try:
-            runtime.launch_mnemo(snapshot, follow=True, artifact=artifact)
-        except Exception as exc:
-            self._refresh_animation_controls()
-            self.animation_action_label.setText(f"Не удалось запустить проверку схемы: {exc}")
-            return {"status": "failed", "error": str(exc)}
         self._refresh_animation_controls()
+        self.animation_status_table.setFocus(QtCore.Qt.OtherFocusReason)
         self.animation_action_label.setText(
-            "Мнемосхема запускается: текущие данные переданы."
+            "Проверка мнемосхемы показана в дочерней dock-панели главного окна. Standalone-окно не запускалось."
         )
-        return {"status": "opening", "args": args}
+        return {
+            "status": "shown",
+            "args": args,
+            "child_dock": {
+                "title": "Мнемосхема",
+                "object_name": "child_dock_animation_mnemo",
+                "content_object_name": "CHILD-ANIMATION-MNEMO-CONTENT",
+                "table_object_name": "CHILD-ANIMATION-MNEMO-TABLE",
+                "summary": self.animation_action_label.text(),
+                "rows": _table_snapshot_rows(self.animation_status_table),
+            },
+        }
 
     def _prepare_diagnostics_handoff(self) -> dict[str, Any]:
         runtime = self._results_runtime()
@@ -4209,23 +4524,21 @@ class AnimationWorkspacePage(RuntimeWorkspacePage):
         super().refresh_view()
         self._refresh_animation_controls()
 
-    def handle_command(self, command_id: str) -> None:
+    def handle_command(self, command_id: str) -> object:
         if command_id == "animation.animator.open":
             self._activate_animation_panel(
                 "Анимация открыта в рабочем шаге. Проверьте готовность данных сцены перед подробным просмотром."
             )
             return
         if command_id == "animation.animator.launch":
-            self._launch_animator_viewer()
-            return
+            return self._show_animator_check()
         if command_id == "animation.mnemo.open":
             self._activate_animation_panel(
                 "Мнемосхема открыта в рабочем шаге. Проверьте журнал и последнее событие перед подробным просмотром."
             )
             return
         if command_id == "animation.mnemo.launch":
-            self._launch_mnemo_viewer()
-            return
+            return self._show_mnemo_check()
         if command_id == "animation.diagnostics.prepare":
             self._prepare_diagnostics_handoff()
 

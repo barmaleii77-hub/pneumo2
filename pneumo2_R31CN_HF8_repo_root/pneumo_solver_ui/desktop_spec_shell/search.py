@@ -27,7 +27,14 @@ def build_search_entries(
     workspace_by_id = {workspace.workspace_id: workspace for workspace in workspaces}
     entries: list[CommandSearchEntry] = []
     for command in commands:
+        if command.availability == "support_fallback":
+            continue
         workspace = workspace_by_id[command.workspace_id]
+        workspace_aliases = (
+            workspace.search_aliases
+            if command.kind == "open_workspace" or command.command_id.startswith("workspace.")
+            else ()
+        )
         keywords = [
             command.title,
             command.summary,
@@ -37,14 +44,14 @@ def build_search_entries(
             workspace.group,
             *command.search_aliases,
             *command.web_aliases,
-            *workspace.search_aliases,
+            *workspace_aliases,
         ]
         exact_aliases = tuple(
             _normalize(alias)
             for alias in (
                 *command.search_aliases,
                 *command.web_aliases,
-                *workspace.search_aliases,
+                *workspace_aliases,
             )
             if _normalize(alias)
         )
@@ -91,7 +98,7 @@ def search_command_palette(
         if haystack.startswith(normalized):
             score += 20
         if entry.command_id.startswith("workspace."):
-            score += 10
+            score -= 20 if normalized in entry.exact_aliases else 5
         score += max(0, 15 - len(entry.title))
         scored.append((score, entry))
 

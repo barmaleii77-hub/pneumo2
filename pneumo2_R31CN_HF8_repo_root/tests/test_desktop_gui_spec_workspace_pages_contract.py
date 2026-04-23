@@ -29,12 +29,12 @@ from pneumo_solver_ui.desktop_spec_shell.registry import build_workspace_map
 from pneumo_solver_ui.desktop_spec_shell.workspace_pages import (
     AnimationWorkspacePage,
     BaselineWorkspacePage,
-    ControlHubWorkspacePage,
     InputWorkspacePage,
     OptimizationWorkspacePage,
     ResultsWorkspacePage,
     RingWorkspacePage,
     SuiteWorkspacePage,
+    ToolsWorkspacePage,
     _operator_catalog_text,
 )
 from pneumo_solver_ui.desktop_spec_shell.v19_guidance_widgets import V19_ACTION_FEEDBACK_TITLE
@@ -335,7 +335,7 @@ def test_suite_workspace_page_shows_test_rows_without_launcher_shell() -> None:
         )
         assert "Связано с редактором циклического сценария" in visible_text
         assert "Перейти к базовому прогону" in visible_text
-        assert "Расширенная настройка набора" in visible_text
+        assert "Расширенная настройка набора" not in visible_text
         assert "Смысл и правила окна" not in visible_text
         assert "Открытие:" not in visible_text
         assert "stage" not in visible_text
@@ -394,7 +394,7 @@ def test_optimization_workspace_page_hosts_primary_launch_controls() -> None:
         assert "Остановить сейчас" in visible_buttons
         assert "Открыть журнал" in visible_buttons
         assert "Открыть папку запуска" in visible_buttons
-        assert "Расширенная настройка" in visible_buttons
+        assert "Расширенная настройка" not in visible_buttons
         assert "Настройка основного запуска открыта" in page.optimization_result_label.text()
 
         window.run_command("optimization.primary_launch.prepare")
@@ -531,10 +531,10 @@ def test_results_workspace_page_hosts_analysis_and_compare_controls() -> None:
         visible_buttons = {button.text() for button in page.findChildren(QtWidgets.QPushButton)}
         assert "Обновить анализ" in visible_buttons
         assert "Подготовить сравнение" in visible_buttons
-        assert "Открыть сравнение" in visible_buttons
+        assert "Показать сравнение" in visible_buttons
         assert "Передать в анимацию" in visible_buttons
         assert "Подготовить материалы проверки" in visible_buttons
-        assert "Расширенный анализ" in visible_buttons
+        assert "Расширенный анализ" not in visible_buttons
         assert "Анализ результатов открыт" in page.results_action_label.text()
         assert page.results_overview_table.columnCount() == 4
         assert page.results_artifacts_table.columnCount() == 3
@@ -1049,6 +1049,11 @@ def test_results_workspace_page_opens_compare_through_hosted_surface(tmp_path, m
         def artifact_preview_lines(self, artifact: SimpleNamespace) -> tuple[str, ...]:
             return (f"Файл результата: {artifact.path.name}", "Размер: 3 байт")
 
+        def write_compare_current_context_sidecar(self, snapshot: SimpleNamespace) -> Path:
+            path = tmp_path / "compare_current_context.json"
+            path.write_text("{}", encoding="utf-8")
+            return path
+
         def launch_compare_viewer(
             self,
             snapshot: SimpleNamespace,
@@ -1074,14 +1079,25 @@ def test_results_workspace_page_opens_compare_through_hosted_surface(tmp_path, m
         window.run_command("results.compare.open")
         app.processEvents()
 
-        assert _FakeResultsRuntime.launched_paths == [npz_path]
+        assert _FakeResultsRuntime.launched_paths == []
+        dock = window.findChild(QtWidgets.QDockWidget, "child_dock_results_compare")
+        assert dock is not None
+        assert dock.windowTitle() == "Сравнение результатов"
+        assert dock.property("spec_command_id") == "results.compare.open"
+        assert dock.property("spec_child_window_role") == "detail"
+        dock_table = dock.findChild(QtWidgets.QTableWidget, "CHILD-COMPARE-TABLE")
+        assert dock_table is not None
         preview_values = {
             page.results_compare_preview_table.item(row, 1).text()
             for row in range(page.results_compare_preview_table.rowCount())
             if page.results_compare_preview_table.item(row, 1) is not None
         }
         assert "latest_result.npz" in preview_values
-        assert "Сравнение открывается" in page.results_action_label.text()
+        assert any(
+            dock_table.item(row, 1) is not None and "latest_result.npz" in dock_table.item(row, 1).text()
+            for row in range(dock_table.rowCount())
+        )
+        assert "Сравнение показано" in page.results_action_label.text()
         assert "results.compare.open" in window.recent_command_ids
     finally:
         window.close()
@@ -1246,7 +1262,7 @@ def test_hosted_input_workspace_page_keeps_runtime_summary_and_route_actions() -
         visible_buttons = {button.text() for button in page.findChildren(QtWidgets.QPushButton)}
         assert "Сохранить рабочую копию" in visible_buttons
         assert "Зафиксировать снимок для маршрута" in visible_buttons
-        assert "Расширенный редактор" in visible_buttons
+        assert "Расширенный редактор" not in visible_buttons
     finally:
         window.close()
         window.deleteLater()
@@ -1270,26 +1286,33 @@ def test_ring_workspace_page_hosts_segment_editor_controls() -> None:
         assert "Дублировать сегмент" in visible_buttons
         assert "Сохранить сценарий" in visible_buttons
         assert "Проверить шов" in visible_buttons
-        assert "Расширенный редактор" in visible_buttons
+        assert "Расширенный редактор" not in visible_buttons
     finally:
         window.close()
         window.deleteLater()
         app.processEvents()
 
 
-def test_control_hub_pages_render_catalog_surface_summary_and_actions() -> None:
+def test_tools_workspace_hosts_geometry_reference_and_autotest_widgets() -> None:
     app = _app()
     window = DesktopGuiSpecMainWindow()
     try:
         page = window._page_widget_by_workspace_id["tools"]
-        assert isinstance(page, ControlHubWorkspacePage)
+        assert isinstance(page, ToolsWorkspacePage)
         page.refresh_view()
         app.processEvents()
 
-        assert page.surface_box.title() == "Ключевые элементы рабочего шага"
-        assert page.actions_box.title() == "Основные действия"
+        assert page.objectName() == "WS-TOOLS-HOSTED-PAGE"
         assert page.workspace.workspace_id == "tools"
         assert len(page.action_commands) >= 1
+        assert page.geometry_box.objectName() == "TOOLS-GEOMETRY-REFERENCE"
+        assert page.geometry_cylinder_table.rowCount() > 0
+        assert page.geometry_fit_table.rowCount() > 0
+        assert page.geometry_spring_table.rowCount() > 0
+        assert page.autotest_box.objectName() == "TOOLS-AUTOTEST"
+        assert page.autotest_level_combo.currentData() == "quick"
+        assert page.autotest_run_button.text() == "Запустить проверки"
+        assert page.autotest_stop_button.text() == "Остановить"
     finally:
         window.close()
         window.deleteLater()
@@ -1550,7 +1573,11 @@ def test_animation_workspace_page_uses_analysis_handoff_artifact(tmp_path, monke
 
         window.run_command("animation.animator.launch")
         app.processEvents()
-        assert _FakeResultsRuntime.launched_args == [["--pointer", str(pointer_path)]]
+        assert _FakeResultsRuntime.launched_args == []
+        motion_dock = window.findChild(QtWidgets.QDockWidget, "child_dock_animation_motion")
+        assert motion_dock is not None
+        assert motion_dock.windowTitle() == "Проверка движения"
+        assert motion_dock.property("spec_command_id") == "animation.animator.launch"
 
         window.run_command("animation.diagnostics.prepare")
         app.processEvents()
@@ -1608,8 +1635,12 @@ def test_animation_workspace_page_launches_animator_through_hosted_surface(tmp_p
         window.run_command("animation.animator.launch")
         app.processEvents()
 
-        assert _FakeResultsRuntime.launched_args == [["--pointer", str(pointer_path)]]
-        assert "Аниматор открывается" in page.animation_action_label.text()
+        assert _FakeResultsRuntime.launched_args == []
+        dock = window.findChild(QtWidgets.QDockWidget, "child_dock_animation_motion")
+        assert dock is not None
+        assert dock.property("spec_command_id") == "animation.animator.launch"
+        assert dock.findChild(QtWidgets.QTableWidget, "CHILD-ANIMATION-MOTION-TABLE") is not None
+        assert "дочерней dock-панели" in page.animation_action_label.text()
         assert "animation.animator.launch" in window.recent_command_ids
     finally:
         window.close()
@@ -1665,8 +1696,12 @@ def test_animation_workspace_page_launches_mnemo_through_hosted_surface(tmp_path
         window.run_command("animation.mnemo.launch")
         app.processEvents()
 
-        assert _FakeResultsRuntime.launched_args == [["--follow", "--pointer", str(pointer_path)]]
-        assert "Мнемосхема запускается" in page.animation_action_label.text()
+        assert _FakeResultsRuntime.launched_args == []
+        dock = window.findChild(QtWidgets.QDockWidget, "child_dock_animation_mnemo")
+        assert dock is not None
+        assert dock.property("spec_command_id") == "animation.mnemo.launch"
+        assert dock.findChild(QtWidgets.QTableWidget, "CHILD-ANIMATION-MNEMO-TABLE") is not None
+        assert "дочерней dock-панели" in page.animation_action_label.text()
         assert "animation.mnemo.launch" in window.recent_command_ids
     finally:
         window.close()
@@ -1906,7 +1941,7 @@ def test_hosted_baseline_workspace_page_requires_explicit_action_before_restore(
         assert page.run_setup_cancel_button.text() == "Отменить запуск"
         assert page.run_setup_open_log_button.text() == "Открыть журнал"
         assert page.run_setup_open_result_button.text() == "Открыть папку результата"
-        assert page.run_setup_advanced_button.text() == "Расширенный центр запуска"
+        assert not hasattr(page, "run_setup_advanced_button")
         assert "Профиль запуска" in page.run_setup_summary_label.text()
         assert "Готовность набора испытаний" in page.run_setup_gate_label.text()
         page.handle_command("baseline.run_setup.open")

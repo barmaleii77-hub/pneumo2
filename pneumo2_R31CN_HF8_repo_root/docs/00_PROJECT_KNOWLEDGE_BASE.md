@@ -348,6 +348,7 @@ Operational note:
 Что задаёт project-specific target spec:
 
 - целевую top-level архитектуру `главный shell + specialized windows` для `Animator`, `Compare Viewer` и `Desktop Mnemo`;
+- active desktop route трактует `specialized windows` как дочерние `dock/floating`-поверхности внутри одного `WIN-MAIN-SHELL` по образцу `Desktop Animator`: дерево/command-search открывает или фокусирует dock-панель напрямую, а standalone legacy-процессы разрешены только как явный `support_fallback`;
 - workflow-first contract: `Исходные данные -> Тест-набор / Сценарии -> Baseline -> Optimization -> Analysis / Animator / Diagnostics`;
 - матрицу `web -> desktop` как обязательный артефакт сохранения функциональности при миграции;
 - один selector optimization-mode, видимые `objective stack`, `hard gate` и baseline policy `автообновлять / не автообновлять`;

@@ -87,6 +87,10 @@ def _safe_mtime(path: Path) -> float:
 
 
 def _safe_relative(path: Path, root: Path) -> str:
+    if path is None:
+        return ""
+    if path.name:
+        return path.name
     try:
         return str(path.relative_to(root))
     except Exception:

@@ -89,7 +89,8 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert commands["diagnostics.collect_bundle"].title == "Сохранить архив проекта"
     assert commands["diagnostics.verify_bundle"].title == "Проверить архив проекта"
     assert commands["diagnostics.send_results"].title == "Скопировать архив"
-    assert commands["diagnostics.legacy_center.open"].title == "Расширенная проверка проекта"
+    assert commands["diagnostics.legacy_center.open"].title == "Сервисная проверка проекта"
+    assert commands["diagnostics.legacy_center.open"].availability == "support_fallback"
     assert commands["tools.autotest.open"].title == "Проверки проекта"
     assert commands["tools.autotest.open"].route_label == "Окна -> Инструменты -> Проверки"
     assert commands["input.editor.open"].title == "Редактировать исходные данные"
@@ -314,6 +315,7 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
 
 def test_gui_spec_shell_launch_module_commands_do_not_claim_native_workspace_surface() -> None:
     commands = build_command_map()
+    workspaces = build_workspace_map()
     allowed_surfaces = {"legacy_bridge", "external_window", "tooling"}
 
     for command in commands.values():
@@ -321,7 +323,10 @@ def test_gui_spec_shell_launch_module_commands_do_not_claim_native_workspace_sur
             continue
         assert command.launch_surface in allowed_surfaces, command.command_id
         if command.launch_surface == "legacy_bridge":
-            assert command.status_label in {"Рабочее окно", "Переходное окно", "Резервное окно"}
+            assert command.availability == "support_fallback"
+            assert command.status_label == "Сервисный fallback"
+        if workspaces[command.workspace_id].kind == "main":
+            assert command.availability == "support_fallback", command.command_id
 
 
 def test_gui_spec_shell_covers_shared_desktop_launch_catalog_without_duplicate_gui_modules() -> None:
@@ -341,18 +346,22 @@ def test_gui_spec_shell_covers_shared_desktop_launch_catalog_without_duplicate_g
     assert catalog_modules <= command_modules
     assert commands["animation.legacy_mnemo.open"].module == "pneumo_solver_ui.desktop_mnemo.main"
     assert commands["animation.legacy_animator.open"].module == "pneumo_solver_ui.desktop_animator.app"
-    assert "tools.qt_main_shell.open" in tools_workspace.quick_action_ids
-    assert "tools.spec_shell.open" in tools_workspace.quick_action_ids
-    assert "input.legacy_editor.open" in tools_workspace.quick_action_ids
+    assert tools_workspace.quick_action_ids == (
+        "tools.geometry_reference.open",
+        "tools.autotest.open",
+    )
+    assert "tools.qt_main_shell.open" not in tools_workspace.quick_action_ids
+    assert "tools.spec_shell.open" not in tools_workspace.quick_action_ids
+    assert "input.legacy_editor.open" not in tools_workspace.quick_action_ids
     assert "input.editor.open" not in tools_workspace.quick_action_ids
-    assert "ring.legacy_editor.open" in tools_workspace.quick_action_ids
+    assert "ring.legacy_editor.open" not in tools_workspace.quick_action_ids
     assert "ring.editor.open" not in tools_workspace.quick_action_ids
-    assert "test.legacy_center.open" in tools_workspace.quick_action_ids
+    assert "test.legacy_center.open" not in tools_workspace.quick_action_ids
     assert "test.center.open" not in tools_workspace.quick_action_ids
-    assert "animation.legacy_mnemo.open" in tools_workspace.quick_action_ids
-    assert "animation.legacy_animator.open" in tools_workspace.quick_action_ids
-    assert "results.legacy_center.open" in tools_workspace.quick_action_ids
-    assert "results.legacy_compare.open" in tools_workspace.quick_action_ids
+    assert "animation.legacy_mnemo.open" not in tools_workspace.quick_action_ids
+    assert "animation.legacy_animator.open" not in tools_workspace.quick_action_ids
+    assert "results.legacy_center.open" not in tools_workspace.quick_action_ids
+    assert "results.legacy_compare.open" not in tools_workspace.quick_action_ids
     assert "results.compare.open" not in tools_workspace.quick_action_ids
 
 
@@ -378,6 +387,12 @@ def test_gui_spec_shell_search_indexes_migration_aliases_and_visual_routes() -> 
     workspaces = build_shell_workspaces()
     commands = tuple(build_command_map().values())
     entries = build_search_entries(workspaces, commands)
+    hidden_support_commands = {
+        command.command_id
+        for command in commands
+        if command.availability == "support_fallback"
+    }
+    assert not ({entry.command_id for entry in entries} & hidden_support_commands)
 
     diagnostics_hits = search_command_palette(entries, "сохранить архив проекта")
     stiffness_hits = search_command_palette(entries, "жёсткость")
@@ -426,6 +441,29 @@ def test_gui_spec_shell_search_indexes_migration_aliases_and_visual_routes() -> 
         hit.command_id in {"workspace.diagnostics.open", "diagnostics.collect_bundle"}
         for hit in v16_diagnostics_hits
     )
+
+
+def test_gui_spec_shell_search_prefers_direct_hosted_actions_over_workspace_hops() -> None:
+    workspaces = build_shell_workspaces()
+    commands = tuple(build_command_map().values())
+    entries = build_search_entries(workspaces, commands)
+
+    direct_queries = {
+        "редактировать исходные данные": "input.editor.open",
+        "редактор кольца": "ring.editor.open",
+        "проверить набор испытаний": "test.center.open",
+        "настройка расчёта": "baseline.run_setup.open",
+        "анализировать результаты": "results.center.open",
+        "аниматор": "animation.animator.open",
+        "проверить архив": "diagnostics.verify_bundle",
+        "справочник геометрии": "tools.geometry_reference.open",
+    }
+
+    for query, command_id in direct_queries.items():
+        hits = search_command_palette(entries, query)
+        assert hits, query
+        assert hits[0].command_id == command_id
+        assert not hits[0].command_id.startswith("workspace.")
 
 
 def test_gui_spec_shell_loads_v16_visibility_priority_contract() -> None:
@@ -602,7 +640,14 @@ def test_gui_spec_shell_main_window_uses_hosted_hubs_and_single_dispatcher() -> 
     assert "self.primary_action_button = QtWidgets.QPushButton(" in src
     assert "def _compact_command_title(" in src
     assert "def _primary_command_title(" in src
+    assert "self.workspace_list = QtWidgets.QTreeWidget()" in src
     assert "self.pinned_list = QtWidgets.QListWidget()" in src
+    assert "def _install_workspace_dock(" in src
+    assert "def _show_child_dock_from_result(" in src
+    assert "self._workspace_dock_by_workspace_id" in src
+    assert "self._child_dock_by_command_id" in src
+    assert "dock_center_placeholder" in src
+    assert "QStackedWidget" not in src
     assert "ControlHubWorkspacePage" in src
     assert "build_v16_visibility_priority_box" in src
     assert "AnimationWorkspacePage" in src
@@ -615,14 +660,16 @@ def test_gui_spec_shell_main_window_uses_hosted_hubs_and_single_dispatcher() -> 
     assert src.count("def open_workspace(") == 1
     assert src.count("def run_command(") == 1
     for expected in (
-        "PneumoApp - Панель восстановления окон",
+        "PneumoApp - Рабочее место инженера",
         "Текущий рабочий шаг: Панель проекта",
         "Быстрый поиск действий",
         "Окна",
+        "Маршрут работы",
+        "Дерево маршрута",
+        "Прямые действия этапов",
         "Цели и ограничения: основные показатели расчёта",
         "Обязательное условие. Происхождение опорного прогона должно быть видимо",
         "Краткая сводка.",
-        "Рабочие окна во вкладках",
         "Сравнить прогоны",
         "Анимировать результат",
         "Проверка проекта",
@@ -634,6 +681,11 @@ def test_gui_spec_shell_main_window_uses_hosted_hubs_and_single_dispatcher() -> 
         "Рабочее место собирает основные инженерные окна приложения",
     ):
         assert expected in src
+    for hidden_from_primary_route in (
+        "Рабочие окна во вкладках",
+        "Панель восстановления окон",
+    ):
+        assert hidden_from_primary_route not in src
     for forbidden in (
         "PneumoApp Desktop Shell",
         "Рабочее пространство: Панель проекта",

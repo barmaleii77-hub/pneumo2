@@ -77,6 +77,59 @@ def _make_duplicate_heuristic(calls: List[Dict[str, float]]):
     return _fake_propose_heuristic
 
 
+def _make_duplicate_qnehvi():
+    def _fake_propose_qnehvi(**kwargs):
+        q_i = max(1, int(kwargs.get("q") or 1))
+        X_done = kwargs.get("X_done")
+        dim = 1
+        if isinstance(X_done, np.ndarray) and X_done.ndim == 2 and int(X_done.shape[1]) > 0:
+            dim = int(X_done.shape[1])
+        return SimpleNamespace(
+            X=np.full((q_i, dim), 0.37, dtype=float),
+            meta={"method": "qnehvi_duplicate_capture"},
+        )
+
+    return _fake_propose_qnehvi
+
+
+def _make_progressive_heuristic(calls: List[Dict[str, float]]):
+    state = {"n": 0}
+
+    def _fake_propose_heuristic(**kwargs):
+        state["n"] += 1
+        call_i = int(state["n"])
+        calls.append(
+            {
+                "call": float(call_i),
+                "q": float(kwargs.get("q") or 0.0),
+                "explore_weight": float(kwargs.get("explore_weight") or 0.0),
+                "pool_size": float(kwargs.get("pool_size") or 0.0),
+            }
+        )
+        q_i = max(1, int(kwargs.get("q") or 1))
+        X_done = kwargs.get("X_done")
+        dim = 1
+        if isinstance(X_done, np.ndarray) and X_done.ndim == 2 and int(X_done.shape[1]) > 0:
+            dim = int(X_done.shape[1])
+        base = min(0.95, 0.11 * float(call_i))
+        return SimpleNamespace(
+            X=np.full((q_i, dim), float(base), dtype=float),
+            meta={"method": "heuristic_progressive_capture"},
+        )
+
+    return _fake_propose_heuristic
+
+
+def _make_duplicate_random_capture(q_calls: List[int]):
+    def _fake_propose_random(*, d: int, q: int, seed: int = 0):  # noqa: ARG001
+        q_i = max(1, int(q))
+        d_i = max(1, int(d))
+        q_calls.append(int(q_i))
+        return SimpleNamespace(X=np.full((q_i, d_i), 0.37, dtype=float))
+
+    return _fake_propose_random
+
+
 def _install_fake_distributed(monkeypatch, submit_log: List[str]) -> None:
     fake_distributed = ModuleType("distributed")
 
@@ -311,6 +364,24 @@ def _base_ray_args(*, budget: int) -> SimpleNamespace:
     )
 
 
+def _seed_one_done_trial(db: ExperimentDB, run_id: str, problem_hash: str, core: _DummyCore) -> None:
+    x_done = [0.10, 0.90]
+    params_done = core.u_to_params(x_done)
+    res_done = db.reserve_trial(
+        run_id=run_id,
+        problem_hash=problem_hash,
+        param_hash="r31ek_seed_done",
+        x_u=list(x_done),
+        params=params_done,
+    )
+    db.mark_done(
+        res_done.trial_id,
+        y=[1.0, 2.0],
+        g=[-0.1],
+        metrics={"obj1": 1.0, "obj2": 2.0, "penalty_total": -0.1},
+    )
+
+
 def test_r31ek_dask_skips_duplicate_running_trial_submission(
     tmp_path: Path,
     monkeypatch,
@@ -419,6 +490,152 @@ def test_r31ek_ray_skips_duplicate_running_trial_submission(
     assert int(meta.get("dedup_skip_total") or 0) >= 1
     assert int(meta.get("dedup_skip_running_count") or 0) >= 1
     assert int(meta.get("dedup_skip_total") or 0) == int(spec.get("dedup_skip_total") or 0)
+
+
+def test_r31ek_portfolio_primary_prefers_heuristic_from_recent_history() -> None:
+    history = [
+        {"mode": "qnehvi", "success": False},
+        {"mode": "qnehvi", "success": False},
+        {"mode": "qnehvi", "success": False},
+        {"mode": "heuristic", "success": True},
+        {"mode": "heuristic", "success": True},
+        {"mode": "heuristic", "success": True},
+    ]
+    primary, reason, stats = coord._portfolio_choose_primary_mode(
+        history,
+        lookback=8,
+        min_attempts_per_mode=3,
+        min_success_gap=0.20,
+    )
+    assert str(primary) == "heuristic"
+    assert str(reason) == "recent_heuristic_outperforming"
+    assert int(stats.get("qnehvi_attempts") or 0) == 3
+    assert int(stats.get("qnehvi_successes") or 0) == 0
+    assert int(stats.get("heuristic_attempts") or 0) == 3
+    assert int(stats.get("heuristic_successes") or 0) == 3
+
+
+def test_r31ek_portfolio_primary_sticky_keeps_heuristic_when_data_is_insufficient() -> None:
+    history = [
+        {"mode": "qnehvi", "success": False},
+        {"mode": "heuristic", "success": True},
+        {"mode": "heuristic", "success": True},
+    ]
+    primary, reason, stats = coord._portfolio_choose_primary_mode(
+        history,
+        lookback=8,
+        min_attempts_per_mode=3,
+        min_success_gap=0.20,
+        previous_choice="heuristic",
+    )
+    assert str(primary) == "heuristic"
+    assert str(reason) == "sticky_previous_choice"
+    assert int(stats.get("qnehvi_attempts") or 0) == 1
+    assert int(stats.get("heuristic_attempts") or 0) == 2
+
+
+def test_r31ek_portfolio_primary_hysteresis_keeps_heuristic_on_small_qnehvi_edge() -> None:
+    history = [
+        {"mode": "qnehvi", "success": True},
+        {"mode": "qnehvi", "success": True},
+        {"mode": "qnehvi", "success": True},
+        {"mode": "qnehvi", "success": False},
+        {"mode": "heuristic", "success": True},
+        {"mode": "heuristic", "success": True},
+        {"mode": "heuristic", "success": False},
+        {"mode": "heuristic", "success": False},
+    ]
+    primary, reason, stats = coord._portfolio_choose_primary_mode(
+        history,
+        lookback=8,
+        min_attempts_per_mode=3,
+        min_success_gap=0.20,
+        previous_choice="heuristic",
+        switch_hysteresis_gap=0.10,
+    )
+    assert str(primary) == "heuristic"
+    assert str(reason) == "sticky_hysteresis"
+    assert int(stats.get("qnehvi_attempts") or 0) == 4
+    assert int(stats.get("heuristic_attempts") or 0) == 4
+
+
+def test_r31ek_portfolio_primary_hysteresis_allows_qnehvi_on_strong_edge() -> None:
+    history = [
+        {"mode": "qnehvi", "success": True},
+        {"mode": "qnehvi", "success": True},
+        {"mode": "qnehvi", "success": True},
+        {"mode": "qnehvi", "success": True},
+        {"mode": "heuristic", "success": True},
+        {"mode": "heuristic", "success": False},
+        {"mode": "heuristic", "success": False},
+        {"mode": "heuristic", "success": False},
+    ]
+    primary, reason, stats = coord._portfolio_choose_primary_mode(
+        history,
+        lookback=8,
+        min_attempts_per_mode=3,
+        min_success_gap=0.20,
+        previous_choice="heuristic",
+        switch_hysteresis_gap=0.10,
+    )
+    assert str(primary) == "qnehvi"
+    assert str(reason) == "recent_qnehvi_outperforming"
+    assert int(stats.get("qnehvi_successes") or 0) == 4
+    assert int(stats.get("heuristic_successes") or 0) == 1
+
+
+def test_r31ek_portfolio_primary_cooldown_holds_switch_on_moderate_edge() -> None:
+    history = [
+        {"mode": "qnehvi", "success": True},
+        {"mode": "qnehvi", "success": True},
+        {"mode": "qnehvi", "success": True},
+        {"mode": "qnehvi", "success": False},
+        {"mode": "heuristic", "success": True},
+        {"mode": "heuristic", "success": False},
+        {"mode": "heuristic", "success": False},
+        {"mode": "heuristic", "success": False},
+    ]
+    primary, reason, stats = coord._portfolio_choose_primary_mode(
+        history,
+        lookback=8,
+        min_attempts_per_mode=3,
+        min_success_gap=0.20,
+        previous_choice="heuristic",
+        switch_hysteresis_gap=0.10,
+        switch_cooldown_ticks=2,
+        cooldown_override_gap=0.35,
+    )
+    assert str(primary) == "heuristic"
+    assert str(reason) == "cooldown_hold"
+    assert int(stats.get("qnehvi_attempts") or 0) == 4
+    assert int(stats.get("heuristic_attempts") or 0) == 4
+
+
+def test_r31ek_portfolio_primary_cooldown_allows_switch_on_strong_edge() -> None:
+    history = [
+        {"mode": "qnehvi", "success": True},
+        {"mode": "qnehvi", "success": True},
+        {"mode": "qnehvi", "success": True},
+        {"mode": "qnehvi", "success": True},
+        {"mode": "heuristic", "success": False},
+        {"mode": "heuristic", "success": False},
+        {"mode": "heuristic", "success": False},
+        {"mode": "heuristic", "success": False},
+    ]
+    primary, reason, stats = coord._portfolio_choose_primary_mode(
+        history,
+        lookback=8,
+        min_attempts_per_mode=3,
+        min_success_gap=0.20,
+        previous_choice="heuristic",
+        switch_hysteresis_gap=0.10,
+        switch_cooldown_ticks=2,
+        cooldown_override_gap=0.35,
+    )
+    assert str(primary) == "qnehvi"
+    assert str(reason) == "recent_qnehvi_outperforming"
+    assert int(stats.get("qnehvi_successes") or 0) == 4
+    assert int(stats.get("heuristic_successes") or 0) == 0
 
 
 def test_r31ek_dask_heuristic_adaptive_explore_after_stall(
@@ -565,3 +782,216 @@ def test_r31ek_ray_heuristic_adaptive_explore_after_stall(
     assert float(meta.get("heuristic_explore_last_effective") or 0.0) >= base_explore
     assert int(meta.get("heuristic_explore_boost_events") or 0) >= 1
     assert float(meta.get("heuristic_explore_effective") or 0.0) >= base_explore
+
+
+def test_r31ek_dask_portfolio_adaptive_rand_blend_after_stall(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    submit_log: List[str] = []
+    _install_fake_distributed(monkeypatch, submit_log)
+    monkeypatch.setattr(coord, "sample_lhs", lambda n, d, seed: np.zeros((0, int(d)), dtype=float))
+    monkeypatch.setattr(coord, "propose_qnehvi", _make_duplicate_qnehvi())
+    rand_q_calls: List[int] = []
+    monkeypatch.setattr(coord, "propose_random", _make_duplicate_random_capture(rand_q_calls))
+
+    db_path = tmp_path / "experiments.sqlite"
+    run_dir = tmp_path / "run_dask_portfolio_rand_adaptive"
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    args = _base_dask_args(budget=3)
+    args.proposer = "portfolio"
+    args.n_init = 1
+    core = _DummyCore(dim=2)
+    with ExperimentDB(db_path, engine="sqlite") as db:
+        run_id = db.create_run(problem_hash="ph_r31ek_dask_portfolio_rand_adaptive", spec={}, meta={"source": "test"})
+        _seed_one_done_trial(db, run_id, "ph_r31ek_dask_portfolio_rand_adaptive", core)
+        coord._run_dask(
+            args,
+            core_local=core,
+            db=db,
+            run_id=run_id,
+            run_dir=run_dir,
+            problem_hash="ph_r31ek_dask_portfolio_rand_adaptive",
+            objective_keys=["obj1", "obj2"],
+        )
+        done_rows = db.fetch_done_trials(run_id)
+
+    assert len(done_rows) == 3
+    assert rand_q_calls
+    assert any(int(qv) > 1 for qv in rand_q_calls)
+
+    spec = json.loads((run_dir / "run_spec.json").read_text(encoding="utf-8"))
+    assert int(spec.get("portfolio_rand_q_last_base") or 0) >= 1
+    assert int(spec.get("portfolio_rand_q_last_effective") or 0) >= int(spec.get("portfolio_rand_q_last_base") or 0)
+    assert int(spec.get("portfolio_rand_q_boost_events") or 0) >= 1
+    assert str(spec.get("portfolio_primary_last_choice") or "") == "qnehvi"
+    assert str(spec.get("portfolio_primary_last_reason") or "") in {"default_qnehvi", "recent_qnehvi_outperforming"}
+    assert int(spec.get("portfolio_primary_switches") or 0) == 0
+    assert int(spec.get("portfolio_primary_switch_cooldown_span") or 0) >= 0
+    assert int(spec.get("portfolio_primary_cooldown_ticks") or 0) >= 0
+    assert int(spec.get("portfolio_primary_cooldown_holds") or 0) >= 0
+    choice_counts = dict(spec.get("portfolio_primary_choice_counts") or {})
+    assert int(choice_counts.get("qnehvi") or 0) >= 1
+    assert int(choice_counts.get("heuristic") or 0) == 0
+    assert int(spec.get("portfolio_history_size") or 0) >= 1
+
+    meta = json.loads((run_dir / "last_proposer_meta.json").read_text(encoding="utf-8"))
+    assert int(meta.get("portfolio_rand_q_last_base") or 0) >= 1
+    assert int(meta.get("portfolio_rand_q_last_effective") or 0) >= int(meta.get("portfolio_rand_q_last_base") or 0)
+    assert int(meta.get("portfolio_rand_q_boost_events") or 0) >= 1
+    assert str(meta.get("portfolio_primary_choice") or "") == "qnehvi"
+    assert str(meta.get("portfolio_preference_reason") or "") in {"default_qnehvi", "recent_qnehvi_outperforming"}
+    assert int(meta.get("portfolio_history_size") or 0) >= 1
+    assert int(meta.get("portfolio_primary_cooldown_ticks") or 0) >= 0
+    assert int(meta.get("portfolio_primary_cooldown_holds") or 0) >= 0
+
+
+def test_r31ek_ray_portfolio_adaptive_rand_blend_after_stall(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    fake_ray = _make_fake_ray_module()
+    monkeypatch.setitem(sys.modules, "ray", fake_ray)
+    monkeypatch.setattr(coord, "EvaluatorCore", _FakeEvaluatorCore)
+    monkeypatch.setattr(coord, "sample_lhs", lambda n, d, seed: np.zeros((0, int(d)), dtype=float))
+    monkeypatch.setattr(coord, "propose_qnehvi", _make_duplicate_qnehvi())
+    rand_q_calls: List[int] = []
+    monkeypatch.setattr(coord, "propose_random", _make_duplicate_random_capture(rand_q_calls))
+    _FakeEvaluatorCore.calls = []
+
+    db_path = tmp_path / "experiments.sqlite"
+    run_dir = tmp_path / "run_ray_portfolio_rand_adaptive"
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    args = _base_ray_args(budget=3)
+    args.proposer = "portfolio"
+    args.n_init = 1
+    core = _DummyCore(dim=2)
+    with ExperimentDB(db_path, engine="sqlite") as db:
+        run_id = db.create_run(problem_hash="ph_r31ek_ray_portfolio_rand_adaptive", spec={}, meta={"source": "test"})
+        _seed_one_done_trial(db, run_id, "ph_r31ek_ray_portfolio_rand_adaptive", core)
+        coord._run_ray(
+            args,
+            core_local=core,
+            db=db,
+            run_id=run_id,
+            run_dir=run_dir,
+            problem_hash="ph_r31ek_ray_portfolio_rand_adaptive",
+            objective_keys=["obj1", "obj2"],
+        )
+        done_rows = db.fetch_done_trials(run_id)
+
+    assert len(done_rows) == 3
+    assert rand_q_calls
+    assert any(int(qv) > 1 for qv in rand_q_calls)
+
+    spec = json.loads((run_dir / "run_spec.json").read_text(encoding="utf-8"))
+    assert int(spec.get("portfolio_rand_q_last_base") or 0) >= 1
+    assert int(spec.get("portfolio_rand_q_last_effective") or 0) >= int(spec.get("portfolio_rand_q_last_base") or 0)
+    assert int(spec.get("portfolio_rand_q_boost_events") or 0) >= 1
+    assert str(spec.get("portfolio_primary_last_choice") or "") == "qnehvi"
+    assert str(spec.get("portfolio_primary_last_reason") or "") in {"default_qnehvi", "recent_qnehvi_outperforming"}
+    assert int(spec.get("portfolio_primary_switches") or 0) == 0
+    assert int(spec.get("portfolio_primary_switch_cooldown_span") or 0) >= 0
+    assert int(spec.get("portfolio_primary_cooldown_ticks") or 0) >= 0
+    assert int(spec.get("portfolio_primary_cooldown_holds") or 0) >= 0
+    choice_counts = dict(spec.get("portfolio_primary_choice_counts") or {})
+    assert int(choice_counts.get("qnehvi") or 0) >= 1
+    assert int(choice_counts.get("heuristic") or 0) == 0
+    assert int(spec.get("portfolio_history_size") or 0) >= 1
+
+    meta = json.loads((run_dir / "last_proposer_meta.json").read_text(encoding="utf-8"))
+    assert int(meta.get("portfolio_rand_q_last_base") or 0) >= 1
+    assert int(meta.get("portfolio_rand_q_last_effective") or 0) >= int(meta.get("portfolio_rand_q_last_base") or 0)
+    assert int(meta.get("portfolio_rand_q_boost_events") or 0) >= 1
+    assert str(meta.get("portfolio_primary_choice") or "") == "qnehvi"
+    assert str(meta.get("portfolio_preference_reason") or "") in {"default_qnehvi", "recent_qnehvi_outperforming"}
+    assert int(meta.get("portfolio_history_size") or 0) >= 1
+    assert int(meta.get("portfolio_primary_cooldown_ticks") or 0) >= 0
+    assert int(meta.get("portfolio_primary_cooldown_holds") or 0) >= 0
+
+
+def test_r31ek_dask_portfolio_primary_switches_to_heuristic_after_qnehvi_failures(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    submit_log: List[str] = []
+    _install_fake_distributed(monkeypatch, submit_log)
+    monkeypatch.setattr(coord, "sample_lhs", lambda n, d, seed: np.zeros((0, int(d)), dtype=float))
+    qnehvi_calls: List[int] = []
+
+    def _always_fail_qnehvi(**_kwargs):
+        qnehvi_calls.append(1)
+        raise RuntimeError("forced_qnehvi_failure_for_contract")
+
+    monkeypatch.setattr(coord, "propose_qnehvi", _always_fail_qnehvi)
+    heuristic_calls: List[Dict[str, float]] = []
+    monkeypatch.setattr(coord, "propose_heuristic", _make_progressive_heuristic(heuristic_calls))
+    monkeypatch.setattr(
+        coord,
+        "_adaptive_portfolio_rand_q",
+        lambda need, stagnation_cycles, rescue_limit_cycles: (0, 0),
+    )
+
+    rand_q_calls: List[int] = []
+
+    def _propose_random_allow_zero(*, d: int, q: int, seed: int = 0):  # noqa: ARG001
+        q_i = max(0, int(q))
+        d_i = max(1, int(d))
+        rand_q_calls.append(int(q_i))
+        if q_i <= 0:
+            return SimpleNamespace(X=np.zeros((0, d_i), dtype=float))
+        val = min(0.99, 0.02 * float(len(rand_q_calls)))
+        return SimpleNamespace(X=np.full((q_i, d_i), float(val), dtype=float))
+
+    monkeypatch.setattr(coord, "propose_random", _propose_random_allow_zero)
+
+    db_path = tmp_path / "experiments.sqlite"
+    run_dir = tmp_path / "run_dask_portfolio_primary_switch"
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    args = _base_dask_args(budget=5)
+    args.proposer = "portfolio"
+    args.n_init = 1
+    args.max_inflight = 1
+    args.proposer_buffer = 1
+    args.q = 1
+    core = _DummyCore(dim=2)
+    with ExperimentDB(db_path, engine="sqlite") as db:
+        run_id = db.create_run(problem_hash="ph_r31ek_dask_portfolio_primary_switch", spec={}, meta={"source": "test"})
+        _seed_one_done_trial(db, run_id, "ph_r31ek_dask_portfolio_primary_switch", core)
+        coord._run_dask(
+            args,
+            core_local=core,
+            db=db,
+            run_id=run_id,
+            run_dir=run_dir,
+            problem_hash="ph_r31ek_dask_portfolio_primary_switch",
+            objective_keys=["obj1", "obj2"],
+        )
+        done_rows = db.fetch_done_trials(run_id)
+
+    assert len(done_rows) == 5
+    assert len(qnehvi_calls) >= 3
+    assert len(heuristic_calls) >= 4
+
+    spec = json.loads((run_dir / "run_spec.json").read_text(encoding="utf-8"))
+    assert str(spec.get("portfolio_primary_last_choice") or "") == "heuristic"
+    assert str(spec.get("portfolio_primary_last_reason") or "") in {"recent_heuristic_outperforming", "sticky_previous_choice"}
+    assert int(spec.get("portfolio_primary_switches") or 0) >= 1
+    assert int(spec.get("portfolio_primary_switch_cooldown_span") or 0) >= 0
+    assert int(spec.get("portfolio_primary_cooldown_ticks") or 0) >= 0
+    assert int(spec.get("portfolio_primary_cooldown_holds") or 0) >= 0
+    choice_counts = dict(spec.get("portfolio_primary_choice_counts") or {})
+    assert int(choice_counts.get("qnehvi") or 0) >= 1
+    assert int(choice_counts.get("heuristic") or 0) >= 1
+    assert int(spec.get("portfolio_history_size") or 0) >= 6
+
+    meta = json.loads((run_dir / "last_proposer_meta.json").read_text(encoding="utf-8"))
+    assert str(meta.get("portfolio_primary_choice") or "") == "heuristic"
+    assert str(meta.get("portfolio_preference_reason") or "") in {"recent_heuristic_outperforming", "sticky_previous_choice"}
+    assert str(meta.get("effective_mode") or "") == "heuristic"
+    assert int(meta.get("portfolio_history_size") or 0) >= 6
+    assert int(meta.get("portfolio_primary_cooldown_ticks") or 0) >= 0
+    assert int(meta.get("portfolio_primary_cooldown_holds") or 0) >= 0
