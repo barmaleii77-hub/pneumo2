@@ -850,7 +850,29 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
         }
         assert "Проект: Runtime Shell" in top_level_labels
         assert "Порядок работы" in top_level_labels
-        assert "Окна" in top_level_labels
+        assert "Сервис и детали" in top_level_labels
+        service_root = next(
+            window.browser_tree.topLevelItem(index)
+            for index in range(window.browser_tree.topLevelItemCount())
+            if window.browser_tree.topLevelItem(index).text(0) == "Сервис и детали"
+        )
+        assert service_root.isExpanded() is False
+        service_tree_tool_keys: set[str] = set()
+
+        def collect_service_tool_keys(item):
+            key = item.data(0, qt_main_window_module.TOOL_ROLE)
+            if isinstance(key, str) and key:
+                service_tree_tool_keys.add(key)
+            for child_index in range(item.childCount()):
+                collect_service_tool_keys(item.child(child_index))
+
+        collect_service_tool_keys(service_root)
+        assert service_tree_tool_keys.isdisjoint(qt_main_window_module.MAIN_ROUTE_KEYS)
+        assert {
+            "desktop_geometry_reference_center",
+            "desktop_engineering_analysis_center",
+            "compare_viewer",
+        } <= service_tree_tool_keys
 
         expected_launch_keys = {
             spec.key for spec in build_desktop_shell_specs() if spec.standalone_module

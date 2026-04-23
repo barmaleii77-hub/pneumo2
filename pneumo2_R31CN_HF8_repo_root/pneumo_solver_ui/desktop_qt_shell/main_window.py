@@ -381,6 +381,16 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             groups.append(("Окна по задаче", other_specs))
         return tuple((title, _unique_specs(specs)) for title, specs in groups if specs)
 
+    def _browser_service_surface_groups(self) -> tuple[tuple[str, tuple[DesktopShellToolSpec, ...]], ...]:
+        groups: list[tuple[str, tuple[DesktopShellToolSpec, ...]]] = []
+        for group_title, group_specs in self._launch_surface_groups():
+            service_specs = tuple(
+                spec for spec in group_specs if spec.key not in MAIN_ROUTE_KEYS
+            )
+            if service_specs:
+                groups.append((group_title, service_specs))
+        return tuple(groups)
+
     def _build_pipeline_search_entries(self) -> tuple[ShellCommandSearchEntry, ...]:
         entries: list[ShellCommandSearchEntry] = []
         for surface in self.pipeline_surfaces:
@@ -1518,8 +1528,10 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.browser_tree.addTopLevelItem(route_root)
         route_root.setExpanded(True)
 
-        modules_root = QtWidgets.QTreeWidgetItem(("Окна", "явный запуск отдельных окон"))
-        for group_title, group_specs in self._launch_surface_groups():
+        modules_root = QtWidgets.QTreeWidgetItem(
+            ("Сервис и детали", "дополнительные проверки и справка")
+        )
+        for group_title, group_specs in self._browser_service_surface_groups():
             root_item = QtWidgets.QTreeWidgetItem((group_title, ""))
             for spec in group_specs:
                 item = QtWidgets.QTreeWidgetItem(
@@ -1533,9 +1545,9 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                 item.setData(0, ITEM_KIND_ROLE, "tool")
                 root_item.addChild(item)
             modules_root.addChild(root_item)
-            root_item.setExpanded(True)
+            root_item.setExpanded(False)
         self.browser_tree.addTopLevelItem(modules_root)
-        modules_root.setExpanded(True)
+        modules_root.setExpanded(False)
 
     def _refresh_search_results(self) -> None:
         query = self.command_search_edit.text().strip()
