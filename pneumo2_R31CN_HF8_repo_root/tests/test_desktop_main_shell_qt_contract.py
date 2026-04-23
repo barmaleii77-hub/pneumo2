@@ -376,7 +376,7 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert 'menubar.addMenu("Диагностика")' in src
     assert 'menubar.addMenu("Инструменты")' in src
     assert 'menubar.addMenu("Справка")' in src
-    assert 'run_menu.addMenu("Окна по задаче")' in src
+    assert 'run_menu.addMenu("Дополнительные проверки")' in src
     assert 'run_menu.addMenu("Все окна")' not in src
     assert '("Справочники и проверки", support_specs)' in src
     assert '("Детальная проверка результата", result_detail_specs)' in src
@@ -395,7 +395,7 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert 'self.optimization_mode_combo = QtWidgets.QComboBox(toolbar)' in src
     assert 'self.browser_dock = QtWidgets.QDockWidget("Панель проекта", self)' in src
     assert 'self.inspector_dock = QtWidgets.QDockWidget("Свойства и помощь", self)' in src
-    assert 'self.runtime_dock = QtWidgets.QDockWidget("Ход выполнения и внешние окна", self)' in src
+    assert 'self.runtime_dock = QtWidgets.QDockWidget("Ход выполнения и открытые поверхности", self)' in src
     assert "def _build_workspace_child_docks(self) -> None:" in src
     assert 'dock.setObjectName(f"DesktopQtShellWorkspaceDock_{object_suffix}")' in src
     assert "self.tabifyDockWidget(self.inspector_dock, dock)" in src
@@ -403,7 +403,7 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert "def _dock_features(self) -> QtWidgets.QDockWidget.DockWidgetFeature:" in src
     assert "setAllowedAreas(" in src
     assert "resizeDocks((self.browser_dock, self.inspector_dock)" in src
-    assert 'self.runtime_table.setHeaderLabels(("Окно", "Состояние", "Тип"))' in src
+    assert 'self.runtime_table.setHeaderLabels(("Поверхность", "Состояние", "Тип"))' in src
     assert 'self.diagnostics_button.setObjectName("AlwaysVisibleDiagnosticsAction")' in src
     assert 'self.diagnostics_button.setShortcut(QtGui.QKeySequence("F7"))' in src
     assert 'self.diagnostics_button.setToolTip("F7. Собрать диагностику и сохранить архив проекта.")' in src
@@ -483,8 +483,8 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert 'return "Инструмент проекта"' in src
     assert 'setObjectName("CalculationStatusBadge")' in src
     assert "def _refresh_calculation_status_badge(self) -> None:" in src
-    assert '"Окна, действия, испытания, сценарии, архив проекта, расчёты, файлы"' in src
-    assert '"Начните вводить действие, окно, расчёт, архив проекта или файл."' in src
+    assert '"Этапы, действия, испытания, сценарии, архив проекта, расчёты, файлы"' in src
+    assert '"Начните вводить действие, этап, расчёт, архив проекта или файл."' in src
     forbidden_qt_visible_fragments = [
         "Команды, экраны, тесты, сценарии, bundle, runs, artifacts",
         "run, bundle или artifact",
@@ -929,10 +929,10 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
             "Инструменты",
             "Справка",
         ]
-        assert "Помощь по рабочим окнам" in visible_audit["menu_actions"]
+        assert "Помощь по рабочему месту" in visible_audit["menu_actions"]
         assert "Панели" in visible_audit["menu_actions"]
         assert "Вернуть все панели" in visible_audit["menu_actions"]
-        assert "Окна по задаче" in visible_audit["menu_actions"]
+        assert "Дополнительные проверки" in visible_audit["menu_actions"]
         assert "Справочники и проверки" in visible_audit["menu_actions"]
         assert "Детальная проверка результата" in visible_audit["menu_actions"]
         assert "Дополнительная визуализация" in visible_audit["menu_actions"]
@@ -949,7 +949,7 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
         assert "Показать в аниматоре" not in visible_audit["toolbar_buttons"]
         assert "Анимировать результат" in visible_audit["toolbar_buttons"]
         assert (
-            "Выбор открывает связанное рабочее окно и показывает его шаг в дереве. Левое дерево остаётся основным порядком работы."
+            "Здесь только дополнительные проверки и справка. Основные этапы открываются из дерева слева или из списка рабочих шагов."
             in visible_audit["auxiliary_visible_texts"]
         )
         assert "Рабочее окно запускается только явной командой" not in visible_audit["auxiliary_visible_texts"]
@@ -966,13 +966,13 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
             "Основной порядок: исходные данные -> сценарии -> испытания -> базовый прогон -> оптимизация -> анализ -> анимация -> диагностика."
             in visible_audit["direct_visible_texts"]
         )
-        assert "Окна, действия, испытания, сценарии, архив проекта, расчёты, файлы" in visible_audit["direct_visible_texts"]
+        assert "Этапы, действия, испытания, сценарии, архив проекта, расчёты, файлы" in visible_audit["direct_visible_texts"]
         assert "Панель проекта" in visible_audit["direct_visible_texts"]
         assert "Основной порядок работы" in visible_audit["direct_visible_texts"]
         assert "Рабочие шаги" in visible_audit["direct_visible_texts"]
         assert "Достоверность отображения" in visible_audit["direct_visible_texts"]
         assert "Крупные состояния: расчётно подтверждено, по исходным данным, условно, недоступно." in visible_audit["direct_visible_texts"]
-        assert "Окно / шаг" in visible_audit["item_visible_texts"]
+        assert "Поверхность / шаг" in visible_audit["item_visible_texts"]
         assert "Недоступно до выбранного прогона" in visible_audit["direct_visible_texts"]
         assert "По исходным данным до расчёта" in visible_audit["direct_visible_texts"]
         assert "Недоступна до результатов расчёта" in visible_audit["direct_visible_texts"]
@@ -1355,10 +1355,11 @@ def test_desktop_qt_shell_handoff_payload_and_layout_state_are_runtime_checked(
         window.start_action_buttons["desktop_ring_editor"].click()
         app.processEvents()
         assert window._selected_surface_key == "ws_ring"
-        input_index = window.launch_tool_combo.findData("desktop_input_editor")
+        assert window.launch_tool_combo.findData("desktop_input_editor") == -1
+        assert window.launch_tool_combo.findData("compare_viewer") >= 0
+        input_index = window.workspace_combo.findData("ws_inputs")
         assert input_index >= 0
-        window.launch_tool_combo.setCurrentIndex(input_index)
-        window.launch_tool_combo.activated.emit(input_index)
+        window.workspace_combo.setCurrentIndex(input_index)
         app.processEvents()
         assert window._selected_surface_key == "ws_inputs"
         assert window.open_tool("desktop_animator") is True

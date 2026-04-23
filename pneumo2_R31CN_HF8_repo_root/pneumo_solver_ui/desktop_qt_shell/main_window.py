@@ -237,7 +237,7 @@ def _build_shell_settings() -> QtCore.QSettings:
 def _operator_state_label(spec: DesktopShellToolSpec) -> str:
     status = spec.effective_migration_status
     if status == "managed_external":
-        return "Готово: рабочее окно"
+        return "Готово: рабочая поверхность"
     if status == "in_development":
         return "Есть открытые ограничения"
     return "Готово к работе"
@@ -246,18 +246,18 @@ def _operator_state_label(spec: DesktopShellToolSpec) -> str:
 def _runtime_label(spec: DesktopShellToolSpec) -> str:
     kind = spec.effective_runtime_kind
     if kind == "tk":
-        return "Рабочее окно"
+        return "Рабочая поверхность"
     if kind == "qt":
-        return "Специализированное окно"
-    return "Дополнительное окно"
+        return "Специализированная поверхность"
+    return "Дополнительная поверхность"
 
 
 def _workspace_role_label(spec: DesktopShellToolSpec) -> str:
     role = spec.effective_workspace_role
     if role == "workspace":
-        return "Рабочее окно"
+        return "Рабочая поверхность"
     if role == "specialized_window":
-        return "Специализированное окно"
+        return "Специализированная поверхность"
     if role == "contextual_tool":
         return "Инструмент по результатам расчёта"
     return "Инструмент проекта"
@@ -378,7 +378,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             ("Детальная проверка результата", result_detail_specs),
         ]
         if other_specs:
-            groups.append(("Окна по задаче", other_specs))
+            groups.append(("Дополнительные проверки", other_specs))
         return tuple((title, _unique_specs(specs)) for title, specs in groups if specs)
 
     def _browser_service_surface_groups(self) -> tuple[tuple[str, tuple[DesktopShellToolSpec, ...]], ...]:
@@ -390,6 +390,13 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             if service_specs:
                 groups.append((group_title, service_specs))
         return tuple(groups)
+
+    def _service_launch_specs(self) -> tuple[DesktopShellToolSpec, ...]:
+        return _unique_specs(
+            spec
+            for _group_title, group_specs in self._browser_service_surface_groups()
+            for spec in group_specs
+        )
 
     def _build_pipeline_search_entries(self) -> tuple[ShellCommandSearchEntry, ...]:
         entries: list[ShellCommandSearchEntry] = []
@@ -715,7 +722,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         view_menu.addSeparator()
         restore_layout_action = view_menu.addAction("Восстановить раскладку")
         restore_layout_action.triggered.connect(self._restore_layout)
-        reset_layout_action = view_menu.addAction("Сбросить раскладку окна")
+        reset_layout_action = view_menu.addAction("Сбросить раскладку")
         reset_layout_action.triggered.connect(self._reset_layout)
 
         run_menu = menubar.addMenu("Запуск")
@@ -729,13 +736,13 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             if spec is None:
                 continue
             self._add_tool_action(run_menu, spec)
-        all_tools_menu = run_menu.addMenu("Окна по задаче")
+        all_tools_menu = run_menu.addMenu("Дополнительные проверки")
         for group_title, group_specs in self._launch_surface_groups():
             group_menu = all_tools_menu.addMenu(group_title)
             for spec in group_specs:
                 self._add_tool_action(group_menu, spec)
         run_menu.addSeparator()
-        stop_action = run_menu.addAction("Остановить выбранное окно")
+        stop_action = run_menu.addAction("Остановить выбранную поверхность")
         stop_action.setShortcut(QtGui.QKeySequence("Shift+F5"))
         stop_action.triggered.connect(self.stop_selected_tool)
 
@@ -778,7 +785,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             if spec is None:
                 continue
             self._add_tool_action(tools_menu, spec)
-        legacy_action = tools_menu.addAction("Помощь по рабочим окнам")
+        legacy_action = tools_menu.addAction("Помощь по рабочему месту")
         legacy_action.triggered.connect(self._show_legacy_shell_note)
 
         help_menu = menubar.addMenu("Справка")
@@ -799,13 +806,13 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
 
         toolbar.addSeparator()
 
-        toolbar.addWidget(QtWidgets.QLabel("Рабочее окно:"))
+        toolbar.addWidget(QtWidgets.QLabel("Доп. проверка:"))
         self.launch_tool_combo = QtWidgets.QComboBox(toolbar)
         self.launch_tool_combo.setObjectName("DesktopQtShellLaunchToolCombo")
-        self.launch_tool_combo.setAccessibleName("Выбор и открытие рабочего окна")
+        self.launch_tool_combo.setAccessibleName("Выбор дополнительной проверки")
         self.launch_tool_combo.setToolTip(
-            "Выбор открывает связанное рабочее окно и показывает его шаг в дереве. "
-            "Левое дерево остаётся основным порядком работы."
+            "Здесь только дополнительные проверки и справка. "
+            "Основные этапы открываются из дерева слева или из списка рабочих шагов."
         )
         self.launch_tool_combo.currentIndexChanged.connect(self._on_launch_tool_changed)
         self.launch_tool_combo.activated.connect(self._on_launch_tool_activated)
@@ -817,9 +824,9 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.command_search_edit = QtWidgets.QLineEdit(toolbar)
         self.command_search_edit.setAccessibleName("Быстрый поиск")
         self.command_search_edit.setPlaceholderText(
-            "Окна, действия, испытания, сценарии, архив проекта, расчёты, файлы"
+            "Этапы, действия, испытания, сценарии, архив проекта, расчёты, файлы"
         )
-        self.command_search_edit.setToolTip("Ctrl+K. Поиск по окнам, действиям, файлам и запуску.")
+        self.command_search_edit.setToolTip("Ctrl+K. Поиск по этапам, действиям, файлам и запуску.")
         self.command_search_edit.textChanged.connect(self._refresh_search_results)
         self.command_search_edit.returnPressed.connect(self._activate_primary_search_result)
         toolbar.addWidget(self.command_search_edit)
@@ -867,7 +874,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.browser_dock.setMinimumWidth(280)
         self.browser_dock.setToolTip("Док-панель: перетаскивается, открепляется и меняет ширину границей.")
         self.browser_tree = QtWidgets.QTreeWidget(self.browser_dock)
-        self.browser_tree.setHeaderLabels(("Окно / шаг", "Состояние"))
+        self.browser_tree.setHeaderLabels(("Поверхность / шаг", "Состояние"))
         self.browser_tree.itemSelectionChanged.connect(self._on_browser_selection_changed)
         self.browser_tree.itemDoubleClicked.connect(self._on_browser_item_activated)
         self.browser_dock.setWidget(self.browser_tree)
@@ -896,12 +903,12 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.property_module_value.setTextInteractionFlags(
             QtCore.Qt.TextInteractionFlag.TextSelectableByMouse
         )
-        properties_layout.addRow("Окно / шаг:", self.property_title_value)
-        properties_layout.addRow("Тип окна:", self.property_runtime_value)
+        properties_layout.addRow("Поверхность / шаг:", self.property_title_value)
+        properties_layout.addRow("Тип поверхности:", self.property_runtime_value)
         properties_layout.addRow("Роль:", self.property_role_value)
         properties_layout.addRow("Источник данных:", self.property_source_value)
         properties_layout.addRow("Состояние:", self.property_operator_state_value)
-        properties_layout.addRow("Связанное окно:", self.property_module_value)
+        properties_layout.addRow("Связанная поверхность:", self.property_module_value)
         self.inspector_tabs.addTab(properties_page, "Свойства")
 
         help_page = QtWidgets.QWidget(self.inspector_tabs)
@@ -922,7 +929,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, self.inspector_dock)
 
     def _build_runtime_dock(self) -> None:
-        self.runtime_dock = QtWidgets.QDockWidget("Ход выполнения и внешние окна", self)
+        self.runtime_dock = QtWidgets.QDockWidget("Ход выполнения и открытые поверхности", self)
         self.runtime_dock.setObjectName("DesktopQtShellRuntimeDock")
         self.runtime_dock.setFeatures(self._dock_features())
         self.runtime_dock.setAllowedAreas(
@@ -935,7 +942,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         runtime_layout = QtWidgets.QVBoxLayout(runtime_widget)
 
         self.runtime_progress_label = QtWidgets.QLabel(
-            "Здесь видно, какие окна запущены, что выполняется сейчас и где смотреть результат.",
+            "Здесь видно, какие поверхности открыты, что выполняется сейчас и где смотреть результат.",
             runtime_widget,
         )
         self.runtime_progress_label.setWordWrap(True)
@@ -948,7 +955,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         runtime_layout.addWidget(self.runtime_progress_bar)
 
         self.runtime_table = QtWidgets.QTreeWidget(runtime_widget)
-        self.runtime_table.setHeaderLabels(("Окно", "Состояние", "Тип"))
+        self.runtime_table.setHeaderLabels(("Поверхность", "Состояние", "Тип"))
         runtime_layout.addWidget(self.runtime_table)
 
         self.runtime_dock.setWidget(runtime_widget)
@@ -1042,7 +1049,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
 
         if command.module and legacy_tool_key is None:
             self._set_status_message(
-                "Старое окно скрыто из основного маршрута. Используйте сервисный fallback только явно."
+                "Старая поверхность скрыта из основного пути. Используйте сервисную команду только явно."
             )
             return
 
@@ -1241,7 +1248,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             linked_spec = self.spec_by_key.get(surface.tool_key)
             for name, value in (
                 ("Рабочий шаг", surface.title),
-                ("Связанное окно", linked_spec.title if linked_spec is not None else surface.tool_key),
+                ("Связанная поверхность", linked_spec.title if linked_spec is not None else surface.tool_key),
                 ("Источник", surface.source_label),
                 ("Передача дальше", surface.handoff_label),
             ):
@@ -1324,7 +1331,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         for row_index, (tool_key, button_text, hint_text) in enumerate(PRIMARY_START_ACTIONS):
             button = QtWidgets.QPushButton(button_text, start_box)
             button.setObjectName(f"PrimaryStartAction_{row_index + 1}_{tool_key}")
-            button.setToolTip("Открывает связанное рабочее окно и показывает его шаг в рабочем месте.")
+            button.setToolTip("Открывает связанный рабочий док и показывает его шаг в рабочем месте.")
             button.clicked.connect(
                 lambda _checked=False, key=tool_key: self.open_tool(key)
             )
@@ -1370,7 +1377,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         truth_layout.setColumnStretch(2, 1)
         right_overview_layout.addWidget(truth_box)
 
-        session_box = QtWidgets.QGroupBox("Открытые окна", right_overview_panel)
+        session_box = QtWidgets.QGroupBox("Открытые поверхности", right_overview_panel)
         session_layout = QtWidgets.QVBoxLayout(session_box)
         self.session_summary_label = QtWidgets.QLabel(session_box)
         self.session_summary_label.setWordWrap(True)
@@ -1435,15 +1442,18 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
     def _populate_launch_tool_switcher(self) -> None:
         self.launch_tool_combo.blockSignals(True)
         self.launch_tool_combo.clear()
-        for spec in self._launchable_specs():
+        self.launch_tool_combo.addItem("Выберите доп. проверку", userData="")
+        for spec in self._service_launch_specs():
             self.launch_tool_combo.addItem(spec.title, userData=spec.key)
             index = self.launch_tool_combo.count() - 1
             self.launch_tool_combo.setItemData(
                 index,
-                "Выбор открывает связанное рабочее окно и показывает его шаг в дереве.",
+                "Выбор открывает дополнительную проверку или справочную поверхность.",
                 QtCore.Qt.ItemDataRole.ToolTipRole,
             )
-        index = max(0, self.launch_tool_combo.findData(self._selected_tool_key))
+        index = self.launch_tool_combo.findData(self._selected_tool_key)
+        if index < 0:
+            index = 0
         self.launch_tool_combo.setCurrentIndex(index)
         self.launch_tool_combo.blockSignals(False)
 
@@ -1568,7 +1578,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             self.central_stack.setCurrentWidget(self.search_page)
         else:
             self.search_summary_label.setText(
-                "Начните вводить действие, окно, расчёт, архив проекта или файл."
+                "Начните вводить действие, этап, расчёт, архив проекта или файл."
             )
             self.central_stack.setCurrentWidget(self.overview_page)
 
@@ -1672,7 +1682,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         )
         self.project_summary_label.setText(self._project_summary_text())
         self.session_summary_label.setText(
-            "Выбор в дереве, быстром поиске или верхнем переключателе открывает связанное рабочее окно "
+            "Выбор в дереве, быстром поиске или верхнем переключателе открывает связанную рабочую поверхность "
             "и возвращает фокус к нужному шагу работы."
         )
         self._refresh_workflow_list()
@@ -1740,7 +1750,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                     f"Назначение: {surface.purpose}",
                     f"Следующее действие: {surface.next_action}",
                     f"Дальше по работе: {surface.handoff_label}",
-                    f"Связанное окно: {spec.title if spec is not None else 'не требуется'}",
+                    f"Связанная поверхность: {spec.title if spec is not None else 'не требуется'}",
                     f"Источник данных: {surface.source_label}",
                 ]
             )
@@ -1749,7 +1759,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         warnings: list[str] = []
         if spec is not None and spec.effective_migration_status == "managed_external":
             warnings.append(
-                "Окно открывается отдельно, а рабочее место передаёт ему данные проекта и отслеживает состояние."
+                "Поверхность открывается отдельно, а рабочее место передаёт ей данные проекта и отслеживает состояние."
             )
         if spec is not None and spec.key == "desktop_animator":
             warnings.append(
@@ -1786,15 +1796,15 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             self.runtime_table.addTopLevelItem(item)
         if sessions:
             self.runtime_progress_bar.setValue(min(100, 10 + len(sessions) * 10))
-            self._set_shell_progress(min(100, 10 + len(sessions) * 10), text="Окна: %p%")
+            self._set_shell_progress(min(100, 10 + len(sessions) * 10), text="Поверхности: %p%")
             self.runtime_progress_label.setText(
-                "Рабочее место отслеживает запущенные окна и передаёт им данные текущего проекта."
+                "Рабочее место отслеживает открытые поверхности и передаёт им данные текущего проекта."
             )
         else:
             self.runtime_progress_bar.setValue(0)
             self._set_shell_progress(0, text="Готово: %p%")
             self.runtime_progress_label.setText(
-                "Пока нет открытых окон. Используйте быстрые действия, панель проекта или быстрый поиск."
+                "Пока нет открытых дополнительных поверхностей. Используйте дерево слева, быстрые действия или поиск."
             )
 
     def _browser_tree_texts(self) -> list[str]:
@@ -1953,12 +1963,12 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                 append_item_text(combo_box.itemData(index, QtCore.Qt.ItemDataRole.WhatsThisRole))
         inspector = {
             "labels": [
-                "Окно / шаг:",
-                "Тип окна:",
+                "Поверхность / шаг:",
+                "Тип поверхности:",
                 "Роль:",
                 "Источник данных:",
                 "Состояние:",
-                "Связанное окно:",
+                "Связанная поверхность:",
             ],
             "values": {
                 "section": self.property_title_value.text(),
@@ -2255,7 +2265,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
     def open_tool(self, key: str, *, force_external: bool = False) -> bool:
         spec = self.spec_by_key.get(key)
         if spec is None:
-            self._set_status_message(f"Неизвестный ключ окна: {key}")
+            self._set_status_message(f"Неизвестный ключ поверхности: {key}")
             return False
         if key in HOSTED_TOOL_WORKSPACE_IDS and not force_external:
             self._apply_selected_tool(key, reveal_child_dock=True)
@@ -2273,14 +2283,14 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             self._set_status_message(f"Не удалось открыть {spec.title}: {exc}")
             QtWidgets.QMessageBox.warning(
                 self,
-                "Не удалось запустить рабочее окно",
+                "Не удалось открыть рабочую поверхность",
                 f"{spec.title}\n\n{exc}",
             )
             return False
         surface = self._surface_for_tool(key)
         self._refresh_workspace_child_dock(surface, spec)
         self._show_workspace_child_dock(surface)
-        self._set_status_message(f"Рабочее окно запущено: {spec.title}")
+        self._set_status_message(f"Рабочая поверхность открыта: {spec.title}")
         self._refresh_runtime_table()
         return True
 
@@ -2300,9 +2310,9 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             return
         if self.coexistence.stop_tool(key):
             title = self.spec_by_key.get(key).title if key in self.spec_by_key else key
-            self._set_status_message(f"Остановлено окно: {title}")
+            self._set_status_message(f"Остановлена поверхность: {title}")
         else:
-            self._set_status_message("Для выбранного окна нет активного запуска.")
+            self._set_status_message("Для выбранной поверхности нет активного запуска.")
         self._refresh_runtime_table()
 
     def _open_startup_tools(self) -> None:
@@ -2312,9 +2322,9 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
     def _show_legacy_shell_note(self) -> None:
         QtWidgets.QMessageBox.information(
             self,
-            "Помощь по рабочим окнам",
-            "Рабочие окна проекта доступны из меню, списка окон и быстрого поиска. "
-            "Основная работа идёт через рабочее место инженера.",
+            "Помощь по рабочему месту",
+            "Основные этапы проекта открываются из дерева слева и списка рабочих шагов. "
+            "Дополнительные проверки доступны через сервисные команды и быстрый поиск.",
         )
 
     def _show_about_dialog(self) -> None:
@@ -2322,8 +2332,8 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             self,
             "О рабочем месте",
             "PneumoApp\n\n"
-                "Рабочее место держит меню, быстрый поиск, список проекта, инспектор, проверку проекта, архив и запуск окон.\n"
-                "Аниматор, сравнение прогонов и мнемосхема остаются отдельными специализированными окнами.",
+                "Рабочее место держит меню, быстрый поиск, дерево проекта, инспектор, проверку проекта, архив и рабочие доки.\n"
+                "Анимация, сравнение прогонов и мнемосхема доступны как рабочие или дополнительные поверхности.",
         )
 
     def _on_workspace_changed(self, index: int) -> None:
@@ -2471,7 +2481,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         finished = self.coexistence.poll()
         if finished:
             names = ", ".join(session.spec.title for session in finished)
-            self._set_status_message(f"Обновлён статус управляемых окон: {names}")
+            self._set_status_message(f"Обновлён статус управляемых поверхностей: {names}")
         self._refresh_runtime_table()
 
     def _restore_layout(self) -> None:
