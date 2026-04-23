@@ -234,6 +234,23 @@ class _FakeCoexistenceManager:
         return ()
 
 
+def _find_tree_item_by_data(tree, role: int, value: str):
+    def visit(item):
+        if item.data(0, role) == value:
+            return item
+        for child_index in range(item.childCount()):
+            found = visit(item.child(child_index))
+            if found is not None:
+                return found
+        return None
+
+    for index in range(tree.topLevelItemCount()):
+        found = visit(tree.topLevelItem(index))
+        if found is not None:
+            return found
+    return None
+
+
 def test_desktop_qt_shell_launcher_exposes_qt_first_cli_and_legacy_fallback() -> None:
     src = (ROOT / "pneumo_solver_ui" / "tools" / "desktop_main_shell_qt.py").read_text(
         encoding="utf-8",
@@ -898,17 +915,17 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
         assert "Показать в аниматоре" not in visible_audit["toolbar_buttons"]
         assert "Анимировать результат" in visible_audit["toolbar_buttons"]
         assert (
-            "Выбор показывает связанный рабочий шаг. Рабочее окно запускается через меню «Запуск», двойной щелчок в списке «Окна» или быстрый поиск."
+            "Выбор открывает связанное рабочее окно и показывает его шаг в дереве. Левое дерево остаётся основным порядком работы."
             in visible_audit["auxiliary_visible_texts"]
         )
-        assert "Выбор из списка сразу открывает выбранное окно." not in visible_audit["auxiliary_visible_texts"]
+        assert "Рабочее окно запускается только явной командой" not in visible_audit["auxiliary_visible_texts"]
         assert "Док-панель: перетаскивается, открепляется и меняет ширину границей." in visible_audit["auxiliary_visible_texts"]
         assert "Открепить панель" in visible_audit["auxiliary_visible_texts"]
         assert "Закрыть панель" in visible_audit["auxiliary_visible_texts"]
         assert "Прокрутить вкладки влево" in visible_audit["auxiliary_visible_texts"]
         assert "Прокрутить вкладки вправо" in visible_audit["auxiliary_visible_texts"]
         assert (
-            "Рабочее место инженера: выберите шаг работы, проверьте состояние и запускайте отдельные окна только явной командой."
+            "Рабочее место инженера: выберите шаг в дереве слева — он открывает связанную рабочую поверхность без промежуточного экрана."
             in visible_audit["direct_visible_texts"]
         )
         assert (
@@ -1008,6 +1025,52 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
         app.processEvents()
 
 
+def test_desktop_qt_shell_tree_click_opens_route_surface_directly(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _QtCore, _QtGui, _QtWidgets = _qt_modules()
+    settings_path = tmp_path / "main_shell_state.ini"
+    monkeypatch.setenv("PNEUMO_QT_MAIN_SHELL_STATE_PATH", str(settings_path))
+    monkeypatch.setattr(
+        qt_main_window_module,
+        "build_shell_project_context",
+        lambda: _test_project_context(tmp_path),
+    )
+    _FakeCoexistenceManager.instances.clear()
+    monkeypatch.setattr(
+        qt_main_window_module,
+        "DesktopShellCoexistenceManager",
+        _FakeCoexistenceManager,
+    )
+
+    app = _qt_app()
+    window = qt_main_window_module.DesktopQtMainShell()
+    try:
+        app.processEvents()
+        ring_item = _find_tree_item_by_data(
+            window.browser_tree,
+            qt_main_window_module.SURFACE_ROLE,
+            "ws_ring",
+        )
+        assert ring_item is not None
+        assert ring_item.text(0) == "Редактор циклического сценария"
+
+        window.browser_tree.setCurrentItem(ring_item)
+        app.processEvents()
+
+        manager = _FakeCoexistenceManager.instances[-1]
+        assert [session.spec.key for session in manager.opened] == ["desktop_ring_editor"]
+        assert window._selected_surface_key == "ws_ring"
+        assert window._selected_tool_key == "desktop_ring_editor"
+        assert "Рабочее окно запущено: Редактор циклического сценария" in window.status_label.text()
+        assert "Запустить раздел" not in "\n".join(window.operator_visible_audit()["direct_visible_texts"])
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
 def test_desktop_qt_shell_handoff_payload_and_layout_state_are_runtime_checked(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1046,6 +1109,8 @@ def test_desktop_qt_shell_handoff_payload_and_layout_state_are_runtime_checked(
 
         manager = _FakeCoexistenceManager.instances[-1]
         assert [session.spec.key for session in manager.opened] == [
+            "desktop_ring_editor",
+            "desktop_input_editor",
             "desktop_animator",
         ]
         payload = manager.opened[-1].context_payload
@@ -1054,7 +1119,7 @@ def test_desktop_qt_shell_handoff_payload_and_layout_state_are_runtime_checked(
         assert payload["project_name"] == "Runtime Shell"
         assert payload["workspace_dir"] == str((tmp_path / "workspace").resolve())
         assert payload["repo_root"] == str((tmp_path / "repo").resolve())
-        assert window.runtime_table.topLevelItemCount() == 1
+        assert window.runtime_table.topLevelItemCount() == 3
         assert window.runtime_table.columnCount() == 3
         runtime_rows = [
             " | ".join(

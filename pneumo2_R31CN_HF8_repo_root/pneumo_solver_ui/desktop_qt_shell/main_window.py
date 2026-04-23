@@ -672,10 +672,10 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         toolbar.addWidget(QtWidgets.QLabel("Рабочее окно:"))
         self.launch_tool_combo = QtWidgets.QComboBox(toolbar)
         self.launch_tool_combo.setObjectName("DesktopQtShellLaunchToolCombo")
-        self.launch_tool_combo.setAccessibleName("Выбор рабочего окна без запуска")
+        self.launch_tool_combo.setAccessibleName("Выбор и открытие рабочего окна")
         self.launch_tool_combo.setToolTip(
-                "Выбор показывает связанный рабочий шаг. Рабочее окно запускается через меню «Запуск», "
-            "двойной щелчок в списке «Окна» или быстрый поиск."
+            "Выбор открывает связанное рабочее окно и показывает его шаг в дереве. "
+            "Левое дерево остаётся основным порядком работы."
         )
         self.launch_tool_combo.currentIndexChanged.connect(self._on_launch_tool_changed)
         self.launch_tool_combo.activated.connect(self._on_launch_tool_activated)
@@ -829,7 +829,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         central_layout = QtWidgets.QVBoxLayout(central)
 
         self.banner_label = QtWidgets.QLabel(
-            "Рабочее место инженера: выберите шаг работы, проверьте состояние и запускайте отдельные окна только явной командой.",
+            "Рабочее место инженера: выберите шаг в дереве слева — он открывает связанную рабочую поверхность без промежуточного экрана.",
             central,
         )
         self.banner_label.setWordWrap(True)
@@ -887,9 +887,9 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         for row_index, (tool_key, button_text, hint_text) in enumerate(PRIMARY_START_ACTIONS):
             button = QtWidgets.QPushButton(button_text, start_box)
             button.setObjectName(f"PrimaryStartAction_{row_index + 1}_{tool_key}")
-            button.setToolTip("Переход к рабочему шагу внутри рабочего места. Рабочее окно запускается только явной командой.")
+            button.setToolTip("Открывает связанное рабочее окно и показывает его шаг в рабочем месте.")
             button.clicked.connect(
-                lambda _checked=False, key=tool_key: self._select_surface(default_surface_key_for_tool(key))
+                lambda _checked=False, key=tool_key: self.open_tool(key)
             )
             self.start_action_buttons.setdefault(tool_key, button)
             hint_label = QtWidgets.QLabel(hint_text, start_box)
@@ -1003,7 +1003,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             index = self.launch_tool_combo.count() - 1
             self.launch_tool_combo.setItemData(
                 index,
-                "Выбор показывает связанный рабочий шаг; запуск окна выполняется отдельной явной командой.",
+                "Выбор открывает связанное рабочее окно и показывает его шаг в дереве.",
                 QtCore.Qt.ItemDataRole.ToolTipRole,
             )
         index = max(0, self.launch_tool_combo.findData(self._selected_tool_key))
@@ -1165,8 +1165,8 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         )
         self.project_summary_label.setText(self._project_summary_text())
         self.session_summary_label.setText(
-            "Выбор в списке, быстром поиске или верхнем переключателе уже является навигацией. "
-                "Рабочее окно запускается только явной командой из списка окон."
+            "Выбор в дереве, быстром поиске или верхнем переключателе открывает связанное рабочее окно "
+            "и возвращает фокус к нужному шагу работы."
         )
         self._refresh_workflow_list()
         self._refresh_inspector(surface, spec)
@@ -1773,10 +1773,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
     def open_selected_launch_tool(self) -> None:
         key = self.launch_tool_combo.currentData()
         if isinstance(key, str) and key:
-            self._select_workspace(key)
-            self._set_status_message(
-                    "Выбран связанный рабочий шаг. Для запуска рабочего окна используйте меню «Запуск» или двойной щелчок в списке «Окна»."
-            )
+            self.open_tool(key)
 
     def stop_selected_tool(self) -> None:
         key = self._selected_tool_key
@@ -1823,10 +1820,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
     def _on_launch_tool_activated(self, index: int) -> None:
         key = self.launch_tool_combo.itemData(index)
         if isinstance(key, str) and key:
-            self._select_workspace(key)
-            self._set_status_message(
-                "Выбран связанный рабочий шаг. Рабочее окно запускается только явной командой."
-            )
+            self.open_tool(key)
 
     def _select_workspace(self, key: str) -> None:
         self._apply_selected_tool(key)
@@ -1848,7 +1842,12 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         item = self.browser_tree.currentItem()
         if item is None:
             return
+        item_kind = item.data(0, ITEM_KIND_ROLE)
+        tool_key = item.data(0, TOOL_ROLE)
         surface_key = item.data(0, SURFACE_ROLE)
+        if item_kind in {"surface", "tool"} and isinstance(tool_key, str) and tool_key:
+            self.open_tool(tool_key)
+            return
         if isinstance(surface_key, str) and surface_key in self.pipeline_surface_by_key:
             self._select_surface(surface_key)
 
@@ -1856,7 +1855,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         item_kind = item.data(0, ITEM_KIND_ROLE)
         tool_key = item.data(0, TOOL_ROLE)
         surface_key = item.data(0, SURFACE_ROLE)
-        if item_kind == "tool" and isinstance(tool_key, str) and tool_key:
+        if item_kind in {"surface", "tool"} and isinstance(tool_key, str) and tool_key:
             self.open_tool(tool_key)
             return
         if isinstance(surface_key, str) and surface_key in self.pipeline_surface_by_key:
