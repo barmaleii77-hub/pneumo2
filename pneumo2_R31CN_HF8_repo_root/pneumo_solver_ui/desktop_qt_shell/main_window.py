@@ -1541,9 +1541,6 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                 )
             )
         project_root.addChild(artifacts_root)
-        self.browser_tree.addTopLevelItem(project_root)
-        project_root.setExpanded(True)
-        artifacts_root.setExpanded(True)
 
         route_root = QtWidgets.QTreeWidgetItem(("Порядок работы", "выбор сразу показывает нужный экран"))
         for surface in self.pipeline_surfaces:
@@ -1578,6 +1575,10 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             route_root.addChild(item)
         self.browser_tree.addTopLevelItem(route_root)
         route_root.setExpanded(True)
+
+        self.browser_tree.addTopLevelItem(project_root)
+        project_root.setExpanded(False)
+        artifacts_root.setExpanded(False)
 
         modules_root = QtWidgets.QTreeWidgetItem(
             ("Сервис и детали", "дополнительные проверки и справка")

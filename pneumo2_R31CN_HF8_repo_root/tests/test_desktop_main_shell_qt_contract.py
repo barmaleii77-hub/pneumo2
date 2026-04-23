@@ -852,13 +852,24 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
             window.message_strip_label,
         ]
 
-        top_level_labels = {
+        top_level_labels = [
             window.browser_tree.topLevelItem(index).text(0)
             for index in range(window.browser_tree.topLevelItemCount())
-        }
+        ]
+        assert top_level_labels[:3] == [
+            "Порядок работы",
+            "Проект: Runtime Shell",
+            "Сервис и детали",
+        ]
         assert "Проект: Runtime Shell" in top_level_labels
         assert "Порядок работы" in top_level_labels
         assert "Сервис и детали" in top_level_labels
+        route_root = window.browser_tree.topLevelItem(0)
+        assert route_root.text(0) == "Порядок работы"
+        assert route_root.isExpanded() is True
+        project_root = window.browser_tree.topLevelItem(1)
+        assert project_root.text(0) == "Проект: Runtime Shell"
+        assert project_root.isExpanded() is False
         service_root = next(
             window.browser_tree.topLevelItem(index)
             for index in range(window.browser_tree.topLevelItemCount())
