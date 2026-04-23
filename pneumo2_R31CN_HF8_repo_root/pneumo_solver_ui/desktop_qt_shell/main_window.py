@@ -33,6 +33,8 @@ from pneumo_solver_ui.desktop_shell.command_search import (
 )
 from pneumo_solver_ui.desktop_shell.contracts import DesktopShellToolSpec
 from pneumo_solver_ui.desktop_shell.registry import build_desktop_shell_specs
+from pneumo_solver_ui.desktop_spec_shell.contracts import DesktopWorkspaceSpec
+from pneumo_solver_ui.desktop_spec_shell.diagnostics_panel import DiagnosticsWorkspacePage
 from pneumo_solver_ui.desktop_animator.analysis_context import load_analysis_context
 from pneumo_solver_ui.release_info import get_release
 
@@ -275,6 +277,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self._message_log: list[str] = []
         self.workspace_docks: dict[str, QtWidgets.QDockWidget] = {}
         self.workspace_dock_labels: dict[str, dict[str, QtWidgets.QLabel]] = {}
+        self.workspace_hosted_widgets: dict[str, QtWidgets.QWidget] = {}
 
         self._configure_window()
         self._build_command_toolbar()
@@ -841,6 +844,92 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.runtime_dock.setWidget(runtime_widget)
         self.addDockWidget(QtCore.Qt.DockWidgetArea.BottomDockWidgetArea, self.runtime_dock)
 
+    def _diagnostics_workspace_spec(self, surface: ShellPipelineSurface) -> DesktopWorkspaceSpec:
+        return DesktopWorkspaceSpec(
+            workspace_id="diagnostics",
+            title="Диагностика",
+            group="Основной порядок работы",
+            route_order=90,
+            kind="main",
+            summary=surface.purpose,
+            source_of_truth=surface.source_label,
+            launch_surface="workspace",
+            next_step=surface.next_action,
+            hard_gate="Перед отправкой результатов соберите и проверьте архив проекта.",
+            details=surface.handoff_label,
+            units_policy="В диагностике показываются статусы, пути, время выполнения и состав архива проекта.",
+            graphics_policy="Состояние архива проекта показывается без скрытия предупреждений и недостающих файлов.",
+            capability_ids=("tools.diagnostics_and_bundle",),
+            search_aliases=surface.search_aliases,
+            quick_action_ids=(
+                "diagnostics.collect_bundle",
+                "diagnostics.verify_bundle",
+                "diagnostics.send_results",
+            ),
+            workspace_owner="рабочее_пространство.Проверка_проекта",
+            region="right_dock",
+            automation_id="DG-LAST-BUNDLE",
+            tooltip_id="tooltip.DG-LAST-BUNDLE",
+            help_id="diagnostics",
+            availability="active_path",
+            catalog_owner_aliases=(
+                "WS-DIAGNOSTICS",
+                "рабочее_пространство.Проверка_проекта",
+            ),
+        )
+
+    def _on_hosted_workspace_status(self, text: str, busy: bool) -> None:
+        self._set_status_message(text)
+        if busy:
+            self.status_progress_bar.setRange(0, 0)
+            self.status_progress_bar.setFormat("Выполняется")
+            return
+        self.status_progress_bar.setRange(0, 100)
+        self.status_progress_bar.setValue(100)
+        self.status_progress_bar.setFormat("Готово")
+
+    def _handle_hosted_workspace_command(self, command_id: str) -> None:
+        if command_id == "baseline.center.open":
+            self.open_tool("desktop_run_setup_center")
+            return
+        if command_id == "diagnostics.legacy_center.open":
+            self.open_tool("desktop_diagnostics_center", force_external=True)
+            return
+        self._set_status_message(f"Команда рабочего шага пока не подключена: {command_id}")
+
+    def _ensure_hosted_diagnostics_workspace(
+        self,
+        surface: ShellPipelineSurface,
+    ) -> DiagnosticsWorkspacePage | None:
+        if surface.key != "ws_diagnostics":
+            return None
+        dock = self.workspace_docks.get(surface.key)
+        if dock is None:
+            return None
+        existing = self.workspace_hosted_widgets.get(surface.key)
+        if isinstance(existing, DiagnosticsWorkspacePage):
+            return existing
+
+        old_widget = dock.widget()
+        page = DiagnosticsWorkspacePage(
+            self._diagnostics_workspace_spec(surface),
+            repo_root=self.project_context.repo_root,
+            on_shell_status=self._on_hosted_workspace_status,
+            on_command=self._handle_hosted_workspace_command,
+            parent=dock,
+        )
+        page.setObjectName("HostedDiagnosticsWorkspacePage")
+        page.collect_button.setText("Собрать диагностику")
+        page.verify_button.setText("Проверить архив")
+        page.send_button.setText("Отправить результаты")
+        dock.setWidget(page)
+        dock.setProperty("workspace_hosting", "native")
+        self.workspace_hosted_widgets[surface.key] = page
+        self.workspace_dock_labels[surface.key] = {}
+        if old_widget is not None:
+            old_widget.deleteLater()
+        return page
+
     def _build_workspace_child_docks(self) -> None:
         for surface in self.pipeline_surfaces:
             if not surface.tool_key:
@@ -1218,7 +1307,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         spec: DesktopShellToolSpec | None,
     ) -> None:
         labels = self.workspace_dock_labels.get(surface.key)
-        if labels is None:
+        if not labels:
             return
         state_text = "готово к открытию"
         if spec is not None:
@@ -1237,6 +1326,9 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         dock = self.workspace_docks.get(surface.key)
         if dock is None:
             return
+        hosted_page = self._ensure_hosted_diagnostics_workspace(surface)
+        if hosted_page is not None:
+            hosted_page.refresh_view()
         dock.show()
         dock.raise_()
         if dock.isFloating():
@@ -1873,11 +1965,16 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             return False
         return self._open_local_artifact_path(target, artifact_label=artifact_label)
 
-    def open_tool(self, key: str) -> bool:
+    def open_tool(self, key: str, *, force_external: bool = False) -> bool:
         spec = self.spec_by_key.get(key)
         if spec is None:
             self._set_status_message(f"Неизвестный ключ окна: {key}")
             return False
+        if key == "desktop_diagnostics_center" and not force_external:
+            self._apply_selected_tool(key, reveal_child_dock=True)
+            self._set_status_message("Диагностика открыта в рабочей поверхности.")
+            self._refresh_runtime_table()
+            return True
         self._apply_selected_tool(key, reveal_child_dock=True)
         try:
             session = self.coexistence.open_tool(

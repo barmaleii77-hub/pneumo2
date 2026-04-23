@@ -1090,6 +1090,64 @@ def test_desktop_qt_shell_tree_click_opens_route_surface_directly(
         app.processEvents()
 
 
+def test_desktop_qt_shell_diagnostics_route_is_hosted_workspace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _QtCore, _QtGui, _QtWidgets = _qt_modules()
+    from pneumo_solver_ui.desktop_spec_shell.diagnostics_panel import DiagnosticsWorkspacePage
+
+    settings_path = tmp_path / "main_shell_state.ini"
+    monkeypatch.setenv("PNEUMO_QT_MAIN_SHELL_STATE_PATH", str(settings_path))
+    monkeypatch.setattr(
+        qt_main_window_module,
+        "build_shell_project_context",
+        lambda: _test_project_context(tmp_path),
+    )
+    _FakeCoexistenceManager.instances.clear()
+    monkeypatch.setattr(
+        qt_main_window_module,
+        "DesktopShellCoexistenceManager",
+        _FakeCoexistenceManager,
+    )
+
+    app = _qt_app()
+    window = qt_main_window_module.DesktopQtMainShell()
+    try:
+        app.processEvents()
+        diagnostics_item = _find_tree_item_by_data(
+            window.browser_tree,
+            qt_main_window_module.SURFACE_ROLE,
+            "ws_diagnostics",
+        )
+        assert diagnostics_item is not None
+
+        window.browser_tree.setCurrentItem(diagnostics_item)
+        app.processEvents()
+
+        manager = _FakeCoexistenceManager.instances[-1]
+        assert manager.opened == []
+        assert window._selected_surface_key == "ws_diagnostics"
+        assert window._selected_tool_key == "desktop_diagnostics_center"
+        diagnostics_dock = window.workspace_docks["ws_diagnostics"]
+        assert diagnostics_dock.isHidden() is False
+        assert diagnostics_dock.property("workspace_hosting") == "native"
+        hosted_page = window.workspace_hosted_widgets["ws_diagnostics"]
+        assert isinstance(hosted_page, DiagnosticsWorkspacePage)
+        assert hosted_page.collect_button.text() == "Собрать диагностику"
+        assert hosted_page.verify_button.text() == "Проверить архив"
+        assert hosted_page.send_button.text() == "Отправить результаты"
+        assert window.findChild(_QtWidgets.QPushButton, "DG-BTN-COLLECT") is hosted_page.collect_button
+        assert "Диагностика открыта в рабочей поверхности." in window.status_label.text()
+
+        assert window.open_tool("desktop_diagnostics_center", force_external=True) is True
+        assert [session.spec.key for session in manager.opened] == ["desktop_diagnostics_center"]
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
 def test_desktop_qt_shell_handoff_payload_and_layout_state_are_runtime_checked(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
