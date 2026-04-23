@@ -350,7 +350,7 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert 'menubar.addMenu("Запуск")' in src
     assert 'menubar.addMenu("Анализ")' in src
     assert 'menubar.addMenu("Анимация")' in src
-    assert 'menubar.addMenu("Проверка")' in src
+    assert 'menubar.addMenu("Диагностика")' in src
     assert 'menubar.addMenu("Инструменты")' in src
     assert 'menubar.addMenu("Справка")' in src
     assert 'run_menu.addMenu("Окна по задаче")' in src
@@ -379,7 +379,7 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert 'self.runtime_table.setHeaderLabels(("Окно", "Состояние", "Тип"))' in src
     assert 'self.diagnostics_button.setObjectName("AlwaysVisibleDiagnosticsAction")' in src
     assert 'self.diagnostics_button.setShortcut(QtGui.QKeySequence("F7"))' in src
-    assert 'self.diagnostics_button.setToolTip("F7. Проверить проект и сохранить архив проекта.")' in src
+    assert 'self.diagnostics_button.setToolTip("F7. Собрать диагностику и сохранить архив проекта.")' in src
     assert "Открыть диагностику и собрать" not in src
     assert "self.central_stack = QtWidgets.QStackedWidget(central)" in src
     assert 'self.banner_label = QtWidgets.QLabel(' in src
@@ -399,8 +399,8 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert '"5. Оптимизация"' in src
     assert '"6. Анализ"' in src
     assert '"7. Анимация"' in src
-    assert '"8. Проверка проекта"' in src
-    assert '"Проверить проект"' in src
+    assert '"8. Диагностика"' in src
+    assert '"Собрать диагностику"' in src
     assert "self.start_action_buttons" in src
     assert 'self.start_action_buttons.setdefault(tool_key, button)' in src
     assert 'QtWidgets.QGroupBox("Достоверность отображения", right_overview_panel)' in src
@@ -578,7 +578,7 @@ def test_desktop_shell_command_search_manual_keywords_are_operator_language() ->
     entries = build_shell_command_search_entries(build_desktop_shell_specs())
     checked_labels = {
         "Перейти к списку рабочих окон",
-        "Проверить проект и сохранить архив",
+        "Собрать диагностику",
         "Анимировать результат",
         "Проверить подготовку анимации",
         "Проверить связь с аниматором",
@@ -779,7 +779,7 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
             "Запуск",
             "Анализ",
             "Анимация",
-            "Проверка",
+            "Диагностика",
             "Инструменты",
             "Справка",
         ]
@@ -874,7 +874,7 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
             "Запуск",
             "Анализ",
             "Анимация",
-            "Проверка",
+            "Диагностика",
             "Инструменты",
             "Справка",
         ]
@@ -892,7 +892,7 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
         assert "1. Исходные данные" in visible_audit["toolbar_buttons"]
         assert "2. Сценарии" in visible_audit["toolbar_buttons"]
         assert "7. Анимация" in visible_audit["toolbar_buttons"]
-        assert "8. Проверка проекта" in visible_audit["toolbar_buttons"]
+        assert "8. Диагностика" in visible_audit["toolbar_buttons"]
         assert "Открыть сравнение" not in visible_audit["toolbar_buttons"]
         assert "Открыть в аниматоре" not in visible_audit["toolbar_buttons"]
         assert "Показать в аниматоре" not in visible_audit["toolbar_buttons"]
@@ -912,7 +912,7 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
             in visible_audit["direct_visible_texts"]
         )
         assert (
-            "Основной порядок: исходные данные -> сценарии -> испытания -> базовый прогон -> оптимизация -> анализ -> анимация -> проверка проекта."
+            "Основной порядок: исходные данные -> сценарии -> испытания -> базовый прогон -> оптимизация -> анализ -> анимация -> диагностика."
             in visible_audit["direct_visible_texts"]
         )
         assert "Окна, действия, испытания, сценарии, архив проекта, расчёты, файлы" in visible_audit["direct_visible_texts"]

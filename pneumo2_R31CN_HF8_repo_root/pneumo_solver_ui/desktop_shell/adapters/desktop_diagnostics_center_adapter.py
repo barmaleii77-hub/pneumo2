@@ -14,8 +14,8 @@ def create_hosted_diagnostics_center(parent: tk.Misc) -> DesktopDiagnosticsCente
 def build_spec() -> DesktopShellToolSpec:
     return DesktopShellToolSpec(
         key="desktop_diagnostics_center",
-        title="Проверка проекта",
-        description="Единое окно проверки проекта, сохранения архива проекта и просмотра материалов.",
+        title="Диагностика",
+        description="Единое окно диагностики проекта, сохранения архива проекта и просмотра материалов.",
         group="Встроенные окна",
         mode="hosted",
         workflow_stage="tools",
@@ -28,12 +28,14 @@ def build_spec() -> DesktopShellToolSpec:
         launch_contexts=("data", "results", "tools"),
         menu_section="Инструменты",
         nav_section="Инструменты",
-        details="Сводит проверку проекта, сохранение архива проекта и просмотр материалов в одно рабочее окно.",
+        details="Сводит диагностику проекта, сохранение архива проекта и просмотр материалов в одно рабочее окно.",
         menu_order=140,
         nav_order=140,
         standalone_module="pneumo_solver_ui.tools.desktop_diagnostics_center",
         create_hosted=create_hosted_diagnostics_center,
         search_aliases=(
+            "диагностика",
+            "собрать диагностику",
             "проверка проекта",
             "архив проекта",
             "проверка окружения",

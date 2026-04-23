@@ -86,8 +86,8 @@ PRIMARY_START_ACTIONS = (
     ),
     (
         "desktop_diagnostics_center",
-        "8. Проверка проекта",
-        "Проверьте проект и сохраните архив проекта после проверки результата.",
+        "8. Диагностика",
+        "Соберите диагностику и сохраните архив проекта после проверки результата.",
     ),
 )
 
@@ -223,7 +223,7 @@ def _source_of_truth_label(spec: DesktopShellToolSpec) -> str:
     if role == "launcher":
         return "Запуск"
     if role == "support":
-        return "Справка и проверка проекта"
+        return "Справка и диагностика"
     return "Не задан"
 
 
@@ -635,8 +635,8 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                 continue
             self._add_tool_action(visual_detail_menu, spec)
 
-        diagnostics_menu = menubar.addMenu("Проверка")
-        collect_diag_action = diagnostics_menu.addAction("Проверить проект и подготовить архив")
+        diagnostics_menu = menubar.addMenu("Диагностика")
+        collect_diag_action = diagnostics_menu.addAction("Собрать диагностику")
         collect_diag_action.setShortcut(QtGui.QKeySequence("F7"))
         collect_diag_action.triggered.connect(lambda: self.open_tool("desktop_diagnostics_center"))
         focus_messages_action = diagnostics_menu.addAction("Перейти к сообщениям рабочего места")
@@ -696,10 +696,10 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
 
         toolbar.addSeparator()
 
-        self.diagnostics_button = QtWidgets.QPushButton("Проверить проект", toolbar)
+        self.diagnostics_button = QtWidgets.QPushButton("Собрать диагностику", toolbar)
         self.diagnostics_button.setObjectName("AlwaysVisibleDiagnosticsAction")
         self.diagnostics_button.setShortcut(QtGui.QKeySequence("F7"))
-        self.diagnostics_button.setToolTip("F7. Проверить проект и сохранить архив проекта.")
+        self.diagnostics_button.setToolTip("F7. Собрать диагностику и сохранить архив проекта.")
         self.diagnostics_button.clicked.connect(lambda: self.open_tool("desktop_diagnostics_center"))
         toolbar.addWidget(self.diagnostics_button)
 
@@ -837,7 +837,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         central_layout.addWidget(self.banner_label)
 
         self.route_label = QtWidgets.QLabel(
-            "Основной порядок: исходные данные -> сценарии -> испытания -> базовый прогон -> оптимизация -> анализ -> анимация -> проверка проекта.",
+            "Основной порядок: исходные данные -> сценарии -> испытания -> базовый прогон -> оптимизация -> анализ -> анимация -> диагностика.",
             central,
         )
         self.route_label.setWordWrap(True)
@@ -1351,6 +1351,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             for query in (
                 "список проекта",
                 "исходные данные",
+                "диагностика",
                 "проверка проекта",
                 "Engineering Analysis",
             )

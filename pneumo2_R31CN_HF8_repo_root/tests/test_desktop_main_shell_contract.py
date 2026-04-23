@@ -576,9 +576,6 @@ def test_desktop_main_shell_extracts_home_view_builder() -> None:
         "Справочники, анализ и диагностика",
         "Анализ и визуализация",
         "Диагностика и отправка",
-        "Один понятный порядок работы: собрать диагностику",
-        'primary_button_text="Собрать диагностику"',
-        'secondary_title="Дополнительные действия после диагностики"',
     ]
     for fragment in forbidden_visible_home_fragments:
         assert fragment not in src
@@ -586,14 +583,14 @@ def test_desktop_main_shell_extracts_home_view_builder() -> None:
     assert '"Открыто в рабочей области" if key in open_keys else "Готов к переходу"' in src
     assert "button.configure(text=_action_button_text(spec))" in src
     assert 'status_var = tk.StringVar(value="Готов к переходу")' in src
-    assert '"Проверка проекта"' in src
+    assert '"Диагностика"' in src
     assert '"Справочники, проверка и анализ"' in src
     assert '"Анимация результата"' in src
     assert '"Расширенное сравнение и пневмосхема"' in src
-    assert '"Один понятный порядок работы: проверить проект и сохранить архив проекта' in src
+    assert '"Один понятный порядок работы: собрать диагностику и сохранить архив проекта' in src
     assert 'primary_key="desktop_diagnostics_center"' in src
-    assert 'primary_button_text="Сохранить архив проекта"' in src
-    assert 'secondary_title="Дополнительные действия после проверки"' in src
+    assert 'primary_button_text="Собрать диагностику"' in src
+    assert 'secondary_title="Дополнительные действия после диагностики"' in src
     assert "def _build_tool_card(" in src
     assert "primary_specs = tuple(spec for spec in specs if primary_key and spec.key == primary_key)" in src
     assert "secondary_specs = tuple(spec for spec in specs if not primary_key or spec.key != primary_key)" in src
@@ -897,7 +894,7 @@ def test_desktop_shell_adapter_text_avoids_center_wording_for_diagnostics_and_se
         "центр подготовки отправки",
     ):
         assert forbidden not in joined
-    assert "Единое окно проверки проекта" in diag_adapter_src
+    assert "Единое окно диагностики проекта" in diag_adapter_src
     assert "одно рабочее окно" in diag_adapter_src
     assert "Копирование сохранённого архива" in send_adapter_src
     assert "Не удалось открыть сохранение архива проекта" in autotest_src
@@ -1092,7 +1089,7 @@ def test_navigation_helpers_cover_full_user_gui_graph() -> None:
         "Результаты",
         "Анализ",
         "Визуализация",
-        "Проверка проекта",
+        "Диагностика",
     ]
     assert navigation_section_label(
         next(spec for spec in specs if spec.key == "desktop_geometry_reference_center")
@@ -1104,7 +1101,7 @@ def test_navigation_helpers_cover_full_user_gui_graph() -> None:
     assert "compare_viewer" in specs_by_section["Анализ"]
     assert {"desktop_animator", "desktop_mnemo"} <= specs_by_section["Визуализация"]
     assert {"desktop_diagnostics_center", "autotest_gui"} <= specs_by_section[
-        "Проверка проекта"
+        "Диагностика"
     ]
 
 
