@@ -398,6 +398,10 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert 'self.browser_dock = QtWidgets.QDockWidget("Панель проекта", self)' in src
     assert 'self.inspector_dock = QtWidgets.QDockWidget("Свойства и помощь", self)' in src
     assert 'self.runtime_dock = QtWidgets.QDockWidget("Ход выполнения и открытые поверхности", self)' in src
+    assert "self.browser_tree.itemActivated.connect(self._on_browser_item_activated)" in src
+    assert "self.workflow_list.itemActivated.connect(self._on_workflow_item_activated)" in src
+    assert "self.search_results_list.itemActivated.connect(self._on_search_result_activated)" in src
+    assert ".itemDoubleClicked.connect(" not in src
     assert "def _build_workspace_child_docks(self) -> None:" in src
     assert 'dock.setObjectName(f"DesktopQtShellWorkspaceDock_{object_suffix}")' in src
     assert "self.tabifyDockWidget(self.inspector_dock, dock)" in src
@@ -1250,7 +1254,7 @@ def test_desktop_qt_shell_service_tree_selection_requires_explicit_activation(
         assert window.workspace_docks[expected_surface].property("workspace_hosting") == "native"
         assert "Дополнительная поверхность выбрана:" in window.status_label.text()
 
-        window._on_browser_item_activated(compare_item, 0)
+        window.browser_tree.itemActivated.emit(compare_item, 0)
         app.processEvents()
 
         assert [session.spec.key for session in manager.opened] == ["compare_viewer"]

@@ -917,7 +917,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.browser_tree = QtWidgets.QTreeWidget(self.browser_dock)
         self.browser_tree.setHeaderLabels(("Поверхность / шаг", "Состояние"))
         self.browser_tree.itemSelectionChanged.connect(self._on_browser_selection_changed)
-        self.browser_tree.itemDoubleClicked.connect(self._on_browser_item_activated)
+        self.browser_tree.itemActivated.connect(self._on_browser_item_activated)
         self.browser_dock.setWidget(self.browser_tree)
         self.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, self.browser_dock)
 
@@ -1387,7 +1387,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         workflow_box = QtWidgets.QGroupBox("Рабочие шаги", left_overview_panel)
         workflow_layout = QtWidgets.QVBoxLayout(workflow_box)
         self.workflow_list = QtWidgets.QListWidget(workflow_box)
-        self.workflow_list.itemDoubleClicked.connect(self._on_workflow_item_activated)
+        self.workflow_list.itemActivated.connect(self._on_workflow_item_activated)
         workflow_layout.addWidget(self.workflow_list)
         left_overview_layout.addWidget(workflow_box, 1)
 
@@ -1440,7 +1440,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.search_summary_label.setWordWrap(True)
         search_layout.addWidget(self.search_summary_label)
         self.search_results_list = QtWidgets.QListWidget(self.search_page)
-        self.search_results_list.itemDoubleClicked.connect(self._on_search_result_activated)
+        self.search_results_list.itemActivated.connect(self._on_search_result_activated)
         search_layout.addWidget(self.search_results_list, 1)
         self.central_stack.addWidget(self.search_page)
 
