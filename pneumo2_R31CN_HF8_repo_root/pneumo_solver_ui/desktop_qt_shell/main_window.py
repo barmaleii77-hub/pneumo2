@@ -187,6 +187,7 @@ VISUAL_TRUTH_ROWS = (
 SURFACE_ROLE = int(QtCore.Qt.ItemDataRole.UserRole)
 TOOL_ROLE = SURFACE_ROLE + 1
 ITEM_KIND_ROLE = SURFACE_ROLE + 2
+COMMAND_ROLE = SURFACE_ROLE + 3
 
 
 def _apply_cyrillic_operator_font(app: QtWidgets.QApplication | None) -> str:
@@ -308,6 +309,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.pipeline_surface_by_key = build_pipeline_surface_by_key()
         self.command_entries = (
             *self._build_pipeline_search_entries(),
+            *self._build_hosted_command_search_entries(),
             *build_shell_command_search_entries(self.specs),
         )
         self.settings = _build_shell_settings()
@@ -396,6 +398,56 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                         surface.source_label,
                         surface.next_action,
                         surface.handoff_label,
+                        *surface.search_aliases,
+                    ),
+                )
+            )
+        return tuple(entries)
+
+    def _operator_hosted_command_summary(
+        self,
+        command: DesktopShellCommandSpec,
+        workspace: DesktopWorkspaceSpec,
+    ) -> str:
+        return (
+            f"Действие выполняется внутри рабочего этапа «{workspace.title}». "
+            "Выбор открывает нужный док без отдельного окна."
+        )
+
+    def _build_hosted_command_search_entries(self) -> tuple[ShellCommandSearchEntry, ...]:
+        entries: list[ShellCommandSearchEntry] = []
+        for command in self.hosted_command_by_id.values():
+            if command.availability == "support_fallback":
+                continue
+            workspace_id = command.target_workspace_id or command.workspace_id
+            surface_key = HOSTED_WORKSPACE_SURFACE_KEYS.get(workspace_id)
+            if surface_key is None:
+                continue
+            workspace = self.hosted_workspace_by_id.get(workspace_id)
+            surface = self.pipeline_surface_by_key.get(surface_key)
+            if workspace is None or surface is None:
+                continue
+            entries.append(
+                ShellCommandSearchEntry(
+                    label=command.title,
+                    location=f"Рабочее место / {workspace.title} / {command.title}",
+                    summary=self._operator_hosted_command_summary(command, workspace),
+                    action_kind="hosted_command",
+                    action_value=command.command_id,
+                    keywords=(
+                        command.command_id,
+                        command.title,
+                        command.summary,
+                        command.route_label,
+                        command.status_label,
+                        workspace.workspace_id,
+                        workspace.title,
+                        workspace.summary,
+                        surface.title,
+                        surface.next_action,
+                        *command.search_aliases,
+                        *command.web_aliases,
+                        *workspace.search_aliases,
                         *surface.search_aliases,
                     ),
                 )
@@ -984,6 +1036,23 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             )
             return
 
+    def _focus_hosted_workspace_command(self, command_id: str) -> None:
+        command = self.hosted_command_by_id.get(command_id)
+        if command is None:
+            self._set_status_message(f"Команда рабочего шага пока не подключена: {command_id}")
+            return
+        workspace_id = (
+            command.target_workspace_id
+            if command.kind == "open_workspace" and command.target_workspace_id
+            else command.workspace_id
+        )
+        page = self._open_hosted_workspace_id(workspace_id)
+        if command.kind == "hosted_action" and command.command_id.endswith(".open"):
+            handler = getattr(page, "handle_command", None)
+            if callable(handler):
+                handler(command.command_id)
+        self._set_status_message(f"Открыт рабочий этап для действия: {command.title}")
+
     def _open_hosted_workspace_id(self, workspace_id: str) -> QtWidgets.QWidget | None:
         surface_key = HOSTED_WORKSPACE_SURFACE_KEYS.get(workspace_id)
         if surface_key is None:
@@ -1422,6 +1491,29 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             if surface.tool_key:
                 item.setData(0, TOOL_ROLE, surface.tool_key)
             item.setData(0, ITEM_KIND_ROLE, "surface")
+            workspace_id = HOSTED_TOOL_WORKSPACE_IDS.get(surface.tool_key or "")
+            workspace = self.hosted_workspace_by_id.get(workspace_id or "")
+            if workspace_id == "diagnostics":
+                workspace = self._diagnostics_workspace_spec(surface)
+            if workspace is not None:
+                for command in self._hosted_action_commands(workspace):
+                    if command.availability == "support_fallback":
+                        continue
+                    command_item = QtWidgets.QTreeWidgetItem(
+                        (command.title, command.status_label or "действие внутри этапа")
+                    )
+                    command_item.setToolTip(
+                        0,
+                        self._operator_hosted_command_summary(command, workspace),
+                    )
+                    command_item.setToolTip(1, command.route_label)
+                    command_item.setData(0, SURFACE_ROLE, surface.key)
+                    if surface.tool_key:
+                        command_item.setData(0, TOOL_ROLE, surface.tool_key)
+                    command_item.setData(0, COMMAND_ROLE, command.command_id)
+                    command_item.setData(0, ITEM_KIND_ROLE, "hosted_command")
+                    item.addChild(command_item)
+                item.setExpanded(True)
             route_root.addChild(item)
         self.browser_tree.addTopLevelItem(route_root)
         route_root.setExpanded(True)
@@ -2258,8 +2350,12 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         if item is None:
             return
         item_kind = item.data(0, ITEM_KIND_ROLE)
+        command_id = item.data(0, COMMAND_ROLE)
         tool_key = item.data(0, TOOL_ROLE)
         surface_key = item.data(0, SURFACE_ROLE)
+        if item_kind == "hosted_command" and isinstance(command_id, str) and command_id:
+            self._focus_hosted_workspace_command(command_id)
+            return
         if item_kind in {"surface", "tool"} and isinstance(tool_key, str) and tool_key:
             self.open_tool(tool_key)
             return
@@ -2268,8 +2364,12 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
 
     def _on_browser_item_activated(self, item: QtWidgets.QTreeWidgetItem, _column: int) -> None:
         item_kind = item.data(0, ITEM_KIND_ROLE)
+        command_id = item.data(0, COMMAND_ROLE)
         tool_key = item.data(0, TOOL_ROLE)
         surface_key = item.data(0, SURFACE_ROLE)
+        if item_kind == "hosted_command" and isinstance(command_id, str) and command_id:
+            self._handle_hosted_workspace_command(command_id)
+            return
         if item_kind in {"surface", "tool"} and isinstance(tool_key, str) and tool_key:
             self.open_tool(tool_key)
             return
@@ -2307,6 +2407,10 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         if action_kind == "pipeline_surface" and isinstance(action_value, str):
             self.command_search_edit.clear()
             self._select_surface(action_value)
+            return
+        if action_kind == "hosted_command" and isinstance(action_value, str):
+            self.command_search_edit.clear()
+            self._handle_hosted_workspace_command(action_value)
             return
         if action_kind == "tool" and isinstance(action_value, str):
             self.open_tool(action_value)

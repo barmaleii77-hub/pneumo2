@@ -1091,6 +1091,106 @@ def test_desktop_qt_shell_tree_click_opens_route_surface_directly(
         app.processEvents()
 
 
+def test_desktop_qt_shell_tree_command_child_focuses_hosted_workspace_without_external_window(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _QtCore, _QtGui, _QtWidgets = _qt_modules()
+    settings_path = tmp_path / "main_shell_state.ini"
+    monkeypatch.setenv("PNEUMO_QT_MAIN_SHELL_STATE_PATH", str(settings_path))
+    monkeypatch.setattr(
+        qt_main_window_module,
+        "build_shell_project_context",
+        lambda: _test_project_context(tmp_path),
+    )
+    _FakeCoexistenceManager.instances.clear()
+    monkeypatch.setattr(
+        qt_main_window_module,
+        "DesktopShellCoexistenceManager",
+        _FakeCoexistenceManager,
+    )
+
+    app = _qt_app()
+    window = qt_main_window_module.DesktopQtMainShell()
+    try:
+        app.processEvents()
+        command_item = _find_tree_item_by_data(
+            window.browser_tree,
+            qt_main_window_module.COMMAND_ROLE,
+            "ring.editor.open",
+        )
+        assert command_item is not None
+        assert command_item.text(0) == "Редактировать циклический сценарий"
+
+        window.browser_tree.setCurrentItem(command_item)
+        app.processEvents()
+
+        manager = _FakeCoexistenceManager.instances[-1]
+        assert manager.opened == []
+        assert window._selected_surface_key == "ws_ring"
+        assert window.workspace_docks["ws_ring"].property("workspace_hosting") == "native"
+        hosted_page = window.workspace_hosted_widgets["ws_ring"]
+        assert hosted_page.objectName() == "HostedWorkspacePage_ring_editor"
+        assert window.findChild(_QtWidgets.QPushButton, "RG-BTN-SAVE-SOURCE") is not None
+        assert "Открыт рабочий этап для действия: Редактировать циклический сценарий" in window.status_label.text()
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_desktop_qt_shell_command_search_routes_scenario_editor_to_hosted_workspace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _QtCore, _QtGui, _QtWidgets = _qt_modules()
+    settings_path = tmp_path / "main_shell_state.ini"
+    monkeypatch.setenv("PNEUMO_QT_MAIN_SHELL_STATE_PATH", str(settings_path))
+    monkeypatch.setattr(
+        qt_main_window_module,
+        "build_shell_project_context",
+        lambda: _test_project_context(tmp_path),
+    )
+    _FakeCoexistenceManager.instances.clear()
+    monkeypatch.setattr(
+        qt_main_window_module,
+        "DesktopShellCoexistenceManager",
+        _FakeCoexistenceManager,
+    )
+
+    app = _qt_app()
+    window = qt_main_window_module.DesktopQtMainShell()
+    try:
+        app.processEvents()
+        window.command_search_edit.setText("редактировать циклический сценарий")
+        app.processEvents()
+
+        result_item = None
+        for index in range(window.search_results_list.count()):
+            item = window.search_results_list.item(index)
+            if (
+                item.data(_QtCore.Qt.ItemDataRole.UserRole + 1) == "hosted_command"
+                and item.data(_QtCore.Qt.ItemDataRole.UserRole) == "ring.editor.open"
+            ):
+                result_item = item
+                break
+        assert result_item is not None
+
+        window._activate_search_item(result_item)
+        app.processEvents()
+
+        manager = _FakeCoexistenceManager.instances[-1]
+        assert manager.opened == []
+        assert window._selected_surface_key == "ws_ring"
+        assert window.workspace_docks["ws_ring"].property("workspace_hosting") == "native"
+        assert window.workspace_hosted_widgets["ws_ring"].objectName() == "HostedWorkspacePage_ring_editor"
+        assert window.findChild(_QtWidgets.QPushButton, "RG-BTN-SAVE-SOURCE") is not None
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
 def test_desktop_qt_shell_diagnostics_route_is_hosted_workspace(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
