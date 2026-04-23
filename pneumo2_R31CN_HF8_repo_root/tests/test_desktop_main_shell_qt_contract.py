@@ -1104,8 +1104,12 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
         assert window.search_results_list.count() > 0
         window._activate_primary_search_result()
         assert window.central_stack.currentWidget() is window.overview_page
-        assert window.browser_tree.currentItem() is not None
-        assert "список проекта" in window.status_label.text()
+        current_browser_item = window.browser_tree.currentItem()
+        assert current_browser_item is not None
+        assert current_browser_item.data(0, qt_main_window_module.SURFACE_ROLE) == "ws_project"
+        assert current_browser_item.text(0) == "Панель проекта"
+        assert current_browser_item.parent() is not None
+        assert "дерево проекта" in window.status_label.text()
     finally:
         window.close()
         window.deleteLater()

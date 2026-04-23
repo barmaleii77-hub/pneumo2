@@ -827,7 +827,8 @@ def collect_qt_main_shell_runtime_proof(*, offscreen: bool = False, state_path: 
                 "status_progress_messages_strip": dict(proof["status_strip"]).get("message_object_name")
                 == "ShellMessagesStrip",
                 "command_search_project_tree_route": search_result_count > 0
-                and "список проекта" in str(dict(proof["command_search"]).get("status_text") or ""),
+                and "дерево проекта" in str(dict(proof["command_search"]).get("status_text") or "")
+                and dict(proof["project_tree"]).get("current_item") == "Панель проекта",
                 "all_launchable_tools_visible_from_shell": all(
                     not missing for missing in launch_coverage_missing.values()
                 ),

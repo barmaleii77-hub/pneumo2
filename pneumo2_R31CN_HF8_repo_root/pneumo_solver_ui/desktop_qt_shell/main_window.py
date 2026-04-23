@@ -672,9 +672,14 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
 
     def _focus_project_tree(self) -> None:
         self.browser_tree.setFocus()
-        if self.browser_tree.topLevelItemCount() > 0:
+        target_key = (
+            self._selected_surface_key
+            if self._selected_surface_key in self.pipeline_surface_by_key
+            else "ws_project"
+        )
+        if not self._select_browser_item(target_key) and self.browser_tree.topLevelItemCount() > 0:
             self.browser_tree.setCurrentItem(self.browser_tree.topLevelItem(0))
-        self._set_status_message("Фокус переведён в список проекта.")
+        self._set_status_message("Фокус переведён в дерево проекта.")
 
     def _focus_messages_strip(self) -> None:
         self.message_strip_label.setFocus()
@@ -2158,20 +2163,23 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             "rows": rows,
         }
 
-    def _select_browser_item(self, key: str) -> None:
+    def _select_browser_item(self, key: str) -> bool:
         items = self.browser_tree.findItems(
             "*",
             QtCore.Qt.MatchFlag.MatchWildcard | QtCore.Qt.MatchFlag.MatchRecursive,
             0,
         )
+        found = False
         self.browser_tree.blockSignals(True)
         try:
             for item in items:
                 if item.data(0, SURFACE_ROLE) == key:
                     self.browser_tree.setCurrentItem(item)
+                    found = True
                     break
         finally:
             self.browser_tree.blockSignals(False)
+        return found
 
     def _current_context_payload(self, spec: DesktopShellToolSpec) -> dict[str, object]:
         return {
