@@ -2408,6 +2408,21 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             self.workspace_combo.setCurrentIndex(index)
             self.workspace_combo.blockSignals(False)
 
+    def _focus_service_tree_tool(self, tool_key: object, surface_key: object) -> None:
+        if isinstance(surface_key, str) and surface_key in self.pipeline_surface_by_key:
+            self._select_surface(surface_key)
+        spec = self.spec_by_key.get(tool_key) if isinstance(tool_key, str) else None
+        title = spec.title if spec is not None else str(tool_key or "").strip()
+        if title:
+            self._set_status_message(
+                f"Дополнительная поверхность выбрана: {title}. "
+                "Для открытия используйте двойной щелчок или Enter."
+            )
+        else:
+            self._set_status_message(
+                "Дополнительная поверхность выбрана. Для открытия используйте двойной щелчок или Enter."
+            )
+
     def _on_browser_selection_changed(self) -> None:
         item = self.browser_tree.currentItem()
         if item is None:
@@ -2419,7 +2434,10 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         if item_kind == "hosted_command" and isinstance(command_id, str) and command_id:
             self._focus_hosted_workspace_command(command_id)
             return
-        if item_kind in {"surface", "tool"} and isinstance(tool_key, str) and tool_key:
+        if item_kind == "tool":
+            self._focus_service_tree_tool(tool_key, surface_key)
+            return
+        if item_kind == "surface" and isinstance(tool_key, str) and tool_key:
             self.open_tool(tool_key)
             return
         if isinstance(surface_key, str) and surface_key in self.pipeline_surface_by_key:

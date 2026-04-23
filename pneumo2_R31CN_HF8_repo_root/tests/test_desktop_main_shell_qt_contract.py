@@ -1199,6 +1199,56 @@ def test_desktop_qt_shell_tree_command_child_focuses_hosted_workspace_without_ex
         app.processEvents()
 
 
+def test_desktop_qt_shell_service_tree_selection_requires_explicit_activation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _qt_modules()
+    settings_path = tmp_path / "main_shell_state.ini"
+    monkeypatch.setenv("PNEUMO_QT_MAIN_SHELL_STATE_PATH", str(settings_path))
+    monkeypatch.setattr(
+        qt_main_window_module,
+        "build_shell_project_context",
+        lambda: _test_project_context(tmp_path),
+    )
+    _FakeCoexistenceManager.instances.clear()
+    monkeypatch.setattr(
+        qt_main_window_module,
+        "DesktopShellCoexistenceManager",
+        _FakeCoexistenceManager,
+    )
+
+    app = _qt_app()
+    window = qt_main_window_module.DesktopQtMainShell()
+    try:
+        app.processEvents()
+        compare_item = _find_tree_item_by_data(
+            window.browser_tree,
+            qt_main_window_module.TOOL_ROLE,
+            "compare_viewer",
+        )
+        assert compare_item is not None
+
+        window.browser_tree.setCurrentItem(compare_item)
+        app.processEvents()
+
+        manager = _FakeCoexistenceManager.instances[-1]
+        expected_surface = qt_main_window_module.default_surface_key_for_tool("compare_viewer")
+        assert manager.opened == []
+        assert window._selected_surface_key == expected_surface
+        assert window.workspace_docks[expected_surface].property("workspace_hosting") == "native"
+        assert "Дополнительная поверхность выбрана:" in window.status_label.text()
+
+        window._on_browser_item_activated(compare_item, 0)
+        app.processEvents()
+
+        assert [session.spec.key for session in manager.opened] == ["compare_viewer"]
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
 def test_desktop_qt_shell_command_search_routes_scenario_editor_to_hosted_workspace(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
