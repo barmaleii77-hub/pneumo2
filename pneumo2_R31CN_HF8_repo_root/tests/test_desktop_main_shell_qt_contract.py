@@ -757,9 +757,15 @@ def test_desktop_qt_shell_opens_animator_ho008_artifacts_from_command_surface(
         app.processEvents()
         first = window.search_results_list.item(0)
         assert first is not None
-        assert first.data(QtCore.Qt.ItemDataRole.UserRole + 1) == "tool"
+        assert first.data(QtCore.Qt.ItemDataRole.UserRole + 1) == "hosted_command"
+        assert first.data(QtCore.Qt.ItemDataRole.UserRole) in {
+            "animation.animator.open",
+            "animation.animator.launch",
+        }
         window._activate_search_item(first)
-        assert launched[-1] == "desktop_animator"
+        assert launched == []
+        assert window._selected_surface_key == "ws_animator"
+        assert window.workspace_docks["ws_animator"].property("workspace_hosting") == "native"
 
         window.command_search_edit.setText("сохранение анимации")
         app.processEvents()
@@ -920,6 +926,12 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
             "маршрут",
             "статус миграции",
         }
+        assert [
+            entry
+            for entry in visible_audit["command_search_catalog"]
+            if entry["action_kind"] == "tool"
+            and entry["action_value"] in qt_main_window_module.MAIN_ROUTE_KEYS
+        ] == []
         assert visible_audit["menu_titles"] == [
             "Файл",
             "Правка",

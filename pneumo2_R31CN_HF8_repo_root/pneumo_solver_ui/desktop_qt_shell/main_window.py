@@ -161,6 +161,16 @@ LEGACY_COMMAND_TOOL_KEYS = {
     "diagnostics.legacy_center.open": "desktop_diagnostics_center",
 }
 
+HOSTED_COMMAND_SEARCH_ALIASES = {
+    "animation.animator.open": (
+        "загрузить файл анимации",
+        "файл анимации",
+        "последняя анимация",
+        "просмотр анимации",
+        "результат для аниматора",
+    ),
+}
+
 VISUAL_TRUTH_ROWS = (
     (
         "Результаты",
@@ -310,7 +320,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.command_entries = (
             *self._build_pipeline_search_entries(),
             *self._build_hosted_command_search_entries(),
-            *build_shell_command_search_entries(self.specs),
+            *self._build_support_tool_search_entries(),
         )
         self.settings = _build_shell_settings()
         self.project_context: ShellProjectContext = build_shell_project_context()
@@ -463,6 +473,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                         surface.title,
                         surface.next_action,
                         *command.search_aliases,
+                        *HOSTED_COMMAND_SEARCH_ALIASES.get(command.command_id, ()),
                         *command.web_aliases,
                         *workspace.search_aliases,
                         *surface.search_aliases,
@@ -470,6 +481,16 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                 )
             )
         return tuple(entries)
+
+    def _build_support_tool_search_entries(self) -> tuple[ShellCommandSearchEntry, ...]:
+        return tuple(
+            entry
+            for entry in build_shell_command_search_entries(self.specs)
+            if not (
+                entry.action_kind == "tool"
+                and entry.action_value in MAIN_ROUTE_KEYS
+            )
+        )
 
     def _surface_for_tool(self, key: str) -> ShellPipelineSurface:
         if self._selected_surface_key in self.pipeline_surface_by_key:
@@ -541,11 +562,29 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         return tuple(sorted(ids))
 
     def visible_command_search_tool_keys(self) -> tuple[str, ...]:
-        keys = {
-            entry.action_value
-            for entry in self.command_entries
-            if entry.action_kind == "tool" and entry.action_value in self.spec_by_key
-        }
+        keys: set[str] = set()
+        for entry in self.command_entries:
+            if entry.action_kind == "tool" and entry.action_value in self.spec_by_key:
+                keys.add(entry.action_value)
+                continue
+            if entry.action_kind == "pipeline_surface":
+                surface = self.pipeline_surface_by_key.get(entry.action_value)
+                if surface is not None and surface.tool_key:
+                    keys.add(surface.tool_key)
+                continue
+            if entry.action_kind == "hosted_command":
+                command = self.hosted_command_by_id.get(entry.action_value)
+                if command is None:
+                    continue
+                workspace_id = command.target_workspace_id or command.workspace_id
+                surface_key = HOSTED_WORKSPACE_SURFACE_KEYS.get(workspace_id)
+                surface = (
+                    self.pipeline_surface_by_key.get(surface_key)
+                    if surface_key is not None
+                    else None
+                )
+                if surface is not None and surface.tool_key:
+                    keys.add(surface.tool_key)
         return tuple(sorted(keys))
 
     def visible_command_search_workspace_ids(self) -> tuple[str, ...]:
