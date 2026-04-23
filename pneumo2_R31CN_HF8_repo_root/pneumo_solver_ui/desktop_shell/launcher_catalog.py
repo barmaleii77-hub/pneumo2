@@ -23,12 +23,12 @@ class DesktopLaunchCatalogItem:
 def build_desktop_launch_catalog(*, include_mnemo: bool = True) -> tuple[DesktopLaunchCatalogItem, ...]:
     items: list[DesktopLaunchCatalogItem] = [
         DesktopLaunchCatalogItem(
-            key="desktop_gui_spec_shell",
+            key="desktop_main_shell_qt",
             title="Рабочее место инженера",
-            module="pneumo_solver_ui.tools.desktop_gui_spec_shell",
+            module="pneumo_solver_ui.tools.desktop_main_shell_qt",
             description=(
-                "Основное desktop-рабочее место: дерево этапов слева, рабочие dock-виджеты в центре, "
-                "инспектор, строка состояния, индикатор выполнения и прямые действия этапов."
+                "Основное desktop-рабочее место: дерево этапов слева, прямое открытие рабочих окон, "
+                "поиск команд, инспектор, строка состояния и доступ к реальным редакторам/центрам."
             ),
             group="Рабочее место",
             runtime_kind="qt",
@@ -40,6 +40,8 @@ def build_desktop_launch_catalog(*, include_mnemo: bool = True) -> tuple[Desktop
                 "основное рабочее место",
                 "панель проекта",
                 "desktop gui",
+                "нормальные окна",
+                "редактор сценариев",
             ),
             context_handoff_keys=(
                 "selected_tool_key",
@@ -52,11 +54,12 @@ def build_desktop_launch_catalog(*, include_mnemo: bool = True) -> tuple[Desktop
             ),
         ),
         DesktopLaunchCatalogItem(
-            key="desktop_main_shell_qt",
-            title="Старое рабочее место Qt",
-            module="pneumo_solver_ui.tools.desktop_main_shell_qt",
+            key="desktop_gui_spec_shell",
+            title="Проверочная контрактная оболочка",
+            module="pneumo_solver_ui.tools.desktop_gui_spec_shell",
             description=(
-                "Сервисный fallback прежнего Qt-shell для восстановления и сравнения поведения."
+                "Сервисная поверхность для проверки GUI contracts. Не является основным "
+                "пользовательским входом."
             ),
             group="Сервисный fallback",
             runtime_kind="qt",
@@ -64,8 +67,9 @@ def build_desktop_launch_catalog(*, include_mnemo: bool = True) -> tuple[Desktop
             source_of_truth_role="launcher",
             migration_status="legacy_fallback",
             search_aliases=(
-                "старое рабочее место",
-                "qt fallback",
+                "проверочная оболочка",
+                "контрактная проверка",
+                "service fallback",
             ),
             context_handoff_keys=(
                 "selected_tool_key",

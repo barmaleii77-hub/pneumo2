@@ -28,6 +28,10 @@
 ## А. Ключевые принципы именно для этого проекта
 
 - Главный shell строится как document-first и viewport-first Windows desktop application: в центре всегда рабочая поверхность, а не длинная прокручиваемая форма.
+- Публичный launcher верхнего уровня один: `START_PNEUMO_APP.*`. Он обязан показывать две явные пользовательские кнопки `Запустить WEB` и `Запустить GUI`; общая кнопка `Запустить` без указания режима запрещена.
+- `Запустить GUI` запускает `pneumo_solver_ui.tools.desktop_main_shell_qt` / Desktop Main Shell как primary route к реальным рабочим окнам. `desktop_gui_spec_shell` не является primary route и допускается только как support/dev entrypoint для проверки GUI-spec contracts.
+- `START_DESKTOP_*` wrappers являются support/dev entrypoints для прямой проверки и восстановления конкретных desktop surfaces. Они не считаются отдельными главными пользовательскими launcher-ами и не должны доминировать в portable-поверхности.
+- Operational memory `docs/context/release_readiness/GUI_CANONICAL_WINDOW_MEMORY_2026-04-23.md` фиксирует выводы из uploaded V11...V16 human reports, V15...V21 graph iterations, V38 actualized with V10 and consolidated master: дерево слева открывает dock/widget/window напрямую, `desktop_main_shell_qt` является public GUI target, а промежуточные launcher-grid/center-of-windows запрещены для primary path.
 - Главное окно обязано сохранять нормальные Windows windowing patterns: стандартную строку заголовка, system menu, перетаскивание, двойной щелчок для разворачивания, правый щелчок по заголовку и совместимость со Snap Layouts.
 - `Исходные данные`, `Набор испытаний`, `Сценарии`, `Базовый прогон`, `Оптимизация`, `Анализ`, `Анимация` и `Диагностика` являются рабочими пространствами, а не набором случайных страниц.
 - Матрица сохранения функций `web -> desktop` обязательна и должна обновляться при каждом значимом переносе поведения.

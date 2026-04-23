@@ -61,6 +61,7 @@
 - `docs/context/gui_spec_imports/v16_visibility_priority/WORKSPACE_FIRST_5_SECONDS_V16.csv` — first 3-5 seconds workspace comprehension contract.
 - `docs/context/gui_spec_imports/v16_visibility_priority/VISIBILITY_ESCALATION_GRAPH_V16.dot` — escalation graph from hidden detail to message/bar/blocker/return-route state.
 - `docs/context/release_readiness/HUMAN_GUI_REPORT_ONLY_V16_VISIBILITY_PRIORITY_2026-04-21.md` — local V16 import audit and KB reconciliation for visibility priority and inspector/help boundaries.
+- `docs/context/release_readiness/GUI_CANONICAL_WINDOW_MEMORY_2026-04-23.md` — durable operational memory from `pneumo_chat_consolidated_master_v1 (2).zip`, V38 actualized with V10, graph iterations V15...V21 and human reports V11...V16: `desktop_main_shell_qt` is the public GUI target; left-tree direct open is mandatory; launcher-grid/center-of-windows is forbidden for the primary path; ring editor is the only editable scenario source-of-truth.
 - `docs/context/gui_spec_imports/v38_github_kb_commit_ready/README.md` — predecessor consolidated GUI-spec / knowledge-base commit-ready layer из `pneumo_codex_tz_spec_connector_reconciled_v38_github_kb_commit_ready.zip`; не является runtime-closure proof.
 - `docs/context/gui_spec_imports/v38_github_kb_commit_ready/TECHNICAL_SPECIFICATION.md` — V38 human-readable technical specification with local ambiguity audit boundary.
 - `docs/context/gui_spec_imports/v38_github_kb_commit_ready/GUI_SPEC.yaml` — V38 machine-readable successor GUI-spec/TZ connector.

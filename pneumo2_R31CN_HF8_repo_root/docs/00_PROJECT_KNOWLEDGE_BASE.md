@@ -359,6 +359,25 @@ Operational note:
 - обязательные графические input surfaces, source markers и время построения для расчётных previews и графиков;
 - refined Windows title-bar/system-menu/Snap Layout behavior, `UI Automation`, `WM_DPICHANGED`, idle CPU, hidden-pane budget и ETW-style instrumentation policy для desktop GUI.
 
+Публичный launcher contract:
+
+- единственный пользовательский вход верхнего уровня - `START_PNEUMO_APP.*`;
+- внутри него должны быть две явные кнопки запуска: `Запустить WEB` для Streamlit и `Запустить GUI` для desktop GUI;
+- `Запустить GUI` запускает `pneumo_solver_ui.tools.desktop_main_shell_qt` / Desktop Main Shell, потому что это primary route с реальными рабочими окнами: input editor, ring/scenario editor, test center, baseline run, optimizer, results, animator, diagnostics;
+- `desktop_gui_spec_shell` не является primary route и не должен подменять Desktop Main Shell; это support/dev поверхность для проверки contracts;
+- кнопка с общим названием `Запустить` запрещена, потому что скрывает, какой интерфейс стартует;
+- прямые `START_DESKTOP_*` wrappers остаются support/dev entrypoints для диагностики, восстановления и прямой проверки конкретного окна; они не должны выглядеть как основной пользовательский launcher в portable-поверхности;
+- `pneumo_solver_ui/START_PNEUMO_UI.pyw` - historical WEB wrapper и не должен подменять `START_PNEUMO_APP.*` как публичный launcher.
+
+GUI canonical window memory от 2026-04-23:
+
+- источник: `pneumo_chat_consolidated_master_v1 (2).zip`, V38 actualized with V10, graph iterations V15...V21 and human reports V11...V16;
+- durable note: `docs/context/release_readiness/GUI_CANONICAL_WINDOW_MEMORY_2026-04-23.md`;
+- главное правило: левое дерево открывает нужный dock/widget/window напрямую, без launcher-grid, "центра окон" и второго выбора;
+- Desktop Main Shell / `desktop_main_shell_qt` является public `Запустить GUI` target; `desktop_gui_spec_shell` остаётся только support/dev surface;
+- `Редактор кольца` является единственным editable source-of-truth сценариев; набор испытаний только потребляет сценарный snapshot;
+- `Диагностика` имеет один first-class route, где `Собрать диагностику` primary, а отправка результатов secondary после готового bundle.
+
 Что добавляет V38 actualized with V10 KB layer:
 
 - текущий активный imported layer для GUI/TZ/spec и базы знаний после

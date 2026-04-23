@@ -109,10 +109,11 @@ def test_desktop_main_shell_registry_exposes_shared_standalone_launch_catalog() 
     assert "pneumo_solver_ui.qt_compare_viewer" in modules
     assert "pneumo_solver_ui.desktop_animator.app" in modules
     assert "pneumo_solver_ui.desktop_mnemo.main" in modules
-    assert by_key["desktop_gui_spec_shell"].title == "Рабочее место инженера"
-    assert by_key["desktop_gui_spec_shell"].group == "Рабочее место"
-    assert by_key["desktop_main_shell_qt"].title == "Старое рабочее место Qt"
-    assert by_key["desktop_main_shell_qt"].group == "Сервисный fallback"
+    assert catalog[0].key == "desktop_main_shell_qt"
+    assert by_key["desktop_main_shell_qt"].title == "Рабочее место инженера"
+    assert by_key["desktop_main_shell_qt"].group == "Рабочее место"
+    assert by_key["desktop_gui_spec_shell"].title == "Проверочная контрактная оболочка"
+    assert by_key["desktop_gui_spec_shell"].group == "Сервисный fallback"
 
 
 def test_desktop_main_shell_catalog_visible_text_hides_service_jargon() -> None:

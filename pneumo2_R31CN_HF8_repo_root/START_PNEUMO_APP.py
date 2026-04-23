@@ -3,9 +3,9 @@
 
 Unified PneumoApp launcher (Windows-friendly):
 - без консоли (pyw)
-- кнопка "Запустить" ВСЕГДА пытается установить/обновить зависимости автоматически
+- кнопки "Запустить WEB" и "Запустить GUI" ВСЕГДА пытаются установить/обновить зависимости автоматически
 - показ прогресса установки (чтобы было понятно, что процесс не завис)
-- запуск Streamlit UI одной кнопкой
+- запуск Streamlit WEB и desktop GUI двумя явными кнопками
 - ничего не теряем: stdout/stderr pip/streamlit пишем в логи
 
 Логи:
@@ -720,10 +720,10 @@ class LauncherGUI:
         ttk.Checkbutton(top, text="Открыть браузер", variable=self.open_browser_var).pack(side="left")
         ttk.Checkbutton(top, text="Показать консоль Streamlit", variable=self.show_console_var).pack(side="left", padx=(12, 0))
 
-        ttk.Button(top, text="Запустить (с авто-установкой зависимостей)", command=self.start_app).pack(
+        ttk.Button(top, text="Запустить WEB", command=self.start_app).pack(
             side="right", padx=6
         )
-        ttk.Button(top, text="Открыть рабочее место", command=self.start_desktop_shell).pack(side="right", padx=6)
+        ttk.Button(top, text="Запустить GUI", command=self.start_desktop_shell).pack(side="right", padx=6)
         ttk.Button(top, text="Остановить", command=lambda: self.stop_app(reason="button_stop")).pack(side="right", padx=6)
         ttk.Button(top, text="Только установить зависимости", command=self.install_deps).pack(side="right", padx=6)
 
@@ -747,7 +747,7 @@ class LauncherGUI:
         ttk.Button(bottom, text="Открыть папку логов", command=self.open_logs_dir).pack(side="left")
         ttk.Button(bottom, text="Открыть deps_install.log", command=self.open_deps_log).pack(side="left", padx=6)
         ttk.Button(bottom, text="Открыть streamlit_stdout.log", command=self.open_streamlit_log).pack(side="left", padx=6)
-        ttk.Button(bottom, text="Открыть desktop_gui_spec_shell.log", command=self.open_desktop_log).pack(side="left", padx=6)
+        ttk.Button(bottom, text="Открыть desktop GUI log", command=self.open_desktop_log).pack(side="left", padx=6)
         ttk.Button(bottom, text="Выход", command=self.on_close).pack(side="right")
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -1725,7 +1725,7 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
                         "warning",
                     ]
 
-                    self._ui_status("Запускаю Streamlit сервер …")
+                    self._ui_status("Запускаю WEB (Streamlit) …")
                     self._pbar_start_indeterminate()
                     self.proc_kind = "web"
                     self.proc = self._launch_logged_process(
@@ -1851,18 +1851,18 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
                     _, _, log_dir, _, _, env = self._prepare_child_session_env(
                         run_prefix="DESKTOP",
                         extra_env={
-                            "PNEUMO_LAUNCH_SURFACE": "desktop_gui_spec_shell",
-                            "PNEUMO_DESKTOP_GUI_SPEC_SHELL": "1",
+                            "PNEUMO_LAUNCH_SURFACE": "desktop_main_shell_qt",
+                            "PNEUMO_DESKTOP_MAIN_SHELL_QT": "1",
                         },
                     )
-                    desktop_log_path = log_dir / "desktop_gui_spec_shell.log"
+                    desktop_log_path = log_dir / "desktop_main_shell_qt.log"
                     cmd = [
                         str(py),
                         "-m",
-                        "pneumo_solver_ui.tools.desktop_gui_spec_shell",
+                        "pneumo_solver_ui.tools.desktop_main_shell_qt",
                     ]
 
-                    self._ui_status("Запускаю Desktop GUI …")
+                    self._ui_status("Запускаю GUI …")
                     self._pbar_start_indeterminate()
                     self.proc_kind = "desktop"
                     self.proc = self._launch_logged_process(
@@ -2186,7 +2186,7 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
             messagebox.showinfo(
                 "Нет файла",
                 "deps_install.log пока не создан.\n\n"
-                "Нажмите 'Только установить зависимости' или 'Запустить'.",
+                "Нажмите 'Только установить зависимости', 'Запустить WEB' или 'Запустить GUI'.",
             )
             return
 
@@ -2227,8 +2227,8 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
             pass
         try:
             if self.session_dir is not None:
-                candidates.append(self.session_dir / "logs" / "desktop_gui_spec_shell.log")
                 candidates.append(self.session_dir / "logs" / "desktop_main_shell_qt.log")
+                candidates.append(self.session_dir / "logs" / "desktop_gui_spec_shell.log")
         except Exception:
             pass
 
@@ -2242,7 +2242,7 @@ print(json.dumps({"ok": (len(issues) == 0), "issues": issues}, ensure_ascii=Fals
                 continue
 
         if target is None:
-            messagebox.showinfo("Нет файла", "desktop_gui_spec_shell.log пока не создан.")
+            messagebox.showinfo("Нет файла", "desktop GUI log пока не создан.")
             return
 
         try:
