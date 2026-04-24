@@ -15,7 +15,7 @@ from pneumo_solver_ui.desktop_baseline_run_runtime import (
     baseline_run_launch_request_path,
     prepare_baseline_run_launch_request,
 )
-from pneumo_solver_ui.desktop_results_model import DesktopResultsArtifact
+from pneumo_solver_ui.desktop_results_model import DesktopResultsArtifact, DesktopResultsContextField
 from pneumo_solver_ui.desktop_results_runtime import DesktopResultsRuntime
 from pneumo_solver_ui.desktop_input_model import (
     load_base_with_defaults,
@@ -298,16 +298,31 @@ def test_gui_spec_main_window_uses_hosted_pages_for_runtime_and_control_hubs_for
         app.processEvents()
 
 
-def test_suite_workspace_page_shows_test_rows_without_launcher_shell() -> None:
+def test_suite_workspace_page_shows_test_rows_without_launcher_shell(monkeypatch) -> None:
     app = _app()
     window = DesktopGuiSpecMainWindow()
     try:
         page = window._page_widget_by_workspace_id["test_matrix"]
         assert isinstance(page, SuiteWorkspacePage)
         assert page.objectName() == "WS-SUITE-HOSTED-PAGE"
+        assert page.suite_filter_edit.objectName() == "TS-FILTER"
+        assert page.suite_filter_preset_combo.objectName() == "TS-FILTER-PRESET"
         assert page.suite_table.objectName() == "TS-TABLE"
+        assert page.suite_detail_box.objectName() == "TS-DETAIL"
+        assert page.suite_detail_table.objectName() == "TS-DETAIL-TABLE"
         assert page.validation_label.objectName() == "TS-VALIDATION-SUMMARY"
         assert page.check_button.objectName() == "TS-BTN-VALIDATE"
+        assert page.detail_button.objectName() == "TS-BTN-DETAIL"
+        assert page.validation_dock_button.objectName() == "TS-BTN-VALIDATION-DOCK"
+        assert page.save_button.objectName() == "TS-BTN-SAVE-SNAPSHOT"
+        assert page.snapshot_dock_button.objectName() == "TS-BTN-SNAPSHOT-DOCK"
+        assert page.suite_autotest_box.objectName() == "TS-AUTOTEST"
+        assert page.suite_autotest_level_combo.objectName() == "TS-AUTOTEST-LEVEL"
+        assert page.suite_autotest_run_button.objectName() == "TS-BTN-AUTOTEST-RUN"
+        assert page.suite_autotest_stop_button.objectName() == "TS-BTN-AUTOTEST-STOP"
+        assert page.suite_autotest_open_dir_button.objectName() == "TS-BTN-AUTOTEST-OPEN-DIR"
+        assert page.suite_autotest_status_label.objectName() == "TS-AUTOTEST-STATUS"
+        assert page.suite_autotest_log_view.objectName() == "TS-AUTOTEST-LOG"
         page.refresh_view()
         app.processEvents()
 
@@ -325,6 +340,15 @@ def test_suite_workspace_page_shows_test_rows_without_launcher_shell() -> None:
             "Связанные файлы",
         ]
         assert page.suite_table.rowCount() > 0
+        assert page.suite_detail_table.rowCount() >= 6
+        assert "Выбрано:" in page.suite_detail_label.text()
+        page.suite_filter_edit.setText("невозможный фильтр")
+        app.processEvents()
+        assert all(page.suite_table.isRowHidden(row) for row in range(page.suite_table.rowCount()))
+        page.suite_filter_edit.clear()
+        page.suite_filter_preset_combo.setCurrentText("Все испытания")
+        app.processEvents()
+        assert any(not page.suite_table.isRowHidden(row) for row in range(page.suite_table.rowCount()))
         visible_text = "\n".join(
             [
                 *(label.text() for label in page.findChildren(QtWidgets.QLabel)),
@@ -338,13 +362,49 @@ def test_suite_workspace_page_shows_test_rows_without_launcher_shell() -> None:
         assert "Расширенная настройка набора" not in visible_text
         assert "Смысл и правила окна" not in visible_text
         assert "Открытие:" not in visible_text
+        assert "test center" not in visible_text
         assert "stage" not in visible_text
         assert "suite" not in visible_text
         assert "sidecar" not in visible_text
 
+        def _fake_run_suite_autotest(self: SuiteWorkspacePage) -> dict[str, object]:
+            self.suite_autotest_status_label.setText("Автономная проверка показана в рабочем шаге.")
+            self.suite_autotest_log_view.setPlainText("fake autotest log")
+            return self._show_suite_autotest_dock()
+
+        monkeypatch.setattr(SuiteWorkspacePage, "run_suite_autotest", _fake_run_suite_autotest)
+
         window.run_command("test.center.open")
         app.processEvents()
         assert "Проверка набора открыта" in page.validation_label.text()
+
+        expected_child_docks = {
+            "test.selection.show": (
+                "child_dock_suite_selected_test",
+                "CHILD-SUITE-SELECTED-TEST-TABLE",
+            ),
+            "test.validation.show": (
+                "child_dock_suite_validation",
+                "CHILD-SUITE-VALIDATION-TABLE",
+            ),
+            "test.snapshot.show": (
+                "child_dock_suite_snapshot",
+                "CHILD-SUITE-SNAPSHOT-TABLE",
+            ),
+            "test.autotest.run": (
+                "child_dock_suite_autotest",
+                "CHILD-SUITE-AUTOTEST-TABLE",
+            ),
+        }
+        for command_id, (dock_name, table_name) in expected_child_docks.items():
+            window.run_command(command_id)
+            app.processEvents()
+            child = window.findChild(QtWidgets.QDockWidget, dock_name)
+            assert child is not None
+            assert child.property("spec_command_id") == command_id
+            table = child.findChild(QtWidgets.QTableWidget, table_name)
+            assert table is not None
+            assert table.rowCount() > 0
     finally:
         window.close()
         window.deleteLater()
@@ -394,6 +454,10 @@ def test_optimization_workspace_page_hosts_primary_launch_controls() -> None:
         assert "Остановить сейчас" in visible_buttons
         assert "Открыть журнал" in visible_buttons
         assert "Открыть папку запуска" in visible_buttons
+        assert "История запусков" in visible_buttons
+        assert "Готовые прогоны" in visible_buttons
+        assert "Передача стадий" in visible_buttons
+        assert "Упаковка и выпуск" in visible_buttons
         assert "Расширенная настройка" not in visible_buttons
         assert "Настройка основного запуска открыта" in page.optimization_result_label.text()
 
@@ -532,8 +596,17 @@ def test_results_workspace_page_hosts_analysis_and_compare_controls() -> None:
         assert "Обновить анализ" in visible_buttons
         assert "Подготовить сравнение" in visible_buttons
         assert "Показать сравнение" in visible_buttons
+        assert any(button.startswith("Следующая пара") for button in visible_buttons)
+        assert any(button.startswith("Следующий сигнал") for button in visible_buttons)
+        assert any(button.startswith("Следующая точка") for button in visible_buttons)
+        assert any(button.startswith("Следующее окно") for button in visible_buttons)
+        assert "Подробности графика" in visible_buttons
         assert "Передать в анимацию" in visible_buttons
         assert "Подготовить материалы проверки" in visible_buttons
+        assert "Выбранный материал" in visible_buttons
+        assert "Рассчитать влияние" in visible_buttons
+        assert "Полный отчёт" in visible_buttons
+        assert "Диапазоны влияния" in visible_buttons
         assert "Расширенный анализ" not in visible_buttons
         assert "Анализ результатов открыт" in page.results_action_label.text()
         assert page.results_overview_table.columnCount() == 4
@@ -558,6 +631,8 @@ def test_results_workspace_page_hosts_analysis_and_compare_controls() -> None:
 def test_results_workspace_page_renders_native_chart_preview(tmp_path, monkeypatch) -> None:
     npz_path = tmp_path / "chart_result.npz"
     npz_path.write_bytes(b"NPZ")
+    contract_path = tmp_path / "chart_selected_run_contract.json"
+    contract_path.write_text("{}", encoding="utf-8")
 
     class _FakeResultsRuntime:
         def __init__(self, *, repo_root: Path, python_executable: str) -> None:
@@ -592,6 +667,36 @@ def test_results_workspace_page_renders_native_chart_preview(tmp_path, monkeypat
                 mnemo_recent_titles=(),
                 operator_recommendations=("Проверьте графики.",),
                 selected_run_contract_status="CURRENT",
+                selected_run_contract_path=contract_path,
+                selected_run_contract_hash="selected-contract-001",
+                result_context_detail="Контекст сравнения отличается от выбранного прогона.",
+                result_context_action="Синхронизируйте выбранный прогон перед подробным разбором.",
+                result_context_fields=(
+                    SimpleNamespace(
+                        key="run_id",
+                        title="Run ID",
+                        current_value="run-current",
+                        selected_value="run-selected",
+                        status="STALE",
+                        detail="run differs",
+                    ),
+                    SimpleNamespace(
+                        key="segment_id",
+                        title="Segment",
+                        current_value="segment-a",
+                        selected_value="segment-b",
+                        status="STALE",
+                        detail="segment differs",
+                    ),
+                    SimpleNamespace(
+                        key="suite_snapshot_hash",
+                        title="Suite",
+                        current_value="suite-001",
+                        selected_value="suite-001",
+                        status="CURRENT",
+                        detail="",
+                    ),
+                ),
                 selected_run_contract_banner="Выбранный прогон актуален.",
             )
 
@@ -816,6 +921,55 @@ def test_results_workspace_page_updates_previews_for_selected_artifact(tmp_path,
         assert "selected_result_series" in page.results_chart_preview_view.toolTip()
         assert page.results_compare_window_button.isEnabled()
 
+        window.run_command("results.selected_material.show")
+        app.processEvents()
+        selected_material_dock = window.findChild(
+            QtWidgets.QDockWidget,
+            "child_dock_results_selected_material",
+        )
+        assert selected_material_dock is not None
+        selected_material_table = selected_material_dock.findChild(
+            QtWidgets.QTableWidget,
+            "CHILD-RESULTS-SELECTED-MATERIAL-TABLE",
+        )
+        assert selected_material_table is not None
+        selected_material_values = {
+            selected_material_table.item(row, column).text()
+            for row in range(selected_material_table.rowCount())
+            for column in range(selected_material_table.columnCount())
+            if selected_material_table.item(row, column) is not None
+        }
+        assert any("selected_result.npz" in value for value in selected_material_values)
+        assert "Предпросмотр 1" in selected_material_values
+        assert "Карточка выбранного материала показана" in page.results_action_label.text()
+        assert "results.selected_material.show" in window.recent_command_ids
+
+        page.results_chart_preview_table.selectRow(0)
+        app.processEvents()
+        window.run_command("results.chart_detail.show")
+        app.processEvents()
+        chart_detail_dock = window.findChild(
+            QtWidgets.QDockWidget,
+            "child_dock_results_chart_detail",
+        )
+        assert chart_detail_dock is not None
+        chart_detail_table = chart_detail_dock.findChild(
+            QtWidgets.QTableWidget,
+            "CHILD-RESULTS-CHART-DETAIL-TABLE",
+        )
+        assert chart_detail_table is not None
+        chart_detail_values = {
+            chart_detail_table.item(row, column).text()
+            for row in range(chart_detail_table.rowCount())
+            for column in range(chart_detail_table.columnCount())
+            if chart_detail_table.item(row, column) is not None
+        }
+        assert "selected_result_series" in chart_detail_values
+        assert "42" in chart_detail_values
+        assert "1.5" in chart_detail_values
+        assert "Подробности графика показаны" in page.results_action_label.text()
+        assert "results.chart_detail.show" in window.recent_command_ids
+
         window.run_command("results.animation.prepare")
         app.processEvents()
         assert _FakeResultsRuntime.handoff_paths == [selected_path]
@@ -843,6 +997,12 @@ def test_results_runtime_extracts_npz_chart_preview_rows(tmp_path) -> None:
     rows = runtime.chart_preview_rows(snapshot, artifact=artifact)
     rows_by_series = {row["series"]: row for row in rows}
     samples = runtime.chart_preview_series_samples(snapshot, artifact=artifact, max_points=2)
+    roll_samples = runtime.chart_preview_series_samples(
+        snapshot,
+        artifact=artifact,
+        max_points=2,
+        series_name="roll_deg",
+    )
 
     assert rows_by_series["z_body_mm"]["points"] == "3; форма 3"
     assert rows_by_series["z_body_mm"]["range"] == "0 .. 4"
@@ -853,6 +1013,9 @@ def test_results_runtime_extracts_npz_chart_preview_rows(tmp_path) -> None:
     assert samples["samples"] == (0.0, 4.0)
     assert samples["point_count"] == 3
     assert samples["range"] == "0 .. 4"
+    assert roll_samples["status"] == "READY"
+    assert roll_samples["series"] == "roll_deg"
+    assert roll_samples["samples"] == (-3.0, 4.0)
 
 
 def test_results_runtime_extracts_animation_scene_preview_points(tmp_path) -> None:
@@ -878,6 +1041,445 @@ def test_results_runtime_extracts_animation_scene_preview_points(tmp_path) -> No
     assert preview["point_count"] == 3
     assert preview["source_path"] == str(npz_path)
     assert preview["pointer_path"] == str(pointer_path)
+
+
+def test_results_runtime_builds_hosted_compare_contract_preview(tmp_path) -> None:
+    np = pytest.importorskip("numpy")
+    npz_path = tmp_path / "runtime_compare_result.npz"
+    meta = {
+        "selected_run_contract": {
+            "run_id": "run-selected",
+            "run_contract_hash": "run-hash-selected",
+            "objective_contract_hash": "objective-selected",
+            "active_baseline_hash": "baseline-selected",
+            "suite_snapshot_hash": "suite-selected",
+            "ring_source_hash": "ring-selected",
+        }
+    }
+    np.savez(
+        npz_path,
+        z_body_mm=np.array([10.0, 20.0, 30.0]),
+        time_s=np.array([0.0, 1.0, 2.0]),
+        roll_deg=np.array([1.0, 0.0, -1.0]),
+        meta_json=json.dumps(meta, ensure_ascii=False),
+    )
+    runtime = DesktopResultsRuntime(repo_root=tmp_path, python_executable=sys.executable)
+    artifact = DesktopResultsArtifact(
+        key="latest_npz",
+        title="Результат расчёта",
+        category="results",
+        path=npz_path,
+    )
+    snapshot = SimpleNamespace(
+        latest_npz_path=npz_path,
+        latest_pointer_json_path=None,
+        latest_validation_json_path=None,
+        latest_validation_md_path=None,
+        diagnostics_evidence_manifest_path=None,
+        latest_capture_export_manifest_path=None,
+        selected_run_contract_path=None,
+        latest_optimizer_pointer_json_path=None,
+        latest_optimizer_run_dir=None,
+        selected_run_contract_status="CURRENT",
+        selected_run_contract_banner="Выбранный прогон готов.",
+        selected_run_contract_hash="selected-contract-001",
+        result_context_state="STALE",
+        result_context_banner="Контекст отличается.",
+        result_context_detail="Выбранный прогон не совпадает с текущим.",
+        result_context_action="Синхронизируйте выбранный прогон.",
+        result_context_fields=(
+            DesktopResultsContextField(
+                key="run_id",
+                title="Run ID",
+                current_value="run-current",
+                selected_value="run-selected",
+                status="STALE",
+                detail="run differs",
+            ),
+            DesktopResultsContextField(
+                key="objective_contract_hash",
+                title="Objective hash",
+                current_value="objective-current",
+                selected_value="objective-selected",
+                status="STALE",
+                detail="objective differs",
+            ),
+        ),
+    )
+
+    preview = runtime.build_hosted_compare_contract_preview(
+        snapshot,
+        artifact=artifact,
+        series_name="roll_deg",
+    )
+
+    assert preview["status"] == "STALE"
+    assert preview["selected_table"] == "main"
+    assert preview["selected_metrics"] == ("roll_deg", "z_body_mm")
+    assert preview["selected_time_window"] == (0.0, 2.0)
+    assert preview["alignment_mode"] == "time_s"
+    assert preview["run_ref_source"] == "npz_meta"
+    assert preview["compare_contract_hash"]
+    assert "0.000..2.000 s" in preview["summary_text"]
+    assert "отличается" in preview["mismatch_banner_text"]
+    assert preview["contract"]["selected_table"] == "main"
+    assert preview["contract"]["run_refs"][0]["run_id"] == "run-selected"
+
+
+def test_results_runtime_builds_hosted_compare_session_preview(tmp_path) -> None:
+    np = pytest.importorskip("numpy")
+    npz_path = tmp_path / "runtime_compare_session_result.npz"
+    meta = {
+        "selected_run_contract": {
+            "run_id": "run-selected",
+            "run_contract_hash": "run-hash-selected",
+            "objective_contract_hash": "objective-selected",
+            "active_baseline_hash": "baseline-selected",
+            "suite_snapshot_hash": "suite-selected",
+        }
+    }
+    np.savez(
+        npz_path,
+        z_body_mm=np.array([10.0, 20.0, 30.0]),
+        time_s=np.array([0.0, 1.0, 2.0]),
+        roll_deg=np.array([1.0, 0.0, -1.0]),
+        meta_json=json.dumps(meta, ensure_ascii=False),
+    )
+    current_context_path = tmp_path / "compare_current_context.json"
+    current_context_path.write_text("{}", encoding="utf-8")
+    runtime = DesktopResultsRuntime(repo_root=tmp_path, python_executable=sys.executable)
+    artifact = DesktopResultsArtifact(
+        key="latest_npz",
+        title="Результат расчёта",
+        category="results",
+        path=npz_path,
+    )
+    snapshot = SimpleNamespace(
+        latest_npz_path=npz_path,
+        latest_pointer_json_path=None,
+        latest_validation_json_path=None,
+        latest_validation_md_path=None,
+        diagnostics_evidence_manifest_path=None,
+        latest_capture_export_manifest_path=None,
+        selected_run_contract_path=None,
+        latest_optimizer_pointer_json_path=None,
+        latest_optimizer_run_dir=None,
+        selected_run_contract_status="CURRENT",
+        selected_run_contract_banner="Выбранный прогон готов.",
+        selected_run_contract_hash="selected-contract-001",
+        result_context_state="STALE",
+        result_context_banner="Контекст отличается.",
+        result_context_detail="Выбранный прогон не совпадает с текущим.",
+        result_context_action="Синхронизируйте выбранный прогон.",
+        result_context_fields=(
+            DesktopResultsContextField(
+                key="run_id",
+                title="Run ID",
+                current_value="run-current",
+                selected_value="run-selected",
+                status="STALE",
+                detail="run differs",
+            ),
+            DesktopResultsContextField(
+                key="objective_contract_hash",
+                title="Objective hash",
+                current_value="objective-current",
+                selected_value="objective-selected",
+                status="STALE",
+                detail="objective differs",
+            ),
+        ),
+    )
+
+    preview = runtime.build_hosted_compare_session_preview(
+        snapshot,
+        artifact=artifact,
+        series_name="roll_deg",
+        current_context_path=current_context_path,
+    )
+
+    assert preview["status"] == "STALE"
+    assert preview["session_source"] == "desktop_results_runtime_hosted_compare"
+    assert preview["run_refs_count"] == 2
+    assert preview["npz_count"] == 1
+    assert preview["reference_label"] == "run-selected"
+    assert preview["playhead_t"] == 1.0
+    assert preview["labels"] == ("run-selected", "run-current")
+    assert preview["mode"] == "overlay"
+    assert preview["timeline_target"]["signal"] == "roll_deg"
+    assert preview["timeline_target"]["pair_label"] == "run-selected -> run-current"
+    assert preview["run_rows"][0]["role"] == "reference"
+    assert preview["run_rows"][0]["source"] == "selected_result"
+    assert preview["run_rows"][0]["path_name"] == "runtime_compare_session_result.npz"
+    assert preview["run_rows"][1]["role"] == "current_context"
+    assert preview["run_rows"][1]["source"] == "current_context"
+    assert preview["run_rows"][1]["path_name"] == "compare_current_context.json"
+    assert "table=main" in preview["summary_lines"][1]
+    assert preview["payload"]["table"] == "main"
+    assert preview["payload"]["signals"] == ["roll_deg", "z_body_mm"]
+    assert preview["payload"]["current_context_path"] == str(current_context_path)
+
+
+def test_results_runtime_builds_hosted_compare_open_timeline_preview(tmp_path) -> None:
+    np = pytest.importorskip("numpy")
+    npz_path = tmp_path / "runtime_compare_open_result.npz"
+    open_cols = np.array(["time_s", "valve_a", "valve_b", "valve_c"], dtype=object)
+    open_values = np.array(
+        [
+            [0.0, 0.0, 1.0, 0.0],
+            [1.0, 1.0, 1.0, 0.0],
+            [2.0, 1.0, 0.0, 0.0],
+            [3.0, 0.0, 0.0, 1.0],
+        ],
+        dtype=float,
+    )
+    np.savez(
+        npz_path,
+        open_cols=open_cols,
+        open_values=open_values,
+        meta_json=json.dumps({}, ensure_ascii=False),
+    )
+    runtime = DesktopResultsRuntime(repo_root=tmp_path, python_executable=sys.executable)
+    artifact = DesktopResultsArtifact(
+        key="latest_npz",
+        title="Open timeline result",
+        category="results",
+        path=npz_path,
+    )
+    snapshot = SimpleNamespace(latest_npz_path=npz_path, recent_artifacts=(artifact,))
+
+    preview = runtime.build_hosted_compare_open_timeline_preview(
+        snapshot,
+        artifact=artifact,
+        max_valves=2,
+    )
+
+    assert preview["status"] == "READY"
+    assert preview["reference_label"] == "Open timeline result"
+    assert preview["valve_count"] == 3
+    assert preview["changed_count"] == 3
+    assert preview["active_count"] == 3
+    assert preview["time_window"] == (0.0, 3.0)
+    assert preview["top_names"] == ("valve_a", "valve_b")
+    assert preview["truncated"] is True
+    assert preview["summary_lines"][0] == "ref=Open timeline result | valves=3 | changed=3 | active=3"
+    assert preview["valve_rows"][0]["name"] == "valve_a"
+    assert preview["valve_rows"][0]["transitions"] == 2
+
+
+def test_results_runtime_builds_hosted_compare_peak_heat_preview(tmp_path) -> None:
+    np = pytest.importorskip("numpy")
+    selected_path = tmp_path / "selected_compare_result.npz"
+    current_path = tmp_path / "current_compare_result.npz"
+    cols = np.array(["time_s", "roll_deg", "z_body_mm"], dtype=object)
+    selected_values = np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [2.0, 0.0, 0.0],
+            [3.0, 0.0, 0.0],
+        ],
+        dtype=float,
+    )
+    current_values = np.array(
+        [
+            [0.0, 0.0, 0.1],
+            [1.0, 1.0, 0.4],
+            [2.0, 0.2, 0.2],
+            [3.0, 0.0, 0.0],
+        ],
+        dtype=float,
+    )
+    np.savez(
+        selected_path,
+        main_cols=cols,
+        main_values=selected_values,
+        meta_json=json.dumps({}, ensure_ascii=False),
+    )
+    np.savez(
+        current_path,
+        main_cols=cols,
+        main_values=current_values,
+        meta_json=json.dumps({}, ensure_ascii=False),
+    )
+
+    runtime = DesktopResultsRuntime(repo_root=tmp_path, python_executable=sys.executable)
+    artifact = DesktopResultsArtifact(
+        key="selected_npz",
+        title="Selected compare result",
+        category="results",
+        path=selected_path,
+    )
+    snapshot = SimpleNamespace(
+        latest_npz_path=current_path,
+        latest_pointer_json_path=None,
+        recent_artifacts=(artifact,),
+        result_context_fields=(
+            DesktopResultsContextField(
+                key="run_id",
+                title="Run ID",
+                current_value="run-current",
+                selected_value="run-selected",
+                status="STALE",
+                detail="run differs",
+            ),
+        ),
+        result_context_state="STALE",
+        result_context_banner="",
+        result_context_detail="",
+        result_context_action="",
+        selected_run_contract_status="CURRENT",
+        selected_run_contract_banner="",
+        selected_run_contract_path=None,
+        selected_run_contract_hash="",
+        latest_optimizer_pointer_json_path=None,
+        latest_optimizer_run_dir=None,
+        latest_validation_json_path=None,
+        latest_validation_md_path=None,
+        diagnostics_evidence_manifest_path=None,
+        latest_capture_export_manifest_path=None,
+    )
+
+    preview = runtime.build_hosted_compare_peak_heat_preview(
+        snapshot,
+        artifact=artifact,
+        series_name="roll_deg",
+    )
+
+    assert preview["status"] == "READY"
+    assert preview["reference_label"] == "run-selected"
+    assert preview["compare_label"] == "run-current"
+    assert preview["table"] == "main"
+    assert preview["run_count"] == 2
+    assert preview["signal_count"] == 2
+    assert preview["hotspot_signal"] == "roll_deg"
+    assert preview["hotspot_run"] == "run-current"
+    assert preview["hotspot_time"] == pytest.approx(1.0)
+    assert preview["hotspot_peak"] == pytest.approx(1.0)
+    assert preview["hotspot_signed_delta"] == pytest.approx(1.0)
+    assert preview["dominant_signal"] == "roll_deg"
+    assert preview["dominant_run"] == "run-current"
+    assert preview["signal_competition"] == 1
+    assert preview["run_competition"] == 1
+    assert preview["bridge_headline"] == "Peak heat already isolates one dominant signal."
+    assert preview["bridge_tone"] == "accent"
+    assert preview["note"] == (
+        "Peak heat preview uses the selected run as reference and compares it with the current latest NPZ."
+    )
+    assert preview["summary_lines"][0] == (
+        "ref=run-selected | compare=run-current | table=main | signals=2"
+    )
+    assert preview["signal_rows"][0]["name"] == "roll_deg"
+    assert preview["signal_rows"][0]["run"] == "run-current"
+
+
+def test_results_runtime_builds_hosted_compare_delta_timeline_preview(tmp_path) -> None:
+    np = pytest.importorskip("numpy")
+    selected_path = tmp_path / "selected_compare_timeline_result.npz"
+    current_path = tmp_path / "current_compare_timeline_result.npz"
+    cols = np.array(["time_s", "roll_deg", "z_body_mm"], dtype=object)
+    selected_values = np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [2.0, 0.0, 0.0],
+            [3.0, 0.0, 0.0],
+        ],
+        dtype=float,
+    )
+    current_values = np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0, 0.5, 0.2],
+            [2.0, 1.0, 0.4],
+            [3.0, 0.0, 0.0],
+        ],
+        dtype=float,
+    )
+    np.savez(
+        selected_path,
+        main_cols=cols,
+        main_values=selected_values,
+        meta_json=json.dumps({}, ensure_ascii=False),
+    )
+    np.savez(
+        current_path,
+        main_cols=cols,
+        main_values=current_values,
+        meta_json=json.dumps({}, ensure_ascii=False),
+    )
+
+    runtime = DesktopResultsRuntime(repo_root=tmp_path, python_executable=sys.executable)
+    artifact = DesktopResultsArtifact(
+        key="selected_npz",
+        title="Selected compare result",
+        category="results",
+        path=selected_path,
+    )
+    snapshot = SimpleNamespace(
+        latest_npz_path=current_path,
+        latest_pointer_json_path=None,
+        recent_artifacts=(artifact,),
+        result_context_fields=(
+            DesktopResultsContextField(
+                key="run_id",
+                title="Run ID",
+                current_value="run-current",
+                selected_value="run-selected",
+                status="STALE",
+                detail="run differs",
+            ),
+        ),
+        result_context_state="STALE",
+        result_context_banner="",
+        result_context_detail="",
+        result_context_action="",
+        selected_run_contract_status="CURRENT",
+        selected_run_contract_banner="",
+        selected_run_contract_path=None,
+        selected_run_contract_hash="",
+        latest_optimizer_pointer_json_path=None,
+        latest_optimizer_run_dir=None,
+        latest_validation_json_path=None,
+        latest_validation_md_path=None,
+        diagnostics_evidence_manifest_path=None,
+        latest_capture_export_manifest_path=None,
+    )
+
+    preview = runtime.build_hosted_compare_delta_timeline_preview(
+        snapshot,
+        artifact=artifact,
+        series_name="roll_deg",
+        max_points=3,
+    )
+
+    assert preview["status"] == "READY"
+    assert preview["reference_label"] == "run-selected"
+    assert preview["compare_label"] == "run-current"
+    assert preview["table"] == "main"
+    assert preview["signal"] == "roll_deg"
+    assert preview["point_count"] == 4
+    assert preview["hotspot_time"] == pytest.approx(2.0)
+    assert preview["hotspot_peak"] == pytest.approx(1.0)
+    assert preview["hotspot_signed_delta"] == pytest.approx(1.0)
+    assert preview["hotspot_reference_value"] == pytest.approx(0.0)
+    assert preview["hotspot_compare_value"] == pytest.approx(1.0)
+    assert preview["note"] == (
+        "Delta timeline preview uses the selected run as reference and shows delta(t) for the compared current NPZ."
+    )
+    assert preview["summary_lines"][0] == (
+        "ref=run-selected | compare=run-current | table=main | signal=roll_deg"
+    )
+    assert preview["summary_lines"][1] == (
+        "hotspot=2.000 s | ref=0 deg | compare=1 deg | delta=1 deg"
+    )
+    assert preview["sample_points"][0] == pytest.approx((0.0, 0.0))
+    assert preview["sample_points"][-1] == pytest.approx((3.0, 0.0))
+    assert preview["context_rows"][1]["time_s"] == pytest.approx(2.0)
+    assert preview["context_rows"][1]["reference_value"] == pytest.approx(0.0)
+    assert preview["context_rows"][1]["compare_value"] == pytest.approx(1.0)
+    assert preview["context_rows"][1]["delta"] == pytest.approx(1.0)
+    assert preview["truncated"] is True
 
 
 def test_results_runtime_writes_animation_handoff_for_selected_artifact(tmp_path) -> None:
@@ -991,10 +1593,16 @@ def test_results_runtime_writes_animation_diagnostics_handoff(tmp_path) -> None:
 def test_results_workspace_page_opens_compare_through_hosted_surface(tmp_path, monkeypatch) -> None:
     npz_path = tmp_path / "latest_result.npz"
     npz_path.write_bytes(b"NPZ")
+    current_npz_path = tmp_path / "current_result.npz"
+    current_npz_path.write_bytes(b"NPZ")
+    contract_path = tmp_path / "selected_run_contract.json"
+    contract_path.write_text("{}", encoding="utf-8")
 
     class _FakeResultsRuntime:
         instances: list["_FakeResultsRuntime"] = []
         launched_paths: list[Path | None] = []
+        evidence_paths: list[Path] = []
+        animation_paths: list[Path] = []
 
         def __init__(self, *, repo_root: Path, python_executable: str) -> None:
             self.repo_root = Path(repo_root)
@@ -1022,7 +1630,7 @@ def test_results_workspace_page_opens_compare_through_hosted_surface(tmp_path, m
                     ),
                 ),
                 recent_artifacts=(artifact,),
-                latest_npz_path=npz_path,
+                latest_npz_path=current_npz_path,
                 latest_pointer_json_path=None,
                 latest_mnemo_event_log_path=None,
                 latest_capture_export_manifest_status="READY",
@@ -1052,6 +1660,280 @@ def test_results_workspace_page_opens_compare_through_hosted_surface(tmp_path, m
         def write_compare_current_context_sidecar(self, snapshot: SimpleNamespace) -> Path:
             path = tmp_path / "compare_current_context.json"
             path.write_text("{}", encoding="utf-8")
+            return path
+
+        def build_compare_current_context_sidecar(self, snapshot: SimpleNamespace) -> dict[str, object]:
+            mismatches = [
+                {
+                    "key": "run_id",
+                    "title": "Run ID",
+                    "current": "run-current",
+                    "selected": "run-selected",
+                    "detail": "run differs",
+                },
+                {
+                    "key": "segment_id",
+                    "title": "Segment",
+                    "current": "segment-a",
+                    "selected": "segment-b",
+                    "detail": "segment differs",
+                },
+            ]
+            return {
+                "current_context_ref": {
+                    "run_id": "run-current",
+                    "segment_id": "segment-a",
+                    "suite_snapshot_hash": "suite-001",
+                },
+                "selected_context_ref": {
+                    "run_id": "run-selected",
+                    "segment_id": "segment-b",
+                    "suite_snapshot_hash": "suite-001",
+                },
+                "result_context": {"state": "STALE"},
+                "mismatch_summary": {
+                    "state": "STALE",
+                    "banner": "Есть расхождения между текущим и выбранным контекстом.",
+                    "detail": "Контекст сравнения отличается от выбранного прогона.",
+                    "required_action": "Синхронизируйте выбранный прогон перед подробным разбором.",
+                    "mismatches": mismatches,
+                },
+                "mismatch_banner": {
+                    "banner_id": "BANNER-HIST-002",
+                    "mismatches": mismatches,
+                },
+                "optimizer_selected_run_contract": {
+                    "status": "CURRENT",
+                    "path": str(contract_path),
+                    "hash": "selected-contract-001",
+                },
+                "artifacts": {"selected_run_contract_path": str(contract_path)},
+                "current_context_ref_hash": "ctx-hash-001",
+            }
+
+        def build_hosted_compare_contract_preview(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+            *,
+            series_name: str | None = None,
+            selected_table: str = "main",
+        ) -> dict[str, object]:
+            return {
+                "status": "READY",
+                "selected_table": selected_table,
+                "selected_metrics": ("roll_deg", "z_body_mm"),
+                "selected_time_window": (0.0, 2.0),
+                "alignment_mode": "time_s",
+                "run_ref_source": "npz_meta",
+                "summary_text": (
+                    "Контракт сравнения сформирован.\n"
+                    "Таблица: main | Сигналы: 2 | Окно времени: 0.000..2.000 s"
+                ),
+                "summary_lines": (
+                    "Контракт сравнения сформирован.",
+                    "Таблица: main | Сигналы: 2 | Окно времени: 0.000..2.000 s",
+                ),
+                "mismatch_banner_text": "расчётные данные различаются: хэш цели",
+                "compare_contract_hash": "compare-contract-001",
+                "contract": {"selected_table": selected_table},
+            }
+
+        def build_hosted_compare_session_preview(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+            *,
+            series_name: str | None = None,
+            selected_table: str = "main",
+            current_context_path: Path | None = None,
+        ) -> dict[str, object]:
+            return {
+                "status": "READY",
+                "session_source": "desktop_results_runtime_hosted_compare",
+                "run_refs_count": 2,
+                "npz_count": 1,
+                "reference_label": "run-selected",
+                "playhead_t": 1.0,
+                "labels": ("run-selected", "run-current"),
+                "mode": "overlay",
+                "timeline_target": {
+                    "signal": "roll_deg",
+                    "pair_label": "run-selected -> run-current",
+                    "time_window": (0.0, 2.0),
+                },
+                "run_rows": (
+                    {
+                        "label": "run-selected",
+                        "role": "reference",
+                        "source": "selected_result",
+                        "path_name": "latest_result.npz",
+                        "run_id": "run-selected",
+                    },
+                    {
+                        "label": "run-current",
+                        "role": "current_context",
+                        "source": "current_context",
+                        "path_name": "compare_current_context.json",
+                        "run_id": "run-current",
+                    },
+                ),
+                "summary_lines": (
+                    "runs=2 | npz=1 | mode=overlay",
+                    "table=main | signals=2 | window=0.000..2.000 s",
+                    "reference=run-selected | playhead=1.000 s | context=STALE",
+                ),
+                "payload": {
+                    "table": selected_table,
+                    "signals": ["roll_deg", "z_body_mm"],
+                    "current_context_path": str(current_context_path or ""),
+                },
+            }
+
+        def build_hosted_compare_peak_heat_preview(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+            *,
+            series_name: str | None = None,
+            selected_table: str = "main",
+            max_signals: int = 6,
+        ) -> dict[str, object]:
+            return {
+                "status": "READY",
+                "reference_label": "run-selected",
+                "compare_label": "run-current",
+                "table": selected_table,
+                "run_count": 2,
+                "signal_count": 2,
+                "hotspot_signal": "roll_deg",
+                "hotspot_run": "run-current",
+                "hotspot_time": 1.0,
+                "hotspot_peak": 1.0,
+                "hotspot_signed_delta": 1.0,
+                "hotspot_unit": "deg",
+                "dominant_signal": "roll_deg",
+                "dominant_run": "run-current",
+                "signal_competition": 1,
+                "run_competition": 1,
+                "bridge_headline": "Peak heat already isolates one dominant signal.",
+                "bridge_detail": (
+                    "Use Delta timeline to inspect roll_deg near 1.000 s and confirm the mismatch stays local."
+                ),
+                "bridge_tone": "accent",
+                "note": (
+                    "Peak heat preview uses the selected run as reference and compares it with the current latest NPZ."
+                ),
+                "summary_lines": (
+                    "ref=run-selected | compare=run-current | table=main | signals=2",
+                    "hotspot=roll_deg | run=run-current | time=1.000 s | abs_delta=1 deg",
+                    "window=0.000..2.000 s | shown=2 | truncated=no",
+                ),
+                "signal_rows": (
+                    {
+                        "name": "roll_deg",
+                        "run": "run-current",
+                        "time_s": 1.0,
+                        "peak_abs": 1.0,
+                        "signed_delta": 1.0,
+                        "unit": "deg",
+                    },
+                    {
+                        "name": "z_body_mm",
+                        "run": "run-current",
+                        "time_s": 1.0,
+                        "peak_abs": 0.4,
+                        "signed_delta": 0.4,
+                        "unit": "mm",
+                    },
+                ),
+            }
+
+        def build_hosted_compare_delta_timeline_preview(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+            *,
+            series_name: str | None = None,
+            selected_table: str = "main",
+            max_points: int = 12,
+        ) -> dict[str, object]:
+            return {
+                "status": "READY",
+                "reference_label": "run-selected",
+                "compare_label": "run-current",
+                "table": selected_table,
+                "signal": "roll_deg",
+                "point_count": 4,
+                "time_window": (0.0, 2.0),
+                "hotspot_time": 1.0,
+                "hotspot_peak": 1.0,
+                "hotspot_signed_delta": 1.0,
+                "hotspot_reference_value": 0.0,
+                "hotspot_compare_value": 1.0,
+                "unit": "deg",
+                "note": (
+                    "Delta timeline preview uses the selected run as reference and shows delta(t) for the compared current NPZ."
+                ),
+                "summary_lines": (
+                    "ref=run-selected | compare=run-current | table=main | signal=roll_deg",
+                    "hotspot=1.000 s | ref=0 deg | compare=1 deg | delta=1 deg",
+                    "window=0.000..2.000 s | points=4 | shown=4 | truncated=no",
+                ),
+                "sample_points": (
+                    (0.0, 0.0),
+                    (1.0, 1.0),
+                    (2.0, 0.2),
+                    (3.0, 0.0),
+                ),
+                "context_rows": (
+                    {"time_s": 0.0, "reference_value": 0.0, "compare_value": 0.0, "delta": 0.0},
+                    {"time_s": 1.0, "reference_value": 0.0, "compare_value": 1.0, "delta": 1.0},
+                    {"time_s": 2.0, "reference_value": 0.0, "compare_value": 0.2, "delta": 0.2},
+                    {"time_s": 3.0, "reference_value": 0.0, "compare_value": 0.0, "delta": 0.0},
+                ),
+                "truncated": False,
+            }
+
+        def build_hosted_compare_open_timeline_preview(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+            *,
+            max_valves: int = 8,
+        ) -> dict[str, object]:
+            return {
+                "status": "READY",
+                "reference_label": "run-selected",
+                "valve_count": 3,
+                "changed_count": 2,
+                "active_count": 2,
+                "time_window": (0.0, 2.0),
+                "note": "Open timeline: changed valves are prioritised first.",
+                "summary_lines": (
+                    "ref=run-selected | valves=3 | changed=2 | active=2",
+                    "time=0.000..2.000 s | shown=2 | truncated=no",
+                ),
+                "valve_rows": (
+                    {"name": "valve_A", "changed": 1, "active": 1, "transitions": 2, "duty": 0.50},
+                    {"name": "valve_B", "changed": 1, "active": 0, "transitions": 1, "duty": 0.25},
+                ),
+            }
+
+        def write_diagnostics_evidence_manifest(self, snapshot: SimpleNamespace) -> Path:
+            path = tmp_path / "diagnostics_evidence_manifest.json"
+            path.write_text("{}", encoding="utf-8")
+            self.__class__.evidence_paths.append(path)
+            return path
+
+        def write_analysis_animation_handoff(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+        ) -> Path:
+            path = tmp_path / "analysis_animation_handoff.json"
+            path.write_text("{}", encoding="utf-8")
+            self.__class__.animation_paths.append(path)
             return path
 
         def launch_compare_viewer(
@@ -1087,6 +1969,9 @@ def test_results_workspace_page_opens_compare_through_hosted_surface(tmp_path, m
         assert dock.property("spec_child_window_role") == "detail"
         dock_table = dock.findChild(QtWidgets.QTableWidget, "CHILD-COMPARE-TABLE")
         assert dock_table is not None
+        compare_plot = dock.widget().findChild(QtWidgets.QGraphicsView, "CHILD-COMPARE-PLOT")
+        assert compare_plot is not None
+        assert "roll deg" in compare_plot.toolTip()
         preview_values = {
             page.results_compare_preview_table.item(row, 1).text()
             for row in range(page.results_compare_preview_table.rowCount())
@@ -1098,7 +1983,525 @@ def test_results_workspace_page_opens_compare_through_hosted_surface(tmp_path, m
             for row in range(dock_table.rowCount())
         )
         assert "Сравнение показано" in page.results_action_label.text()
+        dock_values = {
+            dock_table.item(row, column).text()
+            for row in range(dock_table.rowCount())
+            for column in range(dock_table.columnCount())
+            if dock_table.item(row, column) is not None
+        }
+        assert "selected-contract-001" in dock_values
+        assert "run-current" in dock_values
+        assert "run-selected" in dock_values
+        assert "BANNER-HIST-002" in dock_values
+        assert "ctx-hash-001" in dock_values
+        assert "main" in dock_values
+        assert "0.000 .. 2.000" in dock_values
+        assert "time_s" in dock_values
+        assert "npz_meta" in dock_values
+        assert "compare-contract-001" in dock_values
+        assert "desktop_results_runtime_hosted_compare" in dock_values
+        assert "overlay" in dock_values
+        assert "1.000 s" in dock_values
+        assert "roll deg" in dock_values
+        assert "run-selected -> run-current" in dock_values
+        assert "Peak heat preview uses the selected run as reference and compares it with the current latest NPZ." in dock_values
+        assert "Peak heat already isolates one dominant signal." in dock_values
+        assert "Use Delta timeline to inspect roll deg near 1.000 s and confirm the mismatch stays local." in dock_values
+        assert "accent" in dock_values
+        assert "Delta timeline preview uses the selected run as reference and shows delta(t) for the compared current NPZ." in dock_values
+        assert any(
+            "run-selected" in text and "role=reference" in text and "source=selected result" in text and "latest result.npz" in text
+            for text in dock_values
+        )
+        assert any(
+            "run-current" in text and "role=current context" in text and "source=current context" in text and "compare current context.json" in text
+            for text in dock_values
+        )
+        assert any(
+            text.startswith("roll_deg | run=run-current | time=1.000 s | abs_delta=1")
+            and "signed_delta=1" in text
+            and "unit=deg" in text
+            for text in dock_values
+        )
+        assert any(
+            text.startswith("z_body_mm | run=run-current | time=1.000 s | abs_delta=0.4")
+            and "signed_delta=0.4" in text
+            and "unit=mm" in text
+            for text in dock_values
+        )
+        assert any(
+            "t=1.000 s" in text
+            and "| ref=" in text
+            and "| compare=" in text
+            and "| delta=" in text
+            and "1" in text
+            and text.endswith("deg")
+            for text in dock_values
+        )
+        assert any(
+            "t=2.000 s" in text
+            and "| ref=" in text
+            and "| compare=" in text
+            and "| delta=" in text
+            and "0.2" in text
+            and text.endswith("deg")
+            for text in dock_values
+        )
+        assert "Open timeline: changed valves are prioritised first." in dock_values
+        assert "valve_A | changed=1 | active=1 | transitions=2 | duty=0.50" in dock_values
+        assert "valve_B | changed=1 | active=0 | transitions=1 | duty=0.25" in dock_values
+        assert "Контракт сравнения сформирован." in dock_values
         assert "results.compare.open" in window.recent_command_ids
+
+        expected_child_docks = {
+            "results.compare.prepare": (
+                "child_dock_results_compare_context",
+                "CHILD-RESULTS-COMPARE-CONTEXT-TABLE",
+            ),
+            "results.evidence.prepare": (
+                "child_dock_results_evidence",
+                "CHILD-RESULTS-EVIDENCE-TABLE",
+            ),
+            "results.animation.prepare": (
+                "child_dock_results_animation_handoff",
+                "CHILD-RESULTS-ANIMATION-HANDOFF-TABLE",
+            ),
+        }
+        for command_id, (dock_name, table_name) in expected_child_docks.items():
+            window.run_command(command_id)
+            app.processEvents()
+            child = window.findChild(QtWidgets.QDockWidget, dock_name)
+            assert child is not None
+            assert child.property("spec_command_id") == command_id
+            table = child.findChild(QtWidgets.QTableWidget, table_name)
+            assert table is not None
+            assert table.rowCount() > 0
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_results_workspace_page_cycles_compare_target_and_signal_through_hosted_surface(
+    tmp_path, monkeypatch
+) -> None:
+    latest_path = tmp_path / "latest_compare_result.npz"
+    selected_path = tmp_path / "selected_compare_result.npz"
+    current_path = tmp_path / "current_compare_result.npz"
+    contract_path = tmp_path / "selected_run_contract.json"
+    latest_path.write_bytes(b"NPZ")
+    selected_path.write_bytes(b"NPZ")
+    current_path.write_bytes(b"NPZ")
+    contract_path.write_text("{}", encoding="utf-8")
+
+    class _FakeResultsRuntime:
+        def __init__(self, *, repo_root: Path, python_executable: str) -> None:
+            self.repo_root = Path(repo_root)
+            self.python_executable = python_executable
+
+        def snapshot(self) -> SimpleNamespace:
+            latest_artifact = SimpleNamespace(
+                key="latest_npz",
+                title="Latest compare artifact",
+                category="results",
+                path=latest_path,
+                detail="",
+            )
+            selected_artifact = SimpleNamespace(
+                key="selected_npz",
+                title="Selected compare artifact",
+                category="results",
+                path=selected_path,
+                detail="",
+            )
+            return SimpleNamespace(
+                result_context_state="STALE",
+                result_context_banner="Compare route is ready.",
+                result_context_detail="Selected and current contexts differ.",
+                result_context_action="Inspect the hosted compare dock.",
+                validation_overview_rows=(
+                    SimpleNamespace(
+                        title="Compare",
+                        status="READY",
+                        detail="Artifacts are available.",
+                        next_action="Open compare.",
+                    ),
+                ),
+                recent_artifacts=(latest_artifact, selected_artifact),
+                latest_npz_path=current_path,
+                latest_pointer_json_path=None,
+                latest_mnemo_event_log_path=None,
+                latest_capture_export_manifest_status="READY",
+                mnemo_current_mode="idle",
+                mnemo_recent_titles=(),
+                operator_recommendations=("Open compare.",),
+                selected_run_contract_status="CURRENT",
+                selected_run_contract_banner="Selected run is current.",
+                selected_run_contract_path=contract_path,
+                selected_run_contract_hash="selected-contract-switch-001",
+                result_context_fields=(
+                    DesktopResultsContextField(
+                        key="run_id",
+                        title="Run ID",
+                        current_value="run-current",
+                        selected_value="run-selected",
+                        status="STALE",
+                        detail="run differs",
+                    ),
+                ),
+            )
+
+        def artifact_by_key(
+            self, snapshot: SimpleNamespace, artifact_key: str
+        ) -> SimpleNamespace | None:
+            for artifact in snapshot.recent_artifacts:
+                if artifact.key == artifact_key:
+                    return artifact
+            return None
+
+        def compare_viewer_path(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+        ) -> Path | None:
+            return artifact.path if artifact is not None else snapshot.latest_npz_path
+
+        def artifact_preview_lines(self, artifact: SimpleNamespace) -> tuple[str, ...]:
+            return (f"artifact={artifact.path.name}",)
+
+        def chart_preview_rows(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+        ) -> tuple[dict[str, str], ...]:
+            artifact_stem = artifact.path.stem if artifact is not None else "latest_compare_result"
+            return (
+                {
+                    "series": "roll_deg",
+                    "points": "42; форма 42",
+                    "range": f"{artifact_stem}: -1 .. 1",
+                    "role": "compare-primary",
+                },
+                {
+                    "series": "z_body_mm",
+                    "points": "42; форма 42",
+                    "range": f"{artifact_stem}: 0 .. 12",
+                    "role": "compare-secondary",
+                },
+            )
+
+        def write_compare_current_context_sidecar(self, snapshot: SimpleNamespace) -> Path:
+            path = tmp_path / "compare_current_context_switch.json"
+            path.write_text("{}", encoding="utf-8")
+            return path
+
+        def build_compare_current_context_sidecar(
+            self, snapshot: SimpleNamespace
+        ) -> dict[str, object]:
+            return {
+                "current_context_ref": {"run_id": "run-current"},
+                "selected_context_ref": {"run_id": "run-selected"},
+                "result_context": {"state": "STALE"},
+                "mismatch_summary": {
+                    "state": "STALE",
+                    "banner": "Contexts differ.",
+                    "detail": "Selected and current contexts differ.",
+                    "required_action": "Use hosted compare controls.",
+                    "mismatches": (
+                        {
+                            "key": "run_id",
+                            "title": "Run ID",
+                            "current": "run-current",
+                            "selected": "run-selected",
+                            "detail": "run differs",
+                        },
+                    ),
+                },
+                "mismatch_banner": {
+                    "banner_id": "BANNER-SWITCH-001",
+                },
+                "optimizer_selected_run_contract": {
+                    "status": "CURRENT",
+                    "path": str(contract_path),
+                    "hash": "selected-contract-switch-001",
+                },
+                "artifacts": {"selected_run_contract_path": str(contract_path)},
+                "current_context_ref_hash": "ctx-switch-001",
+            }
+
+        def build_hosted_compare_contract_preview(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+            *,
+            series_name: str | None = None,
+            selected_table: str = "main",
+        ) -> dict[str, object]:
+            active_signal = series_name or "roll_deg"
+            return {
+                "status": "READY",
+                "selected_table": selected_table,
+                "selected_metrics": (active_signal, "z_body_mm"),
+                "selected_time_window": (0.0, 2.0),
+                "alignment_mode": "time_s",
+                "run_ref_source": "npz_meta",
+                "summary_lines": (
+                    f"signal={active_signal}",
+                    "window=0.000..2.000 s",
+                ),
+                "mismatch_banner_text": "contexts differ",
+                "compare_contract_hash": "compare-switch-001",
+                "contract": {"selected_table": selected_table},
+            }
+
+        def build_hosted_compare_session_preview(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+            *,
+            series_name: str | None = None,
+            selected_table: str = "main",
+            current_context_path: Path | None = None,
+        ) -> dict[str, object]:
+            active_signal = series_name or "roll_deg"
+            artifact_label = artifact.path.stem if artifact is not None else "latest_compare_result"
+            return {
+                "status": "READY",
+                "session_source": "desktop_results_runtime_hosted_compare",
+                "run_refs_count": 2,
+                "npz_count": 2,
+                "reference_label": artifact_label,
+                "playhead_t": 1.0,
+                "labels": (artifact_label, "run-current"),
+                "mode": "overlay",
+                "timeline_target": {
+                    "signal": active_signal,
+                    "pair_label": f"{artifact_label} -> run-current",
+                    "time_window": (0.0, 2.0),
+                },
+                "run_rows": (
+                    {
+                        "label": artifact_label,
+                        "role": "reference",
+                        "source": "selected_result",
+                        "path_name": artifact.path.name if artifact is not None else latest_path.name,
+                        "run_id": "run-selected",
+                    },
+                    {
+                        "label": "run-current",
+                        "role": "current_context",
+                        "source": "current_context",
+                        "path_name": Path(current_context_path or "").name,
+                        "run_id": "run-current",
+                    },
+                ),
+                "summary_lines": (
+                    f"signal={active_signal}",
+                    f"artifact={artifact_label}",
+                ),
+            }
+
+        def build_hosted_compare_peak_heat_preview(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+            *,
+            series_name: str | None = None,
+            selected_table: str = "main",
+            max_signals: int = 6,
+        ) -> dict[str, object]:
+            active_signal = series_name or "roll_deg"
+            unit = "mm" if active_signal == "z_body_mm" else "deg"
+            peak = 0.4 if active_signal == "z_body_mm" else 1.0
+            return {
+                "status": "READY",
+                "reference_label": "run-selected",
+                "compare_label": "run-current",
+                "table": selected_table,
+                "run_count": 2,
+                "signal_count": 2,
+                "hotspot_signal": active_signal,
+                "hotspot_run": "run-current",
+                "hotspot_time": 1.0,
+                "hotspot_peak": peak,
+                "hotspot_signed_delta": peak,
+                "hotspot_unit": unit,
+                "dominant_signal": active_signal,
+                "dominant_run": "run-current",
+                "signal_competition": 1,
+                "run_competition": 1,
+                "bridge_headline": "Peak heat already isolates one dominant signal.",
+                "bridge_detail": f"Use Delta timeline to inspect {active_signal} near 1.000 s.",
+                "bridge_tone": "accent",
+                "summary_lines": (f"signal={active_signal}",),
+                "signal_rows": (
+                    {
+                        "name": active_signal,
+                        "run": "run-current",
+                        "time_s": 1.0,
+                        "peak_abs": peak,
+                        "signed_delta": peak,
+                        "unit": unit,
+                    },
+                ),
+            }
+
+        def build_hosted_compare_delta_timeline_preview(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+            *,
+            series_name: str | None = None,
+            selected_table: str = "main",
+            max_points: int = 12,
+        ) -> dict[str, object]:
+            active_signal = series_name or "roll_deg"
+            unit = "mm" if active_signal == "z_body_mm" else "deg"
+            peak = 0.4 if active_signal == "z_body_mm" else 1.0
+            return {
+                "status": "READY",
+                "reference_label": "run-selected",
+                "compare_label": "run-current",
+                "table": selected_table,
+                "signal": active_signal,
+                "point_count": 3,
+                "time_window": (0.0, 2.0),
+                "hotspot_time": 1.0,
+                "hotspot_peak": peak,
+                "hotspot_signed_delta": peak,
+                "hotspot_reference_value": 0.0,
+                "hotspot_compare_value": peak,
+                "unit": unit,
+                "summary_lines": (
+                    f"signal={active_signal}",
+                    f"hotspot=1.000 s | ref=0 {unit} | compare={peak:g} {unit} | delta={peak:g} {unit}",
+                ),
+                "sample_points": ((0.0, 0.0), (1.0, peak), (2.0, 0.0)),
+                "context_rows": (
+                    {
+                        "time_s": 0.0,
+                        "reference_value": 0.0,
+                        "compare_value": 0.0,
+                        "delta": 0.0,
+                    },
+                    {
+                        "time_s": 1.0,
+                        "reference_value": 0.0,
+                        "compare_value": peak,
+                        "delta": peak,
+                    },
+                    {
+                        "time_s": 2.0,
+                        "reference_value": 0.0,
+                        "compare_value": 0.0,
+                        "delta": 0.0,
+                    },
+                ),
+                "truncated": False,
+            }
+
+    settings_path = tmp_path / "desktop_spec_shell_compare_switch_state.ini"
+    monkeypatch.setenv("PNEUMO_GUI_SPEC_SHELL_STATE_PATH", str(settings_path))
+    monkeypatch.setattr(workspace_pages_module, "DesktopResultsRuntime", _FakeResultsRuntime)
+
+    app = _app()
+    window = DesktopGuiSpecMainWindow()
+    try:
+        page = window._page_widget_by_workspace_id["results_analysis"]
+        assert isinstance(page, ResultsWorkspacePage)
+        window.run_command("results.center.open")
+        app.processEvents()
+
+        page.results_artifacts_table.selectRow(0)
+        page.results_chart_preview_table.selectRow(0)
+        app.processEvents()
+        assert page.results_compare_next_target_button.isEnabled() is True
+        assert page.results_compare_next_signal_button.isEnabled() is True
+        assert page.results_compare_next_playhead_button.isEnabled() is True
+        assert page.results_compare_next_window_button.isEnabled() is True
+
+        window.run_command("results.compare.open")
+        app.processEvents()
+        dock = window.findChild(QtWidgets.QDockWidget, "child_dock_results_compare")
+        assert dock is not None
+        assert dock.property("spec_command_id") == "results.compare.open"
+        assert "roll deg" in page.results_action_label.text()
+        compare_plot = dock.widget().findChild(QtWidgets.QGraphicsView, "CHILD-COMPARE-PLOT")
+        assert compare_plot is not None
+        assert "roll deg" in compare_plot.toolTip()
+
+        window.run_command("results.compare.signal.next")
+        app.processEvents()
+        dock = window.findChild(QtWidgets.QDockWidget, "child_dock_results_compare")
+        assert dock is not None
+        assert page.results_chart_preview_table.currentRow() == 1
+        assert "results.compare.signal.next" in window.recent_command_ids
+        assert "z body mm" in page.results_action_label.text()
+        signal_table = dock.findChild(QtWidgets.QTableWidget, "CHILD-COMPARE-TABLE")
+        assert signal_table is not None
+        signal_values = {
+            signal_table.item(row, column).text()
+            for row in range(signal_table.rowCount())
+            for column in range(signal_table.columnCount())
+            if signal_table.item(row, column) is not None
+        }
+        assert any("z_body_mm" in text or "z body mm" in text for text in signal_values)
+        compare_plot = dock.widget().findChild(QtWidgets.QGraphicsView, "CHILD-COMPARE-PLOT")
+        assert compare_plot is not None
+        assert "z body mm" in compare_plot.toolTip()
+
+        window.run_command("results.compare.target.next")
+        app.processEvents()
+        dock = window.findChild(QtWidgets.QDockWidget, "child_dock_results_compare")
+        assert dock is not None
+        assert page.results_artifacts_table.currentRow() == 1
+        assert page.results_chart_preview_table.currentRow() == 1
+        assert "results.compare.target.next" in window.recent_command_ids
+        assert "selected compare result" in page.results_action_label.text()
+        target_table = dock.findChild(QtWidgets.QTableWidget, "CHILD-COMPARE-TABLE")
+        assert target_table is not None
+        compare_plot = dock.widget().findChild(QtWidgets.QGraphicsView, "CHILD-COMPARE-PLOT")
+        assert compare_plot is not None
+        assert "selected compare result" in compare_plot.toolTip()
+
+        window.run_command("results.compare.playhead.next")
+        app.processEvents()
+        dock = window.findChild(QtWidgets.QDockWidget, "child_dock_results_compare")
+        assert dock is not None
+        assert "results.compare.playhead.next" in window.recent_command_ids
+        assert "2.000 s" in page.results_action_label.text()
+        playhead_table = dock.findChild(QtWidgets.QTableWidget, "CHILD-COMPARE-TABLE")
+        assert playhead_table is not None
+        playhead_values = {
+            playhead_table.item(row, column).text()
+            for row in range(playhead_table.rowCount())
+            for column in range(playhead_table.columnCount())
+            if playhead_table.item(row, column) is not None
+        }
+        assert any(value.endswith("/3") for value in playhead_values)
+        compare_plot = dock.widget().findChild(QtWidgets.QGraphicsView, "CHILD-COMPARE-PLOT")
+        assert compare_plot is not None
+        assert "точка 2.000 s" in compare_plot.toolTip()
+
+        window.run_command("results.compare.window.next")
+        app.processEvents()
+        dock = window.findChild(QtWidgets.QDockWidget, "child_dock_results_compare")
+        assert dock is not None
+        assert "results.compare.window.next" in window.recent_command_ids
+        assert "1.500 .. 2.000 s" in page.results_action_label.text()
+        window_table = dock.findChild(QtWidgets.QTableWidget, "CHILD-COMPARE-TABLE")
+        assert window_table is not None
+        window_values = {
+            window_table.item(row, column).text()
+            for row in range(window_table.rowCount())
+            for column in range(window_table.columnCount())
+            if window_table.item(row, column) is not None
+        }
+        assert any(value.endswith("/3") for value in window_values)
+        compare_plot = dock.widget().findChild(QtWidgets.QGraphicsView, "CHILD-COMPARE-PLOT")
+        assert compare_plot is not None
+        assert "окно 1.500 .. 2.000 s" in compare_plot.toolTip()
+        assert len(window.findChildren(QtWidgets.QDockWidget, "child_dock_results_compare")) == 1
     finally:
         window.close()
         window.deleteLater()
@@ -1583,6 +2986,26 @@ def test_animation_workspace_page_uses_analysis_handoff_artifact(tmp_path, monke
         app.processEvents()
         assert _FakeResultsRuntime.diagnostics_handoff_paths == [selected_path]
         assert "Материал передан в проверку проекта" in page.animation_action_label.text()
+        diagnostics_dock = window.findChild(
+            QtWidgets.QDockWidget,
+            "child_dock_animation_diagnostics_handoff",
+        )
+        assert diagnostics_dock is not None
+        assert diagnostics_dock.windowTitle() == "Передача анимации в диагностику"
+        assert diagnostics_dock.property("spec_command_id") == "animation.diagnostics.prepare"
+        assert (
+            diagnostics_dock.findChild(
+                QtWidgets.QWidget,
+                "CHILD-ANIMATION-DIAGNOSTICS-HANDOFF-CONTENT",
+            )
+            is not None
+        )
+        diagnostics_table = diagnostics_dock.findChild(
+            QtWidgets.QTableWidget,
+            "CHILD-ANIMATION-DIAGNOSTICS-HANDOFF-TABLE",
+        )
+        assert diagnostics_table is not None
+        assert diagnostics_table.rowCount() > 0
     finally:
         window.close()
         window.deleteLater()
@@ -1817,11 +3240,16 @@ def test_hosted_baseline_workspace_page_runs_native_request_in_background(
         assert page.run_setup_open_log_button.isEnabled()
         assert page.run_setup_open_result_button.isEnabled()
 
-        page.handle_command("baseline.run.open_log")
-        page.handle_command("baseline.run.open_result")
+        log_result = page.handle_command("baseline.run.open_log")
+        result_result = page.handle_command("baseline.run.open_result")
 
-        assert Path(opened_paths[0]) == Path(request["paths"]["log"])
-        assert Path(opened_paths[1]) == Path(request["paths"]["run_dir"])
+        assert opened_paths == []
+        assert isinstance(log_result, dict)
+        assert log_result["child_dock"]["object_name"] == "child_dock_baseline_log"
+        assert any(str(request["paths"]["log"]) in row for row in log_result["child_dock"]["rows"])
+        assert isinstance(result_result, dict)
+        assert result_result["child_dock"]["object_name"] == "child_dock_baseline_artifacts"
+        assert any(str(request["paths"]["run_dir"]) in row for row in result_result["child_dock"]["rows"])
     finally:
         page.close()
         page.deleteLater()
@@ -1939,8 +3367,8 @@ def test_hosted_baseline_workspace_page_requires_explicit_action_before_restore(
         assert page.run_setup_plain_launch_button.text() == "Подготовить запуск"
         assert page.run_setup_execute_button.text() == "Запустить в фоне"
         assert page.run_setup_cancel_button.text() == "Отменить запуск"
-        assert page.run_setup_open_log_button.text() == "Открыть журнал"
-        assert page.run_setup_open_result_button.text() == "Открыть папку результата"
+        assert page.run_setup_open_log_button.text() == "Показать журнал"
+        assert page.run_setup_open_result_button.text() == "Показать результаты"
         assert not hasattr(page, "run_setup_advanced_button")
         assert "Профиль запуска" in page.run_setup_summary_label.text()
         assert "Готовность набора испытаний" in page.run_setup_gate_label.text()

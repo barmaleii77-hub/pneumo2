@@ -422,7 +422,7 @@ def build_ring_workspace_summary(
         WorkspaceSummaryFact(
             "Длина и время",
             f"Длина круга: {ring_length:.2f} м. Круг: {lap_time:.2f} с. Всего: {total_time:.2f} с.",
-            "Эти значения вычислены runtime-моделью, а не введены вручную в shell.",
+            "Эти значения рассчитаны из текущего сценария и не редактируются вручную на этой сводке.",
         ),
         WorkspaceSummaryFact(
             "Шов и замыкание",

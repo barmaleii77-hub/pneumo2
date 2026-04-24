@@ -36,6 +36,7 @@ from pneumo_solver_ui.desktop_shell.command_search import (
 from pneumo_solver_ui.desktop_shell.external_launch import build_shell_context_env
 from pneumo_solver_ui.desktop_shell.launcher_catalog import build_desktop_launch_catalog
 from pneumo_solver_ui.desktop_shell.registry import build_desktop_shell_specs
+from pneumo_solver_ui.desktop_spec_shell import workspace_pages as workspace_pages_module
 from pneumo_solver_ui.tools import desktop_main_shell_qt as desktop_main_shell_qt_module
 
 
@@ -86,6 +87,147 @@ def _qt_app():
     return app
 
 
+def _assert_hosted_ring_editor_controls(window, QtWidgets) -> None:
+    expected_widgets = {
+        "RG-EDITOR-SPLITTER": QtWidgets.QSplitter,
+        "RG-SEGMENT-TABLE": QtWidgets.QTableWidget,
+        "RG-SEGMENT-DETAIL": QtWidgets.QWidget,
+        "RG-RING-PRESET": QtWidgets.QComboBox,
+        "RG-SEGMENT-PRESET": QtWidgets.QComboBox,
+        "RG-CLOSURE-POLICY": QtWidgets.QComboBox,
+        "RG-V0-KPH": QtWidgets.QDoubleSpinBox,
+        "RG-N-LAPS": QtWidgets.QSpinBox,
+        "RG-SEGMENT-NAME": QtWidgets.QLineEdit,
+        "RG-SEGMENT-DURATION-S": QtWidgets.QDoubleSpinBox,
+        "RG-SEGMENT-SPEED-END-KPH": QtWidgets.QDoubleSpinBox,
+        "RG-SEGMENT-TURN": QtWidgets.QComboBox,
+        "RG-SEGMENT-PASSAGE": QtWidgets.QComboBox,
+        "RG-ROAD-MODE": QtWidgets.QComboBox,
+        "RG-CROSSFALL-START-PCT": QtWidgets.QDoubleSpinBox,
+        "RG-CROSSFALL-END-PCT": QtWidgets.QDoubleSpinBox,
+        "RG-EVENTS-TABLE": QtWidgets.QTableWidget,
+        "RG-EXPORT-STATUS": QtWidgets.QLabel,
+        "RG-OUTPUT-DIR": QtWidgets.QLineEdit,
+        "RG-BUNDLE-TABLE": QtWidgets.QTableWidget,
+    }
+    for object_name, widget_type in expected_widgets.items():
+        assert window.findChild(widget_type, object_name) is not None, object_name
+
+    for object_name in (
+        "RG-BTN-SAVE-SOURCE",
+        "RG-BTN-APPLY-RING-PRESET",
+        "RG-BTN-APPLY-SEGMENT-PRESET",
+        "RG-BTN-INSERT-SEGMENT-PRESET",
+        "RG-BTN-ADD-EVENT",
+        "RG-BTN-DELETE-EVENT",
+        "RG-BTN-EXPORT-BUNDLE",
+        "RG-BTN-OPEN-OUTPUT",
+    ):
+        assert window.findChild(QtWidgets.QPushButton, object_name) is not None, object_name
+
+
+def _assert_hosted_input_editor_controls(window, QtWidgets) -> None:
+    expected_widgets = {
+        "ID-EDITOR-SPLITTER": QtWidgets.QSplitter,
+        "ID-PARAM-TABLE-VIEW": QtWidgets.QTableWidget,
+        "ID-DETAIL-PANEL": QtWidgets.QWidget,
+        "ID-FIELD-SEARCH": QtWidgets.QLineEdit,
+        "ID-FIELD-SEARCH-RESULTS": QtWidgets.QListWidget,
+        "ID-FIELD-INSPECTOR": QtWidgets.QLabel,
+        "ID-SOURCE-LABEL": QtWidgets.QLabel,
+        "ID-SNAPSHOT-STATUS": QtWidgets.QLabel,
+        "ID-SECTION-STATUS-TABLE": QtWidgets.QTableWidget,
+        "ID-QUICK-PRESET": QtWidgets.QComboBox,
+        "ID-PROFILE-LIST": QtWidgets.QComboBox,
+        "ID-PROFILE-NAME": QtWidgets.QLineEdit,
+        "ID-SNAPSHOT-LIST": QtWidgets.QComboBox,
+        "ID-SNAPSHOT-NAME": QtWidgets.QLineEdit,
+        "ID-CHANGE-TABLE": QtWidgets.QTableWidget,
+    }
+    for object_name, widget_type in expected_widgets.items():
+        assert window.findChild(widget_type, object_name) is not None, object_name
+
+    for object_name in (
+        "ID-BTN-SAVE-WORKING-COPY",
+        "ID-BTN-SAVE-HANDOFF",
+        "ID-BTN-LOAD-FILE",
+        "ID-BTN-SAVE-AS",
+        "ID-BTN-RESTORE-TEMPLATE",
+        "ID-BTN-APPLY-PRESET",
+        "ID-BTN-SAVE-PROFILE",
+        "ID-BTN-LOAD-PROFILE",
+        "ID-BTN-SAVE-SNAPSHOT",
+        "ID-BTN-LOAD-SNAPSHOT",
+    ):
+        assert window.findChild(QtWidgets.QPushButton, object_name) is not None, object_name
+
+
+def _assert_hosted_baseline_run_controls(window, QtWidgets) -> None:
+    expected_widgets = {
+        "BL-RUN-SETUP-PANEL": QtWidgets.QGroupBox,
+        "BL-RUN-PROFILE": QtWidgets.QComboBox,
+        "BL-RUN-CACHE-POLICY": QtWidgets.QComboBox,
+        "BL-RUN-RUNTIME-POLICY": QtWidgets.QComboBox,
+        "BL-RUN-GATE": QtWidgets.QLabel,
+        "BL-RUN-LAUNCH-HINT": QtWidgets.QLabel,
+        "BL-RUN-PREVIEW-POLICY": QtWidgets.QGroupBox,
+        "BL-PREVIEW-DT": QtWidgets.QDoubleSpinBox,
+        "BL-PREVIEW-T-END": QtWidgets.QDoubleSpinBox,
+        "BL-PREVIEW-ROAD-LEN": QtWidgets.QDoubleSpinBox,
+        "BL-RUN-DT": QtWidgets.QDoubleSpinBox,
+        "BL-RUN-T-END": QtWidgets.QDoubleSpinBox,
+        "BL-RUN-RECORD-FULL": QtWidgets.QCheckBox,
+        "BL-RUN-EXPORT-CSV": QtWidgets.QCheckBox,
+        "BL-RUN-EXPORT-NPZ": QtWidgets.QCheckBox,
+        "BL-RUN-AUTO-CHECK": QtWidgets.QCheckBox,
+        "BL-RUN-WRITE-LOG": QtWidgets.QCheckBox,
+        "BL-RUN-POLICY-TABLE": QtWidgets.QTableWidget,
+        "BL-HISTORY-TABLE": QtWidgets.QTableWidget,
+        "BL-MISMATCH-MATRIX": QtWidgets.QTableWidget,
+        "BL-REVIEW-DETAILS": QtWidgets.QGroupBox,
+        "BL-REVIEW-DETAILS-TABLE": QtWidgets.QTableWidget,
+    }
+    for object_name, widget_type in expected_widgets.items():
+        assert window.findChild(widget_type, object_name) is not None, object_name
+
+    for object_name in (
+        "BL-BTN-RUN-CHECK",
+        "BL-BTN-RUN-CHECKED",
+        "BL-BTN-RUN-PLAIN",
+        "BL-BTN-RUN-EXECUTE",
+        "BL-BTN-RUN-CANCEL",
+        "BL-BTN-APPLY-RUN-PROFILE",
+        "BL-BTN-RUN-OPEN-LOG",
+        "BL-BTN-RUN-OPEN-RESULT",
+        "BL-BTN-RUN-ROAD-PREVIEW",
+        "BL-BTN-RUN-WARNINGS",
+        "BL-BTN-HANDOFF-OPTIMIZATION",
+        "BL-BTN-GO-OPTIMIZATION",
+        "BL-BTN-REVIEW",
+        "BL-BTN-ADOPT",
+        "BL-BTN-RESTORE",
+    ):
+        assert window.findChild(QtWidgets.QPushButton, object_name) is not None, object_name
+
+
+def _assert_hosted_optimization_controls(window, QtWidgets) -> None:
+    assert window.findChild(QtWidgets.QGroupBox, "OP-STAGERUNNER-BLOCK") is not None
+    for object_name in (
+        "OP-BTN-CHECK",
+        "OP-BTN-LAUNCH",
+        "OP-BTN-EXECUTE",
+        "OP-BTN-SOFT-STOP",
+        "OP-BTN-HARD-STOP",
+        "OP-BTN-OPEN-LOG",
+        "OP-BTN-OPEN-RUN-DIR",
+        "OP-BTN-HISTORY",
+        "OP-BTN-FINISHED",
+        "OP-BTN-HANDOFF",
+        "OP-BTN-PACKAGING",
+    ):
+        assert window.findChild(QtWidgets.QPushButton, object_name) is not None, object_name
+
+
 def _test_project_context(tmp_path: Path) -> ShellProjectContext:
     repo_root = tmp_path / "repo"
     workspace_dir = tmp_path / "workspace"
@@ -104,6 +246,75 @@ def _test_project_context(tmp_path: Path) -> ShellProjectContext:
         workspace_source="PNEUMO_WORKSPACE_DIR",
         missing_workspace_dirs=(),
     )
+
+
+def _write_qt_shell_baseline_request(workspace_dir: Path) -> tuple[Path, Path, Path]:
+    handoff_dir = workspace_dir / "handoffs" / "WS-BASELINE"
+    log_dir = handoff_dir / "logs"
+    run_dir = workspace_dir / "desktop_runs" / "baseline_demo"
+    handoff_dir.mkdir(parents=True, exist_ok=True)
+    log_dir.mkdir(parents=True, exist_ok=True)
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    log_path = log_dir / "baseline_demo.log"
+    log_path.write_text(
+        "Подготовка базового прогона\nРасчёт завершён успешно\n",
+        encoding="utf-8",
+    )
+    (run_dir / "run_summary.json").write_text(
+        json.dumps(
+            {
+                "ok": True,
+                "scenario_name": "demo",
+                "dt_s": 0.003,
+                "t_end_s": 1.6,
+                "cache_key": "baseline-demo",
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    (run_dir / "signals.csv").write_text("t,value\n0,1\n", encoding="utf-8")
+
+    request_path = handoff_dir / "baseline_run_launch_request.json"
+    request_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "baseline_run_launch_request_v1",
+                "source_workspace": "WS-BASELINE",
+                "handoff_id": "HO-006",
+                "request_id": "baseline_demo",
+                "created_at_utc": "2026-04-23T00:00:00Z",
+                "started_at_utc": "2026-04-23T00:00:01Z",
+                "completed_at_utc": "2026-04-23T00:00:02Z",
+                "execution_status": "finished",
+                "execution_ready": True,
+                "operator_blockers": [],
+                "run_setup": {
+                    "launch_profile": "detail",
+                    "cache_policy": "reuse",
+                    "runtime_policy": "balanced",
+                },
+                "selected_test": {"index": 0, "name": "Демонстрационный прогон"},
+                "paths": {
+                    "request": str(request_path),
+                    "workspace": str(workspace_dir),
+                    "suite_snapshot": str(handoff_dir / "validated_suite_snapshot.json"),
+                    "inputs_snapshot": str(handoff_dir / "inputs_snapshot.json"),
+                    "prepared_inputs": str(handoff_dir / "baseline_run_inputs.json"),
+                    "prepared_suite": str(handoff_dir / "baseline_run_suite.json"),
+                    "run_dir": str(run_dir),
+                    "log": str(log_path),
+                },
+                "run_summary_path": str(run_dir / "run_summary.json"),
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    return request_path, log_path, run_dir
 
 
 def _write_qt_shell_analysis_context(workspace_dir: Path) -> tuple[Path, Path, Path, Path]:
@@ -469,6 +680,10 @@ def test_desktop_qt_shell_main_window_uses_qmainwindow_docks_and_search_surface(
     assert "def _reset_layout(self) -> None:" in src
     assert 'self.settings.setValue("layout/geometry", geometry)' in src
     assert 'self.settings.setValue("layout/window_state", state)' in src
+    assert "PNEUMO_QT_MAIN_SHELL_RESTORE_BINARY_LAYOUT" in src
+    assert "lambda _checked=False: self._restore_layout(restore_binary=True)" in src
+    assert "if restore_binary and isinstance(geometry, QtCore.QByteArray):" in src
+    assert "if restore_binary and isinstance(state, QtCore.QByteArray):" in src
     assert 'self.settings.setValue("layout/last_workspace_key", self._selected_tool_key)' in src
     assert 'self.settings.setValue("layout/last_surface_key", self._selected_surface_key)' in src
     assert '"project_name": self.project_context.project_name' in src
@@ -771,6 +986,48 @@ def test_desktop_qt_shell_opens_animator_ho008_artifacts_from_command_surface(
         assert launched == []
         assert window._selected_surface_key == "ws_animator"
         assert window.workspace_docks["ws_animator"].property("workspace_hosting") == "native"
+        window._handle_hosted_workspace_command("animation.animator.launch")
+        motion_dock = window.findChild(_QtWidgets.QDockWidget, "child_dock_animation_motion")
+        assert motion_dock is not None
+        assert motion_dock.property("hosted_child_dock") is True
+        assert motion_dock.isHidden() is False
+        assert motion_dock.findChild(_QtWidgets.QWidget, "CHILD-ANIMATION-MOTION-CONTENT") is not None
+        motion_table = motion_dock.findChild(_QtWidgets.QTableWidget, "CHILD-ANIMATION-MOTION-TABLE")
+        assert motion_table is not None
+        assert motion_table.rowCount() > 0
+
+        window._handle_hosted_workspace_command("animation.mnemo.launch")
+        mnemo_dock = window.findChild(_QtWidgets.QDockWidget, "child_dock_animation_mnemo")
+        assert mnemo_dock is not None
+        assert mnemo_dock.property("hosted_child_dock") is True
+        assert mnemo_dock.isHidden() is False
+        assert mnemo_dock.findChild(_QtWidgets.QWidget, "CHILD-ANIMATION-MNEMO-CONTENT") is not None
+        mnemo_table = mnemo_dock.findChild(_QtWidgets.QTableWidget, "CHILD-ANIMATION-MNEMO-TABLE")
+        assert mnemo_table is not None
+        assert mnemo_table.rowCount() > 0
+
+        window._handle_hosted_workspace_command("animation.diagnostics.prepare")
+        diagnostics_dock = window.findChild(
+            _QtWidgets.QDockWidget,
+            "child_dock_animation_diagnostics_handoff",
+        )
+        assert diagnostics_dock is not None
+        assert diagnostics_dock.property("hosted_child_dock") is True
+        assert diagnostics_dock.property("spec_command_id") == "animation.diagnostics.prepare"
+        assert diagnostics_dock.isHidden() is False
+        assert (
+            diagnostics_dock.findChild(
+                _QtWidgets.QWidget,
+                "CHILD-ANIMATION-DIAGNOSTICS-HANDOFF-CONTENT",
+            )
+            is not None
+        )
+        diagnostics_table = diagnostics_dock.findChild(
+            _QtWidgets.QTableWidget,
+            "CHILD-ANIMATION-DIAGNOSTICS-HANDOFF-TABLE",
+        )
+        assert diagnostics_table is not None
+        assert diagnostics_table.rowCount() > 0
 
         window.command_search_edit.setText("сохранение анимации")
         app.processEvents()
@@ -779,6 +1036,847 @@ def test_desktop_qt_shell_opens_animator_ho008_artifacts_from_command_surface(
         assert first.data(QtCore.Qt.ItemDataRole.UserRole + 1) == "open_artifact"
         window._activate_search_item(first)
         assert Path(opened[-1]) == capture_manifest_path.resolve()
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_desktop_qt_shell_baseline_run_log_artifacts_and_handoff_are_child_docks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _QtCore, QtGui, _QtWidgets = _qt_modules()
+    context = _test_project_context(tmp_path)
+    _request_path, _log_path, _run_dir = _write_qt_shell_baseline_request(context.workspace_dir)
+    opened: list[str] = []
+
+    monkeypatch.setattr(
+        qt_main_window_module,
+        "build_shell_project_context",
+        lambda: context,
+    )
+    monkeypatch.setattr(
+        QtGui.QDesktopServices,
+        "openUrl",
+        lambda url: opened.append(url.toLocalFile()) or True,
+    )
+
+    app = _qt_app()
+    window = qt_main_window_module.DesktopQtMainShell()
+    try:
+        app.processEvents()
+        window._handle_hosted_workspace_command("baseline.run.open_log")
+        assert opened == []
+        log_dock = window.findChild(_QtWidgets.QDockWidget, "child_dock_baseline_log")
+        assert log_dock is not None
+        assert log_dock.property("hosted_child_dock") is True
+        assert log_dock.isHidden() is False
+        assert log_dock.findChild(_QtWidgets.QWidget, "CHILD-BASELINE-LOG-CONTENT") is not None
+        log_table = log_dock.findChild(_QtWidgets.QTableWidget, "CHILD-BASELINE-LOG-TABLE")
+        assert log_table is not None
+        assert log_table.rowCount() > 0
+
+        window._handle_hosted_workspace_command("baseline.run.open_result")
+        assert opened == []
+        artifacts_dock = window.findChild(_QtWidgets.QDockWidget, "child_dock_baseline_artifacts")
+        assert artifacts_dock is not None
+        assert artifacts_dock.property("hosted_child_dock") is True
+        assert artifacts_dock.isHidden() is False
+        assert artifacts_dock.findChild(_QtWidgets.QWidget, "CHILD-BASELINE-ARTIFACTS-CONTENT") is not None
+        artifacts_table = artifacts_dock.findChild(_QtWidgets.QTableWidget, "CHILD-BASELINE-ARTIFACTS-TABLE")
+        assert artifacts_table is not None
+        assert artifacts_table.rowCount() > 0
+
+        window._handle_hosted_workspace_command("baseline.run.road_preview")
+        assert opened == []
+        road_preview_dock = window.findChild(_QtWidgets.QDockWidget, "child_dock_baseline_road_preview")
+        assert road_preview_dock is not None
+        assert road_preview_dock.property("hosted_child_dock") is True
+        assert road_preview_dock.isHidden() is False
+        assert road_preview_dock.findChild(
+            _QtWidgets.QWidget,
+            "CHILD-BASELINE-ROAD-PREVIEW-CONTENT",
+        ) is not None
+        road_preview_table = road_preview_dock.findChild(
+            _QtWidgets.QTableWidget,
+            "CHILD-BASELINE-ROAD-PREVIEW-TABLE",
+        )
+        assert road_preview_table is not None
+        assert road_preview_table.rowCount() > 0
+
+        window._handle_hosted_workspace_command("baseline.run.warnings")
+        assert opened == []
+        warnings_dock = window.findChild(_QtWidgets.QDockWidget, "child_dock_baseline_warnings")
+        assert warnings_dock is not None
+        assert warnings_dock.property("hosted_child_dock") is True
+        assert warnings_dock.isHidden() is False
+        assert warnings_dock.findChild(_QtWidgets.QWidget, "CHILD-BASELINE-WARNINGS-CONTENT") is not None
+        warnings_table = warnings_dock.findChild(_QtWidgets.QTableWidget, "CHILD-BASELINE-WARNINGS-TABLE")
+        assert warnings_table is not None
+        assert warnings_table.rowCount() > 0
+
+        window._handle_hosted_workspace_command("baseline.optimization_handoff.show")
+        handoff_dock = window.findChild(_QtWidgets.QDockWidget, "child_dock_baseline_optimization_handoff")
+        assert handoff_dock is not None
+        assert handoff_dock.property("hosted_child_dock") is True
+        assert handoff_dock.isHidden() is False
+        assert handoff_dock.findChild(
+            _QtWidgets.QWidget,
+            "CHILD-BASELINE-OPTIMIZATION-HANDOFF-CONTENT",
+        ) is not None
+        handoff_table = handoff_dock.findChild(
+            _QtWidgets.QTableWidget,
+            "CHILD-BASELINE-OPTIMIZATION-HANDOFF-TABLE",
+        )
+        assert handoff_table is not None
+        assert handoff_table.rowCount() > 0
+
+        _assert_hosted_baseline_run_controls(window, _QtWidgets)
+        go_button = window.findChild(_QtWidgets.QPushButton, "BL-BTN-GO-OPTIMIZATION")
+        assert go_button is not None
+        go_button.click()
+        app.processEvents()
+        assert window._selected_surface_key == "ws_optimization"
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_desktop_qt_shell_optimization_review_surfaces_are_child_docks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _QtCore, QtGui, _QtWidgets = _qt_modules()
+    context = _test_project_context(tmp_path)
+    opened: list[str] = []
+
+    monkeypatch.setattr(
+        qt_main_window_module,
+        "build_shell_project_context",
+        lambda: context,
+    )
+    monkeypatch.setattr(
+        QtGui.QDesktopServices,
+        "openUrl",
+        lambda url: opened.append(url.toLocalFile()) or True,
+    )
+
+    app = _qt_app()
+    window = qt_main_window_module.DesktopQtMainShell()
+    try:
+        app.processEvents()
+        expected = {
+            "optimization.history.show": (
+                "child_dock_optimization_history",
+                "CHILD-OPTIMIZATION-HISTORY-CONTENT",
+                "CHILD-OPTIMIZATION-HISTORY-TABLE",
+            ),
+            "optimization.finished.show": (
+                "child_dock_optimization_finished",
+                "CHILD-OPTIMIZATION-FINISHED-CONTENT",
+                "CHILD-OPTIMIZATION-FINISHED-TABLE",
+            ),
+            "optimization.handoff.show": (
+                "child_dock_optimization_handoff",
+                "CHILD-OPTIMIZATION-HANDOFF-CONTENT",
+                "CHILD-OPTIMIZATION-HANDOFF-TABLE",
+            ),
+            "optimization.packaging.show": (
+                "child_dock_optimization_packaging",
+                "CHILD-OPTIMIZATION-PACKAGING-CONTENT",
+                "CHILD-OPTIMIZATION-PACKAGING-TABLE",
+            ),
+        }
+        for command_id, (dock_name, content_name, table_name) in expected.items():
+            window._handle_hosted_workspace_command(command_id)
+            assert opened == []
+            dock = window.findChild(_QtWidgets.QDockWidget, dock_name)
+            assert dock is not None, dock_name
+            assert dock.property("hosted_child_dock") is True
+            assert dock.isHidden() is False
+            assert dock.findChild(_QtWidgets.QWidget, content_name) is not None
+            table = dock.findChild(_QtWidgets.QTableWidget, table_name)
+            assert table is not None
+            assert table.rowCount() > 0
+
+        _assert_hosted_optimization_controls(window, _QtWidgets)
+        assert window._selected_surface_key == "ws_optimization"
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_desktop_qt_shell_results_handoffs_are_child_docks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _QtCore, _QtGui, _QtWidgets = _qt_modules()
+    context = _test_project_context(tmp_path)
+    npz_path = tmp_path / "latest_result.npz"
+    npz_path.write_bytes(b"NPZ")
+    engineering_manifest_path = tmp_path / "latest_engineering_analysis_evidence_manifest.json"
+    engineering_manifest_path.write_text("{}", encoding="utf-8")
+    engineering_run_dir = tmp_path / "engineering_run"
+    engineering_run_dir.mkdir()
+    (engineering_run_dir / "system_influence.json").write_text("{}", encoding="utf-8")
+    (engineering_run_dir / "SYSTEM_INFLUENCE.md").write_text("# influence\n", encoding="utf-8")
+
+    class _FakeResultsRuntime:
+        def __init__(self, *, repo_root: Path, python_executable: str) -> None:
+            self.repo_root = Path(repo_root)
+            self.python_executable = python_executable
+
+        def snapshot(self) -> SimpleNamespace:
+            artifact = SimpleNamespace(
+                key="latest_npz",
+                title="Последний файл результата",
+                category="results",
+                path=npz_path,
+                detail="",
+            )
+            return SimpleNamespace(
+                result_context_state="CURRENT",
+                result_context_banner="Свежий результат готов к сравнению.",
+                validation_overview_rows=(
+                    SimpleNamespace(
+                        title="Результат",
+                        status="READY",
+                        detail="Файл результата найден.",
+                        next_action="Открыть сравнение.",
+                    ),
+                ),
+                recent_artifacts=(artifact,),
+                latest_npz_path=npz_path,
+                latest_pointer_json_path=None,
+                latest_mnemo_event_log_path=None,
+                latest_capture_export_manifest_status="READY",
+                mnemo_current_mode="нет данных",
+                mnemo_recent_titles=(),
+                operator_recommendations=("Откройте сравнение.",),
+                selected_run_contract_status="CURRENT",
+                selected_run_contract_banner="Выбранный прогон актуален.",
+            )
+
+        def artifact_by_key(self, snapshot: SimpleNamespace, artifact_key: str) -> SimpleNamespace | None:
+            for artifact in snapshot.recent_artifacts:
+                if artifact.key == artifact_key:
+                    return artifact
+            return None
+
+        def compare_viewer_path(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+        ) -> Path | None:
+            return artifact.path if artifact is not None else snapshot.latest_npz_path
+
+        def artifact_preview_lines(self, artifact: SimpleNamespace) -> tuple[str, ...]:
+            return (f"Файл результата: {artifact.path.name}", "Размер: 3 байт")
+
+        def write_compare_current_context_sidecar(self, snapshot: SimpleNamespace) -> Path:
+            path = tmp_path / "compare_current_context.json"
+            path.write_text("{}", encoding="utf-8")
+            return path
+
+        def write_diagnostics_evidence_manifest(self, snapshot: SimpleNamespace) -> Path:
+            path = tmp_path / "diagnostics_evidence_manifest.json"
+            path.write_text("{}", encoding="utf-8")
+            return path
+
+        def write_analysis_animation_handoff(
+            self,
+            snapshot: SimpleNamespace,
+            artifact: SimpleNamespace | None = None,
+        ) -> Path:
+            path = tmp_path / "analysis_animation_handoff.json"
+            path.write_text("{}", encoding="utf-8")
+            return path
+
+    class _FakeEngineeringAnalysisRuntime:
+        def __init__(self, *, repo_root: Path, python_executable: str) -> None:
+            self.repo_root = Path(repo_root)
+            self.python_executable = python_executable
+
+        def snapshot(self) -> SimpleNamespace:
+            return SimpleNamespace(
+                run_dir=engineering_run_dir,
+                status="PASS",
+                influence_status="PASS",
+                calibration_status="PASS",
+                compare_status="READY",
+                artifacts=(
+                    SimpleNamespace(
+                        key="system_influence_json",
+                        title="Данные влияния системы",
+                        category="influence",
+                        path=engineering_run_dir / "system_influence.json",
+                        status="READY",
+                    ),
+                    SimpleNamespace(
+                        key="system_influence_md",
+                        title="Отчёт влияния системы",
+                        category="report",
+                        path=engineering_run_dir / "SYSTEM_INFLUENCE.md",
+                        status="READY",
+                    ),
+                    SimpleNamespace(
+                        key="compare_influence_json",
+                        title="Поверхность сравнения влияния",
+                        category="compare_influence",
+                        path=engineering_run_dir / "compare_influence.json",
+                        status="READY",
+                    ),
+                ),
+                sensitivity_rows=(
+                    SimpleNamespace(
+                        param="p_up",
+                        group="pressure",
+                        score=1.0,
+                        status="READY",
+                        strongest_metric="body_height",
+                        strongest_elasticity=0.4,
+                    ),
+                ),
+                diagnostics_evidence_manifest_path=engineering_manifest_path,
+                diagnostics_evidence_manifest_status="READY",
+                selected_run_contract_path=tmp_path / "selected_run_contract.json",
+                selected_run_context=SimpleNamespace(
+                    run_id="run-001",
+                    objective_contract_hash="objective-hash",
+                    hard_gate_key="max_pressure",
+                ),
+                contract_status="READY",
+                blocking_states=(),
+            )
+
+        def selected_run_candidate_readiness(self, *, limit: int = 25) -> dict[str, object]:
+            return {
+                "candidate_count": 2,
+                "ready_candidate_count": 1,
+                "missing_inputs_candidate_count": 1,
+                "failed_candidate_count": 0,
+                "unique_missing_inputs": ("results_csv_path",),
+                "unique_blocking_states": (),
+                "ready_run_dirs": (str(engineering_run_dir),),
+            }
+
+        def resolve_run_dir(self, run_dir: Path | str | None = None) -> Path | None:
+            if run_dir is None:
+                return None
+            path = Path(run_dir)
+            return path if path.exists() else None
+
+        def discover_selected_run_candidates(self, *, limit: int = 25) -> tuple[dict[str, object], ...]:
+            return (
+                {
+                    "run_id": "run-001",
+                    "run_name": "engineering_run",
+                    "run_dir": str(engineering_run_dir),
+                    "bridge_status": "READY",
+                    "status": "done",
+                    "status_label": "Готов к инженерному разбору",
+                    "row_count": 10,
+                    "done_count": 10,
+                    "result_path": str(npz_path),
+                    "objective_contract_hash": "objective-hash",
+                    "hard_gate_key": "max_pressure",
+                    "missing_inputs": (),
+                    "warnings": (),
+                    "error": "",
+                },
+            )
+
+        def build_system_influence_command(
+            self,
+            run_dir: Path | str,
+            *,
+            adaptive_eps: bool = True,
+            stage_name: str = "",
+        ) -> tuple[str, ...]:
+            return (
+                str(self.python_executable),
+                "-c",
+                "print('system influence ready')",
+            )
+
+        def build_full_report_command(
+            self,
+            run_dir: Path | str,
+            *,
+            max_plots: int = 12,
+        ) -> tuple[str, ...]:
+            return (
+                str(self.python_executable),
+                "-c",
+                "print('full report ready')",
+            )
+
+        def build_param_staging_command(
+            self,
+            run_dir: Path | str,
+            *,
+            fit_ranges_json: Path | str,
+            system_influence_json: Path | str,
+            oed_report_json: Path | str | None = None,
+            out_dir: Path | str | None = None,
+        ) -> tuple[str, ...]:
+            return (
+                str(self.python_executable),
+                "-c",
+                "print('param staging ready')",
+            )
+
+        def export_selected_run_contract_from_run_dir(
+            self,
+            run_dir: Path | str,
+            *,
+            selected_from: str = "desktop_results_workspace",
+        ) -> SimpleNamespace:
+            contract_path = tmp_path / "selected_run_contract.json"
+            contract_path.write_text("{}", encoding="utf-8")
+            return SimpleNamespace(
+                ok=True,
+                status="FINISHED",
+                command=(
+                    "export_selected_run_contract_from_run_dir",
+                    str(run_dir),
+                    str(contract_path),
+                    selected_from,
+                ),
+                returncode=0,
+                run_dir=Path(run_dir),
+                artifacts=(
+                    SimpleNamespace(
+                        key="selected_run_contract_json",
+                        title="Выбранный прогон",
+                        category="handoff",
+                        path=contract_path,
+                        status="READY",
+                    ),
+                ),
+                log_text="selected_run_contract_hash=hash",
+                error="",
+            )
+
+        def analysis_workspace_pipeline_status(self, snapshot: SimpleNamespace) -> tuple[SimpleNamespace, ...]:
+            return (
+                SimpleNamespace(
+                    title="Выбранный прогон для анализа",
+                    status="READY",
+                    detail="Прогон выбран.",
+                    path=engineering_manifest_path,
+                ),
+                SimpleNamespace(
+                    title="Отчёт влияния системы",
+                    status="READY",
+                    detail="Материалы влияния найдены.",
+                    path=engineering_run_dir / "SYSTEM_INFLUENCE.md",
+                ),
+            )
+
+        def analysis_workspace_chart_table_preview(
+            self,
+            snapshot: SimpleNamespace,
+            *,
+            max_rows: int = 8,
+        ) -> dict[str, object]:
+            return {
+                "status": "READY",
+                "charts": (
+                    {
+                        "title": "Матрица влияния",
+                        "feature_count": 2,
+                        "target_count": 1,
+                        "source_path": str(engineering_run_dir / "system_influence.json"),
+                    },
+                ),
+                "tables": (
+                    {
+                        "key": "system_influence_params_csv",
+                        "title": "Параметры влияния",
+                        "status": "READY",
+                        "columns": ("param", "score"),
+                        "source_path": str(engineering_run_dir / "system_influence_params.csv"),
+                    },
+                ),
+                "sensitivity_table": {
+                    "status": "READY",
+                    "row_count": 1,
+                },
+                "warnings": (),
+            }
+
+        def validated_artifacts_summary(self, snapshot: SimpleNamespace) -> dict[str, object]:
+            return {
+                "status": "READY",
+                "required_artifact_count": 2,
+                "ready_required_artifact_count": 2,
+                "missing_required_artifact_count": 0,
+                "missing_required_artifacts": (),
+                "discovered_artifacts": (),
+            }
+
+        def analysis_compare_handoff_summary(self, snapshot: SimpleNamespace) -> dict[str, object]:
+            return {
+                "status": "READY",
+                "run_id": "run-001",
+                "run_dir": str(engineering_run_dir),
+                "selected_results_ref": str(npz_path),
+                "selected_artifact_dir": str(engineering_run_dir),
+                "compare_surface_count": 1,
+                "blocking_states": (),
+                "warnings": (),
+            }
+
+        def analysis_results_boundary_summary(self, snapshot: SimpleNamespace) -> dict[str, object]:
+            return {
+                "status": "READY",
+                "results_csv_path": str(npz_path),
+                "results_ref_exists": True,
+                "artifact_dir": str(engineering_run_dir),
+                "artifact_dir_exists": True,
+                "rules": ("Полное сравнение выполняется после выбора результата.",),
+            }
+
+        def compare_influence_surfaces(
+            self,
+            snapshot: SimpleNamespace,
+            *,
+            top_k: int = 8,
+        ) -> tuple[dict[str, object], ...]:
+            return (
+                {
+                    "title": "Матрица влияния",
+                    "source": str(engineering_run_dir / "compare_influence.json"),
+                    "axes": {
+                        "features": ({"key": "p_up", "unit": "Pa"}, {"key": "track", "unit": "m"}),
+                        "targets": ({"key": "body_height", "unit": "m"},),
+                    },
+                    "diagnostics": {
+                        "finite_cell_count": 2,
+                        "max_abs_corr": 0.81,
+                    },
+                    "top_cells": (
+                        {
+                            "feature": "p_up",
+                            "target": "body_height",
+                            "corr": 0.81,
+                            "feature_unit": "Pa",
+                            "target_unit": "m",
+                        },
+                    ),
+                },
+            )
+
+        def write_diagnostics_evidence_manifest(
+            self,
+            snapshot: SimpleNamespace,
+            *,
+            compare_surfaces: tuple[dict[str, object], ...] | None = None,
+        ) -> Path:
+            path = tmp_path / "engineering_analysis_evidence_manifest.json"
+            payload = {
+                "evidence_manifest_hash": "engineering-hash",
+                "validation": {
+                    "status": "PASS",
+                    "influence_status": "PASS",
+                    "calibration_status": "PASS",
+                    "compare_status": "READY",
+                    "selected_run_contract_status": "READY",
+                    "warnings": (),
+                },
+                "selected_artifact_list": (
+                    {"key": "system_influence_json"},
+                    {"key": "compare_influence_json"},
+                ),
+                "selected_tables": ("system_influence_params_csv",),
+                "selected_charts": ("Матрица влияния",),
+                "validated_artifacts": {
+                    "required_artifact_count": 2,
+                    "ready_required_artifact_count": 2,
+                    "missing_required_artifact_count": 0,
+                    "missing_required_artifacts": (),
+                },
+                "compare_influence_diagnostics": {
+                    "surface_count": len(tuple(compare_surfaces or ())),
+                    "surface_titles": ("Матрица влияния",),
+                },
+            }
+            path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+            return path
+
+        def export_analysis_to_animator_link_contract(
+            self,
+            snapshot: SimpleNamespace,
+            *,
+            selected_result_artifact_pointer: Path | str | None,
+            compare_contract: dict[str, object] | None = None,
+        ) -> dict[str, object]:
+            context_path = tmp_path / "analysis_context.json"
+            link_path = tmp_path / "animator_link_contract.json"
+            link_payload = {
+                "ready_state": "ready",
+                "run_id": "run-001",
+                "selected_test_id": "test-001",
+                "selected_segment_id": "all",
+                "selected_result_artifact_pointer": {
+                    "path": str(selected_result_artifact_pointer or ""),
+                    "exists": bool(selected_result_artifact_pointer),
+                },
+                "animator_link_contract_hash": "animator-link-hash",
+                "blocking_states": (),
+                "warnings": (),
+                "rules": ("Открыть рабочий шаг анимации.",),
+            }
+            payload = {
+                "analysis_context_path": str(context_path),
+                "analysis_context_hash": "analysis-context-hash",
+                "animator_link_contract_path": str(link_path),
+                "animator_link_contract_hash": "animator-link-hash",
+                "selected_result_artifact_pointer": link_payload["selected_result_artifact_pointer"],
+                "animator_link_contract": link_payload,
+            }
+            context_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+            link_path.write_text(json.dumps(link_payload, ensure_ascii=False), encoding="utf-8")
+            return payload
+
+        def analysis_animator_handoff_summary(self, snapshot: SimpleNamespace) -> dict[str, object]:
+            return {
+                "status": "READY",
+                "analysis_context_path": str(tmp_path / "analysis_context.json"),
+                "animator_link_contract_path": str(tmp_path / "animator_link_contract.json"),
+                "selected_artifact_pointer_status": "READY",
+            }
+
+    monkeypatch.setattr(qt_main_window_module, "build_shell_project_context", lambda: context)
+    monkeypatch.setattr(workspace_pages_module, "DesktopResultsRuntime", _FakeResultsRuntime)
+    monkeypatch.setattr(
+        workspace_pages_module,
+        "DesktopEngineeringAnalysisRuntime",
+        _FakeEngineeringAnalysisRuntime,
+    )
+
+    app = _qt_app()
+    window = qt_main_window_module.DesktopQtMainShell()
+    try:
+        app.processEvents()
+        results_page = window.workspace_hosted_widgets.get("ws_analysis")
+        assert isinstance(results_page, workspace_pages_module.ResultsWorkspacePage)
+        expected = {
+            "results.compare.prepare": (
+                "child_dock_results_compare_context",
+                "CHILD-RESULTS-COMPARE-CONTEXT-CONTENT",
+                "CHILD-RESULTS-COMPARE-CONTEXT-TABLE",
+            ),
+            "results.evidence.prepare": (
+                "child_dock_results_evidence",
+                "CHILD-RESULTS-EVIDENCE-CONTENT",
+                "CHILD-RESULTS-EVIDENCE-TABLE",
+            ),
+            "results.run_materials.show": (
+                "child_dock_results_run_materials",
+                "CHILD-RESULTS-RUN-MATERIALS-CONTENT",
+                "CHILD-RESULTS-RUN-MATERIALS-TABLE",
+            ),
+            "results.selected_material.show": (
+                "child_dock_results_selected_material",
+                "CHILD-RESULTS-SELECTED-MATERIAL-CONTENT",
+                "CHILD-RESULTS-SELECTED-MATERIAL-TABLE",
+            ),
+            "results.chart_detail.show": (
+                "child_dock_results_chart_detail",
+                "CHILD-RESULTS-CHART-DETAIL-CONTENT",
+                "CHILD-RESULTS-CHART-DETAIL-TABLE",
+            ),
+            "results.engineering_qa.show": (
+                "child_dock_results_engineering_qa",
+                "CHILD-RESULTS-ENGINEERING-QA-CONTENT",
+                "CHILD-RESULTS-ENGINEERING-QA-TABLE",
+            ),
+            "results.engineering_candidates.show": (
+                "child_dock_results_engineering_candidates",
+                "CHILD-RESULTS-ENGINEERING-CANDIDATES-CONTENT",
+                "CHILD-RESULTS-ENGINEERING-CANDIDATES-TABLE",
+            ),
+            "results.engineering_run.pin": (
+                "child_dock_results_engineering_pin_run",
+                "CHILD-RESULTS-ENGINEERING-PIN-RUN-CONTENT",
+                "CHILD-RESULTS-ENGINEERING-PIN-RUN-TABLE",
+            ),
+            "results.engineering_influence.run": (
+                "child_dock_results_engineering_influence_run",
+                "CHILD-RESULTS-ENGINEERING-INFLUENCE-RUN-CONTENT",
+                "CHILD-RESULTS-ENGINEERING-INFLUENCE-RUN-TABLE",
+            ),
+            "results.engineering_full_report.run": (
+                "child_dock_results_engineering_full_report_run",
+                "CHILD-RESULTS-ENGINEERING-FULL-REPORT-RUN-CONTENT",
+                "CHILD-RESULTS-ENGINEERING-FULL-REPORT-RUN-TABLE",
+            ),
+            "results.engineering_param_staging.run": (
+                "child_dock_results_engineering_param_staging_run",
+                "CHILD-RESULTS-ENGINEERING-PARAM-STAGING-RUN-CONTENT",
+                "CHILD-RESULTS-ENGINEERING-PARAM-STAGING-RUN-TABLE",
+            ),
+            "results.influence_review.show": (
+                "child_dock_results_influence_review",
+                "CHILD-RESULTS-INFLUENCE-REVIEW-CONTENT",
+                "CHILD-RESULTS-INFLUENCE-REVIEW-TABLE",
+            ),
+            "results.compare_influence.show": (
+                "child_dock_results_compare_influence",
+                "CHILD-RESULTS-COMPARE-INFLUENCE-CONTENT",
+                "CHILD-RESULTS-COMPARE-INFLUENCE-TABLE",
+            ),
+            "results.engineering_evidence.export": (
+                "child_dock_results_engineering_evidence",
+                "CHILD-RESULTS-ENGINEERING-EVIDENCE-CONTENT",
+                "CHILD-RESULTS-ENGINEERING-EVIDENCE-TABLE",
+            ),
+            "results.engineering_animation_link.export": (
+                "child_dock_results_engineering_animation_link",
+                "CHILD-RESULTS-ENGINEERING-ANIMATION-LINK-CONTENT",
+                "CHILD-RESULTS-ENGINEERING-ANIMATION-LINK-TABLE",
+            ),
+            "results.animation.prepare": (
+                "child_dock_results_animation_handoff",
+                "CHILD-RESULTS-ANIMATION-HANDOFF-CONTENT",
+                "CHILD-RESULTS-ANIMATION-HANDOFF-TABLE",
+            ),
+            "results.compare.open": (
+                "child_dock_results_compare",
+                "CHILD-COMPARE-CONTENT",
+                "CHILD-COMPARE-TABLE",
+            ),
+            "results.compare.target.next": (
+                "child_dock_results_compare",
+                "CHILD-COMPARE-CONTENT",
+                "CHILD-COMPARE-TABLE",
+            ),
+            "results.compare.signal.next": (
+                "child_dock_results_compare",
+                "CHILD-COMPARE-CONTENT",
+                "CHILD-COMPARE-TABLE",
+            ),
+            "results.compare.playhead.next": (
+                "child_dock_results_compare",
+                "CHILD-COMPARE-CONTENT",
+                "CHILD-COMPARE-TABLE",
+            ),
+            "results.compare.window.next": (
+                "child_dock_results_compare",
+                "CHILD-COMPARE-CONTENT",
+                "CHILD-COMPARE-TABLE",
+            ),
+        }
+        for command_id, (dock_name, content_name, table_name) in expected.items():
+            window._handle_hosted_workspace_command(command_id)
+            app.processEvents()
+            if command_id in {
+                "results.engineering_influence.run",
+                "results.engineering_full_report.run",
+                "results.engineering_param_staging.run",
+            }:
+                process = results_page.engineering_analysis_process
+                if process is not None:
+                    process.waitForFinished(2000)
+                    app.processEvents()
+            dock = window.findChild(_QtWidgets.QDockWidget, dock_name)
+            assert dock is not None, dock_name
+            assert dock.property("hosted_child_dock") is True
+            assert dock.isHidden() is False
+            assert dock.findChild(_QtWidgets.QWidget, content_name) is not None
+            table = dock.findChild(_QtWidgets.QTableWidget, table_name)
+            assert table is not None
+            assert table.rowCount() > 0
+
+        assert window._selected_surface_key == "ws_analysis"
+        assert window.findChild(_QtWidgets.QPushButton, "RS-BTN-RUN-MATERIALS") is not None
+        assert window.findChild(_QtWidgets.QPushButton, "RS-BTN-SELECTED-MATERIAL") is not None
+        assert window.findChild(_QtWidgets.QPushButton, "RS-BTN-CHART-DETAIL") is not None
+        assert window.findChild(_QtWidgets.QPushButton, "RS-BTN-ENGINEERING-QA") is not None
+        assert window.findChild(_QtWidgets.QPushButton, "RS-BTN-ENGINEERING-CANDIDATES") is not None
+        assert window.findChild(_QtWidgets.QPushButton, "RS-BTN-ENGINEERING-PIN-RUN") is not None
+        assert window.findChild(_QtWidgets.QPushButton, "RS-BTN-ENGINEERING-INFLUENCE-RUN") is not None
+        assert window.findChild(_QtWidgets.QPushButton, "RS-BTN-ENGINEERING-FULL-REPORT-RUN") is not None
+        assert window.findChild(_QtWidgets.QPushButton, "RS-BTN-ENGINEERING-PARAM-STAGING-RUN") is not None
+        assert window.findChild(_QtWidgets.QPushButton, "RS-BTN-INFLUENCE-REVIEW") is not None
+        assert window.findChild(_QtWidgets.QPushButton, "RS-BTN-COMPARE-INFLUENCE") is not None
+        assert window.findChild(_QtWidgets.QPushButton, "RS-BTN-ENGINEERING-EVIDENCE") is not None
+        assert window.findChild(_QtWidgets.QPushButton, "RS-BTN-COMPARE-NEXT-TARGET") is not None
+        assert window.findChild(_QtWidgets.QPushButton, "RS-BTN-COMPARE-NEXT-SIGNAL") is not None
+        assert window.findChild(_QtWidgets.QPushButton, "RS-BTN-COMPARE-NEXT-PLAYHEAD") is not None
+        assert window.findChild(_QtWidgets.QPushButton, "RS-BTN-COMPARE-NEXT-WINDOW") is not None
+        assert window.findChild(_QtWidgets.QPushButton, "RS-BTN-ENGINEERING-ANIMATION-LINK") is not None
+        assert len(window.findChildren(_QtWidgets.QDockWidget, "child_dock_results_compare")) == 1
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_desktop_qt_shell_suite_review_surfaces_are_child_docks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _QtCore, _QtGui, _QtWidgets = _qt_modules()
+    context = _test_project_context(tmp_path)
+    monkeypatch.setattr(qt_main_window_module, "build_shell_project_context", lambda: context)
+
+    def _fake_run_suite_autotest(self):
+        self.suite_autotest_status_label.setText("Автономная проверка показана в рабочем шаге.")
+        self.suite_autotest_log_view.setPlainText("fake autotest log")
+        return self._show_suite_autotest_dock()
+
+    monkeypatch.setattr(qt_main_window_module.SuiteWorkspacePage, "run_suite_autotest", _fake_run_suite_autotest)
+
+    app = _qt_app()
+    window = qt_main_window_module.DesktopQtMainShell()
+    try:
+        app.processEvents()
+        expected = {
+            "test.selection.show": (
+                "child_dock_suite_selected_test",
+                "CHILD-SUITE-SELECTED-TEST-CONTENT",
+                "CHILD-SUITE-SELECTED-TEST-TABLE",
+            ),
+            "test.validation.show": (
+                "child_dock_suite_validation",
+                "CHILD-SUITE-VALIDATION-CONTENT",
+                "CHILD-SUITE-VALIDATION-TABLE",
+            ),
+            "test.snapshot.show": (
+                "child_dock_suite_snapshot",
+                "CHILD-SUITE-SNAPSHOT-CONTENT",
+                "CHILD-SUITE-SNAPSHOT-TABLE",
+            ),
+            "test.autotest.run": (
+                "child_dock_suite_autotest",
+                "CHILD-SUITE-AUTOTEST-CONTENT",
+                "CHILD-SUITE-AUTOTEST-TABLE",
+            ),
+        }
+        for command_id, (dock_name, content_name, table_name) in expected.items():
+            window._handle_hosted_workspace_command(command_id)
+            dock = window.findChild(_QtWidgets.QDockWidget, dock_name)
+            assert dock is not None, dock_name
+            assert dock.property("hosted_child_dock") is True
+            assert dock.isHidden() is False
+            assert dock.findChild(_QtWidgets.QWidget, content_name) is not None
+            table = dock.findChild(_QtWidgets.QTableWidget, table_name)
+            assert table is not None
+            assert table.rowCount() > 0
+
+        assert window._selected_surface_key == "ws_suite"
+        assert window.findChild(_QtWidgets.QLineEdit, "TS-FILTER") is not None
+        assert window.findChild(_QtWidgets.QComboBox, "TS-FILTER-PRESET") is not None
+        assert window.findChild(_QtWidgets.QTableWidget, "TS-DETAIL-TABLE") is not None
+        assert window.findChild(_QtWidgets.QGroupBox, "TS-AUTOTEST") is not None
+        assert window.findChild(_QtWidgets.QPushButton, "TS-BTN-AUTOTEST-RUN") is not None
+        assert window.findChild(_QtWidgets.QPlainTextEdit, "TS-AUTOTEST-LOG") is not None
     finally:
         window.close()
         window.deleteLater()
@@ -861,42 +1959,19 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
             window.browser_tree.topLevelItem(index).text(0)
             for index in range(window.browser_tree.topLevelItemCount())
         ]
-        assert top_level_labels[:3] == [
+        assert top_level_labels[:2] == [
             "Порядок работы",
             "Проект: Runtime Shell",
-            "Сервис и детали",
         ]
         assert "Проект: Runtime Shell" in top_level_labels
         assert "Порядок работы" in top_level_labels
-        assert "Сервис и детали" in top_level_labels
+        assert "Сервис и детали" not in top_level_labels
         route_root = window.browser_tree.topLevelItem(0)
         assert route_root.text(0) == "Порядок работы"
         assert route_root.isExpanded() is True
         project_root = window.browser_tree.topLevelItem(1)
         assert project_root.text(0) == "Проект: Runtime Shell"
         assert project_root.isExpanded() is False
-        service_root = next(
-            window.browser_tree.topLevelItem(index)
-            for index in range(window.browser_tree.topLevelItemCount())
-            if window.browser_tree.topLevelItem(index).text(0) == "Сервис и детали"
-        )
-        assert service_root.isExpanded() is False
-        service_tree_tool_keys: set[str] = set()
-
-        def collect_service_tool_keys(item):
-            key = item.data(0, qt_main_window_module.TOOL_ROLE)
-            if isinstance(key, str) and key:
-                service_tree_tool_keys.add(key)
-            for child_index in range(item.childCount()):
-                collect_service_tool_keys(item.child(child_index))
-
-        collect_service_tool_keys(service_root)
-        assert service_tree_tool_keys.isdisjoint(qt_main_window_module.MAIN_ROUTE_KEYS)
-        assert {
-            "desktop_geometry_reference_center",
-            "desktop_engineering_analysis_center",
-            "compare_viewer",
-        } <= service_tree_tool_keys
 
         expected_launch_keys = {
             spec.key for spec in build_desktop_shell_specs() if spec.standalone_module
@@ -906,11 +1981,12 @@ def test_desktop_qt_shell_offscreen_runtime_keeps_menu_docks_shortcuts_and_statu
             for surface, keys in window.launch_surface_coverage().items()
         }
         assert coverage["expected"] == expected_launch_keys
-        assert expected_launch_keys <= coverage["browser"]
+        assert set(qt_main_window_module.MAIN_ROUTE_KEYS) <= coverage["browser"]
+        assert coverage["browser"] <= set(qt_main_window_module.MAIN_ROUTE_KEYS)
         assert expected_launch_keys <= coverage["menu"]
         assert expected_launch_keys <= coverage["toolbar"]
         assert expected_launch_keys <= coverage["command_search"]
-        assert "desktop_engineering_analysis_center" in coverage["browser"]
+        assert "desktop_engineering_analysis_center" not in coverage["browser"]
         assert "desktop_engineering_analysis_center" in coverage["menu"]
         assert "desktop_engineering_analysis_center" in coverage["toolbar"]
 
@@ -1164,7 +2240,7 @@ def test_desktop_qt_shell_tree_click_opens_route_surface_directly(
         assert ring_dock.property("workspace_hosting") == "native"
         hosted_page = window.workspace_hosted_widgets["ws_ring"]
         assert hosted_page.objectName() == "HostedWorkspacePage_ring_editor"
-        assert window.findChild(_QtWidgets.QPushButton, "RG-BTN-SAVE-SOURCE") is not None
+        _assert_hosted_ring_editor_controls(window, _QtWidgets)
         assert "Рабочий этап открыт в док-поверхности: Редактор циклического сценария" in window.status_label.text()
         assert "Запустить раздел" not in "\n".join(window.operator_visible_audit()["direct_visible_texts"])
     finally:
@@ -1213,7 +2289,7 @@ def test_desktop_qt_shell_tree_command_child_focuses_hosted_workspace_without_ex
         assert window.workspace_docks["ws_ring"].property("workspace_hosting") == "native"
         hosted_page = window.workspace_hosted_widgets["ws_ring"]
         assert hosted_page.objectName() == "HostedWorkspacePage_ring_editor"
-        assert window.findChild(_QtWidgets.QPushButton, "RG-BTN-SAVE-SOURCE") is not None
+        _assert_hosted_ring_editor_controls(window, _QtWidgets)
         assert "Открыт рабочий этап для действия: Редактировать циклический сценарий" in window.status_label.text()
     finally:
         window.close()
@@ -1221,11 +2297,11 @@ def test_desktop_qt_shell_tree_command_child_focuses_hosted_workspace_without_ex
         app.processEvents()
 
 
-def test_desktop_qt_shell_service_tree_selection_requires_explicit_activation(
+def test_desktop_qt_shell_browser_tree_hides_support_windows_from_primary_route(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _qt_modules()
+    _QtCore, _QtGui, _QtWidgets = _qt_modules()
     settings_path = tmp_path / "main_shell_state.ini"
     monkeypatch.setenv("PNEUMO_QT_MAIN_SHELL_STATE_PATH", str(settings_path))
     monkeypatch.setattr(
@@ -1244,27 +2320,30 @@ def test_desktop_qt_shell_service_tree_selection_requires_explicit_activation(
     window = qt_main_window_module.DesktopQtMainShell()
     try:
         app.processEvents()
-        compare_item = _find_tree_item_by_data(
+        top_level_labels = [
+            window.browser_tree.topLevelItem(index).text(0)
+            for index in range(window.browser_tree.topLevelItemCount())
+        ]
+        assert top_level_labels == ["Порядок работы", "Проект: Runtime Shell"]
+        assert _find_tree_item_by_data(
             window.browser_tree,
             qt_main_window_module.TOOL_ROLE,
             "compare_viewer",
-        )
-        assert compare_item is not None
-
-        window.browser_tree.setCurrentItem(compare_item)
-        app.processEvents()
-
+        ) is None
+        assert _find_tree_item_by_data(
+            window.browser_tree,
+            qt_main_window_module.TOOL_ROLE,
+            "desktop_engineering_analysis_center",
+        ) is None
+        assert _find_tree_item_by_data(
+            window.browser_tree,
+            qt_main_window_module.TOOL_ROLE,
+            "desktop_geometry_reference_center",
+        ) is None
+        assert "compare_viewer" in window.visible_menu_tool_keys()
+        assert "desktop_engineering_analysis_center" in window.visible_menu_tool_keys()
         manager = _FakeCoexistenceManager.instances[-1]
-        expected_surface = qt_main_window_module.default_surface_key_for_tool("compare_viewer")
         assert manager.opened == []
-        assert window._selected_surface_key == expected_surface
-        assert window.workspace_docks[expected_surface].property("workspace_hosting") == "native"
-        assert "Дополнительная поверхность выбрана:" in window.status_label.text()
-
-        window.browser_tree.itemActivated.emit(compare_item, 0)
-        app.processEvents()
-
-        assert [session.spec.key for session in manager.opened] == ["compare_viewer"]
     finally:
         window.close()
         window.deleteLater()
@@ -1316,7 +2395,113 @@ def test_desktop_qt_shell_command_search_routes_scenario_editor_to_hosted_worksp
         assert window._selected_surface_key == "ws_ring"
         assert window.workspace_docks["ws_ring"].property("workspace_hosting") == "native"
         assert window.workspace_hosted_widgets["ws_ring"].objectName() == "HostedWorkspacePage_ring_editor"
-        assert window.findChild(_QtWidgets.QPushButton, "RG-BTN-SAVE-SOURCE") is not None
+        _assert_hosted_ring_editor_controls(window, _QtWidgets)
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_desktop_qt_shell_input_workspace_has_native_field_search_and_status(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _QtCore, _QtGui, _QtWidgets = _qt_modules()
+    settings_path = tmp_path / "main_shell_state.ini"
+    monkeypatch.setenv("PNEUMO_QT_MAIN_SHELL_STATE_PATH", str(settings_path))
+    monkeypatch.setattr(
+        qt_main_window_module,
+        "build_shell_project_context",
+        lambda: _test_project_context(tmp_path),
+    )
+    _FakeCoexistenceManager.instances.clear()
+    monkeypatch.setattr(
+        qt_main_window_module,
+        "DesktopShellCoexistenceManager",
+        _FakeCoexistenceManager,
+    )
+
+    app = _qt_app()
+    window = qt_main_window_module.DesktopQtMainShell()
+    try:
+        app.processEvents()
+        window.open_tool("desktop_input_editor")
+        app.processEvents()
+
+        manager = _FakeCoexistenceManager.instances[-1]
+        assert manager.opened == []
+        assert window._selected_surface_key == "ws_inputs"
+        assert window.workspace_docks["ws_inputs"].property("workspace_hosting") == "native"
+        _assert_hosted_input_editor_controls(window, _QtWidgets)
+
+        search_edit = window.findChild(_QtWidgets.QLineEdit, "ID-FIELD-SEARCH")
+        search_results = window.findChild(_QtWidgets.QListWidget, "ID-FIELD-SEARCH-RESULTS")
+        section_table = window.findChild(_QtWidgets.QTableWidget, "ID-SECTION-STATUS-TABLE")
+        snapshot_status = window.findChild(_QtWidgets.QLabel, "ID-SNAPSHOT-STATUS")
+        assert search_edit is not None
+        assert search_results is not None
+        assert section_table is not None
+        assert snapshot_status is not None
+
+        search_edit.setText("колея")
+        app.processEvents()
+        assert search_results.count() >= 1
+        assert "Колея" in search_results.item(0).text()
+        assert section_table.rowCount() >= 1
+        assert "снимок исходных данных" in snapshot_status.text().casefold()
+    finally:
+        window.close()
+        window.deleteLater()
+        app.processEvents()
+
+
+def test_desktop_qt_shell_input_workspace_loads_saves_and_restores_json_without_legacy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _QtCore, _QtGui, _QtWidgets = _qt_modules()
+    settings_path = tmp_path / "main_shell_state.ini"
+    monkeypatch.setenv("PNEUMO_QT_MAIN_SHELL_STATE_PATH", str(settings_path))
+    monkeypatch.setattr(
+        qt_main_window_module,
+        "build_shell_project_context",
+        lambda: _test_project_context(tmp_path),
+    )
+    _FakeCoexistenceManager.instances.clear()
+    monkeypatch.setattr(
+        qt_main_window_module,
+        "DesktopShellCoexistenceManager",
+        _FakeCoexistenceManager,
+    )
+
+    app = _qt_app()
+    window = qt_main_window_module.DesktopQtMainShell()
+    try:
+        app.processEvents()
+        window.open_tool("desktop_input_editor")
+        app.processEvents()
+
+        page = window.workspace_hosted_widgets["ws_inputs"]
+        payload_path = tmp_path / "imported_inputs.json"
+        payload_path.write_text(
+            json.dumps({"колея": 1.23}, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        saved_path = tmp_path / "saved_inputs.json"
+
+        assert page._load_input_file_path(payload_path) == payload_path.resolve()
+        app.processEvents()
+        assert "загруженный файл" in window.findChild(_QtWidgets.QLabel, "ID-SOURCE-LABEL").text()
+        assert page._save_input_as_path(saved_path) == saved_path.resolve()
+        saved_payload = json.loads(saved_path.read_text(encoding="utf-8"))
+        assert float(saved_payload["колея"]) == pytest.approx(1.23)
+
+        page._restore_input_template()
+        app.processEvents()
+        assert "исходный шаблон" in window.findChild(_QtWidgets.QLabel, "ID-SOURCE-LABEL").text()
+
+        manager = _FakeCoexistenceManager.instances[-1]
+        assert manager.opened == []
     finally:
         window.close()
         window.deleteLater()
@@ -1328,6 +2513,7 @@ def test_desktop_qt_shell_diagnostics_route_is_hosted_workspace(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _QtCore, _QtGui, _QtWidgets = _qt_modules()
+    from pneumo_solver_ui.desktop_spec_shell import diagnostics_panel as diagnostics_panel_module
     from pneumo_solver_ui.desktop_spec_shell.diagnostics_panel import DiagnosticsWorkspacePage
 
     settings_path = tmp_path / "main_shell_state.ini"
@@ -1342,6 +2528,15 @@ def test_desktop_qt_shell_diagnostics_route_is_hosted_workspace(
         qt_main_window_module,
         "DesktopShellCoexistenceManager",
         _FakeCoexistenceManager,
+    )
+
+    def _fake_start_full_check(self) -> None:
+        self._set_status("Полная проверка проекта выполняется в рабочем шаге.", busy=False)
+
+    monkeypatch.setattr(
+        diagnostics_panel_module.DiagnosticsShellController,
+        "start_full_check",
+        _fake_start_full_check,
     )
 
     app = _qt_app()
@@ -1367,11 +2562,55 @@ def test_desktop_qt_shell_diagnostics_route_is_hosted_workspace(
         assert diagnostics_dock.property("workspace_hosting") == "native"
         hosted_page = window.workspace_hosted_widgets["ws_diagnostics"]
         assert isinstance(hosted_page, DiagnosticsWorkspacePage)
+        assert hosted_page.full_check_button.text() == "Полная проверка проекта"
+        assert hosted_page.send_review_button.text() == "Показать материалы отправки"
         assert hosted_page.collect_button.text() == "Собрать диагностику"
         assert hosted_page.verify_button.text() == "Проверить архив"
         assert hosted_page.send_button.text() == "Отправить результаты"
+        assert window.findChild(_QtWidgets.QPushButton, "DG-BTN-FULL-CHECK") is hosted_page.full_check_button
+        assert window.findChild(_QtWidgets.QPushButton, "DG-BTN-SEND-REVIEW") is hosted_page.send_review_button
         assert window.findChild(_QtWidgets.QPushButton, "DG-BTN-COLLECT") is hosted_page.collect_button
         assert "Рабочий этап открыт в док-поверхности: Диагностика" in window.status_label.text()
+
+        window._handle_hosted_workspace_command("diagnostics.full_check.run")
+        app.processEvents()
+        assert "Полная проверка проекта выполняется" in hosted_page.status_label.text()
+        assert manager.opened == []
+
+        window.command_search_edit.setText("полная проверка проекта")
+        app.processEvents()
+        search_item = None
+        for index in range(window.search_results_list.count()):
+            item = window.search_results_list.item(index)
+            if (
+                item.data(_QtCore.Qt.ItemDataRole.UserRole + 1) == "hosted_command"
+                and item.data(_QtCore.Qt.ItemDataRole.UserRole) == "diagnostics.full_check.run"
+            ):
+                search_item = item
+                break
+        assert search_item is not None
+
+        window._handle_hosted_workspace_command("diagnostics.send_review.show")
+        app.processEvents()
+        send_review_dock = window.findChild(_QtWidgets.QDockWidget, "child_dock_diagnostics_send_review")
+        assert send_review_dock is not None
+        assert send_review_dock.property("hosted_child_dock") is True
+        assert send_review_dock.property("spec_command_id") == "diagnostics.send_review.show"
+        assert send_review_dock.isHidden() is False
+        assert (
+            send_review_dock.findChild(
+                _QtWidgets.QWidget,
+                "CHILD-DIAGNOSTICS-SEND-REVIEW-CONTENT",
+            )
+            is not None
+        )
+        send_review_table = send_review_dock.findChild(
+            _QtWidgets.QTableWidget,
+            "CHILD-DIAGNOSTICS-SEND-REVIEW-TABLE",
+        )
+        assert send_review_table is not None
+        assert send_review_table.rowCount() > 0
+        assert manager.opened == []
 
         assert window.open_tool("desktop_diagnostics_center", force_external=True) is True
         assert [session.spec.key for session in manager.opened] == ["desktop_diagnostics_center"]
@@ -1417,6 +2656,13 @@ def test_desktop_qt_shell_primary_route_docks_are_hosted_without_external_window
         app.processEvents()
         manager = _FakeCoexistenceManager.instances[-1]
         for surface_key, object_name in expected_pages.items():
+            dock = window.workspace_docks[surface_key]
+            assert dock.property("workspace_hosting") == "native"
+            assert window.workspace_dock_labels[surface_key] == {}
+            assert window.workspace_hosted_widgets[surface_key].objectName() == object_name
+            assert dock.widget() is window.workspace_hosted_widgets[surface_key]
+
+        for surface_key, object_name in expected_pages.items():
             item = _find_tree_item_by_data(
                 window.browser_tree,
                 qt_main_window_module.SURFACE_ROLE,
@@ -1431,6 +2677,7 @@ def test_desktop_qt_shell_primary_route_docks_are_hosted_without_external_window
             assert dock.isHidden() is False
             assert window.workspace_hosted_widgets[surface_key].objectName() == object_name
             assert manager.opened == []
+        _assert_hosted_baseline_run_controls(window, _QtWidgets)
     finally:
         window.close()
         window.deleteLater()
@@ -1478,7 +2725,7 @@ def test_desktop_qt_shell_handoff_payload_and_layout_state_are_runtime_checked(
         assert manager.opened == []
         assert window.workspace_docks["ws_inputs"].property("workspace_hosting") == "native"
         assert window.workspace_docks["ws_animator"].property("workspace_hosting") == "native"
-        assert window.findChild(_QtWidgets.QPushButton, "ID-BTN-SAVE-WORKING-COPY") is not None
+        _assert_hosted_input_editor_controls(window, _QtWidgets)
         assert window.findChild(_QtWidgets.QPushButton, "AM-BTN-CHECK-ANIMATOR") is not None
 
         assert window.open_tool("desktop_animator", force_external=True) is True
@@ -1599,10 +2846,12 @@ def test_desktop_qt_shell_runtime_proof_writes_shell_only_evidence(
         spec.key for spec in build_desktop_shell_specs() if spec.standalone_module
     }
     assert set(proof["launch_coverage"]["expected"]) == expected_launch_keys
-    assert set(proof["launch_coverage"]["browser"]) >= expected_launch_keys
+    assert set(proof["launch_coverage"]["browser"]) >= set(qt_main_window_module.MAIN_ROUTE_KEYS)
+    assert set(proof["launch_coverage"]["browser"]) <= set(qt_main_window_module.MAIN_ROUTE_KEYS)
     assert set(proof["launch_coverage"]["menu"]) >= expected_launch_keys
     assert set(proof["launch_coverage"]["toolbar"]) >= expected_launch_keys
     assert set(proof["launch_coverage"]["command_search"]) >= expected_launch_keys
+    assert set(proof["launch_coverage_required"]["browser"]) == set(qt_main_window_module.MAIN_ROUTE_KEYS)
     assert proof["launch_coverage_missing"] == {
         "browser": [],
         "menu": [],

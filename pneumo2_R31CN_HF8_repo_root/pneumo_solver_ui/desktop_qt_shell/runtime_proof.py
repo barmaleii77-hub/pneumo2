@@ -427,9 +427,22 @@ def validate_qt_main_shell_runtime_proof(
     expected_launch_keys = {str(item) for item in launch_coverage.get("expected") or []}
     if not expected_launch_keys:
         errors.append("runtime proof launch_coverage.expected must be non-empty")
+    required_by_surface_raw = proof.get("launch_coverage_required")
+    required_by_surface = (
+        required_by_surface_raw if isinstance(required_by_surface_raw, dict) else {}
+    )
     for surface in ("browser", "menu", "toolbar", "command_search"):
         surface_keys = {str(item) for item in launch_coverage.get(surface) or []}
-        missing = sorted(expected_launch_keys - surface_keys)
+        required_keys = {
+            str(item)
+            for item in (
+                required_by_surface.get(surface)
+                if surface in required_by_surface
+                else expected_launch_keys
+            )
+            or []
+        }
+        missing = sorted(required_keys - surface_keys)
         if missing:
             errors.append(
                 f"runtime proof launch coverage missing from {surface}: "
@@ -636,7 +649,7 @@ def collect_qt_main_shell_runtime_proof(*, offscreen: bool = False, state_path: 
 
     from PySide6 import QtCore, QtGui, QtWidgets
 
-    from pneumo_solver_ui.desktop_qt_shell.main_window import DesktopQtMainShell
+    from pneumo_solver_ui.desktop_qt_shell.main_window import DesktopQtMainShell, MAIN_ROUTE_KEYS
 
     app = QtWidgets.QApplication.instance()
     owns_app = app is None
@@ -698,8 +711,14 @@ def collect_qt_main_shell_runtime_proof(*, offscreen: bool = False, state_path: 
                 for key, value in window.launch_surface_coverage().items()
             }
             expected_launch_keys = set(launch_coverage["expected"])
+            required_launch_keys_by_surface = {
+                "browser": set(MAIN_ROUTE_KEYS),
+                "menu": expected_launch_keys,
+                "toolbar": expected_launch_keys,
+                "command_search": expected_launch_keys,
+            }
             launch_coverage_missing = {
-                surface: sorted(expected_launch_keys - set(launch_coverage[surface]))
+                surface: sorted(required_launch_keys_by_surface[surface] - set(launch_coverage[surface]))
                 for surface in ("browser", "menu", "toolbar", "command_search")
             }
             pipeline_surface_coverage = {
@@ -775,6 +794,10 @@ def collect_qt_main_shell_runtime_proof(*, offscreen: bool = False, state_path: 
                     "status_text": command_search_status_text,
                 },
                 "launch_coverage": launch_coverage,
+                "launch_coverage_required": {
+                    surface: sorted(keys)
+                    for surface, keys in required_launch_keys_by_surface.items()
+                },
                 "launch_coverage_missing": launch_coverage_missing,
                 "pipeline_surface_coverage": pipeline_surface_coverage,
                 "pipeline_surface_coverage_missing": pipeline_surface_coverage_missing,

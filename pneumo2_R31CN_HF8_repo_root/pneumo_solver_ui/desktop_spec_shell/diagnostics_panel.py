@@ -341,7 +341,10 @@ class DiagnosticsShellController(QtCore.QObject):
         self.snapshot_changed.emit(snapshot)
         return snapshot
 
-    def handle_command(self, command_id: str) -> None:
+    def handle_command(self, command_id: str) -> object:
+        if command_id == "diagnostics.full_check.run":
+            self.start_full_check()
+            return
         if command_id == "diagnostics.collect_bundle":
             self.start_collect()
             return
@@ -390,8 +393,11 @@ class DiagnosticsShellController(QtCore.QObject):
         self._process.setProgram(cmd[0])
         self._process.setArguments(cmd[1:])
         self._process.start()
-        self._set_status("Идёт сохранение архива проекта...", busy=True)
+        self._set_status("Идёт полная проверка проекта и сохранение архива...", busy=True)
         self.refresh(regenerate_reports=False)
+
+    def start_full_check(self) -> None:
+        self.start_collect()
 
     def verify_bundle(self) -> None:
         bundle = self._current_bundle or load_desktop_diagnostics_bundle_record(self.repo_root)
@@ -737,22 +743,36 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
 
         self.actions_box = QtWidgets.QGroupBox("Действия")
         actions_layout = QtWidgets.QGridLayout(self.actions_box)
+        self.full_check_button = QtWidgets.QPushButton("Полная проверка проекта")
+        self.full_check_button.setObjectName("DG-BTN-FULL-CHECK")
+        self.full_check_button.setToolTip(
+            "Запустить полную проверку проекта и сохранение архива в этом рабочем шаге."
+        )
+        self.send_review_button = QtWidgets.QPushButton("Показать материалы отправки")
+        self.send_review_button.setObjectName("DG-BTN-SEND-REVIEW")
+        self.send_review_button.setToolTip(
+            "Показать архив, проверки и связанные материалы перед ручной передачей."
+        )
         self.collect_button = QtWidgets.QPushButton("Сохранить архив проекта")
         self.verify_button = QtWidgets.QPushButton("Проверить архив проекта")
         self.send_button = QtWidgets.QPushButton("Скопировать архив")
         self.open_dir_button = QtWidgets.QPushButton("Открыть каталог")
         self.refresh_button = QtWidgets.QPushButton("Обновить состояние")
         _apply_action_contract(self.collect_button, "DG-BTN-COLLECT")
+        self.full_check_button.clicked.connect(lambda: self.handle_command("diagnostics.full_check.run"))
+        self.send_review_button.clicked.connect(lambda: self.handle_command("diagnostics.send_review.show"))
         self.collect_button.clicked.connect(lambda: self.handle_command("diagnostics.collect_bundle"))
         self.verify_button.clicked.connect(lambda: self.handle_command("diagnostics.verify_bundle"))
         self.send_button.clicked.connect(lambda: self.handle_command("diagnostics.send_results"))
         self.open_dir_button.clicked.connect(self.controller.open_bundle_folder)
         self.refresh_button.clicked.connect(self.refresh_view)
-        actions_layout.addWidget(self.collect_button, 0, 0)
-        actions_layout.addWidget(self.verify_button, 0, 1)
-        actions_layout.addWidget(self.send_button, 0, 2)
-        actions_layout.addWidget(self.open_dir_button, 1, 0)
-        actions_layout.addWidget(self.refresh_button, 1, 1)
+        actions_layout.addWidget(self.full_check_button, 0, 0)
+        actions_layout.addWidget(self.send_review_button, 0, 1)
+        actions_layout.addWidget(self.collect_button, 0, 2)
+        actions_layout.addWidget(self.verify_button, 1, 0)
+        actions_layout.addWidget(self.send_button, 1, 1)
+        actions_layout.addWidget(self.open_dir_button, 1, 2)
+        actions_layout.addWidget(self.refresh_button, 2, 0)
         layout.addWidget(self.actions_box)
 
         self.log_box = QtWidgets.QGroupBox("Журнал / последние сообщения")
@@ -777,8 +797,10 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
     def refresh_view(self) -> None:
         self.controller.refresh(regenerate_reports=False)
 
-    def handle_command(self, command_id: str) -> None:
-        self.controller.handle_command(command_id)
+    def handle_command(self, command_id: str) -> object:
+        if command_id == "diagnostics.send_review.show":
+            return self.show_send_review()
+        return self.controller.handle_command(command_id)
 
     def open_baseline_center(self) -> None:
         if self.on_command is not None:
@@ -786,6 +808,41 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
             self.status_label.setText("Переход к базовому прогону выполнен из проверки проекта и архива.")
             return
         self.status_label.setText("Базовый прогон доступен из рабочего места инженера.")
+
+    def show_send_review(self) -> dict[str, object]:
+        snapshot = self.controller.refresh(regenerate_reports=False)
+        bundle = snapshot.bundle
+        run_record = snapshot.run_record
+        rows: list[tuple[str, str]] = [
+            ("Последний архив", _safe_path_text(bundle.latest_zip_path)),
+            ("Папка архива", _safe_path_text(bundle.out_dir)),
+            ("Состояние копирования", self.bundle_clipboard_value.text()),
+            ("Состав архива", _safe_path_text(bundle.latest_inspection_md_path)),
+            ("Состояние проекта", _safe_path_text(bundle.latest_health_md_path)),
+            ("Проверка результата", _safe_path_text(bundle.latest_validation_md_path)),
+            ("Разбор предупреждений", _safe_path_text(bundle.latest_triage_md_path)),
+            ("Последний запуск", self.run_state_value.text()),
+            ("Каталог запуска", _safe_path_text(run_record.run_dir if run_record is not None else "")),
+            ("Материал анимации", self.animation_handoff_source_value.text()),
+            ("Сцена анимации", self.animation_handoff_scene_value.text()),
+            ("Данные проигрывания", self.animation_handoff_pointer_value.text()),
+            ("Опорный прогон", self.baseline_status_value.text()),
+            ("Следующий шаг", snapshot.recommended_next_step),
+        ]
+        for index, line in enumerate(bundle.summary_lines[:8], start=1):
+            rows.append((f"Сводка {index}", _operator_message_text(line)))
+        return {
+            "child_dock": {
+                "title": "Материалы отправки",
+                "object_name": "child_dock_diagnostics_send_review",
+                "content_object_name": "CHILD-DIAGNOSTICS-SEND-REVIEW-CONTENT",
+                "table_object_name": "CHILD-DIAGNOSTICS-SEND-REVIEW-TABLE",
+                "summary": (
+                    "Проверьте архив, состояние копирования и связанные материалы перед ручной передачей."
+                ),
+                "rows": tuple(rows),
+            }
+        }
 
     def _on_controller_status(self, text: str, busy: bool) -> None:
         self.status_label.setText(text)
@@ -894,6 +951,8 @@ class DiagnosticsWorkspacePage(QtWidgets.QWidget):
         self.log_view.setPlainText(snapshot.run_log_text or "\n".join(snapshot.summary_lines))
 
         busy = snapshot.is_busy
+        self.full_check_button.setEnabled(not busy)
+        self.send_review_button.setEnabled(not busy)
         self.collect_button.setEnabled(not busy)
         self.verify_button.setEnabled(not busy)
         self.send_button.setEnabled(not busy)

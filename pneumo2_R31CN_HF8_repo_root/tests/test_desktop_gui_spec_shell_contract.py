@@ -74,6 +74,10 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert workspaces["test_matrix"].launch_surface == "workspace"
     assert workspaces["test_matrix"].quick_action_ids == (
         "test.center.open",
+        "test.selection.show",
+        "test.validation.show",
+        "test.snapshot.show",
+        "test.autotest.run",
         "workspace.baseline_run.open",
         "workspace.ring_editor.open",
     )
@@ -116,10 +120,26 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert commands["results.center.open"].kind == "hosted_action"
     assert commands["results.center.open"].module is None
     assert commands["results.center.open"].automation_id == "RS-BTN-OPEN-ANALYTICS"
+    assert commands["results.selected_material.show"].kind == "hosted_action"
+    assert commands["results.selected_material.show"].automation_id == "RS-BTN-SELECTED-MATERIAL"
+    assert commands["results.chart_detail.show"].kind == "hosted_action"
+    assert commands["results.chart_detail.show"].automation_id == "RS-BTN-CHART-DETAIL"
     assert commands["results.compare.prepare"].kind == "hosted_action"
     assert commands["results.compare.open"].kind == "hosted_action"
     assert commands["results.compare.open"].automation_id == "RS-BTN-OPEN-COMPARE"
     assert commands["results.compare.open"].launch_surface == "workspace"
+    assert commands["results.compare.target.next"].kind == "hosted_action"
+    assert commands["results.compare.target.next"].automation_id == "RS-BTN-COMPARE-NEXT-TARGET"
+    assert commands["results.compare.target.next"].launch_surface == "workspace"
+    assert commands["results.compare.signal.next"].kind == "hosted_action"
+    assert commands["results.compare.signal.next"].automation_id == "RS-BTN-COMPARE-NEXT-SIGNAL"
+    assert commands["results.compare.signal.next"].launch_surface == "workspace"
+    assert commands["results.compare.playhead.next"].kind == "hosted_action"
+    assert commands["results.compare.playhead.next"].automation_id == "RS-BTN-COMPARE-NEXT-PLAYHEAD"
+    assert commands["results.compare.playhead.next"].launch_surface == "workspace"
+    assert commands["results.compare.window.next"].kind == "hosted_action"
+    assert commands["results.compare.window.next"].automation_id == "RS-BTN-COMPARE-NEXT-WINDOW"
+    assert commands["results.compare.window.next"].launch_surface == "workspace"
     assert commands["results.animation.prepare"].kind == "hosted_action"
     assert commands["results.animation.prepare"].automation_id == "RS-BTN-HANDOFF-ANIMATION"
     assert commands["results.animation.prepare"].launch_surface == "workspace"
@@ -236,8 +256,14 @@ def test_gui_spec_shell_registry_is_catalog_driven_for_route_critical_surfaces()
     assert "optimization.center.open" in workspaces["optimization"].quick_action_ids
     assert "optimization.legacy_center.open" not in workspaces["optimization"].quick_action_ids
     assert "results.center.open" in workspaces["results_analysis"].quick_action_ids
+    assert "results.selected_material.show" in workspaces["results_analysis"].quick_action_ids
+    assert "results.chart_detail.show" in workspaces["results_analysis"].quick_action_ids
     assert "results.compare.prepare" in workspaces["results_analysis"].quick_action_ids
     assert "results.compare.open" in workspaces["results_analysis"].quick_action_ids
+    assert "results.compare.target.next" in workspaces["results_analysis"].quick_action_ids
+    assert "results.compare.signal.next" in workspaces["results_analysis"].quick_action_ids
+    assert "results.compare.playhead.next" in workspaces["results_analysis"].quick_action_ids
+    assert "results.compare.window.next" in workspaces["results_analysis"].quick_action_ids
     assert "results.animation.prepare" in workspaces["results_analysis"].quick_action_ids
     assert "results.evidence.prepare" in workspaces["results_analysis"].quick_action_ids
     assert "results.legacy_center.open" not in workspaces["results_analysis"].quick_action_ids

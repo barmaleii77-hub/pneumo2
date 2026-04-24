@@ -324,6 +324,8 @@ def _operator_v16_text(raw: Any) -> str:
         ("conflict", "конфликт"),
         ("Freshness + path + time", "Свежесть, путь и время"),
         ("Visible архив contents list", "Видимый список состава архива"),
+        ("run identity", "карточка выбранного прогона"),
+        ("Run identity", "Карточка выбранного прогона"),
         ("report", "отчёт"),
         ("card", "карточка"),
         ("Health", "Состояние"),

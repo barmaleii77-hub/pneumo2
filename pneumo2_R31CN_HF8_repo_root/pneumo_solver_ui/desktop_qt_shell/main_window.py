@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -244,6 +245,11 @@ def _build_shell_settings() -> QtCore.QSettings:
     return QtCore.QSettings("PneumoApp", "DesktopQtMainShell")
 
 
+def _binary_layout_restore_enabled() -> bool:
+    value = str(os.environ.get("PNEUMO_QT_MAIN_SHELL_RESTORE_BINARY_LAYOUT") or "").strip().lower()
+    return value in {"1", "true", "yes", "on"}
+
+
 def _operator_state_label(spec: DesktopShellToolSpec) -> str:
     status = spec.effective_migration_status
     if status == "managed_external":
@@ -324,6 +330,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         )
         self.settings = _build_shell_settings()
         self.project_context: ShellProjectContext = build_shell_project_context()
+        self._sync_runtime_environment_with_project_context()
         self.coexistence = DesktopShellCoexistenceManager()
         self._startup_tool_keys = startup_tool_keys
         self._selected_tool_key = startup_tool_keys[0] if startup_tool_keys else "desktop_input_editor"
@@ -338,6 +345,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self.workspace_docks: dict[str, QtWidgets.QDockWidget] = {}
         self.workspace_dock_labels: dict[str, dict[str, QtWidgets.QLabel]] = {}
         self.workspace_hosted_widgets: dict[str, QtWidgets.QWidget] = {}
+        self.hosted_child_docks: dict[str, QtWidgets.QDockWidget] = {}
 
         self._configure_window()
         self._build_command_toolbar()
@@ -358,6 +366,10 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         self._install_shortcuts()
         self._start_polling()
         QtCore.QTimer.singleShot(0, self._open_startup_tools)
+
+    def _sync_runtime_environment_with_project_context(self) -> None:
+        os.environ["PNEUMO_WORKSPACE_DIR"] = str(self.project_context.workspace_dir)
+        os.environ["PNEUMO_PROJECT"] = self.project_context.project_name
 
     def _launchable_specs(self) -> tuple[DesktopShellToolSpec, ...]:
         return tuple(spec for spec in self.specs if spec.standalone_module)
@@ -765,7 +777,9 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         show_all_panels_action.triggered.connect(self._show_all_docks)
         view_menu.addSeparator()
         restore_layout_action = view_menu.addAction("Восстановить раскладку")
-        restore_layout_action.triggered.connect(self._restore_layout)
+        restore_layout_action.triggered.connect(
+            lambda _checked=False: self._restore_layout(restore_binary=True)
+        )
         reset_layout_action = view_menu.addAction("Сбросить раскладку")
         reset_layout_action.triggered.connect(self._reset_layout)
 
@@ -1087,8 +1101,16 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             page = self._open_hosted_workspace_id(command.workspace_id)
             handler = getattr(page, "handle_command", None)
             if callable(handler):
-                handler(command.command_id)
-                self._set_status_message(f"Выполнено действие: {command.title}")
+                result = handler(command.command_id)
+                child_title = self._apply_hosted_command_result(
+                    result,
+                    command_id=command.command_id,
+                    workspace_id=command.workspace_id,
+                )
+                if child_title:
+                    self._set_status_message(f"Открыта дочерняя dock-панель: {child_title}")
+                else:
+                    self._set_status_message(f"Выполнено действие: {command.title}")
                 return
             self._set_status_message(f"Действие пока недоступно в рабочем шаге: {command.title}")
             return
@@ -1151,6 +1173,7 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                 actions,
                 self._handle_hosted_workspace_command,
                 repo_root=repo_root,
+                python_executable=sys.executable,
                 parent=dock,
             )
         elif workspace_id == "ring_editor":
@@ -1313,6 +1336,15 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                 "next": next_label,
                 "handoff": handoff_label,
             }
+            hosted_page = self._build_hosted_workspace_page(surface, dock)
+            if hosted_page is not None:
+                placeholder_widget = dock.widget()
+                dock.setWidget(hosted_page)
+                dock.setProperty("workspace_hosting", "native")
+                self.workspace_hosted_widgets[surface.key] = hosted_page
+                self.workspace_dock_labels[surface.key] = {}
+                if placeholder_widget is not None:
+                    placeholder_widget.deleteLater()
 
     def _build_central_surface(self) -> None:
         central = QtWidgets.QWidget(self)
@@ -1585,26 +1617,9 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         project_root.setExpanded(False)
         artifacts_root.setExpanded(False)
 
-        modules_root = QtWidgets.QTreeWidgetItem(
-            ("Сервис и детали", "дополнительные проверки и справка")
-        )
-        for group_title, group_specs in self._browser_service_surface_groups():
-            root_item = QtWidgets.QTreeWidgetItem((group_title, ""))
-            for spec in group_specs:
-                item = QtWidgets.QTreeWidgetItem(
-                    (
-                        spec.title,
-                        _operator_state_label(spec),
-                    )
-                )
-                item.setData(0, SURFACE_ROLE, default_surface_key_for_tool(spec.key))
-                item.setData(0, TOOL_ROLE, spec.key)
-                item.setData(0, ITEM_KIND_ROLE, "tool")
-                root_item.addChild(item)
-            modules_root.addChild(root_item)
-            root_item.setExpanded(False)
-        self.browser_tree.addTopLevelItem(modules_root)
-        modules_root.setExpanded(False)
+        # The project tree is the operator route. Support/fallback launchers
+        # stay in menus and explicit controls so old duplicate windows do not
+        # compete with the active dock workflow.
 
     def _refresh_search_results(self) -> None:
         query = self.command_search_edit.text().strip()
@@ -1677,6 +1692,124 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
         dock.raise_()
         if dock.isFloating():
             dock.activateWindow()
+
+    def _apply_hosted_command_result(
+        self,
+        result: object,
+        *,
+        command_id: str = "",
+        workspace_id: str = "",
+    ) -> str:
+        if not isinstance(result, Mapping):
+            return ""
+        child_dock = result.get("child_dock")
+        if not isinstance(child_dock, Mapping):
+            return ""
+        return self._show_hosted_child_dock(
+            child_dock,
+            command_id=command_id,
+            workspace_id=workspace_id,
+        )
+
+    @staticmethod
+    def _hosted_child_text(value: object, *, fallback: str = "") -> str:
+        text = " ".join(str(value or "").split()).strip()
+        return text or fallback
+
+    def _show_hosted_child_dock(
+        self,
+        child_dock: Mapping[str, object],
+        *,
+        command_id: str = "",
+        workspace_id: str = "",
+    ) -> str:
+        object_name = self._hosted_child_text(child_dock.get("object_name"))
+        if not object_name:
+            return ""
+        title = self._hosted_child_text(child_dock.get("title"), fallback="Дочерняя панель")
+        dock = self.hosted_child_docks.get(object_name)
+        if dock is None:
+            dock = QtWidgets.QDockWidget(title, self)
+            dock.setObjectName(object_name)
+            dock.setFeatures(self._dock_features())
+            dock.setAllowedAreas(
+                QtCore.Qt.DockWidgetArea.LeftDockWidgetArea
+                | QtCore.Qt.DockWidgetArea.RightDockWidgetArea
+                | QtCore.Qt.DockWidgetArea.TopDockWidgetArea
+                | QtCore.Qt.DockWidgetArea.BottomDockWidgetArea
+            )
+            dock.setMinimumWidth(420)
+            dock.setMinimumHeight(180)
+            dock.setProperty("hosted_child_dock", True)
+            dock.setToolTip(
+                "Дочерняя dock-панель рабочего шага: её можно открепить, вернуть в рабочее место и закрыть без запуска второго приложения."
+            )
+            self.addDockWidget(QtCore.Qt.DockWidgetArea.BottomDockWidgetArea, dock)
+            self.hosted_child_docks[object_name] = dock
+        if command_id:
+            dock.setProperty("spec_command_id", command_id)
+        if workspace_id:
+            dock.setProperty("spec_workspace_id", workspace_id)
+        dock.setWindowTitle(title)
+        content = self._build_hosted_child_dock_content(child_dock)
+        old_widget = dock.widget()
+        dock.setWidget(content)
+        if old_widget is not None:
+            old_widget.deleteLater()
+        dock.show()
+        dock.raise_()
+        if dock.isFloating():
+            dock.activateWindow()
+        self._refresh_runtime_table()
+        return title
+
+    def _build_hosted_child_dock_content(self, child_dock: Mapping[str, object]) -> QtWidgets.QWidget:
+        content_name = self._hosted_child_text(
+            child_dock.get("content_object_name"),
+            fallback="HostedChildDockContent",
+        )
+        table_name = self._hosted_child_text(
+            child_dock.get("table_object_name"),
+            fallback="HostedChildDockTable",
+        )
+        summary = self._hosted_child_text(child_dock.get("summary"))
+        raw_rows = child_dock.get("rows")
+        rows: list[tuple[str, ...]] = []
+        if isinstance(raw_rows, Sequence) and not isinstance(raw_rows, (str, bytes, bytearray)):
+            for raw_row in raw_rows:
+                if isinstance(raw_row, Sequence) and not isinstance(raw_row, (str, bytes, bytearray)):
+                    values = tuple(self._hosted_child_text(value) for value in raw_row)
+                else:
+                    values = (self._hosted_child_text(raw_row),)
+                if any(values):
+                    rows.append(values)
+
+        widget = QtWidgets.QWidget(self)
+        widget.setObjectName(content_name)
+        layout = QtWidgets.QVBoxLayout(widget)
+        layout.setSpacing(8)
+        if summary:
+            summary_label = QtWidgets.QLabel(summary, widget)
+            summary_label.setObjectName(f"{content_name}-SUMMARY")
+            summary_label.setWordWrap(True)
+            layout.addWidget(summary_label)
+
+        table = QtWidgets.QTableWidget(len(rows), max(2, max((len(row) for row in rows), default=2)), widget)
+        table.setObjectName(table_name)
+        table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        table.verticalHeader().setVisible(False)
+        table.setHorizontalHeaderLabels(
+            tuple(("Пункт", "Значение", "Деталь", "Дополнительно")[: table.columnCount()])
+        )
+        table.horizontalHeader().setStretchLastSection(True)
+        for row_index, row_values in enumerate(rows):
+            for column_index, value in enumerate(row_values[: table.columnCount()]):
+                table.setItem(row_index, column_index, QtWidgets.QTableWidgetItem(value))
+        table.resizeColumnsToContents()
+        layout.addWidget(table, 1)
+        return widget
 
     def _apply_selected_tool(
         self,
@@ -1923,13 +2056,44 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                 "Engineering Analysis",
             )
         }
+        def is_operator_visible(widget: QtWidgets.QWidget) -> bool:
+            current: QtWidgets.QWidget | None = widget
+            while current is not None and current is not self:
+                if current.isHidden():
+                    return False
+                current = current.parentWidget()
+            return True
+
+        def is_toolbar_child(widget: QtWidgets.QWidget) -> bool:
+            current = widget.parentWidget()
+            while current is not None and current is not self:
+                if isinstance(current, QtWidgets.QToolBar):
+                    return True
+                current = current.parentWidget()
+            return False
+
+        def is_operator_audit_visible(widget: QtWidgets.QWidget) -> bool:
+            return is_operator_visible(widget) or is_toolbar_child(widget)
+
         toolbar_buttons = [
             button.text().strip()
             for button in self.findChildren(QtWidgets.QPushButton)
             if button.text().strip()
+            and is_operator_audit_visible(button)
         ]
         auxiliary_visible_texts: list[str] = []
+        localized_builtin_button_names = {
+            "qt_dockwidget_floatbutton",
+            "qt_dockwidget_closebutton",
+            "ScrollLeftButton",
+            "ScrollRightButton",
+        }
         for widget in self.findChildren(QtWidgets.QWidget):
+            if not is_operator_audit_visible(widget) and not (
+                isinstance(widget, QtWidgets.QAbstractButton)
+                and widget.objectName() in localized_builtin_button_names
+            ):
+                continue
             auxiliary_visible_texts.extend(
                 text.strip()
                 for text in (
@@ -1948,23 +2112,33 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             )
         direct_visible_texts: list[str] = []
         for label in self.findChildren(QtWidgets.QLabel):
+            if not is_operator_audit_visible(label):
+                continue
             text = label.text().strip()
             if text:
                 direct_visible_texts.append(text)
         for group in self.findChildren(QtWidgets.QGroupBox):
+            if not is_operator_visible(group):
+                continue
             title = group.title().strip()
             if title:
                 direct_visible_texts.append(title)
         for dock in self.findChildren(QtWidgets.QDockWidget):
+            if not is_operator_visible(dock):
+                continue
             title = dock.windowTitle().strip()
             if title:
                 direct_visible_texts.append(title)
         for tabs in self.findChildren(QtWidgets.QTabWidget):
+            if not is_operator_visible(tabs):
+                continue
             for index in range(tabs.count()):
                 title = tabs.tabText(index).strip()
                 if title:
                     direct_visible_texts.append(title)
         for line_edit in self.findChildren(QtWidgets.QLineEdit):
+            if not is_operator_audit_visible(line_edit):
+                continue
             placeholder = line_edit.placeholderText().strip()
             if placeholder:
                 direct_visible_texts.append(placeholder)
@@ -1985,6 +2159,8 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                 append_tree_item_texts(item.child(child_index), column_count)
 
         for list_widget in self.findChildren(QtWidgets.QListWidget):
+            if not is_operator_visible(list_widget):
+                continue
             for index in range(list_widget.count()):
                 item = list_widget.item(index)
                 append_item_text(item.text())
@@ -1992,6 +2168,8 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
                 append_item_text(item.statusTip())
                 append_item_text(item.whatsThis())
         for tree_widget in self.findChildren(QtWidgets.QTreeWidget):
+            if not is_operator_visible(tree_widget):
+                continue
             column_count = tree_widget.columnCount()
             header = tree_widget.headerItem()
             if header is not None:
@@ -2003,6 +2181,8 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             for index in range(tree_widget.topLevelItemCount()):
                 append_tree_item_texts(tree_widget.topLevelItem(index), column_count)
         for combo_box in self.findChildren(QtWidgets.QComboBox):
+            if not is_operator_audit_visible(combo_box):
+                continue
             for index in range(combo_box.count()):
                 append_item_text(combo_box.itemText(index))
                 append_item_text(combo_box.itemData(index, QtCore.Qt.ItemDataRole.ToolTipRole))
@@ -2552,7 +2732,9 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             self._set_status_message(f"Обновлён статус управляемых поверхностей: {names}")
         self._refresh_runtime_table()
 
-    def _restore_layout(self) -> None:
+    def _restore_layout(self, *, restore_binary: bool | None = None) -> None:
+        if restore_binary is None:
+            restore_binary = _binary_layout_restore_enabled()
         geometry = self.settings.value("layout/geometry") or self.settings.value("geometry")
         state = self.settings.value("layout/window_state") or self.settings.value("window_state")
         last_surface_key = str(self.settings.value("layout/last_surface_key") or "").strip()
@@ -2574,13 +2756,21 @@ class DesktopQtMainShell(QtWidgets.QMainWindow):
             index = self.optimization_mode_combo.findText(mode)
             if index >= 0:
                 self.optimization_mode_combo.setCurrentIndex(index)
-        if isinstance(geometry, QtCore.QByteArray):
+        restored_binary_layout = False
+        if restore_binary and isinstance(geometry, QtCore.QByteArray):
             self.restoreGeometry(geometry)
-        if isinstance(state, QtCore.QByteArray):
+            restored_binary_layout = True
+        if restore_binary and isinstance(state, QtCore.QByteArray):
             self.restoreState(state)
+            restored_binary_layout = True
         self._localize_builtin_accessibility()
         if hasattr(self, "status_label"):
             self._set_status_message("Раскладка панелей восстановлена.")
+
+        if hasattr(self, "status_label") and not restored_binary_layout:
+            self._set_status_message(
+                "Рабочий шаг восстановлен; геометрия окна оставлена базовой для стабильности."
+            )
 
     def _save_layout(self) -> None:
         geometry = self.saveGeometry()

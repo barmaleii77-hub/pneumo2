@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 from collections import deque
+import math
 import os
 from pathlib import Path
+import sys
 import traceback
-from typing import Callable, Mapping
+from typing import Any, Callable, Mapping
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
@@ -356,6 +358,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         self._dock_widget_by_panel: dict[str, QtWidgets.QDockWidget] = {}
         self._workspace_dock_by_workspace_id: dict[str, QtWidgets.QDockWidget] = {}
         self._child_dock_by_command_id: dict[str, QtWidgets.QDockWidget] = {}
+        self._child_dock_by_object_name: dict[str, QtWidgets.QDockWidget] = {}
         self._shortcut_objects: list[QtGui.QShortcut] = []
         self._primary_command_id: str | None = None
         self._current_workspace_id = "overview"
@@ -690,6 +693,206 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         dock.hide()
         return dock
 
+    @staticmethod
+    def _child_dock_plot_points(raw_points: object) -> tuple[tuple[float, float], ...]:
+        points: list[tuple[float, float]] = []
+        for raw_point in raw_points if isinstance(raw_points, (list, tuple)) else ():
+            if not isinstance(raw_point, (list, tuple)) or len(raw_point) < 2:
+                continue
+            try:
+                x_value = float(raw_point[0])
+                y_value = float(raw_point[1])
+            except Exception:
+                continue
+            if not (math.isfinite(x_value) and math.isfinite(y_value)):
+                continue
+            points.append((x_value, y_value))
+        return tuple(points)
+
+    def _build_child_dock_plot_widget(
+        self,
+        plot_preview: Mapping[str, object],
+        command: DesktopShellCommandSpec,
+    ) -> QtWidgets.QWidget | None:
+        raw_series = plot_preview.get("series")
+        series_rows: list[dict[str, object]] = []
+        all_x_values: list[float] = []
+        all_y_values: list[float] = []
+        for raw_entry in raw_series if isinstance(raw_series, (list, tuple)) else ():
+            if not isinstance(raw_entry, Mapping):
+                continue
+            points = self._child_dock_plot_points(raw_entry.get("points"))
+            if not points:
+                continue
+            series_rows.append(
+                {
+                    "label": str(raw_entry.get("label") or "").strip() or "series",
+                    "color": str(raw_entry.get("color") or "#2563eb").strip() or "#2563eb",
+                    "points": points,
+                }
+            )
+            all_x_values.extend(point[0] for point in points)
+            all_y_values.extend(point[1] for point in points)
+        if not series_rows or not all_x_values or not all_y_values:
+            return None
+
+        x_min = min(all_x_values)
+        x_max = max(all_x_values)
+        y_min = min(all_y_values)
+        y_max = max(all_y_values)
+        if x_min == x_max:
+            x_min -= 1.0
+            x_max += 1.0
+        if y_min == y_max:
+            y_min -= 1.0
+            y_max += 1.0
+
+        width = 520.0
+        height = 188.0
+        margin_left = 44.0
+        margin_right = 18.0
+        margin_top = 26.0
+        margin_bottom = 30.0
+        plot_width = width - margin_left - margin_right
+        plot_height = height - margin_top - margin_bottom
+
+        def _px(x_value: float) -> float:
+            return margin_left + plot_width * ((x_value - x_min) / max(1e-9, x_max - x_min))
+
+        def _py(y_value: float) -> float:
+            return margin_top + plot_height * (1.0 - ((y_value - y_min) / max(1e-9, y_max - y_min)))
+
+        container = QtWidgets.QWidget()
+        container.setObjectName(
+            str(
+                plot_preview.get("container_object_name")
+                or self._safe_dock_object_name("child_dock_plot_box", command.command_id)
+            )
+        )
+        layout = QtWidgets.QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+
+        title = str(plot_preview.get("title") or "").strip()
+        summary = str(plot_preview.get("summary") or "").strip()
+        if title or summary:
+            title_label = QtWidgets.QLabel(" | ".join(part for part in (title, summary) if part))
+            title_label.setObjectName(
+                str(
+                    plot_preview.get("title_object_name")
+                    or self._safe_dock_object_name("child_dock_plot_title", command.command_id)
+                )
+            )
+            title_label.setWordWrap(True)
+            title_label.setStyleSheet("color:#334e68; font-weight:600;")
+            layout.addWidget(title_label)
+
+        scene = QtWidgets.QGraphicsScene(container)
+        scene.setSceneRect(0.0, 0.0, width, height)
+        scene.addRect(
+            0.0,
+            0.0,
+            width,
+            height,
+            QtGui.QPen(QtGui.QColor("#d5dde6")),
+            QtGui.QBrush(QtGui.QColor("#f8fafc")),
+        )
+        axis_pen = QtGui.QPen(QtGui.QColor("#7f8fa6"))
+        scene.addLine(margin_left, height - margin_bottom, width - margin_right, height - margin_bottom, axis_pen)
+        scene.addLine(margin_left, margin_top, margin_left, height - margin_bottom, axis_pen)
+
+        raw_window = plot_preview.get("window")
+        if isinstance(raw_window, (list, tuple)) and len(raw_window) >= 2:
+            try:
+                window_start = float(raw_window[0])
+                window_end = float(raw_window[1])
+            except Exception:
+                window_start = None
+                window_end = None
+            if window_start is not None and window_end is not None:
+                left = _px(min(window_start, window_end))
+                right = _px(max(window_start, window_end))
+                scene.addRect(
+                    left,
+                    margin_top,
+                    max(2.0, right - left),
+                    plot_height,
+                    QtGui.QPen(QtCore.Qt.NoPen),
+                    QtGui.QBrush(QtGui.QColor(191, 219, 254, 70)),
+                )
+
+        if y_min < 0.0 < y_max:
+            zero_pen = QtGui.QPen(QtGui.QColor("#cbd5e1"))
+            zero_pen.setStyle(QtCore.Qt.DashLine)
+            zero_y = _py(0.0)
+            scene.addLine(margin_left, zero_y, width - margin_right, zero_y, zero_pen)
+
+        legend_x = margin_left
+        legend_y = 6.0
+        for index, series in enumerate(series_rows):
+            color = QtGui.QColor(str(series["color"]))
+            legend_pen = QtGui.QPen(color, 2.0)
+            y_pos = legend_y + index * 12.0
+            scene.addLine(legend_x, y_pos + 5.0, legend_x + 14.0, y_pos + 5.0, legend_pen)
+            text_item = scene.addText(str(series["label"]))
+            text_item.setDefaultTextColor(QtGui.QColor("#334e68"))
+            text_item.setPos(legend_x + 18.0, y_pos - 4.0)
+
+            path = QtGui.QPainterPath()
+            points = tuple(series["points"])
+            for point_index, (x_value, y_value) in enumerate(points):
+                x_pos = _px(x_value)
+                y_pos = _py(y_value)
+                if point_index == 0:
+                    path.moveTo(x_pos, y_pos)
+                else:
+                    path.lineTo(x_pos, y_pos)
+                scene.addEllipse(
+                    x_pos - 1.8,
+                    y_pos - 1.8,
+                    3.6,
+                    3.6,
+                    QtGui.QPen(color),
+                    QtGui.QBrush(color),
+                )
+            scene.addPath(path, QtGui.QPen(color, 2.0))
+
+        focus_value = plot_preview.get("focus_x")
+        try:
+            focus_x = float(focus_value)
+        except Exception:
+            focus_x = None
+        if focus_x is not None and math.isfinite(focus_x):
+            focus_pen = QtGui.QPen(QtGui.QColor("#ea580c"), 1.6)
+            focus_pen.setStyle(QtCore.Qt.DashLine)
+            x_pos = _px(focus_x)
+            scene.addLine(x_pos, margin_top, x_pos, height - margin_bottom, focus_pen)
+
+        x_text = scene.addText(f"{x_min:.3f} .. {x_max:.3f} s")
+        x_text.setDefaultTextColor(QtGui.QColor("#52606d"))
+        x_text.setPos(margin_left, height - margin_bottom + 2.0)
+        y_text = scene.addText(f"{y_min:.3g} .. {y_max:.3g}")
+        y_text.setDefaultTextColor(QtGui.QColor("#52606d"))
+        y_text.setPos(width - margin_right - 104.0, height - margin_bottom + 2.0)
+
+        view = QtWidgets.QGraphicsView(scene, container)
+        view.setObjectName(
+            str(
+                plot_preview.get("object_name")
+                or self._safe_dock_object_name("child_dock_plot", command.command_id)
+            )
+        )
+        view.setMinimumHeight(int(height + 2.0))
+        view.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        view.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        view.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        view.setFrameShape(QtWidgets.QFrame.NoFrame)
+        tooltip = str(plot_preview.get("tooltip") or "").strip()
+        if tooltip:
+            view.setToolTip(tooltip)
+        layout.addWidget(view)
+        return container
+
     def _show_child_dock_from_result(
         self,
         command: DesktopShellCommandSpec,
@@ -713,6 +916,12 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         label.setWordWrap(True)
         label.setStyleSheet("color:#334e68;")
         layout.addWidget(label)
+
+        plot_preview = payload.get("plot_preview")
+        if isinstance(plot_preview, Mapping):
+            plot_widget = self._build_child_dock_plot_widget(plot_preview, command)
+            if plot_widget is not None:
+                layout.addWidget(plot_widget)
 
         table = QtWidgets.QTableWidget(0, 2)
         table.setObjectName(str(payload.get("table_object_name") or self._safe_dock_object_name("child_dock_table", command.command_id)))
@@ -740,26 +949,34 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
         table.resizeColumnsToContents()
         layout.addWidget(table, 1)
 
-        dock = self._child_dock_by_command_id.get(command.command_id)
+        dock_object_name = str(
+            payload.get("object_name")
+            or self._safe_dock_object_name("child_dock", command.command_id)
+        )
+        dock = self._child_dock_by_object_name.get(dock_object_name)
+        if dock is None:
+            dock = self._child_dock_by_command_id.get(command.command_id)
         if dock is None:
             dock = QtWidgets.QDockWidget(title, self)
-            dock.setObjectName(str(payload.get("object_name") or self._safe_dock_object_name("child_dock", command.command_id)))
+            dock.setObjectName(dock_object_name)
             dock.setAllowedAreas(QtCore.Qt.AllDockWidgetAreas)
             dock.setFeatures(
                 QtWidgets.QDockWidget.DockWidgetMovable
                 | QtWidgets.QDockWidget.DockWidgetFloatable
                 | QtWidgets.QDockWidget.DockWidgetClosable
             )
-            dock.setProperty("spec_panel_id", f"child:{command.command_id}")
-            dock.setProperty("spec_command_id", command.command_id)
-            dock.setProperty("spec_workspace_id", command.workspace_id)
-            dock.setProperty("spec_child_window_role", "detail")
             self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, dock)
             self._register_window_toggle(dock, title)
-            self._child_dock_by_command_id[command.command_id] = dock
+            self._child_dock_by_object_name[dock_object_name] = dock
             dock.topLevelChanged.connect(lambda _floating, self=self: self._save_window_state())
             dock.dockLocationChanged.connect(lambda _area, self=self: self._save_window_state())
             dock.visibilityChanged.connect(lambda _visible, self=self: self._save_window_state())
+        self._child_dock_by_command_id[command.command_id] = dock
+        self._child_dock_by_object_name[dock_object_name] = dock
+        dock.setProperty("spec_panel_id", f"child:{command.command_id}")
+        dock.setProperty("spec_command_id", command.command_id)
+        dock.setProperty("spec_workspace_id", command.workspace_id)
+        dock.setProperty("spec_child_window_role", "detail")
         old_widget = dock.widget()
         if old_widget is not None:
             old_widget.setParent(None)
@@ -1031,6 +1248,7 @@ class DesktopGuiSpecMainWindow(QtWidgets.QMainWindow):
                 actions,
                 self.run_command,
                 repo_root=self.repo_root,
+                python_executable=sys.executable,
             )
         if workspace.workspace_id == "baseline_run":
             return BaselineWorkspacePage(

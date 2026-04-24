@@ -64,6 +64,15 @@ def _existing_path(raw: Any) -> Path | None:
     return path if path.exists() else None
 
 
+def _resolved_path_key(path: Path | None) -> str:
+    if path is None:
+        return ""
+    try:
+        return str(path.expanduser().resolve()).lower()
+    except Exception:
+        return str(path).lower()
+
+
 def _latest_child_dir(root: Path) -> Path | None:
     if not root.exists() or not root.is_dir():
         return None
@@ -1449,6 +1458,7 @@ class DesktopResultsRuntime:
         artifact: DesktopResultsArtifact | None = None,
         *,
         max_points: int = 80,
+        series_name: str | None = None,
     ) -> dict[str, Any]:
         target_artifact = artifact or self.artifact_by_key(snapshot, "latest_npz")
         target_path = self.compare_viewer_path(snapshot, artifact=target_artifact)
@@ -1484,6 +1494,8 @@ class DesktopResultsRuntime:
         try:
             with np.load(target_path, allow_pickle=False) as data:
                 for key in data.files:
+                    if series_name and str(key) != str(series_name):
+                        continue
                     try:
                         array = np.asarray(data[key])
                     except Exception:
@@ -1509,6 +1521,15 @@ class DesktopResultsRuntime:
                         "minimum": _preview_number(finite.min()),
                         "maximum": _preview_number(finite.max()),
                         "range": f"{_preview_number(finite.min())} .. {_preview_number(finite.max())}",
+                        "source_path": str(target_path),
+                    }
+                if series_name:
+                    return {
+                        "status": "MISSING",
+                        "series": str(series_name),
+                        "samples": (),
+                        "point_count": 0,
+                        "range": "выбранная серия не найдена в файле результата",
                         "source_path": str(target_path),
                     }
         except Exception:
@@ -2002,6 +2023,34 @@ class DesktopResultsRuntime:
             or artifacts.get("latest_pointer_json_path")
         )
         if target_path is None:
+            analysis_context_path = (
+                _effective_workspace_dir(self.repo_root)
+                / "handoffs"
+                / "WS-ANALYSIS"
+                / "analysis_context.json"
+            )
+            analysis_context = _safe_read_json_dict(analysis_context_path)
+            link_contract = dict(analysis_context.get("animator_link_contract") or {})
+            selected_pointer = dict(
+                analysis_context.get("selected_result_artifact_pointer")
+                or link_contract.get("selected_result_artifact_pointer")
+                or {}
+            )
+            target_path = _existing_path(
+                selected_pointer.get("path")
+                or selected_pointer.get("pointer_json")
+                or analysis_context.get("selected_npz_path")
+                or link_contract.get("selected_npz_path")
+            )
+            if target_path is not None:
+                selected = {
+                    "key": "analysis_context_animation_handoff",
+                    "title": "Переданный результат анализа",
+                    "category": "results",
+                    "path": str(target_path),
+                    "detail": "Материал взят из analysis_context рабочего шага анализа.",
+                }
+        if target_path is None:
             return None
         return DesktopResultsArtifact(
             key=str(selected.get("key") or "analysis_animation_handoff"),
@@ -2245,6 +2294,1279 @@ class DesktopResultsRuntime:
                 "point_count": 0,
                 "range": "предпросмотр сцены не прочитан",
             }
+
+    def build_hosted_compare_contract_preview(
+        self,
+        snapshot: DesktopResultsSnapshot,
+        artifact: DesktopResultsArtifact | None = None,
+        *,
+        series_name: str | None = None,
+        selected_table: str = "main",
+    ) -> dict[str, Any]:
+        target_artifact = artifact or self.artifact_by_key(snapshot, "latest_npz")
+        target_path = self.compare_viewer_path(snapshot, artifact=target_artifact)
+        compare_payload = self.build_compare_current_context_sidecar(snapshot)
+        current_context_ref = dict(compare_payload.get("current_context_ref") or {})
+        selected_context_ref = dict(compare_payload.get("selected_context_ref") or {})
+        preview = self.animation_scene_preview_points(snapshot, artifact=target_artifact)
+
+        selected_metrics: list[str] = []
+        for raw_value in (series_name, str(preview.get("series_y") or "").strip()):
+            value = str(raw_value or "").strip()
+            if value and value not in selected_metrics:
+                selected_metrics.append(value)
+
+        def _finite_float(raw: Any) -> float | None:
+            try:
+                value = float(raw)
+            except Exception:
+                return None
+            if value != value or value in (float("inf"), float("-inf")):
+                return None
+            return value
+
+        x_values = [
+            value
+            for value in (
+                _finite_float(point[0])
+                for point in list(preview.get("points") or ())
+                if isinstance(point, (tuple, list)) and len(point) >= 1
+            )
+            if value is not None
+        ]
+        selected_time_window: tuple[float, float] | tuple[()] = ()
+        if x_values:
+            selected_time_window = (min(x_values), max(x_values))
+
+        alignment_mode = str(preview.get("series_x") or "time_s").strip() or "time_s"
+        source_path = str(target_path or "")
+        label = str(
+            getattr(target_artifact, "title", "")
+            or getattr(target_artifact, "key", "")
+            or (target_path.name if target_path is not None else "")
+        ).strip()
+
+        selected_run_ref: dict[str, Any] = {}
+        run_ref_source = "selected_context_ref"
+        build_compare_contract = None
+        format_compare_contract_summary = None
+        format_compare_mismatch_banner = None
+        if target_path is not None and target_path.exists() and target_path.suffix.lower() == ".npz":
+            try:
+                from pneumo_solver_ui.compare_contract import (
+                    build_compare_contract as _build_compare_contract,
+                    extract_compare_run_ref,
+                    format_compare_contract_summary as _format_compare_contract_summary,
+                    format_compare_mismatch_banner as _format_compare_mismatch_banner,
+                )
+                from pneumo_solver_ui.compare_ui import load_npz_bundle
+
+                bundle = load_npz_bundle(target_path)
+                meta = bundle.get("meta") if isinstance(bundle, Mapping) else {}
+                selected_run_ref = extract_compare_run_ref(meta, npz_path=target_path, label=label)
+                build_compare_contract = _build_compare_contract
+                format_compare_contract_summary = _format_compare_contract_summary
+                format_compare_mismatch_banner = _format_compare_mismatch_banner
+                if any(
+                    str(selected_run_ref.get(key) or "").strip()
+                    for key in (
+                        "run_id",
+                        "run_contract_hash",
+                        "objective_contract_hash",
+                        "active_baseline_hash",
+                        "suite_snapshot_hash",
+                    )
+                ):
+                    run_ref_source = "npz_meta"
+            except Exception:
+                selected_run_ref = {}
+
+        if build_compare_contract is None:
+            try:
+                from pneumo_solver_ui.compare_contract import (
+                    build_compare_contract as _build_compare_contract,
+                    format_compare_contract_summary as _format_compare_contract_summary,
+                    format_compare_mismatch_banner as _format_compare_mismatch_banner,
+                )
+
+                build_compare_contract = _build_compare_contract
+                format_compare_contract_summary = _format_compare_contract_summary
+                format_compare_mismatch_banner = _format_compare_mismatch_banner
+            except Exception:
+                build_compare_contract = None
+
+        if not selected_run_ref:
+            selected_run_ref = dict(selected_context_ref)
+        else:
+            for key, value in selected_context_ref.items():
+                if value and not selected_run_ref.get(key):
+                    selected_run_ref[key] = value
+
+        if source_path and not selected_run_ref.get("source_path"):
+            selected_run_ref["source_path"] = source_path
+        if label and not selected_run_ref.get("label"):
+            selected_run_ref["label"] = label
+
+        contract: dict[str, Any] = {}
+        summary_text = ""
+        summary_lines: tuple[str, ...] = ()
+        mismatch_banner_text = ""
+        status = "MISSING" if target_path is None else str(preview.get("status") or "READY").upper()
+        error = ""
+        if build_compare_contract is not None and selected_run_ref:
+            try:
+                contract = build_compare_contract(
+                    (selected_run_ref,),
+                    selected_table=selected_table,
+                    selected_metrics=tuple(selected_metrics),
+                    selected_time_window=selected_time_window or None,
+                    alignment_mode=alignment_mode,
+                    current_context_ref=current_context_ref,
+                )
+                if format_compare_contract_summary is not None:
+                    summary_text = str(format_compare_contract_summary(contract) or "")
+                    summary_lines = tuple(
+                        line.strip() for line in summary_text.splitlines() if str(line).strip()
+                    )
+                if format_compare_mismatch_banner is not None:
+                    mismatch_banner_text = str(
+                        format_compare_mismatch_banner(contract.get("mismatch_banner")) or ""
+                    ).strip()
+                banner_id = str((contract.get("mismatch_banner") or {}).get("banner_id") or "").strip()
+                if banner_id == "BANNER-HIST-002":
+                    status = "STALE"
+                elif banner_id == "BANNER-HIST-003":
+                    status = "WARN"
+                else:
+                    status = "READY"
+            except Exception as exc:
+                error = str(exc)
+                if target_path is not None:
+                    status = "WARN"
+
+        return {
+            "status": status,
+            "source_path": source_path,
+            "selected_table": str(selected_table or "main"),
+            "selected_metrics": tuple(selected_metrics),
+            "selected_time_window": tuple(selected_time_window) if selected_time_window else (),
+            "alignment_mode": alignment_mode,
+            "run_ref_source": run_ref_source,
+            "summary_text": summary_text,
+            "summary_lines": summary_lines,
+            "mismatch_banner_text": mismatch_banner_text,
+            "compare_contract_hash": str(contract.get("compare_contract_hash") or ""),
+            "contract": contract,
+            "error": error,
+        }
+
+    def build_hosted_compare_session_preview(
+        self,
+        snapshot: DesktopResultsSnapshot,
+        artifact: DesktopResultsArtifact | None = None,
+        *,
+        series_name: str | None = None,
+        selected_table: str = "main",
+        current_context_path: Path | None = None,
+    ) -> dict[str, Any]:
+        target_artifact = artifact or self.artifact_by_key(snapshot, "latest_npz")
+        target_path = self.compare_viewer_path(snapshot, artifact=target_artifact)
+        compare_payload = self.build_compare_current_context_sidecar(snapshot)
+        contract_preview = self.build_hosted_compare_contract_preview(
+            snapshot,
+            artifact=target_artifact,
+            series_name=series_name,
+            selected_table=selected_table,
+        )
+        contract = dict(contract_preview.get("contract") or {})
+        current_context_ref = dict(compare_payload.get("current_context_ref") or {})
+        current_context_status = str(
+            (compare_payload.get("result_context") or {}).get("state") or ""
+        ).strip()
+        run_refs = [
+            dict(item)
+            for item in list(contract.get("run_refs") or ())
+            if isinstance(item, Mapping)
+        ]
+        if current_context_ref:
+            current_ref = dict(current_context_ref)
+            if current_context_path is not None and not current_ref.get("source_path"):
+                current_ref["source_path"] = str(current_context_path)
+            duplicate = False
+            for existing in run_refs:
+                if (
+                    str(existing.get("run_id") or "").strip()
+                    == str(current_ref.get("run_id") or "").strip()
+                    and str(existing.get("source_path") or "").strip()
+                    == str(current_ref.get("source_path") or "").strip()
+                ):
+                    duplicate = True
+                    break
+            if not duplicate:
+                run_refs.append(current_ref)
+
+        def _run_label(ref: Mapping[str, Any], index: int) -> str:
+            for key in ("run_id", "label", "source_path"):
+                value = str(ref.get(key) or "").strip()
+                if value:
+                    if key == "source_path":
+                        return Path(value).name
+                    return value
+            return f"run-{index}"
+
+        labels = tuple(
+            _run_label(ref, index)
+            for index, ref in enumerate(run_refs, start=1)
+            if _run_label(ref, index)
+        )
+        selected_metrics = tuple(
+            str(value).strip()
+            for value in list(contract_preview.get("selected_metrics") or ())
+            if str(value).strip()
+        )
+        time_window = tuple(contract_preview.get("selected_time_window") or ())
+        playhead_t: float | None = None
+        if len(time_window) >= 2:
+            try:
+                playhead_t = (float(time_window[0]) + float(time_window[1])) / 2.0
+            except Exception:
+                playhead_t = None
+
+        session_source = "desktop_results_runtime_hosted_compare"
+        npz_paths_list: list[str] = []
+        npz_labels_list: list[str] = []
+        seen_npz_paths: set[str] = set()
+
+        def _append_session_npz(path: Path | None, label: str) -> None:
+            if path is None:
+                return
+            path_text = str(path).strip()
+            if not path_text:
+                return
+            key = _resolved_path_key(path)
+            if not key or key in seen_npz_paths:
+                return
+            seen_npz_paths.add(key)
+            npz_paths_list.append(path_text)
+            npz_labels_list.append(str(label or path.name).strip() or path.name)
+
+        selected_label = labels[0] if labels else (
+            str(getattr(target_artifact, "title", "") or "")
+            or (target_path.name if target_path is not None else "")
+        )
+        current_label = _run_label(current_context_ref, max(2, len(labels) + 1)) if current_context_ref else ""
+        current_npz_path = _existing_path(getattr(snapshot, "latest_npz_path", None))
+
+        _append_session_npz(target_path, selected_label)
+        if current_npz_path is not None and _resolved_path_key(current_npz_path) != _resolved_path_key(target_path):
+            _append_session_npz(current_npz_path, current_label or current_npz_path.stem)
+
+        reference_label = npz_labels_list[0] if npz_labels_list else (labels[0] if labels else "")
+        npz_paths = tuple(npz_paths_list)
+
+        session_payload: dict[str, Any]
+        try:
+            from pneumo_solver_ui.compare_session import CompareSession, to_json_dict
+
+            session_payload = to_json_dict(
+                CompareSession(
+                    npz_paths=list(npz_paths),
+                    labels=list(npz_labels_list or labels),
+                    table=str(contract_preview.get("selected_table") or selected_table or "main"),
+                    signals=list(selected_metrics),
+                    mode="overlay",
+                    reference_label=reference_label or None,
+                    time_window=tuple(time_window) if time_window else None,
+                    playhead_t=playhead_t,
+                    compare_contract=contract or None,
+                    compare_contract_hash=str(contract_preview.get("compare_contract_hash") or ""),
+                    baseline_ref=dict(contract.get("baseline_ref") or {}) or None,
+                    objective_ref=dict(contract.get("objective_ref") or {}) or None,
+                    run_refs=run_refs,
+                    current_context_ref=current_context_ref or None,
+                    current_context_path=str(current_context_path or ""),
+                    current_context_ref_source_path=str(current_context_path or ""),
+                    current_context_ref_source_status=current_context_status,
+                    mismatch_banner=dict(contract.get("mismatch_banner") or {}) or None,
+                    session_source=session_source,
+                )
+            )
+        except Exception:
+            session_payload = {
+                "version": "diagrammy_compare_session_v1",
+                "npz_paths": list(npz_paths),
+                "labels": list(npz_labels_list or labels),
+                "table": str(contract_preview.get("selected_table") or selected_table or "main"),
+                "signals": list(selected_metrics),
+                "mode": "overlay",
+                "reference_label": reference_label,
+                "time_window": list(time_window),
+                "playhead_t": playhead_t,
+                "compare_contract": contract,
+                "compare_contract_hash": str(contract_preview.get("compare_contract_hash") or ""),
+                "baseline_ref": dict(contract.get("baseline_ref") or {}),
+                "objective_ref": dict(contract.get("objective_ref") or {}),
+                "run_refs": run_refs,
+                "current_context_ref": current_context_ref,
+                "current_context_path": str(current_context_path or ""),
+                "current_context_ref_source_path": str(current_context_path or ""),
+                "current_context_ref_source_status": current_context_status,
+                "mismatch_banner": dict(contract.get("mismatch_banner") or {}),
+                "session_source": session_source,
+            }
+
+        mode = str(session_payload.get("mode") or "overlay").strip() or "overlay"
+        compare_label = ""
+        for candidate in list(npz_labels_list or labels):
+            value = str(candidate or "").strip()
+            if value and value != reference_label:
+                compare_label = value
+                break
+        if not compare_label:
+            compare_label = current_label or ""
+
+        timeline_signal = ""
+        for raw_value in list(session_payload.get("signals") or ()) + [series_name]:
+            value = str(raw_value or "").strip()
+            if value:
+                timeline_signal = value
+                break
+
+        target_path_key = _resolved_path_key(target_path)
+        current_path_key = _resolved_path_key(current_npz_path)
+        run_rows: list[dict[str, Any]] = []
+        for index, ref in enumerate(run_refs, start=1):
+            label = _run_label(ref, index)
+            role = "additional"
+            if label == reference_label or index == 1:
+                role = "reference"
+            elif current_context_ref and label == current_label:
+                role = "current_context"
+            elif index == 2:
+                role = "compare"
+            path_text = str(ref.get("source_path") or "").strip()
+            if not path_text and role == "reference" and target_path is not None:
+                path_text = str(target_path)
+            elif not path_text and role in {"compare", "current_context"} and current_npz_path is not None:
+                if current_path_key and current_path_key != target_path_key:
+                    path_text = str(current_npz_path)
+            if not path_text and role == "current_context" and current_context_path is not None:
+                path_text = str(current_context_path)
+            path_obj = _existing_path(path_text) if path_text else None
+            path_name = path_obj.name if path_obj is not None else (Path(path_text).name if path_text else "")
+            source = "session_ref"
+            path_key = _resolved_path_key(path_obj)
+            if role == "reference" or (path_key and path_key == target_path_key):
+                source = "selected_result"
+            elif role == "current_context":
+                source = "current_context"
+            elif path_key and path_key == current_path_key:
+                source = "current_result"
+            if role == "current_context" and current_context_path is not None and path_text and not str(path_text).lower().endswith(".npz"):
+                path_kind = "context_sidecar"
+            elif str(path_text).lower().endswith(".npz"):
+                path_kind = "npz"
+            elif path_text:
+                path_kind = "file"
+            else:
+                path_kind = "none"
+            run_rows.append(
+                {
+                    "label": label,
+                    "role": role,
+                    "source": source,
+                    "path": path_text,
+                    "path_name": path_name,
+                    "path_kind": path_kind,
+                    "run_id": str(ref.get("run_id") or "").strip(),
+                    "suite_snapshot_hash": str(ref.get("suite_snapshot_hash") or "").strip(),
+                    "objective_contract_hash": str(ref.get("objective_contract_hash") or "").strip(),
+                }
+            )
+
+        timeline_target = {
+            "mode": mode,
+            "signal": timeline_signal,
+            "reference_label": reference_label,
+            "compare_label": compare_label,
+            "pair_label": (
+                f"{reference_label or '-'} -> {compare_label or '-'}"
+                if reference_label or compare_label
+                else ""
+            ),
+            "time_window": tuple(time_window) if time_window else (),
+            "playhead_t": playhead_t,
+            "context_status": current_context_status,
+        }
+
+        if len(time_window) >= 2:
+            try:
+                time_text = f"{float(time_window[0]):.3f}..{float(time_window[1]):.3f} s"
+            except Exception:
+                time_text = "-"
+        else:
+            time_text = "-"
+        playhead_text = f"{playhead_t:.3f} s" if playhead_t is not None else "-"
+        summary_lines = (
+            f"runs={len(run_refs)} | npz={len(npz_paths)} | mode=overlay",
+            (
+                f"table={str(contract_preview.get('selected_table') or selected_table or 'main')} "
+                f"| signals={len(selected_metrics)} | window={time_text}"
+            ),
+            f"reference={reference_label or '-'} | playhead={playhead_text} | context={current_context_status or '-'}",
+        )
+        return {
+            "status": str(contract_preview.get("status") or ""),
+            "session_source": session_source,
+            "run_refs_count": len(run_refs),
+            "npz_count": len(npz_paths),
+            "reference_label": reference_label,
+            "playhead_t": playhead_t,
+            "labels": labels,
+            "mode": mode,
+            "run_rows": tuple(dict(item) for item in run_rows),
+            "timeline_target": timeline_target,
+            "summary_lines": summary_lines,
+            "payload": session_payload,
+        }
+
+    def build_hosted_compare_open_timeline_preview(
+        self,
+        snapshot: DesktopResultsSnapshot,
+        artifact: DesktopResultsArtifact | None = None,
+        *,
+        max_valves: int = 8,
+    ) -> dict[str, Any]:
+        target_artifact = artifact or self.artifact_by_key(snapshot, "latest_npz")
+        target_path = self.compare_viewer_path(snapshot, artifact=target_artifact)
+        source_path = str(target_path or "")
+        reference_label = str(
+            getattr(target_artifact, "title", "")
+            or getattr(target_artifact, "key", "")
+            or (target_path.name if target_path is not None else "")
+        ).strip()
+        if target_path is None or not target_path.exists() or target_path.suffix.lower() != ".npz":
+            return {
+                "status": "MISSING",
+                "source_path": source_path,
+                "reference_label": reference_label,
+                "note": "Open timeline needs an NPZ result file.",
+                "summary_lines": (),
+                "valve_rows": (),
+            }
+
+        try:
+            import numpy as np
+            from pneumo_solver_ui.compare_ui import detect_time_col, extract_time_vector, load_npz_bundle
+        except Exception as exc:
+            return {
+                "status": "WARN",
+                "source_path": source_path,
+                "reference_label": reference_label,
+                "note": f"Open timeline helpers are unavailable: {exc}",
+                "summary_lines": (),
+                "valve_rows": (),
+            }
+
+        try:
+            bundle = load_npz_bundle(target_path)
+            tables = bundle.get("tables") if isinstance(bundle, Mapping) else {}
+            df_open = tables.get("open") if isinstance(tables, Mapping) else None
+        except Exception as exc:
+            return {
+                "status": "WARN",
+                "source_path": source_path,
+                "reference_label": reference_label,
+                "note": f"Open timeline failed to load bundle: {exc}",
+                "summary_lines": (),
+                "valve_rows": (),
+            }
+
+        if df_open is None or bool(getattr(df_open, "empty", True)):
+            return {
+                "status": "MISSING",
+                "source_path": source_path,
+                "reference_label": reference_label,
+                "note": "Open timeline: selected run has no non-empty `open` table.",
+                "summary_lines": (),
+                "valve_rows": (),
+            }
+
+        try:
+            tcol = detect_time_col(df_open) or str(df_open.columns[0])
+        except Exception:
+            tcol = str(df_open.columns[0]) if len(getattr(df_open, "columns", ())) else ""
+        try:
+            tt = np.asarray(extract_time_vector(df_open, tcol), dtype=float)
+        except Exception:
+            tt = np.asarray([], dtype=float)
+        if tt.size <= 0:
+            tt = np.arange(len(df_open), dtype=float)
+
+        valve_cols = [str(col) for col in getattr(df_open, "columns", ()) if str(col) != str(tcol)]
+        if not valve_cols:
+            return {
+                "status": "WARN",
+                "source_path": source_path,
+                "reference_label": reference_label,
+                "note": "Open timeline: `open` table exists, but valve columns were not found.",
+                "summary_lines": (),
+                "valve_rows": (),
+            }
+
+        valve_rows: list[dict[str, Any]] = []
+        for col in valve_cols:
+            try:
+                arr_raw = np.asarray(df_open[col].values, dtype=float)
+            except Exception:
+                continue
+            n = min(int(tt.size), int(arr_raw.size))
+            if n <= 0:
+                continue
+            arr_raw = np.asarray(arr_raw[:n], dtype=float)
+            mask = np.isfinite(arr_raw)
+            if not np.any(mask):
+                continue
+            arr01 = np.zeros(n, dtype=float)
+            arr01[mask] = (arr_raw[mask] > 0.5).astype(float)
+            changed = int((float(np.nanmax(arr01[mask])) - float(np.nanmin(arr01[mask]))) > 0.0)
+            active = int(float(np.nanmax(arr01[mask])) > 0.5)
+            transitions = int(np.count_nonzero(np.diff(arr01) != 0.0)) if n > 1 else 0
+            duty = float(np.nanmean(arr01[mask])) if np.any(mask) else 0.0
+            valve_rows.append(
+                {
+                    "name": str(col),
+                    "changed": changed,
+                    "active": active,
+                    "transitions": transitions,
+                    "duty": duty,
+                }
+            )
+        if not valve_rows:
+            return {
+                "status": "WARN",
+                "source_path": source_path,
+                "reference_label": reference_label,
+                "note": "Open timeline: no finite valve state columns were found.",
+                "summary_lines": (),
+                "valve_rows": (),
+            }
+
+        valve_rows.sort(
+            key=lambda item: (
+                -int(item.get("changed") or 0),
+                -int(item.get("active") or 0),
+                -int(item.get("transitions") or 0),
+                str(item.get("name") or "").lower(),
+            )
+        )
+        limit = max(1, int(max_valves or 8))
+        top_rows = valve_rows[:limit]
+        changed_total = int(sum(int(item.get("changed") or 0) for item in valve_rows))
+        active_total = int(sum(int(item.get("active") or 0) for item in valve_rows))
+        truncated = len(valve_rows) > len(top_rows)
+        finite_tt = tt[np.isfinite(tt)]
+        if finite_tt.size >= 2:
+            time_window = (float(finite_tt[0]), float(finite_tt[-1]))
+            window_text = f"{time_window[0]:.3f}..{time_window[1]:.3f} s"
+        elif finite_tt.size == 1:
+            time_window = (float(finite_tt[0]), float(finite_tt[0]))
+            window_text = f"{time_window[0]:.3f} s"
+        else:
+            time_window = ()
+            window_text = "-"
+
+        top_names = tuple(str(item.get("name") or "") for item in top_rows if str(item.get("name") or "").strip())
+        summary_lines = (
+            f"ref={reference_label or '-'} | valves={len(valve_rows)} | changed={changed_total} | active={active_total}",
+            f"time={window_text} | shown={len(top_rows)} | truncated={'yes' if truncated else 'no'}",
+        )
+        return {
+            "status": "READY",
+            "source_path": source_path,
+            "reference_label": reference_label,
+            "time_window": tuple(time_window) if time_window else (),
+            "valve_count": len(valve_rows),
+            "changed_count": changed_total,
+            "active_count": active_total,
+            "top_names": top_names,
+            "valve_rows": tuple(dict(item) for item in top_rows),
+            "summary_lines": summary_lines,
+            "note": "Open timeline: changed valves are prioritised first.",
+            "truncated": truncated,
+        }
+
+    def build_hosted_compare_peak_heat_preview(
+        self,
+        snapshot: DesktopResultsSnapshot,
+        artifact: DesktopResultsArtifact | None = None,
+        *,
+        series_name: str | None = None,
+        selected_table: str = "main",
+        max_signals: int = 6,
+    ) -> dict[str, Any]:
+        target_artifact = artifact or self.artifact_by_key(snapshot, "latest_npz")
+        target_path = self.compare_viewer_path(snapshot, artifact=target_artifact)
+        source_path = str(target_path or "")
+        compare_payload = self.build_compare_current_context_sidecar(snapshot)
+        current_context_ref = dict(compare_payload.get("current_context_ref") or {})
+        selected_context_ref = dict(compare_payload.get("selected_context_ref") or {})
+        contract_preview = self.build_hosted_compare_contract_preview(
+            snapshot,
+            artifact=target_artifact,
+            series_name=series_name,
+            selected_table=selected_table,
+        )
+        table_name = str(contract_preview.get("selected_table") or selected_table or "main").strip() or "main"
+
+        def _run_label(ref: Mapping[str, Any], fallback: str) -> str:
+            for key in ("run_id", "label", "source_path"):
+                value = str(ref.get(key) or "").strip()
+                if not value:
+                    continue
+                if key == "source_path":
+                    return Path(value).name
+                return value
+            return fallback
+
+        selected_label = _run_label(
+            selected_context_ref,
+            str(getattr(target_artifact, "title", "") or (target_path.name if target_path is not None else "selected")),
+        )
+        current_path = _existing_path(getattr(snapshot, "latest_npz_path", None))
+        current_label = _run_label(
+            current_context_ref,
+            str(current_path.name if current_path is not None else "current"),
+        )
+
+        if target_path is None or not target_path.exists() or target_path.suffix.lower() != ".npz":
+            return {
+                "status": "MISSING",
+                "source_path": source_path,
+                "reference_label": selected_label,
+                "note": "Peak heat preview needs a selected NPZ result file.",
+                "summary_lines": (),
+                "signal_rows": (),
+            }
+        if current_path is None or current_path.suffix.lower() != ".npz":
+            return {
+                "status": "MISSING",
+                "source_path": source_path,
+                "reference_label": selected_label,
+                "note": "Peak heat preview needs a current NPZ result file.",
+                "summary_lines": (),
+                "signal_rows": (),
+            }
+        if _resolved_path_key(current_path) == _resolved_path_key(target_path):
+            return {
+                "status": "MISSING",
+                "source_path": source_path,
+                "reference_label": selected_label,
+                "compare_label": current_label or selected_label,
+                "note": "Peak heat preview needs another comparable NPZ besides the selected reference run.",
+                "summary_lines": (),
+                "signal_rows": (),
+            }
+
+        try:
+            import numpy as np
+            from pneumo_solver_ui.compare_deltat_heatmap import build_deltat_cube
+            from pneumo_solver_ui.compare_ui import detect_time_col, load_npz_bundle
+        except Exception as exc:
+            return {
+                "status": "WARN",
+                "source_path": source_path,
+                "reference_label": selected_label,
+                "compare_label": current_label,
+                "note": f"Peak heat helpers are unavailable: {exc}",
+                "summary_lines": (),
+                "signal_rows": (),
+            }
+
+        try:
+            selected_bundle = load_npz_bundle(target_path)
+            current_bundle = load_npz_bundle(current_path)
+        except Exception as exc:
+            return {
+                "status": "WARN",
+                "source_path": source_path,
+                "reference_label": selected_label,
+                "compare_label": current_label,
+                "note": f"Peak heat preview failed to load compare bundles: {exc}",
+                "summary_lines": (),
+                "signal_rows": (),
+            }
+
+        selected_tables = selected_bundle.get("tables") if isinstance(selected_bundle, Mapping) else {}
+        current_tables = current_bundle.get("tables") if isinstance(current_bundle, Mapping) else {}
+        df_selected = selected_tables.get(table_name) if isinstance(selected_tables, Mapping) else None
+        df_current = current_tables.get(table_name) if isinstance(current_tables, Mapping) else None
+        if df_selected is None or bool(getattr(df_selected, "empty", True)):
+            return {
+                "status": "MISSING",
+                "source_path": source_path,
+                "reference_label": selected_label,
+                "compare_label": current_label,
+                "note": f"Peak heat preview: selected run has no non-empty `{table_name}` table.",
+                "summary_lines": (),
+                "signal_rows": (),
+            }
+        if df_current is None or bool(getattr(df_current, "empty", True)):
+            return {
+                "status": "MISSING",
+                "source_path": source_path,
+                "reference_label": selected_label,
+                "compare_label": current_label,
+                "note": f"Peak heat preview: current run has no non-empty `{table_name}` table.",
+                "summary_lines": (),
+                "signal_rows": (),
+            }
+
+        excluded_columns: set[str] = set()
+        for df in (df_selected, df_current):
+            try:
+                time_col = detect_time_col(df)
+            except Exception:
+                time_col = None
+            if time_col:
+                excluded_columns.add(str(time_col))
+
+        selected_columns = [str(col) for col in getattr(df_selected, "columns", ())]
+        current_columns = {str(col) for col in getattr(df_current, "columns", ())}
+        common_columns = [
+            column
+            for column in selected_columns
+            if column in current_columns and column not in excluded_columns
+        ]
+        requested_signals: list[str] = []
+        for raw_value in list(contract_preview.get("selected_metrics") or ()) + [series_name]:
+            value = str(raw_value or "").strip()
+            if value and value not in requested_signals:
+                requested_signals.append(value)
+        signals: list[str] = []
+        for value in requested_signals + common_columns:
+            if value not in common_columns or value in signals:
+                continue
+            signals.append(value)
+            if len(signals) >= max(1, int(max_signals or 6)):
+                break
+        if not signals:
+            return {
+                "status": "MISSING",
+                "source_path": source_path,
+                "reference_label": selected_label,
+                "compare_label": current_label,
+                "note": f"Peak heat preview: no common signals were found in `{table_name}`.",
+                "summary_lines": (),
+                "signal_rows": (),
+            }
+
+        raw_time_window = tuple(contract_preview.get("selected_time_window") or ())
+        time_window: tuple[float, float] | None = None
+        if len(raw_time_window) >= 2:
+            try:
+                time_window = (float(raw_time_window[0]), float(raw_time_window[1]))
+            except Exception:
+                time_window = None
+
+        try:
+            cube = build_deltat_cube(
+                [
+                    (selected_label, selected_bundle),
+                    (current_label, current_bundle),
+                ],
+                table=table_name,
+                sigs=tuple(signals),
+                ref_label=selected_label,
+                mode="delta",
+                time_window=time_window,
+            )
+        except Exception as exc:
+            return {
+                "status": "WARN",
+                "source_path": source_path,
+                "reference_label": selected_label,
+                "compare_label": current_label,
+                "note": f"Peak heat preview failed to build delta cube: {exc}",
+                "summary_lines": (),
+                "signal_rows": (),
+            }
+
+        cube_values = np.asarray(getattr(cube, "cube", np.asarray([])), dtype=float)
+        abs_nonref = np.abs(cube_values[:, :, 1:])
+        if abs_nonref.size <= 0 or not np.isfinite(abs_nonref).any():
+            return {
+                "status": "MISSING",
+                "source_path": source_path,
+                "reference_label": selected_label,
+                "compare_label": current_label,
+                "note": "Peak heat preview: finite delta values were not found for the available runs.",
+                "summary_lines": (),
+                "signal_rows": (),
+            }
+
+        flat_idx = int(np.nanargmax(abs_nonref))
+        time_index, signal_index, run_rel_index = np.unravel_index(flat_idx, abs_nonref.shape)
+        run_index = int(run_rel_index + 1)
+        hotspot_signal = str(cube.sigs[signal_index]) if signal_index < len(cube.sigs) else ""
+        hotspot_run = (
+            str(cube.run_labels[run_index]) if run_index < len(getattr(cube, "run_labels", ())) else ""
+        )
+        hotspot_time = float(cube.t[time_index]) if time_index < len(getattr(cube, "t", ())) else float("nan")
+        hotspot_peak = float(abs_nonref[time_index, signal_index, run_rel_index])
+        hotspot_signed_delta = float(cube_values[time_index, signal_index, run_index])
+        hotspot_unit = str((getattr(cube, "units_by_sig", {}) or {}).get(hotspot_signal) or "").strip()
+
+        signal_rows: list[dict[str, Any]] = []
+        for idx, signal_name in enumerate(getattr(cube, "sigs", ())):
+            signal_slice = abs_nonref[:, idx, :]
+            if signal_slice.size <= 0 or not np.isfinite(signal_slice).any():
+                continue
+            signal_flat_idx = int(np.nanargmax(signal_slice))
+            sig_time_index, sig_run_rel_index = np.unravel_index(signal_flat_idx, signal_slice.shape)
+            sig_run_index = int(sig_run_rel_index + 1)
+            signal_rows.append(
+                {
+                    "name": str(signal_name),
+                    "run": str(cube.run_labels[sig_run_index])
+                    if sig_run_index < len(getattr(cube, "run_labels", ()))
+                    else "",
+                    "time_s": float(cube.t[sig_time_index])
+                    if sig_time_index < len(getattr(cube, "t", ()))
+                    else float("nan"),
+                    "peak_abs": float(signal_slice[sig_time_index, sig_run_rel_index]),
+                    "signed_delta": float(cube_values[sig_time_index, idx, sig_run_index]),
+                    "unit": str((getattr(cube, "units_by_sig", {}) or {}).get(signal_name) or "").strip(),
+                }
+            )
+        signal_rows.sort(
+            key=lambda item: (
+                -float(item.get("peak_abs") or 0.0),
+                str(item.get("name") or "").lower(),
+            )
+        )
+        top_signal_rows = signal_rows[: max(1, int(max_signals or 6))]
+        truncated = len(signal_rows) > len(top_signal_rows)
+        threshold = float(hotspot_peak * 0.7) if hotspot_peak > 0.0 else float("nan")
+        if np.isfinite(threshold):
+            competing_rows = [
+                dict(item)
+                for item in signal_rows
+                if np.isfinite(float(item.get("peak_abs", float("nan"))))
+                and float(item.get("peak_abs") or 0.0) >= threshold
+            ]
+        else:
+            competing_rows = []
+        signal_competition = len(competing_rows)
+        run_competition = len(
+            {
+                str(item.get("run") or "").strip()
+                for item in competing_rows
+                if str(item.get("run") or "").strip()
+            }
+        )
+        dominant_signal = str((signal_rows[0] if signal_rows else {}).get("name") or hotspot_signal or "").strip()
+        dominant_run = str((signal_rows[0] if signal_rows else {}).get("run") or hotspot_run or "").strip()
+        if signal_competition >= 2:
+            bridge_headline = "Peak heat still has multiple competing signals."
+            bridge_detail = (
+                f"{signal_competition} signals remain within 70% of the hotspot. "
+                f"Keep {hotspot_signal or dominant_signal or 'the hotspot signal'} as the working signal, "
+                "then use Delta timeline to confirm whether neighbouring signals diverge or stay coupled."
+            )
+            bridge_tone = "warn"
+        else:
+            bridge_headline = "Peak heat already isolates one dominant signal."
+            bridge_detail = (
+                f"Use Delta timeline to inspect {hotspot_signal or dominant_signal or 'the hotspot signal'} "
+                f"near {hotspot_time:.3f} s and confirm the mismatch stays local."
+            )
+            bridge_tone = "accent"
+        if run_competition >= 2:
+            bridge_detail = f"{bridge_detail} Multiple runs still compete inside the same hotspot band."
+        time_text = (
+            f"{time_window[0]:.3f}..{time_window[1]:.3f} s" if time_window is not None else "-"
+        )
+        hotspot_unit_suffix = f" {hotspot_unit}" if hotspot_unit else ""
+        summary_lines = (
+            f"ref={selected_label or '-'} | compare={current_label or '-'} | table={table_name} | signals={len(signals)}",
+            (
+                f"hotspot={hotspot_signal or '-'} | run={hotspot_run or '-'} | "
+                f"time={hotspot_time:.3f} s | abs_delta={_preview_number(hotspot_peak)}{hotspot_unit_suffix}"
+            ),
+            f"window={time_text} | shown={len(top_signal_rows)} | truncated={'yes' if truncated else 'no'}",
+        )
+        return {
+            "status": "READY",
+            "source_path": source_path,
+            "reference_label": selected_label,
+            "compare_label": current_label,
+            "table": table_name,
+            "run_count": len(getattr(cube, "run_labels", ())),
+            "signal_count": len(getattr(cube, "sigs", ())),
+            "time_window": tuple(time_window) if time_window is not None else (),
+            "hotspot_signal": hotspot_signal,
+            "hotspot_run": hotspot_run,
+            "hotspot_time": hotspot_time,
+            "hotspot_peak": hotspot_peak,
+            "hotspot_signed_delta": hotspot_signed_delta,
+            "hotspot_unit": hotspot_unit,
+            "dominant_signal": dominant_signal,
+            "dominant_run": dominant_run,
+            "signal_competition": signal_competition,
+            "run_competition": run_competition,
+            "bridge_headline": bridge_headline,
+            "bridge_detail": bridge_detail,
+            "bridge_tone": bridge_tone,
+            "signal_rows": tuple(dict(item) for item in top_signal_rows),
+            "summary_lines": summary_lines,
+            "note": (
+                "Peak heat preview uses the selected run as reference and compares it with the current latest NPZ."
+            ),
+            "truncated": truncated,
+        }
+
+    def build_hosted_compare_delta_timeline_preview(
+        self,
+        snapshot: DesktopResultsSnapshot,
+        artifact: DesktopResultsArtifact | None = None,
+        *,
+        series_name: str | None = None,
+        selected_table: str = "main",
+        max_points: int = 12,
+    ) -> dict[str, Any]:
+        target_artifact = artifact or self.artifact_by_key(snapshot, "latest_npz")
+        target_path = self.compare_viewer_path(snapshot, artifact=target_artifact)
+        source_path = str(target_path or "")
+        compare_payload = self.build_compare_current_context_sidecar(snapshot)
+        current_context_ref = dict(compare_payload.get("current_context_ref") or {})
+        selected_context_ref = dict(compare_payload.get("selected_context_ref") or {})
+        contract_preview = self.build_hosted_compare_contract_preview(
+            snapshot,
+            artifact=target_artifact,
+            series_name=series_name,
+            selected_table=selected_table,
+        )
+        table_name = str(contract_preview.get("selected_table") or selected_table or "main").strip() or "main"
+
+        def _run_label(ref: Mapping[str, Any], fallback: str) -> str:
+            for key in ("run_id", "label", "source_path"):
+                value = str(ref.get(key) or "").strip()
+                if not value:
+                    continue
+                if key == "source_path":
+                    return Path(value).name
+                return value
+            return fallback
+
+        selected_label = _run_label(
+            selected_context_ref,
+            str(getattr(target_artifact, "title", "") or (target_path.name if target_path is not None else "selected")),
+        )
+        current_path = _existing_path(getattr(snapshot, "latest_npz_path", None))
+        current_label = _run_label(
+            current_context_ref,
+            str(current_path.name if current_path is not None else "current"),
+        )
+
+        if target_path is None or not target_path.exists() or target_path.suffix.lower() != ".npz":
+            return {
+                "status": "MISSING",
+                "source_path": source_path,
+                "reference_label": selected_label,
+                "note": "Delta timeline preview needs a selected NPZ result file.",
+                "summary_lines": (),
+                "sample_points": (),
+            }
+        if current_path is None or current_path.suffix.lower() != ".npz":
+            return {
+                "status": "MISSING",
+                "source_path": source_path,
+                "reference_label": selected_label,
+                "note": "Delta timeline preview needs a current NPZ result file.",
+                "summary_lines": (),
+                "sample_points": (),
+            }
+        if _resolved_path_key(current_path) == _resolved_path_key(target_path):
+            return {
+                "status": "MISSING",
+                "source_path": source_path,
+                "reference_label": selected_label,
+                "compare_label": current_label or selected_label,
+                "note": "Delta timeline preview needs another comparable NPZ besides the selected reference run.",
+                "summary_lines": (),
+                "sample_points": (),
+            }
+
+        try:
+            import numpy as np
+            from pneumo_solver_ui.compare_deltat_heatmap import build_deltat_cube
+            from pneumo_solver_ui.compare_ui import detect_time_col, load_npz_bundle
+        except Exception as exc:
+            return {
+                "status": "WARN",
+                "source_path": source_path,
+                "reference_label": selected_label,
+                "compare_label": current_label,
+                "note": f"Delta timeline helpers are unavailable: {exc}",
+                "summary_lines": (),
+                "sample_points": (),
+            }
+
+        try:
+            selected_bundle = load_npz_bundle(target_path)
+            current_bundle = load_npz_bundle(current_path)
+        except Exception as exc:
+            return {
+                "status": "WARN",
+                "source_path": source_path,
+                "reference_label": selected_label,
+                "compare_label": current_label,
+                "note": f"Delta timeline preview failed to load compare bundles: {exc}",
+                "summary_lines": (),
+                "sample_points": (),
+            }
+
+        selected_tables = selected_bundle.get("tables") if isinstance(selected_bundle, Mapping) else {}
+        current_tables = current_bundle.get("tables") if isinstance(current_bundle, Mapping) else {}
+        df_selected = selected_tables.get(table_name) if isinstance(selected_tables, Mapping) else None
+        df_current = current_tables.get(table_name) if isinstance(current_tables, Mapping) else None
+        if df_selected is None or bool(getattr(df_selected, "empty", True)):
+            return {
+                "status": "MISSING",
+                "source_path": source_path,
+                "reference_label": selected_label,
+                "compare_label": current_label,
+                "note": f"Delta timeline preview: selected run has no non-empty `{table_name}` table.",
+                "summary_lines": (),
+                "sample_points": (),
+            }
+        if df_current is None or bool(getattr(df_current, "empty", True)):
+            return {
+                "status": "MISSING",
+                "source_path": source_path,
+                "reference_label": selected_label,
+                "compare_label": current_label,
+                "note": f"Delta timeline preview: current run has no non-empty `{table_name}` table.",
+                "summary_lines": (),
+                "sample_points": (),
+            }
+
+        excluded_columns: set[str] = set()
+        for df in (df_selected, df_current):
+            try:
+                time_col = detect_time_col(df)
+            except Exception:
+                time_col = None
+            if time_col:
+                excluded_columns.add(str(time_col))
+
+        selected_columns = [str(col) for col in getattr(df_selected, "columns", ())]
+        current_columns = {str(col) for col in getattr(df_current, "columns", ())}
+        common_columns = [
+            column
+            for column in selected_columns
+            if column in current_columns and column not in excluded_columns
+        ]
+        requested_signals: list[str] = []
+        for raw_value in [series_name] + list(contract_preview.get("selected_metrics") or ()):
+            value = str(raw_value or "").strip()
+            if value and value not in requested_signals:
+                requested_signals.append(value)
+        signal_name = ""
+        for value in requested_signals + common_columns:
+            if value in common_columns:
+                signal_name = value
+                break
+        if not signal_name:
+            return {
+                "status": "MISSING",
+                "source_path": source_path,
+                "reference_label": selected_label,
+                "compare_label": current_label,
+                "note": f"Delta timeline preview: no common signals were found in `{table_name}`.",
+                "summary_lines": (),
+                "sample_points": (),
+            }
+
+        raw_time_window = tuple(contract_preview.get("selected_time_window") or ())
+        time_window: tuple[float, float] | None = None
+        if len(raw_time_window) >= 2:
+            try:
+                time_window = (float(raw_time_window[0]), float(raw_time_window[1]))
+            except Exception:
+                time_window = None
+
+        try:
+            cube = build_deltat_cube(
+                [
+                    (selected_label, selected_bundle),
+                    (current_label, current_bundle),
+                ],
+                table=table_name,
+                sigs=(signal_name,),
+                ref_label=selected_label,
+                mode="delta",
+                time_window=time_window,
+                max_time_points=max(50, int(max_points or 12) * 20),
+            )
+        except Exception as exc:
+            return {
+                "status": "WARN",
+                "source_path": source_path,
+                "reference_label": selected_label,
+                "compare_label": current_label,
+                "signal": signal_name,
+                "note": f"Delta timeline preview failed to build delta cube: {exc}",
+                "summary_lines": (),
+                "sample_points": (),
+            }
+
+        try:
+            value_cube = build_deltat_cube(
+                [
+                    (selected_label, selected_bundle),
+                    (current_label, current_bundle),
+                ],
+                table=table_name,
+                sigs=(signal_name,),
+                ref_label=selected_label,
+                mode="value",
+                time_window=time_window,
+                max_time_points=max(50, int(max_points or 12) * 20),
+            )
+            value_cube_values = np.asarray(getattr(value_cube, "cube", np.asarray([])), dtype=float)
+        except Exception:
+            value_cube_values = np.asarray([], dtype=float)
+
+        cube_t = np.asarray(getattr(cube, "t", np.asarray([])), dtype=float).reshape(-1)
+        cube_values = np.asarray(getattr(cube, "cube", np.asarray([])), dtype=float)
+        if cube_values.ndim != 3 or cube_values.shape[0] != cube_t.size or cube_values.shape[1] < 1 or cube_values.shape[2] < 2:
+            return {
+                "status": "MISSING",
+                "source_path": source_path,
+                "reference_label": selected_label,
+                "compare_label": current_label,
+                "signal": signal_name,
+                "note": "Delta timeline preview: delta data is incomplete for the selected signal.",
+                "summary_lines": (),
+                "sample_points": (),
+            }
+        if value_cube_values.ndim != 3 or value_cube_values.shape[0] != cube_t.size:
+            value_cube_values = np.asarray([], dtype=float)
+
+        delta_series = np.asarray(cube_values[:, 0, 1], dtype=float)
+        mask = np.isfinite(cube_t) & np.isfinite(delta_series)
+        reference_series = np.asarray([], dtype=float)
+        compare_series = np.asarray([], dtype=float)
+        if isinstance(value_cube_values, np.ndarray) and value_cube_values.ndim == 3 and value_cube_values.shape[2] >= 2:
+            reference_series = np.asarray(value_cube_values[:, 0, 0], dtype=float)
+            compare_series = np.asarray(value_cube_values[:, 0, 1], dtype=float)
+            mask = mask & np.isfinite(reference_series) & np.isfinite(compare_series)
+        if not np.any(mask):
+            return {
+                "status": "MISSING",
+                "source_path": source_path,
+                "reference_label": selected_label,
+                "compare_label": current_label,
+                "signal": signal_name,
+                "note": "Delta timeline preview: finite delta points were not found for the selected signal.",
+                "summary_lines": (),
+                "sample_points": (),
+            }
+
+        finite_t = np.asarray(cube_t[mask], dtype=float)
+        finite_delta = np.asarray(delta_series[mask], dtype=float)
+        finite_reference = (
+            np.asarray(reference_series[mask], dtype=float)
+            if reference_series.size == cube_t.size
+            else np.full(finite_t.shape, np.nan, dtype=float)
+        )
+        finite_compare = (
+            np.asarray(compare_series[mask], dtype=float)
+            if compare_series.size == cube_t.size
+            else np.full(finite_t.shape, np.nan, dtype=float)
+        )
+        hotspot_index = int(np.nanargmax(np.abs(finite_delta)))
+        hotspot_time = float(finite_t[hotspot_index])
+        hotspot_signed_delta = float(finite_delta[hotspot_index])
+        hotspot_peak = float(abs(hotspot_signed_delta))
+        signal_unit = str((getattr(cube, "units_by_sig", {}) or {}).get(signal_name) or "").strip()
+        hotspot_reference_value = (
+            float(finite_reference[hotspot_index])
+            if finite_reference.size > hotspot_index and np.isfinite(finite_reference[hotspot_index])
+            else float("nan")
+        )
+        hotspot_compare_value = (
+            float(finite_compare[hotspot_index])
+            if finite_compare.size > hotspot_index and np.isfinite(finite_compare[hotspot_index])
+            else float("nan")
+        )
+
+        point_limit = max(2, int(max_points or 12))
+        sample_indices = np.arange(finite_t.size, dtype=int)
+        truncated = finite_t.size > point_limit
+        if truncated:
+            sample_indices = np.linspace(0, finite_t.size - 1, num=point_limit, dtype=int)
+            if hotspot_index not in sample_indices and sample_indices.size >= 3:
+                replace_pos = max(1, min(sample_indices.size - 2, int(np.argmin(np.abs(sample_indices - hotspot_index)))))
+                sample_indices[replace_pos] = hotspot_index
+            sample_indices = np.unique(sample_indices)
+        sample_points = tuple(
+            (float(finite_t[index]), float(finite_delta[index]))
+            for index in sample_indices.tolist()
+        )
+        context_rows = tuple(
+            {
+                "time_s": float(finite_t[index]),
+                "reference_value": float(finite_reference[index])
+                if finite_reference.size > index and np.isfinite(finite_reference[index])
+                else float("nan"),
+                "compare_value": float(finite_compare[index])
+                if finite_compare.size > index and np.isfinite(finite_compare[index])
+                else float("nan"),
+                "delta": float(finite_delta[index]),
+            }
+            for index in sample_indices.tolist()
+        )
+        time_text = (
+            f"{float(finite_t[0]):.3f}..{float(finite_t[-1]):.3f} s"
+            if finite_t.size >= 2
+            else f"{float(finite_t[0]):.3f} s"
+        )
+        unit_suffix = f" {signal_unit}" if signal_unit else ""
+        summary_lines = (
+            f"ref={selected_label or '-'} | compare={current_label or '-'} | table={table_name} | signal={signal_name}",
+            (
+                f"hotspot={hotspot_time:.3f} s | ref={_preview_number(hotspot_reference_value)}{unit_suffix} | "
+                f"compare={_preview_number(hotspot_compare_value)}{unit_suffix} | "
+                f"delta={_preview_number(hotspot_signed_delta)}{unit_suffix}"
+            ),
+            f"window={time_text} | points={finite_t.size} | shown={len(sample_points)} | truncated={'yes' if truncated else 'no'}",
+        )
+        return {
+            "status": "READY",
+            "source_path": source_path,
+            "reference_label": selected_label,
+            "compare_label": current_label,
+            "table": table_name,
+            "signal": signal_name,
+            "time_window": (float(finite_t[0]), float(finite_t[-1])) if finite_t.size >= 2 else (),
+            "point_count": int(finite_t.size),
+            "hotspot_time": hotspot_time,
+            "hotspot_peak": hotspot_peak,
+            "hotspot_signed_delta": hotspot_signed_delta,
+            "hotspot_reference_value": hotspot_reference_value,
+            "hotspot_compare_value": hotspot_compare_value,
+            "unit": signal_unit,
+            "sample_points": sample_points,
+            "context_rows": context_rows,
+            "summary_lines": summary_lines,
+            "note": (
+                "Delta timeline preview uses the selected run as reference and shows delta(t) for the compared current NPZ."
+            ),
+            "truncated": truncated,
+        }
 
     def compare_viewer_args(
         self,
